@@ -1,0 +1,69 @@
+# ================================
+# BMAD Framework (AI Agent Outputs)
+# ================================
+_bmad/
+_bmad-output/
+
+# ================================
+# IDE & Editor
+# ================================
+.cursor/
+.vscode/
+*.code-workspace
+
+# ================================
+# Roblox Build Artifacts
+# ================================
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+!*.rbxm.source
+!*.rbxlx.source
+
+# ================================
+# Wally (Package Manager)
+# ================================
+Packages/
+wally.lock
+
+# ================================
+# Rojo
+# ================================
+sourcemap.json
+rojo.json
+
+# ================================
+# Zap (Network Codegen)
+# ================================
+# Generated files - regenerate with: zap src/shared/network/packets.zap
+src/server/network/generated.luau
+src/client/network/generated.luau
+
+# ================================
+# OS & System Files
+# ================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ================================
+# Logs & Temp Files
+# ================================
+*.log
+*.tmp
+*.temp
+*.bak
+
+# ================================
+# Node (if using any JS tooling)
+# ================================
+node_modules/
+package-lock.json
+
+# ================================
+# Misc
+# ================================
+*.zip
+*.7z
+*.tar.gz
