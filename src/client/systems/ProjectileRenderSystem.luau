@@ -17,7 +17,36 @@ local GridConfig = require(Shared.config.GridConfig)
 local Logger = require(Shared.utils.Logger)
 
 local Client = script.Parent.Parent
+local Modules = Client:WaitForChild("modules")
 local Network = require(Client.network.generated)
+
+-- VFX/Audio services (lazy loaded)
+local _vfxService: any = nil
+local _audioService: any = nil
+
+local function getVFXService()
+	if not _vfxService then
+		local success, result = pcall(function()
+			return require(Modules.VFXService)
+		end)
+		if success then
+			_vfxService = result
+		end
+	end
+	return _vfxService
+end
+
+local function getAudioService()
+	if not _audioService then
+		local success, result = pcall(function()
+			return require(Modules.AudioService)
+		end)
+		if success then
+			_audioService = result
+		end
+	end
+	return _audioService
+end
 
 -- Projectile visual cache
 type ProjectileVisual = {
@@ -108,8 +137,16 @@ end
 Network.EntityDied.On(function(data)
 	-- Check if this was a projectile we're tracking
 	if _projectileVisuals[data.EntityId] then
-		-- Hit animation (quick scale down)
 		local visual = _projectileVisuals[data.EntityId]
+		local pos = visual.Part.Position
+		
+		-- Play impact VFX and audio
+		local vfx = getVFXService()
+		local audio = getAudioService()
+		if vfx then vfx.PlayPeaImpact(pos, false) end
+		if audio then audio.PlayPeaImpact(pos) end
+		
+		-- Hit animation (quick scale down)
 		local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
 		local tween = TweenService:Create(visual.Part, tweenInfo, {
 			Size = Vector3.new(0.1, 0.1, 0.1),

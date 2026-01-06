@@ -19,7 +19,50 @@ local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 
 local Client = script.Parent.Parent
+local Modules = Client:WaitForChild("modules")
+local UI = Client:WaitForChild("ui")
 local Network = require(Client.network.generated)
+
+-- VFX/Audio services (lazy loaded)
+local _vfxService: any = nil
+local _audioService: any = nil
+local _floatingTextUI: any = nil
+
+local function getVFXService()
+	if not _vfxService then
+		local success, result = pcall(function()
+			return require(Modules.VFXService)
+		end)
+		if success then
+			_vfxService = result
+		end
+	end
+	return _vfxService
+end
+
+local function getAudioService()
+	if not _audioService then
+		local success, result = pcall(function()
+			return require(Modules.AudioService)
+		end)
+		if success then
+			_audioService = result
+		end
+	end
+	return _audioService
+end
+
+local function getFloatingTextUI()
+	if not _floatingTextUI then
+		local success, result = pcall(function()
+			return require(UI.FloatingTextUI)
+		end)
+		if success then
+			_floatingTextUI = result
+		end
+	end
+	return _floatingTextUI
+end
 
 -- Zombie visual cache: entityId -> visual data
 type ZombieVisual = {
@@ -124,6 +167,13 @@ Network.EntityDied.On(function(data)
 	local visual = _zombieVisuals[entityId]
 	
 	if visual then
+		-- Play death VFX and audio
+		local pos = visual.Part.Position
+		local vfx = getVFXService()
+		local audio = getAudioService()
+		if vfx then vfx.PlayZombieDeath(pos) end
+		if audio then audio.PlayZombieDeath(pos) end
+		
 		-- Death animation
 		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		local tween = TweenService:Create(visual.Part, tweenInfo, {
@@ -141,6 +191,32 @@ Network.EntityDied.On(function(data)
 		_zombieVisuals[entityId] = nil
 		
 		Logger.Debug("ZombieRender", `Zombie {entityId} died`)
+	end
+end)
+
+-- Show floating damage numbers
+Network.EntityDamaged.On(function(data)
+	local visual = _zombieVisuals[data.EntityId]
+	if visual then
+		-- Flash red
+		local originalColor = visual.Part.Color
+		visual.Part.Color = Color3.fromRGB(255, 100, 100)
+		task.delay(0.1, function()
+			if visual.Part and visual.Part.Parent then
+				visual.Part.Color = originalColor
+			end
+		end)
+		
+		-- Show floating damage number
+		local floatingText = getFloatingTextUI()
+		if floatingText and data.DamageAmount > 0 then
+			local pos = visual.Part.Position + Vector3.new(
+				(math.random() - 0.5) * 2, -- Random X offset
+				1, -- Above zombie
+				0
+			)
+			floatingText.ShowDamage(pos, data.DamageAmount)
+		end
 	end
 end)
 

@@ -30,9 +30,22 @@ local Tags = require(Shared.components.Tags)
 local GridPositionComponent = require(Shared.components.GridPositionComponent)
 local HealthComponent = require(Shared.components.HealthComponent)
 
+-- Import server services
+local Server = script
+local PlayerDataService = require(Server.services.PlayerDataService)
+local ProgressionHandler = require(Server.handlers.ProgressionHandler)
+
 -- Import server systems folder
 -- Note: init.server.luau IS the Server script, so children are direct
 local Systems = script:WaitForChild("systems")
+
+-- Initialize services
+PlayerDataService.Initialize()
+Logger.Info("Server", "PlayerDataService initialized")
+
+-- Initialize handlers
+ProgressionHandler.Initialize()
+Logger.Info("Server", "ProgressionHandler initialized")
 
 -- Create Matter World
 local world = Matter.World.new()

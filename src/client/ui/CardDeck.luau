@@ -9,6 +9,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
@@ -16,17 +17,41 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
+local Client = script.Parent.Parent
+local PlayerDataClient = require(Client.modules.PlayerDataClient)
+
 -- Fusion primitives
 local New = Fusion.New
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
 local Computed = Fusion.Computed
 local Value = Fusion.Value
+local ForValues = Fusion.ForValues
 
 -- Card configuration
-local CARD_SIZE = UDim2.fromOffset(80, 100)
-local CARD_SPACING = 10
-local DECK_PLANTS = { "Sunflower", "Peashooter", "WallNut" } -- MVP deck
+local CARD_SIZE = UDim2.fromOffset(60, 80) -- Smaller cards to fit 7 on mobile
+local CARD_SPACING = 6
+-- Full deck with all Epic 5 plants ordered by cost
+local DECK_PLANTS = { 
+	"PotatoMine",   -- 25 sun
+	"Sunflower",    -- 50 sun  
+	"WallNut",      -- 50 sun
+	"Peashooter",   -- 100 sun
+	"CherryBomb",   -- 150 sun
+	"SnowPea",      -- 175 sun
+	"Repeater",     -- 200 sun
+}
+
+-- Custom icon colors per plant type
+local PLANT_ICON_COLORS: {[string]: Color3} = {
+	Sunflower = Color3.fromRGB(255, 220, 50),   -- Yellow
+	Peashooter = Color3.fromRGB(100, 200, 100), -- Green
+	WallNut = Color3.fromRGB(180, 140, 80),     -- Brown
+	SnowPea = Color3.fromRGB(130, 200, 255),    -- Ice blue
+	CherryBomb = Color3.fromRGB(220, 60, 60),   -- Red
+	PotatoMine = Color3.fromRGB(140, 100, 60),  -- Dark brown
+	Repeater = Color3.fromRGB(60, 180, 60),     -- Darker green (double pea)
+}
 
 export type CardDeckProps = {
 	Scope: any, -- Fusion.Scope
@@ -43,6 +68,7 @@ local function PlantCard(props: {
 	SunCount: any,
 	Cooldowns: any,
 	OnSelect: (plantType: string) -> (),
+	LayoutOrder: number?,
 })
 	local scope = props.Scope
 	local plantType = props.PlantType
@@ -106,18 +132,46 @@ local function PlantCard(props: {
 		end
 	end)
 	
-	return New(scope, "TextButton")({
+	-- Hover state for animation
+	local isHovered = Value(scope, false)
+	
+	-- Card scale based on hover/selection
+	local cardScale = Computed(scope, function(use)
+		if use(isSelected) then
+			return 1.05
+		elseif use(isHovered) then
+			return 1.08
+		else
+			return 1
+		end
+	end)
+	
+	-- Create the button with animation
+	local button = New(scope, "TextButton")({
 		Name = `Card_{plantType}`,
 		Size = CARD_SIZE,
 		BackgroundColor3 = backgroundColor,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
+		LayoutOrder = props.LayoutOrder or 0,
 		
 		[OnEvent("Activated")] = function()
 			props.OnSelect(plantType)
 		end,
 		
+		[OnEvent("MouseEnter")] = function()
+			isHovered:set(true)
+		end,
+		
+		[OnEvent("MouseLeave")] = function()
+			isHovered:set(false)
+		end,
+		
 		[Children] = {
+			-- Scale container for animation
+			New(scope, "UIScale")({
+				Scale = cardScale,
+			}),
 			-- Border
 			New(scope, "UIStroke")({
 				Color = borderColor,
@@ -130,13 +184,10 @@ local function PlantCard(props: {
 			-- Plant icon placeholder (colored square for MVP)
 			New(scope, "Frame")({
 				Name = "Icon",
-				Position = UDim2.new(0.5, 0, 0.3, 0),
+				Position = UDim2.new(0.5, 0, 0.35, 0),
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(50, 50),
-				BackgroundColor3 = stats.Category == "Attacker" and Color3.fromRGB(100, 200, 100)
-					or stats.Category == "Producer" and Color3.fromRGB(255, 220, 50)
-					or stats.Category == "Defender" and Color3.fromRGB(180, 140, 80)
-					or Color3.fromRGB(150, 150, 150),
+				Size = UDim2.fromOffset(40, 40), -- Smaller icon for smaller cards
+				BackgroundColor3 = PLANT_ICON_COLORS[plantType] or Color3.fromRGB(150, 150, 150),
 				BorderSizePixel = 0,
 				
 				[Children] = {
@@ -194,31 +245,42 @@ local function PlantCard(props: {
 			}),
 		},
 	})
+	
+	return button
 end
 
 local function CardDeck(props: CardDeckProps)
 	local scope = props.Scope
 	
-	local cards = {}
-	for _, plantType in DECK_PLANTS do
-		table.insert(cards, PlantCard({
-			Scope = scope,
-			PlantType = plantType,
-			SelectedPlant = props.SelectedPlant,
-			SunCount = props.SunCount,
-			Cooldowns = props.Cooldowns,
-			OnSelect = props.OnSelect,
-		}))
-	end
+	-- Get unlocked plants sorted by cost
+	local sortedUnlockedPlants = Computed(scope, function(use)
+		local unlocked = use(PlayerDataClient.GetUnlockedPlantsValue())
+		local sorted = table.clone(unlocked)
+		table.sort(sorted, function(a, b)
+			local statsA = PlantData[a]
+			local statsB = PlantData[b]
+			if not statsA then return false end
+			if not statsB then return true end
+			return statsA.Cost < statsB.Cost
+		end)
+		return sorted
+	end)
+	
+	-- Calculate deck size based on unlocked plants
+	local deckSize = Computed(scope, function(use)
+		local unlocked = use(sortedUnlockedPlants)
+		local numPlants = #unlocked
+		return UDim2.fromOffset(
+			numPlants * (CARD_SIZE.X.Offset + CARD_SPACING) - CARD_SPACING + 20,
+			CARD_SIZE.Y.Offset + 20
+		)
+	end)
 	
 	return New(scope, "Frame")({
 		Name = "CardDeck",
 		Position = UDim2.new(0.5, 0, 1, -20),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Size = UDim2.fromOffset(
-			#DECK_PLANTS * (CARD_SIZE.X.Offset + CARD_SPACING) - CARD_SPACING + 20,
-			CARD_SIZE.Y.Offset + 20
-		),
+		Size = deckSize,
 		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
 		BackgroundTransparency = 0.3,
 		BorderSizePixel = 0,
@@ -230,6 +292,7 @@ local function CardDeck(props: CardDeckProps)
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 				Padding = UDim.new(0, CARD_SPACING),
+				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
 			New(scope, "UIPadding")({
 				PaddingLeft = UDim.new(0, 10),
@@ -237,7 +300,22 @@ local function CardDeck(props: CardDeckProps)
 				PaddingTop = UDim.new(0, 10),
 				PaddingBottom = UDim.new(0, 10),
 			}),
-			table.unpack(cards),
+			
+			-- Reactive plant cards based on unlocked plants
+			ForValues(scope, sortedUnlockedPlants, function(use, innerScope, plantType)
+				local stats = PlantData[plantType]
+				local layoutOrder = if stats then stats.Cost else 999
+				
+				return PlantCard({
+					Scope = innerScope,
+					PlantType = plantType,
+					SelectedPlant = props.SelectedPlant,
+					SunCount = props.SunCount,
+					Cooldowns = props.Cooldowns,
+					OnSelect = props.OnSelect,
+					LayoutOrder = layoutOrder,
+				})
+			end),
 		},
 	})
 end

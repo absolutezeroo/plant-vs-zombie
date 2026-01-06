@@ -29,6 +29,7 @@ local PositionComponent = require(Components.PositionComponent)
 local MovementComponent = require(Components.MovementComponent)
 local ZombieTypeComponent = require(Components.ZombieTypeComponent)
 local TargetComponent = require(Components.TargetComponent)
+local SlowComponent = require(Components.SlowComponent)
 
 -- Movement config
 local MovementConfig = {
@@ -59,10 +60,17 @@ local function ZombieMovementSystem(world)
 			continue
 		end
 		
-		-- Apply velocity
-		local newX = pos.X + movement.VelocityX * dt
-		local newY = pos.Y + movement.VelocityY * dt
-		local newZ = pos.Z + movement.VelocityZ * dt
+		-- Check for slow effect
+		local slowMultiplier = 1.0
+		local slow = world:get(id, SlowComponent)
+		if slow then
+			slowMultiplier = 1.0 - slow.SlowPercent
+		end
+		
+		-- Apply velocity with slow modifier
+		local newX = pos.X + movement.VelocityX * dt * slowMultiplier
+		local newY = pos.Y + movement.VelocityY * dt * slowMultiplier
+		local newZ = pos.Z + movement.VelocityZ * dt * slowMultiplier
 		
 		-- Check game over condition
 		if newX <= MovementConfig.HOUSE_X then

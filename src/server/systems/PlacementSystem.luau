@@ -149,7 +149,8 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		WallNut = "WallNut",
 		SnowPea = "SnowPea",
 		CherryBomb = "CherryBomb",
-		PotatoMine = "PotatoMine"
+		PotatoMine = "PotatoMine",
+		Repeater = "Repeater",
 	})[plantType] or "Peashooter"
 	
 	Network.PlantSpawned.FireAll({
@@ -159,6 +160,12 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		Column = column :: any,
 		OwnerId = player.UserId,
 	})
+	
+	-- Notify special plant system for CherryBomb/PotatoMine
+	local SpecialPlantSystem = require(script.Parent.SpecialPlantSystem)
+	if plantType == "CherryBomb" or plantType == "PotatoMine" then
+		SpecialPlantSystem.API.OnPlantPlaced(world, entityId, plantType)
+	end
 	
 	return entityId
 end

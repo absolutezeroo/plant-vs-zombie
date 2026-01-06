@@ -59,6 +59,17 @@ function SelectionState.StartCooldown(plantType: string, duration: number)
 end
 
 --[[
+	Cancel a cooldown (used when placement fails and needs refund)
+	@param plantType string - Plant type to cancel cooldown for
+]]
+function SelectionState.CancelCooldown(plantType: string)
+	local cooldowns = Fusion.peek(SelectionState.Cooldowns)
+	local newCooldowns = table.clone(cooldowns)
+	newCooldowns[plantType] = nil
+	SelectionState.Cooldowns:set(newCooldowns)
+end
+
+--[[
 	Get remaining cooldown time
 	@param plantType string - Plant type to check
 	@return number - Seconds remaining (0 if ready)

@@ -10,8 +10,8 @@ type RequestId = u16
 type EntityId = u32
 type Lane = u8(1..5)           -- Lane index 1-5 (ranged integer)
 type Column = u8(1..9)         -- Column index 1-9 (ranged integer)
-type PlantType = enum { Peashooter, Sunflower, WallNut, SnowPea, CherryBomb, PotatoMine }
-type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football }
+type PlantType = enum { Peashooter, Sunflower, WallNut, SnowPea, CherryBomb, PotatoMine, Repeater }
+type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football, Imp, Flag }
 type GamePhase = enum { Pregame, Wave, Intermission, GameOver }
 
 -- ===================
@@ -268,3 +268,89 @@ event FullStateSync = {
         -- Detailed entity lists sent as separate events after this
     }
 }
+
+-- ===================
+-- PROGRESSION SYSTEM
+-- ===================
+
+type UpgradeType = enum { Damage, Health, Cooldown }
+
+-- Client requests to unlock a plant
+event UnlockPlantRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        RequestId: RequestId,
+        PlantType: PlantType,
+    }
+}
+
+-- Client requests to purchase an upgrade
+event PurchaseUpgradeRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        RequestId: RequestId,
+        PlantType: PlantType,
+        UpgradeType: UpgradeType,
+    }
+}
+
+-- Server sends full player data (on join and after changes)
+event PlayerDataSync = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Coins: u32,
+        UnlockedPlants: PlantType[..10],
+        -- Upgrades sent as parallel arrays (PlantType, Damage, Health, Cooldown)
+        UpgradePlantTypes: PlantType[..10],
+        UpgradeDamage: u8[..10],
+        UpgradeHealth: u8[..10],
+        UpgradeCooldown: u8[..10],
+    }
+}
+
+-- Server notifies client of coin gain (for UI feedback)
+event CoinGained = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Amount: u16,
+        TotalCoins: u32,
+        SourceX: f32?,  -- World position for floating text (optional)
+        SourceZ: f32?,
+    }
+}
+
+-- Server notifies end of game rewards
+event GameEndRewards = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Victory: boolean,
+        CoinsEarned: u32,
+        ZombiesKilled: u16,
+        WavesCompleted: u8,
+        BonusCoins: u16,
+    }
+}
+
+-- Explosion VFX event (CherryBomb, PotatoMine)
+event ExplosionVFX = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PositionX: f32,
+        PositionY: f32,
+        PositionZ: f32,
+        Radius: f32,
+    }
+}
+

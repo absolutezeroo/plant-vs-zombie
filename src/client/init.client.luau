@@ -91,6 +91,11 @@ Logger.Info("Client", `Client ECS loop started at {NetworkConfig.TICK_RATE} Hz`)
 
 local UI = script:WaitForChild("ui")
 local HUDController = require(UI.HUDController)
+local FloatingTextUI = require(UI.FloatingTextUI)
+
+-- Initialize floating text system
+FloatingTextUI.Initialize()
+Logger.Info("Client", "FloatingTextUI initialized")
 
 -- Create and mount HUD
 local hud = HUDController.new()
@@ -124,6 +129,17 @@ end)
 local ClientNetwork = script:WaitForChild("network")
 local Network = require(ClientNetwork.generated)
 
+-- Initialize PlayerDataClient
+local Modules = script:WaitForChild("modules")
+local PlayerDataClient = require(Modules.PlayerDataClient)
+PlayerDataClient.Initialize()
+Logger.Info("Client", "PlayerDataClient initialized")
+
+-- Connect coin gains to HUD
+PlayerDataClient.OnCoinGained(function(event)
+	hud:ShowCoinGain(event.Amount, event.PositionX, event.PositionZ)
+end)
+
 -- Wave started event
 Network.WaveStarted.On(function(data)
 	hud:SetWaveNumber(data.WaveNumber)
@@ -141,6 +157,15 @@ end)
 -- Game over event
 Network.GameOver.On(function(data)
 	hud:SetGameOver(data.Victory, data.WaveReached)
+end)
+
+-- Game end rewards event (detailed summary)
+Network.GameEndRewards.SetCallback(function(data)
+	hud:ShowEndGameRewards(data)
+	Logger.Info("Client", `Game ended: {if data.Victory then "Victory" else "Defeat"}`)
+	Logger.Info("Client", `  Coins earned: {data.CoinsEarned} (bonus: {data.BonusCoins})`)
+	Logger.Info("Client", `  Zombies killed: {data.ZombiesKilled}`)
+	Logger.Info("Client", `  Waves completed: {data.WavesCompleted}`)
 end)
 
 -- Wave completed event

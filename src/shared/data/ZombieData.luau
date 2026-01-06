@@ -68,6 +68,24 @@ local ZombieData: {[string]: ZombieStats} = {
 		AttackSpeed = 0.8,
 		Category = "Armored",
 	},
+	
+	-- Imp - small, fast, weak
+	Imp = {
+		Health = 50,
+		Speed = 3.0,        -- Very fast
+		Damage = 15,
+		AttackSpeed = 0.8,
+		Category = "Normal",
+	},
+	
+	-- Flag zombie - signals large waves
+	Flag = {
+		Health = 100,
+		Speed = 1.8,        -- Slightly faster than Basic
+		Damage = 20,
+		AttackSpeed = 1.0,
+		Category = "Normal",
+	},
 }
 
 return table.freeze(ZombieData)

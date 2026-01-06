@@ -33,6 +33,7 @@ local ZombieTypeComponent = require(Components.ZombieTypeComponent)
 local ProjectileComponent = require(Components.ProjectileComponent)
 local TargetComponent = require(Components.TargetComponent)
 local MovementComponent = require(Components.MovementComponent)
+local SlowComponent = require(Components.SlowComponent)
 
 -- Combat config
 local CombatConfig = {
@@ -103,6 +104,16 @@ local function CombatSystem(world)
 				-- Hit!
 				local killed = applyDamage(world, zombieId, proj.Damage)
 				
+				-- Apply slow effect if frozen projectile
+				if proj.IsFrozen and not killed and proj.SlowPercent and proj.SlowDuration then
+					world:insert(zombieId, SlowComponent({
+						SlowPercent = proj.SlowPercent,
+						Duration = proj.SlowDuration,
+						AppliedAt = currentTime,
+					}))
+					Logger.Debug("Combat", `Frozen pea slowed zombie {zombieId} by {proj.SlowPercent * 100}%`)
+				end
+				
 				Logger.Debug("Combat", `Pea hit zombie {zombieId} for {proj.Damage} damage (killed={killed})`)
 				
 				hitZombie = true
@@ -113,6 +124,14 @@ local function CombatSystem(world)
 		if hitZombie then
 			-- Despawn projectile
 			world:despawn(projId)
+		end
+	end
+	
+	-- Process slow effect expiration
+	for zombieId, slow in world:query(SlowComponent) do
+		if currentTime - slow.AppliedAt >= slow.Duration then
+			world:remove(zombieId, SlowComponent)
+			Logger.Debug("Combat", `Zombie {zombieId} slow effect expired`)
 		end
 	end
 	

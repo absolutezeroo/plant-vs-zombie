@@ -26,11 +26,44 @@ local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
 local Client = script.Parent.Parent
-local SelectionState = require(Client.modules.SelectionState)
+local Modules = Client:WaitForChild("modules")
+local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)
+
+-- VFX/Audio services (lazy loaded)
+local _vfxService: any = nil
+local _audioService: any = nil
+
+local function getVFXService()
+	if not _vfxService then
+		local success, result = pcall(function()
+			return require(Modules.VFXService)
+		end)
+		if success then
+			_vfxService = result
+		end
+	end
+	return _vfxService
+end
+
+local function getAudioService()
+	if not _audioService then
+		local success, result = pcall(function()
+			return require(Modules.AudioService)
+		end)
+		if success then
+			_audioService = result
+		end
+	end
+	return _audioService
+end
 
 -- Request ID counter
 local _requestId = 0
+
+-- Track pending placement requests for refund on failure
+-- { [requestId]: { plantType: string, cost: number } }
+local _pendingPlacements: {[number]: {plantType: string, cost: number}} = {}
 
 -- Ghost visual state
 local _ghostPart: Part? = nil
@@ -183,6 +216,10 @@ local function handlePlacement()
 	
 	Logger.Info("GhostPreview", `Placement requested: {selectedPlant} at ({_currentCell.Column}, {_currentCell.Lane})`)
 	
+	-- Play placement effects
+	local audio = getAudioService()
+	if audio then audio.PlayPlantPlaced() end
+	
 	-- Optimistic update: deduct sun, start cooldown
 	SelectionState.DeductSun(stats.Cost)
 	SelectionState.StartCooldown(selectedPlant, stats.Cooldown)
@@ -191,13 +228,20 @@ local function handlePlacement()
 	-- Send PlacePlant request to server via Zap
 	_requestId = (_requestId + 1) % 65535
 	
+	-- Track this request for potential refund
+	_pendingPlacements[_requestId] = {
+		plantType = selectedPlant,
+		cost = stats.Cost,
+	}
+	
 	local plantTypeEnum = ({
 		Peashooter = "Peashooter",
 		Sunflower = "Sunflower",
 		WallNut = "WallNut",
 		SnowPea = "SnowPea",
 		CherryBomb = "CherryBomb",
-		PotatoMine = "PotatoMine"
+		PotatoMine = "PotatoMine",
+		Repeater = "Repeater",
 	})[selectedPlant] or "Peashooter"
 	
 	Network.PlacePlantRequest.Fire({
@@ -228,6 +272,28 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		or input.KeyCode == Enum.KeyCode.Escape then
 		SelectionState.Select(nil)
 		hideGhost()
+	end
+end)
+
+-- Handle placement response from server - refund on failure
+Network.RequestResponse.On(function(data)
+	local pending = _pendingPlacements[data.RequestId]
+	if not pending then
+		return -- Not a placement request we're tracking
+	end
+	
+	-- Remove from pending
+	_pendingPlacements[data.RequestId] = nil
+	
+	if not data.Success then
+		-- Refund the sun!
+		SelectionState.AddSun(pending.cost)
+		-- Cancel the cooldown
+		SelectionState.CancelCooldown(pending.plantType)
+		
+		Logger.Warn("GhostPreview", `Placement failed (error {data.ErrorCode}), refunded {pending.cost} sun`)
+	else
+		Logger.Debug("GhostPreview", `Placement confirmed for {pending.plantType}`)
 	end
 end)
 

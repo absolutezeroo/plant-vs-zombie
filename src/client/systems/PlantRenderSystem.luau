@@ -20,7 +20,22 @@ local GridUtils = require(Shared.utils.GridUtils)
 local Logger = require(Shared.utils.Logger)
 
 local Client = script.Parent.Parent
+local Modules = Client:WaitForChild("modules")
 local Network = require(Client.network.generated)
+
+-- VFX service (lazy loaded)
+local _vfxService: any = nil
+local function getVFXService()
+	if not _vfxService then
+		local success, result = pcall(function()
+			return require(Modules.VFXService)
+		end)
+		if success then
+			_vfxService = result
+		end
+	end
+	return _vfxService
+end
 
 -- Plant visual cache: entityId -> visual data
 type PlantVisual = {
@@ -40,6 +55,7 @@ local PLANT_COLORS = {
 	SnowPea = Color3.fromRGB(150, 200, 255),     -- Light blue
 	CherryBomb = Color3.fromRGB(255, 50, 50),    -- Red
 	PotatoMine = Color3.fromRGB(150, 100, 50),   -- Brown-ish
+	Repeater = Color3.fromRGB(60, 180, 60),      -- Darker green (double pea)
 }
 
 local function createPlantVisual(entityId: number, plantType: string, column: number, lane: number): PlantVisual
@@ -101,6 +117,12 @@ Network.PlantSpawned.On(function(data)
 	end
 	
 	_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
+	
+	-- Play placement VFX
+	local worldPos = GridUtils.GridToWorld(column, lane)
+	local vfx = getVFXService()
+	if vfx then vfx.PlayPlantPlaced(worldPos + Vector3.new(0, 1, 0)) end
+	
 	Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
 end)
 

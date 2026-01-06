@@ -23,12 +23,31 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = Shared.components
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
+local ProgressionData = require(Shared.data.ProgressionData)
 local Logger = require(Shared.utils.Logger)
 
 -- Network
 local Server = script.Parent.Parent
 local Network = require(Server.network.generated)
 local BaseHealth = require(Server.modules.BaseHealth)
+
+-- Lazy-load to avoid circular deps
+local _playerDataService: any = nil
+local function getPlayerDataService()
+	if not _playerDataService then
+		_playerDataService = require(Server.services.PlayerDataService)
+	end
+	return _playerDataService
+end
+
+-- Lazy-load EntityDeathSystem for session stats
+local _entityDeathSystem: any = nil
+local function getEntityDeathSystem()
+	if not _entityDeathSystem then
+		_entityDeathSystem = require(Server.systems.EntityDeathSystem)
+	end
+	return _entityDeathSystem
+end
 
 -- Components
 local PositionComponent = require(Components.PositionComponent)
@@ -64,13 +83,15 @@ local ZombieCost = {
 	Pole = 25,
 	Newspaper = 15,
 	Football = 50,
+	Imp = 8,      -- Cheap but weak
+	Flag = 10,    -- Same as Basic, spawns at wave start
 }
 
 -- Spawn pool per phase (weighted)
 local SpawnPools = {
-	Trickle = {"Basic", "Basic", "Basic", "Cone"},
-	Assault = {"Basic", "Basic", "Cone", "Cone", "Bucket"},
-	Flag = {"Cone", "Cone", "Bucket", "Bucket", "Pole"},
+	Trickle = {"Basic", "Basic", "Basic", "Cone", "Imp"},
+	Assault = {"Basic", "Basic", "Cone", "Cone", "Bucket", "Imp", "Imp"},
+	Flag = {"Cone", "Cone", "Bucket", "Bucket", "Pole", "Imp"},
 }
 
 -- Game state
@@ -107,7 +128,53 @@ function WaveManager.SetGameState(state: GameState)
 	_gameState = state
 	Logger.Info("WaveManager", `Game state changed to: {state}`)
 	
-	-- Broadcast to clients
+	-- Handle end game rewards
+	if state == "Victory" or state == "Defeat" then
+		local isVictory = state == "Victory"
+		local bonusCoins = if isVictory then _currentWave * ProgressionData.VICTORY_BONUS_PER_WAVE else 0
+		
+		-- Award bonus and send end game summary to each player
+		local PlayerDataService = getPlayerDataService()
+		local EntityDeathSystem = getEntityDeathSystem()
+		
+		for _, player in Players:GetPlayers() do
+			-- Get session stats
+			local sessionStats = EntityDeathSystem.API.GetSessionStats(player)
+			
+			-- Award victory bonus
+			if bonusCoins > 0 then
+				PlayerDataService.AddCoins(player, bonusCoins)
+			end
+			
+			-- Increment games played/won
+			PlayerDataService.IncrementStat(player, "GamesPlayed", 1)
+			if isVictory then
+				PlayerDataService.IncrementStat(player, "GamesWon", 1)
+			end
+			
+			-- Send detailed end game summary
+			Network.GameEndRewards.Fire(player, {
+				Victory = isVictory,
+				CoinsEarned = sessionStats.CoinsEarned + bonusCoins,
+				ZombiesKilled = sessionStats.ZombiesKilled,
+				WavesCompleted = _currentWave,
+				BonusCoins = bonusCoins,
+			})
+		end
+		
+		-- Reset session stats for next game
+		EntityDeathSystem.API.ResetAllSessionStats()
+		
+		-- Send GameOver event
+		Network.GameOver.FireAll({
+			Victory = isVictory,
+			WaveReached = _currentWave,
+		})
+		
+		return
+	end
+	
+	-- Broadcast wave state to clients
 	local phaseEnum = ({
 		Waiting = "Pregame",
 		Playing = "Wave",
@@ -238,7 +305,7 @@ local function startWave(waveNumber: number)
 end
 
 -- Advance to next phase
-local function advancePhase()
+local function advancePhase(world: any)
 	if _currentPhase == "Trickle" then
 		_currentPhase = "Assault"
 		_phaseSpent = 0
@@ -249,6 +316,11 @@ local function advancePhase()
 		_phaseSpent = 0
 		_phaseBudget = _totalBudget * WaveConfig.FLAG_RATIO
 		Logger.Debug("WaveManager", `Phase: Flag (budget: {math.floor(_phaseBudget)})`)
+		
+		-- Spawn a Flag zombie to announce the final wave
+		local lane = math.random(1, GridConfig.GRID_LANES)
+		spawnZombie(world, "Flag", lane)
+		Logger.Info("WaveManager", "🚩 Flag zombie spawned!")
 	end
 end
 
@@ -282,13 +354,8 @@ local function WaveManagerSystem(world)
 	
 	-- Check for defeat (base destroyed)
 	if BaseHealth.IsDefeated() and _gameState ~= "Defeat" then
-		_gameState = "Defeat"
+		WaveManager.SetGameState("Defeat")
 		Logger.Info("WaveManager", "💀 DEFEAT - Base destroyed!")
-		
-		Network.GameOver.FireAll({
-			Victory = false,
-			WaveReached = _currentWave,
-		})
 		return
 	end
 	
@@ -346,7 +413,7 @@ local function WaveManagerSystem(world)
 		-- Check if phase is done
 		if _phaseSpent >= _phaseBudget then
 			if _currentPhase ~= "Flag" then
-				advancePhase()
+				advancePhase(world)
 			end
 			return
 		end

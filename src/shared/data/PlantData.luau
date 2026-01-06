@@ -98,6 +98,18 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Arms after 15 seconds, explodes on contact",
 		Category = "Special",
 	},
+	
+	Repeater = {
+		Name = "Repeater",
+		Cost = 200,
+		Cooldown = 5,
+		Health = 100,
+		Damage = 20,
+		AttackSpeed = 1.5,  -- Same as Peashooter but fires 2 peas
+		Range = 0,
+		Description = "Fires two peas at a time",
+		Category = "Attacker",
+	},
 }
 
 -- Freeze to prevent runtime modification

@@ -23,10 +23,27 @@ local PlantData = require(Shared.data.PlantData)
 
 -- UI Components
 local CardDeck = require(script.Parent.CardDeck)
+local ShopUI = require(script.Parent.ShopUI)
 
 -- Client modules
 local Client = script.Parent.Parent
-local SelectionState = require(Client.modules.SelectionState)
+local Modules = Client:WaitForChild("modules")
+local SelectionState = require(Modules.SelectionState)
+local PlayerDataClient = require(Modules.PlayerDataClient)
+
+-- VFX/Audio (lazy loaded)
+local _audioService: any = nil
+local function getAudioService()
+	if not _audioService then
+		local success, result = pcall(function()
+			return require(Modules.AudioService)
+		end)
+		if success then
+			_audioService = result
+		end
+	end
+	return _audioService
+end
 
 -- Fusion primitives
 local New = Fusion.New
@@ -48,6 +65,7 @@ function HUDController.new()
 	self._baseMaxHealth = Value(self._scope, 1000)
 	self._gameOver = Value(self._scope, false)
 	self._victory = Value(self._scope, false)
+	self._shopVisible = Value(self._scope, false) -- Shop visibility state
 	self._mounted = false
 	self._gui = nil :: ScreenGui?
 	
@@ -100,7 +118,7 @@ function HUDController:Mount()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		
 		[Children] = {
-			-- Sun Counter (top-left)
+			-- Sun Counter (top-left, in-game currency)
 			New(self._scope, "Frame")({
 				Name = "SunCounter",
 				Position = UDim2.fromOffset(20, 20),
@@ -123,6 +141,53 @@ function HUDController:Mount()
 						TextScaled = true,
 						Font = Enum.Font.GothamBold,
 					}),
+				},
+			}),
+			
+			-- Coin Counter (below sun counter, persistent currency)
+			New(self._scope, "Frame")({
+				Name = "CoinCounter",
+				Position = UDim2.fromOffset(20, 80),
+				Size = UDim2.fromOffset(120, 40),
+				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+				BackgroundTransparency = 0.3,
+				
+				[Children] = {
+					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+					New(self._scope, "TextLabel")({
+						Name = "CoinText",
+						Position = UDim2.fromScale(0.5, 0.5),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Size = UDim2.fromScale(0.9, 0.8),
+						BackgroundTransparency = 1,
+						Text = Computed(self._scope, function(use)
+							return `🪙 {use(PlayerDataClient.GetCoinsValue())}`
+						end),
+						TextColor3 = Color3.fromRGB(255, 200, 50),
+						TextScaled = true,
+						Font = Enum.Font.GothamBold,
+					}),
+				},
+			}),
+			
+			-- Shop Button (below coin counter)
+			New(self._scope, "TextButton")({
+				Name = "ShopButton",
+				Position = UDim2.fromOffset(20, 130),
+				Size = UDim2.fromOffset(120, 40),
+				BackgroundColor3 = Color3.fromRGB(80, 120, 180),
+				BorderSizePixel = 0,
+				Text = "🛒 Shop",
+				TextColor3 = Color3.new(1, 1, 1),
+				TextScaled = true,
+				Font = Enum.Font.GothamBold,
+				
+				[OnEvent("Activated")] = function()
+					self._shopVisible:set(true)
+				end,
+				
+				[Children] = {
+					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
 				},
 			}),
 			
@@ -265,6 +330,15 @@ function HUDController:Mount()
 				Cooldowns = SelectionState.Cooldowns,
 				OnSelect = onCardSelect,
 			}),
+			
+			-- Shop UI (overlay)
+			ShopUI({
+				Scope = self._scope,
+				Visible = self._shopVisible,
+				OnClose = function()
+					self._shopVisible:set(false)
+				end,
+			}),
 		},
 	})
 	
@@ -296,6 +370,173 @@ function HUDController:SetGameOver(victory: boolean, waveReached: number)
 	self._victory:set(victory)
 	self._waveNumber:set(waveReached)
 	Logger.Info("HUDController", `Game over: {if victory then "VICTORY" else "DEFEAT"} at wave {waveReached}`)
+end
+
+-- Show floating coin gain text (simple version, can be enhanced with VFX later)
+function HUDController:ShowCoinGain(amount: number, worldX: number?, worldZ: number?)
+	if not self._gui then
+		return
+	end
+	
+	-- Play coin collect sound
+	local audio = getAudioService()
+	if audio then audio.PlayCoinCollect() end
+	
+	-- Create floating text at coin counter location
+	local floatingText = New(self._scope, "TextLabel")({
+		Name = "CoinGain",
+		Parent = self._gui,
+		Position = UDim2.fromOffset(150, 90), -- Near coin counter
+		Size = UDim2.fromOffset(60, 30),
+		BackgroundTransparency = 1,
+		Text = `+{amount}`,
+		TextColor3 = Color3.fromRGB(255, 215, 0),
+		TextScaled = true,
+		Font = Enum.Font.GothamBold,
+		ZIndex = 50,
+	})
+	
+	-- Animate upward and fade out
+	task.spawn(function()
+		local startTime = tick()
+		local duration = 1.0
+		
+		while tick() - startTime < duration do
+			local progress = (tick() - startTime) / duration
+			local yOffset = 90 - (progress * 40) -- Move up
+			local alpha = 1 - progress -- Fade out
+			
+			floatingText.Position = UDim2.fromOffset(150, yOffset)
+			floatingText.TextTransparency = 1 - alpha
+			
+			task.wait()
+		end
+		
+		floatingText:Destroy()
+	end)
+end
+
+-- Show end game rewards summary
+function HUDController:ShowEndGameRewards(data: {
+	Victory: boolean,
+	CoinsEarned: number,
+	ZombiesKilled: number,
+	WavesCompleted: number,
+	BonusCoins: number,
+})
+	if not self._gui then
+		return
+	end
+	
+	-- Create rewards summary panel that appears after game over text
+	local rewardsPanel = New(self._scope, "Frame")({
+		Name = "RewardsSummary",
+		Parent = self._gui,
+		Position = UDim2.fromScale(0.5, 0.65),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(300, 180),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+		BackgroundTransparency = 0.2,
+		ZIndex = 101,
+		
+		[Children] = {
+			New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
+			
+			-- Title
+			New(self._scope, "TextLabel")({
+				Position = UDim2.fromOffset(0, 10),
+				Size = UDim2.new(1, 0, 0, 30),
+				BackgroundTransparency = 1,
+				Text = "📊 Game Summary",
+				TextColor3 = Color3.new(1, 1, 1),
+				TextSize = 20,
+				Font = Enum.Font.GothamBold,
+			}),
+			
+			-- Stats container
+			New(self._scope, "Frame")({
+				Position = UDim2.fromOffset(20, 50),
+				Size = UDim2.new(1, -40, 0, 120),
+				BackgroundTransparency = 1,
+				
+				[Children] = {
+					New(self._scope, "UIListLayout")({
+						Padding = UDim.new(0, 8),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+					
+					-- Zombies killed
+					New(self._scope, "TextLabel")({
+						Size = UDim2.new(1, 0, 0, 22),
+						BackgroundTransparency = 1,
+						Text = `💀 Zombies Killed: {data.ZombiesKilled}`,
+						TextColor3 = Color3.fromRGB(200, 200, 200),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextSize = 16,
+						Font = Enum.Font.GothamMedium,
+						LayoutOrder = 1,
+					}),
+					
+					-- Waves completed
+					New(self._scope, "TextLabel")({
+						Size = UDim2.new(1, 0, 0, 22),
+						BackgroundTransparency = 1,
+						Text = `🌊 Waves Completed: {data.WavesCompleted}`,
+						TextColor3 = Color3.fromRGB(200, 200, 200),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextSize = 16,
+						Font = Enum.Font.GothamMedium,
+						LayoutOrder = 2,
+					}),
+					
+					-- Coins earned
+					New(self._scope, "TextLabel")({
+						Size = UDim2.new(1, 0, 0, 22),
+						BackgroundTransparency = 1,
+						Text = `🪙 Coins Earned: {data.CoinsEarned - data.BonusCoins}`,
+						TextColor3 = Color3.fromRGB(255, 200, 50),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextSize = 16,
+						Font = Enum.Font.GothamMedium,
+						LayoutOrder = 3,
+					}),
+					
+					-- Victory bonus
+					if data.BonusCoins > 0 then New(self._scope, "TextLabel")({
+						Size = UDim2.new(1, 0, 0, 22),
+						BackgroundTransparency = 1,
+						Text = `🏆 Victory Bonus: +{data.BonusCoins}`,
+						TextColor3 = Color3.fromRGB(255, 215, 0),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextSize = 16,
+						Font = Enum.Font.GothamBold,
+						LayoutOrder = 4,
+					}) else nil,
+					
+					-- Total
+					New(self._scope, "TextLabel")({
+						Size = UDim2.new(1, 0, 0, 24),
+						BackgroundTransparency = 1,
+						Text = `💰 Total: {data.CoinsEarned}`,
+						TextColor3 = Color3.fromRGB(100, 255, 100),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextSize = 18,
+						Font = Enum.Font.GothamBlack,
+						LayoutOrder = 5,
+					}),
+				},
+			}),
+		},
+	})
+	
+	-- Fade in animation
+	rewardsPanel.BackgroundTransparency = 1
+	task.spawn(function()
+		for i = 1, 10 do
+			rewardsPanel.BackgroundTransparency = 1 - (i / 10) * 0.8
+			task.wait(0.03)
+		end
+	end)
 end
 
 return HUDController
