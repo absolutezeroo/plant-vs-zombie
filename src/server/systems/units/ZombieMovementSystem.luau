@@ -15,21 +15,21 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 local BaseHealth = require(Server.modules.BaseHealth)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local MovementComponent = require(Components.MovementComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
-local TargetComponent = require(Components.TargetComponent)
-local SlowComponent = require(Components.SlowComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local MovementComponent = Components.MovementComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
+local TargetComponent = Components.TargetComponent
+local SlowComponent = Components.SlowComponent
 
 -- Movement config
 local MovementConfig = {

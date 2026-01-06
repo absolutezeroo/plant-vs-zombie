@@ -21,7 +21,8 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
-local Client = script.Parent.Parent
+-- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
+local Client = script.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)

@@ -25,7 +25,8 @@ local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
-local Client = script.Parent.Parent
+-- Client root (script.Parent.Parent.Parent since we're in systems/input/)
+local Client = script.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)

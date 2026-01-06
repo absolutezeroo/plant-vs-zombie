@@ -20,19 +20,20 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local HealthComponent = require(Components.HealthComponent)
-local PlantTypeComponent = require(Components.PlantTypeComponent)
-local OwnerComponent = require(Components.OwnerComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local HealthComponent = Components.HealthComponent
+local PlantTypeComponent = Components.PlantTypeComponent
+local OwnerComponent = Components.OwnerComponent
 
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+local Server = script.Parent.Parent.Parent
 local GridState = require(Server.modules.GridState)
 local Network = require(Server.network.generated)
 
@@ -162,8 +163,10 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	})
 	
 	-- Notify special plant system if this is an explosive plant (data-driven)
+	-- SpecialPlantSystem is in systems/combat/
 	local stats = PlantData[plantType]
-	local SpecialPlantSystem = require(script.Parent.SpecialPlantSystem)
+	local Systems = script.Parent.Parent
+	local SpecialPlantSystem = require(Systems.combat.SpecialPlantSystem)
 	if stats and stats.IsExplosive then
 		SpecialPlantSystem.API.OnPlantPlaced(world, entityId, plantType)
 	end

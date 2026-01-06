@@ -15,8 +15,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
--- Client modules
-local Client = game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
+-- Client root (script.Parent.Parent.Parent since we're in systems/presentation/)
+local Client = script.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local VFXService = require(Modules.VFXService)
 local AudioService = require(Modules.AudioService)

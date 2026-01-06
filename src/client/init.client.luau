@@ -45,7 +45,7 @@ local loop = Matter.Loop.new(world)
 
 Logger.Info("Client", "Client Matter World created")
 
--- Load all client systems from systems folder
+-- Load all client systems from systems folder (RECURSIVELY scan subfolders)
 local systemModules: {any} = {}
 
 local function loadSystem(moduleScript: ModuleScript)
@@ -61,10 +61,11 @@ local function loadSystem(moduleScript: ModuleScript)
 	end
 end
 
--- Load systems
-for _, child in Systems:GetChildren() do
-	if child:IsA("ModuleScript") then
-		loadSystem(child)
+-- Recursively load systems from all subfolders using GetDescendants
+-- This supports the domain-driven folder structure (input/, rendering/, presentation/)
+for _, descendant in Systems:GetDescendants() do
+	if descendant:IsA("ModuleScript") then
+		loadSystem(descendant)
 	end
 end
 

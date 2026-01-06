@@ -20,20 +20,20 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/core/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 local BaseHealth = require(Server.modules.BaseHealth)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local PlantTypeComponent = require(Components.PlantTypeComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
-local SunComponent = require(Components.SunComponent)
-local HealthComponent = require(Components.HealthComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local PlantTypeComponent = Components.PlantTypeComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
+local SunComponent = Components.SunComponent
+local HealthComponent = Components.HealthComponent
 
 -- Track players pending sync
 local _pendingSync: {[Player]: boolean} = {}

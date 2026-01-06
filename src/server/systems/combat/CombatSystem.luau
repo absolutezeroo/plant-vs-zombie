@@ -16,24 +16,24 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/combat/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local HealthComponent = require(Components.HealthComponent)
-local PlantTypeComponent = require(Components.PlantTypeComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
-local ProjectileComponent = require(Components.ProjectileComponent)
-local TargetComponent = require(Components.TargetComponent)
-local MovementComponent = require(Components.MovementComponent)
-local SlowComponent = require(Components.SlowComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local HealthComponent = Components.HealthComponent
+local PlantTypeComponent = Components.PlantTypeComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
+local ProjectileComponent = Components.ProjectileComponent
+local TargetComponent = Components.TargetComponent
+local MovementComponent = Components.MovementComponent
+local SlowComponent = Components.SlowComponent
 
 -- Combat config
 local CombatConfig = {

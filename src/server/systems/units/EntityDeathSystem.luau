@@ -19,20 +19,20 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 local ProgressionData = require(Shared.data.ProgressionData)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 local GridState = require(Server.modules.GridState)
 
--- Components
-local HealthComponent = require(Components.HealthComponent)
-local PlantTypeComponent = require(Components.PlantTypeComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
-local PositionComponent = require(Components.PositionComponent)
+-- Components (via index module)
+local HealthComponent = Components.HealthComponent
+local PlantTypeComponent = Components.PlantTypeComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
+local PositionComponent = Components.PositionComponent
 
 -- Player data service (lazy load to avoid circular deps)
 local _playerDataService: any = nil

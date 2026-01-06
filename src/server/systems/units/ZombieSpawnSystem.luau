@@ -15,20 +15,20 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local HealthComponent = require(Components.HealthComponent)
-local MovementComponent = require(Components.MovementComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local HealthComponent = Components.HealthComponent
+local MovementComponent = Components.MovementComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
 
 -- Spawn config (MVP - simple timer)
 -- NOTE: This system is DEPRECATED. Use WaveManagerSystem instead.

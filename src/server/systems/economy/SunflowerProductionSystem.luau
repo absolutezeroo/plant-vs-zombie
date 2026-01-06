@@ -15,18 +15,18 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/economy/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local PlantTypeComponent = require(Components.PlantTypeComponent)
-local SunComponent = require(Components.SunComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local PlantTypeComponent = Components.PlantTypeComponent
+local SunComponent = Components.SunComponent
 
 -- Production config (defaults for missing plant data)
 local ProductionDefaults = {

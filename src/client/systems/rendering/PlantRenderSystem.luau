@@ -20,7 +20,8 @@ local PlantData = require(Shared.data.PlantData)
 local GridUtils = require(Shared.utils.GridUtils)
 local Logger = require(Shared.utils.Logger)
 
-local Client = script.Parent.Parent
+-- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
+local Client = script.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local Network = require(Client.network.generated)
 

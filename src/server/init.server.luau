@@ -25,10 +25,11 @@ local EntityPool = require(Shared.utils.EntityPool)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 
--- Import components
-local Tags = require(Shared.components.Tags)
-local GridPositionComponent = require(Shared.components.GridPositionComponent)
-local HealthComponent = require(Shared.components.HealthComponent)
+-- Import components via index module
+local Components = require(Shared.components)
+local Tags = Components.Tags
+local GridPositionComponent = Components.GridPositionComponent
+local HealthComponent = Components.HealthComponent
 
 -- Import server services
 local Server = script
@@ -60,7 +61,7 @@ Logger.Info("Server", "Matter World created")
 EntityPool.Initialize(world, Tags.InactiveTag)
 Logger.Info("Server", "Entity Pool initialized", EntityPool.GetStats())
 
--- Load all systems from systems folder
+-- Load all systems from systems folder (RECURSIVELY scan subfolders)
 local systemModules: {any} = {}
 
 local function loadSystem(moduleScript: ModuleScript)
@@ -76,10 +77,11 @@ local function loadSystem(moduleScript: ModuleScript)
 	end
 end
 
--- Load systems (they'll be created in separate files)
-for _, child in Systems:GetChildren() do
-	if child:IsA("ModuleScript") then
-		loadSystem(child)
+-- Recursively load systems from all subfolders using GetDescendants
+-- This supports the domain-driven folder structure (combat/, economy/, units/, etc.)
+for _, descendant in Systems:GetDescendants() do
+	if descendant:IsA("ModuleScript") then
+		loadSystem(descendant)
 	end
 end
 

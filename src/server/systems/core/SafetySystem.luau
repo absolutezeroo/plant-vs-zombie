@@ -13,7 +13,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
-local Tags = require(Shared.components.Tags)
+local Components = require(Shared.components)
+local Tags = Components.Tags
 
 local WARNING_THRESHOLD = 0.8 -- Warn at 80% capacity
 local lastWarningTime = 0

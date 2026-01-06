@@ -15,22 +15,22 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/combat/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 local GridState = require(Server.modules.GridState)
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local HealthComponent = require(Components.HealthComponent)
-local PlantTypeComponent = require(Components.PlantTypeComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
-local ArmedComponent = require(Components.ArmedComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local HealthComponent = Components.HealthComponent
+local PlantTypeComponent = Components.PlantTypeComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
+local ArmedComponent = Components.ArmedComponent
 
 -- Config defaults (used when PlantData doesn't specify)
 local SpecialDefaults = {

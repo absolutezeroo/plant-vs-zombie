@@ -20,14 +20,14 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Components = Shared.components
+local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local ProgressionData = require(Shared.data.ProgressionData)
 local Logger = require(Shared.utils.Logger)
 
--- Network
-local Server = script.Parent.Parent
+-- Network (script.Parent.Parent.Parent = server root, since we're in systems/wave/)
+local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 local BaseHealth = require(Server.modules.BaseHealth)
 
@@ -44,16 +44,18 @@ end
 local _entityDeathSystem: any = nil
 local function getEntityDeathSystem()
 	if not _entityDeathSystem then
-		_entityDeathSystem = require(Server.systems.EntityDeathSystem)
+		-- EntityDeathSystem is in systems/units/
+		local Systems = script.Parent.Parent
+		_entityDeathSystem = require(Systems.units.EntityDeathSystem)
 	end
 	return _entityDeathSystem
 end
 
--- Components
-local PositionComponent = require(Components.PositionComponent)
-local HealthComponent = require(Components.HealthComponent)
-local MovementComponent = require(Components.MovementComponent)
-local ZombieTypeComponent = require(Components.ZombieTypeComponent)
+-- Components (via index module)
+local PositionComponent = Components.PositionComponent
+local HealthComponent = Components.HealthComponent
+local MovementComponent = Components.MovementComponent
+local ZombieTypeComponent = Components.ZombieTypeComponent
 
 -- Wave configuration
 local WaveConfig = {
