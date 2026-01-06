@@ -75,17 +75,18 @@ local WaveConfig = {
 	FLAG_RATIO = 0.3,         -- 30% of budget
 }
 
--- Zombie cost table
-local ZombieCost = {
-	Basic = 10,
-	Cone = 20,
-	Bucket = 30,
-	Pole = 25,
-	Newspaper = 15,
-	Football = 50,
-	Imp = 8,      -- Cheap but weak
-	Flag = 10,    -- Same as Basic, spawns at wave start
-}
+-- Default spawn cost fallback (if ZombieData doesn't specify)
+local DEFAULT_SPAWN_COST = 10
+
+-- Get zombie spawn cost from ZombieData (data-driven)
+local function getZombieCost(zombieType: string): number
+	local stats = ZombieData[zombieType]
+	if stats and stats.SpawnCost then
+		return stats.SpawnCost
+	end
+	Logger.Warn("WaveManager", `Zombie type {zombieType} missing SpawnCost, using default`)
+	return DEFAULT_SPAWN_COST
+end
 
 -- Spawn pool per phase (weighted)
 local SpawnPools = {
@@ -267,10 +268,10 @@ end
 
 -- Pick random zombie from pool
 local function pickZombie(pool: {string}, budget: number): string?
-	-- Filter pool by what we can afford
+	-- Filter pool by what we can afford (data-driven costs)
 	local affordable = {}
 	for _, zType in pool do
-		if ZombieCost[zType] <= budget then
+		if getZombieCost(zType) <= budget then
 			table.insert(affordable, zType)
 		end
 	end
@@ -426,7 +427,7 @@ local function WaveManagerSystem(world)
 		if zombieType then
 			local lane = math.random(1, GridConfig.GRID_LANES)
 			spawnZombie(world, zombieType, lane)
-			_phaseSpent += ZombieCost[zombieType]
+			_phaseSpent += getZombieCost(zombieType)
 			_lastSpawnTime = currentTime
 		else
 			-- Can't afford anything, phase done

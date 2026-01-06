@@ -12,6 +12,19 @@ export type ZombieStats = {
 	Damage: number,         -- Damage per bite
 	AttackSpeed: number,    -- Seconds between attacks
 	Category: string,       -- "Normal", "Armored", "Special"
+	
+	-- Wave spawn config (data-driven)
+	SpawnCost: number,      -- Budget cost to spawn this zombie
+	
+	-- Behavior flags
+	CanJump: boolean?,      -- Can vault over first plant (Pole Vaulter)
+	HasRage: boolean?,      -- Speeds up when armor destroyed (Newspaper)
+	IsFlagBearer: boolean?, -- Spawns at wave start (Flag zombie)
+	
+	-- Rage stats (for HasRage zombies)
+	RageSpeed: number?,     -- Speed when enraged
+	RageAttackSpeed: number?, -- Attack speed when enraged
+	ArmorHealth: number?,   -- Health of removable armor (newspaper, cone, bucket)
 }
 
 local ZombieData: {[string]: ZombieStats} = {
@@ -22,6 +35,7 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 20,
 		AttackSpeed = 1.0,
 		Category = "Normal",
+		SpawnCost = 10,
 	},
 	
 	-- Cone zombie - more health
@@ -31,6 +45,8 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 20,
 		AttackSpeed = 1.0,
 		Category = "Armored",
+		SpawnCost = 20,
+		ArmorHealth = 100,  -- Cone HP
 	},
 	
 	-- Bucket zombie - even more health
@@ -40,6 +56,8 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 20,
 		AttackSpeed = 1.0,
 		Category = "Armored",
+		SpawnCost = 30,
+		ArmorHealth = 300,  -- Bucket HP
 	},
 	
 	-- Pole Vaulter - jumps over first plant
@@ -49,6 +67,9 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 20,
 		AttackSpeed = 1.0,
 		Category = "Special",
+		SpawnCost = 25,
+		-- Behavior
+		CanJump = true,
 	},
 	
 	-- Newspaper zombie - gets angry when paper destroyed
@@ -56,8 +77,14 @@ local ZombieData: {[string]: ZombieStats} = {
 		Health = 150,       -- 50 paper + 100 zombie
 		Speed = 1.5,
 		Damage = 20,
-		AttackSpeed = 0.5,  -- Faster when angry
+		AttackSpeed = 1.0,  -- Normal attack speed
 		Category = "Special",
+		SpawnCost = 15,
+		-- Rage behavior
+		HasRage = true,
+		ArmorHealth = 50,   -- Newspaper HP
+		RageSpeed = 3.0,    -- Speed when enraged
+		RageAttackSpeed = 0.5, -- Attack speed when enraged
 	},
 	
 	-- Football zombie - tanky and fast
@@ -67,6 +94,8 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 25,
 		AttackSpeed = 0.8,
 		Category = "Armored",
+		SpawnCost = 50,
+		ArmorHealth = 400,  -- Helmet HP
 	},
 	
 	-- Imp - small, fast, weak
@@ -76,6 +105,7 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 15,
 		AttackSpeed = 0.8,
 		Category = "Normal",
+		SpawnCost = 8,
 	},
 	
 	-- Flag zombie - signals large waves
@@ -85,6 +115,9 @@ local ZombieData: {[string]: ZombieStats} = {
 		Damage = 20,
 		AttackSpeed = 1.0,
 		Category = "Normal",
+		SpawnCost = 10,
+		-- Behavior
+		IsFlagBearer = true,
 	},
 }
 
