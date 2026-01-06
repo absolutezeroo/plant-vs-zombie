@@ -28,13 +28,13 @@ local PositionComponent = require(Components.PositionComponent)
 local PlantTypeComponent = require(Components.PlantTypeComponent)
 local SunComponent = require(Components.SunComponent)
 
--- Production config
-local ProductionConfig = {
-	PRODUCTION_INTERVAL = 24,  -- Seconds between sun production
-	FIRST_PRODUCTION_DELAY = 7, -- Seconds before first sun (faster start)
-	SUN_VALUE = 25,            -- Sun value when collected
-	SUN_LIFETIME = 12,         -- Seconds until despawn
-	SPAWN_OFFSET_Y = 3,        -- Height above plant to spawn sun
+-- Production config (defaults for missing plant data)
+local ProductionDefaults = {
+	PRODUCTION_INTERVAL = 24,  -- Default seconds between sun production
+	FIRST_PRODUCTION_DELAY = 7, -- Default seconds before first sun
+	SUN_VALUE = 25,            -- Default sun value when collected
+	SUN_LIFETIME = 12,         -- Seconds until despawn (global)
+	SPAWN_OFFSET_Y = 3,        -- Height above plant to spawn sun (global)
 }
 
 -- Track production timers per sunflower entity
@@ -43,18 +43,24 @@ local _productionTimers: {[number]: number} = {}
 local function SunflowerProductionSystem(world)
 	local currentTime = os.clock()
 	
-	-- Find all Sunflowers and manage their production
+	-- Find all plants with ProducesSun flag and manage their production
 	for id, plant, pos in world:query(PlantTypeComponent, PositionComponent) do
-		-- Only process Sunflowers
-		if plant.PlantType ~= "Sunflower" then
+		-- Get plant stats and check if it produces sun (data-driven)
+		local stats = PlantData[plant.PlantType]
+		if not stats or not stats.ProducesSun then
 			continue
 		end
 		
-		-- Initialize timer for new sunflowers
+		-- Read production values from PlantData (with defaults)
+		local firstDelay = stats.FirstSunDelay or ProductionDefaults.FIRST_PRODUCTION_DELAY
+		local productionInterval = stats.SunProductionInterval or ProductionDefaults.PRODUCTION_INTERVAL
+		local sunValue = stats.SunValue or ProductionDefaults.SUN_VALUE
+		
+		-- Initialize timer for new sun-producing plants
 		if not _productionTimers[id] then
 			-- First production is faster to feel rewarding
-			_productionTimers[id] = currentTime + ProductionConfig.FIRST_PRODUCTION_DELAY
-			Logger.Debug("SunflowerProduction", `Sunflower {id} initialized, first sun in {ProductionConfig.FIRST_PRODUCTION_DELAY}s`)
+			_productionTimers[id] = currentTime + firstDelay
+			Logger.Debug("SunflowerProduction", `{plant.PlantType} {id} initialized, first sun in {firstDelay}s`)
 		end
 		
 		-- Check if it's time to produce
@@ -63,15 +69,15 @@ local function SunflowerProductionSystem(world)
 			local sunId = world:spawn(
 				PositionComponent({
 					X = pos.X,
-					Y = pos.Y + ProductionConfig.SPAWN_OFFSET_Y,
+					Y = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y,
 					Z = pos.Z,
 				}),
 				SunComponent({
-					Value = ProductionConfig.SUN_VALUE,
+					Value = sunValue,
 					SpawnTime = currentTime,
-					Lifetime = ProductionConfig.SUN_LIFETIME,
-					IsFalling = false, -- Sunflower sun doesn't fall, just floats
-					SourceType = "Sunflower",
+					Lifetime = ProductionDefaults.SUN_LIFETIME,
+					IsFalling = false, -- Plant-produced sun doesn't fall, just floats
+					SourceType = plant.PlantType,
 				})
 			)
 			
@@ -79,16 +85,16 @@ local function SunflowerProductionSystem(world)
 			Network.SunSpawned.FireAll({
 				EntityId = sunId,
 				PositionX = pos.X,
-				PositionY = pos.Y + ProductionConfig.SPAWN_OFFSET_Y,
+				PositionY = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y,
 				PositionZ = pos.Z,
-				Value = ProductionConfig.SUN_VALUE,
-				TargetY = pos.Y + ProductionConfig.SPAWN_OFFSET_Y, -- Sunflower sun doesn't fall
+				Value = sunValue,
+				TargetY = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y, -- Plant sun doesn't fall
 			})
 			
-			Logger.Debug("SunflowerProduction", `Sunflower {id} produced sun {sunId}`)
+			Logger.Debug("SunflowerProduction", `{plant.PlantType} {id} produced sun {sunId} (value={sunValue})`)
 			
 			-- Reset timer for next production
-			_productionTimers[id] = currentTime + ProductionConfig.PRODUCTION_INTERVAL
+			_productionTimers[id] = currentTime + productionInterval
 		end
 	end
 	

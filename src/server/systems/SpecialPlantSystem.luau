@@ -32,17 +32,15 @@ local PlantTypeComponent = require(Components.PlantTypeComponent)
 local ZombieTypeComponent = require(Components.ZombieTypeComponent)
 local ArmedComponent = require(Components.ArmedComponent)
 
--- Config
-local SpecialConfig = {
-	-- CherryBomb
-	CHERRY_EXPLOSION_RADIUS = 9,   -- Studs (1.5 cells in each direction)
-	CHERRY_DAMAGE = 1800,          -- Instant kill most zombies
-	CHERRY_FUSE_TIME = 0.5,        -- Seconds before explosion (visual cue)
+-- Config defaults (used when PlantData doesn't specify)
+local SpecialDefaults = {
+	-- Explosion defaults
+	FUSE_TIME = 0.5,           -- Seconds before explosion
+	EXPLOSION_RADIUS = 9,      -- Studs (1.5 cells in each direction)
 	
-	-- PotatoMine
-	POTATO_ARM_TIME = 15,          -- Seconds to arm
-	POTATO_TRIGGER_RADIUS = 2,     -- Studs to trigger explosion
-	POTATO_DAMAGE = 1800,          -- Instant kill
+	-- Armed plant defaults
+	ARM_DURATION = 15,         -- Seconds to arm
+	TRIGGER_RADIUS = 2,        -- Studs to trigger explosion
 }
 
 -- Track CherryBombs that are about to explode
@@ -55,18 +53,26 @@ local _newCherryBombs: {[number]: boolean} = {}
 local SpecialPlantAPI = {}
 
 function SpecialPlantAPI.OnPlantPlaced(world: any, entityId: number, plantType: string)
-	if plantType == "CherryBomb" then
-		-- Start fuse timer
-		_cherryBombFuse[entityId] = os.clock() + SpecialConfig.CHERRY_FUSE_TIME
-		Logger.Debug("SpecialPlant", `CherryBomb {entityId} fuse started`)
-	elseif plantType == "PotatoMine" then
-		-- Add ArmedComponent (starts unarmed)
+	local stats = PlantData[plantType]
+	if not stats then
+		return
+	end
+	
+	-- Check behavior flags instead of hardcoded names
+	if stats.ExplodesOnPlace then
+		-- CherryBomb-type: Start fuse timer for immediate explosion (data-driven)
+		local fuseTime = stats.FuseTime or SpecialDefaults.FUSE_TIME
+		_cherryBombFuse[entityId] = os.clock() + fuseTime
+		Logger.Debug("SpecialPlant", `{plantType} {entityId} fuse started ({fuseTime}s)`)
+	elseif stats.NeedsArming then
+		-- PotatoMine-type: Add ArmedComponent (starts unarmed, data-driven)
+		local armDuration = stats.ArmDuration or SpecialDefaults.ARM_DURATION
 		world:insert(entityId, ArmedComponent({
 			IsArmed = false,
 			ArmTime = os.clock(),
-			ArmDuration = SpecialConfig.POTATO_ARM_TIME,
+			ArmDuration = armDuration,
 		}))
-		Logger.Debug("SpecialPlant", `PotatoMine {entityId} placed, arming in {SpecialConfig.POTATO_ARM_TIME}s`)
+		Logger.Debug("SpecialPlant", `{plantType} {entityId} placed, arming in {armDuration}s`)
 	end
 end
 
@@ -74,13 +80,18 @@ end
 local function explodeCherryBomb(world: any, entityId: number, pos: any)
 	local killCount = 0
 	
+	-- Get explosion radius from PlantData (data-driven)
+	local plant = world:get(entityId, PlantTypeComponent)
+	local stats = plant and PlantData[plant.PlantType]
+	local explosionRadius = (stats and stats.Range) or SpecialDefaults.EXPLOSION_RADIUS
+	
 	-- Find all zombies in explosion radius
 	for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
 		local dx = zombiePos.X - pos.X
 		local dz = zombiePos.Z - pos.Z
 		local distance = math.sqrt(dx * dx + dz * dz)
 		
-		if distance <= SpecialConfig.CHERRY_EXPLOSION_RADIUS then
+		if distance <= explosionRadius then
 			-- Apply massive damage
 			local health = world:get(zombieId, HealthComponent)
 			if health then
@@ -96,7 +107,6 @@ local function explodeCherryBomb(world: any, entityId: number, pos: any)
 	Logger.Info("SpecialPlant", `CherryBomb {entityId} exploded! Killed {killCount} zombies`)
 	
 	-- Clear grid cell
-	local plant = world:get(entityId, PlantTypeComponent)
 	if plant then
 		GridState.Clear(plant.Column, plant.Lane)
 	end
@@ -106,7 +116,7 @@ local function explodeCherryBomb(world: any, entityId: number, pos: any)
 		PositionX = pos.X,
 		PositionY = 1,
 		PositionZ = pos.Z,
-		Radius = SpecialConfig.CHERRY_EXPLOSION_RADIUS,
+		Radius = explosionRadius,
 	})
 	
 	-- Broadcast entity death
@@ -170,9 +180,10 @@ local function SpecialPlantSystem(world)
 		end
 	end
 	
-	-- Process PotatoMine arming and triggering
+	-- Process armed plants (NeedsArming) triggering
 	for mineId, pos, plant, armed in world:query(PositionComponent, PlantTypeComponent, ArmedComponent) do
-		if plant.PlantType ~= "PotatoMine" then
+		local stats = PlantData[plant.PlantType]
+		if not stats or not stats.NeedsArming then
 			continue
 		end
 		
@@ -185,12 +196,13 @@ local function SpecialPlantSystem(world)
 					ArmTime = armed.ArmTime,
 					ArmDuration = armed.ArmDuration,
 				}))
-				Logger.Debug("SpecialPlant", `PotatoMine {mineId} is now armed!`)
+				Logger.Debug("SpecialPlant", `{plant.PlantType} {mineId} is now armed!`)
 			end
 			continue
 		end
 		
-		-- Armed mine - check for zombie contact
+		-- Armed mine - check for zombie contact (data-driven trigger radius)
+		local triggerRadius = stats.TriggerRadius or SpecialDefaults.TRIGGER_RADIUS
 		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
 			-- Must be in same lane
 			if zombie.Lane ~= plant.Lane then
@@ -199,7 +211,7 @@ local function SpecialPlantSystem(world)
 			
 			-- Check distance
 			local distance = math.abs(zombiePos.X - pos.X)
-			if distance <= SpecialConfig.POTATO_TRIGGER_RADIUS then
+			if distance <= triggerRadius then
 				-- BOOM!
 				explodePotatoMine(world, mineId, pos, zombieId)
 				break

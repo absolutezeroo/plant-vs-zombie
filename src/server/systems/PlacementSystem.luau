@@ -161,9 +161,10 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		OwnerId = player.UserId,
 	})
 	
-	-- Notify special plant system for CherryBomb/PotatoMine
+	-- Notify special plant system if this is an explosive plant (data-driven)
+	local stats = PlantData[plantType]
 	local SpecialPlantSystem = require(script.Parent.SpecialPlantSystem)
-	if plantType == "CherryBomb" or plantType == "PotatoMine" then
+	if stats and stats.IsExplosive then
 		SpecialPlantSystem.API.OnPlantPlaced(world, entityId, plantType)
 	end
 	

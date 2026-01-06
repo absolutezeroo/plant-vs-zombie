@@ -31,15 +31,15 @@ local PlantTypeComponent = require(Components.PlantTypeComponent)
 local ProjectileComponent = require(Components.ProjectileComponent)
 local ZombieTypeComponent = require(Components.ZombieTypeComponent)
 
--- Projectile config
-local ProjectileConfig = {
-	SPEED = 15,              -- Studs per second
+-- Projectile config defaults (used when PlantData doesn't specify)
+local ProjectileDefaults = {
+	SPEED = 15,              -- Studs per second (global)
 	FIRE_INTERVAL = 0.67,    -- Seconds between shots (1.5 attacks/sec)
-	MAX_RANGE = 100,         -- Max distance before despawn
+	MAX_RANGE = 100,         -- Max distance before despawn (global)
 	DAMAGE = 20,             -- Base pea damage
-	SLOW_PERCENT = 0.5,      -- SnowPea slows by 50%
-	SLOW_DURATION = 3,       -- Slow lasts 3 seconds
-	REPEATER_DELAY = 0.1,    -- Delay between Repeater's two shots
+	SLOW_PERCENT = 0.5,      -- Default slow (50%)
+	SLOW_DURATION = 3,       -- Default slow duration
+	SHOT_DELAY = 0.1,        -- Default delay for multi-shot plants
 }
 
 -- Track last fire time per plant
@@ -56,9 +56,16 @@ local function hasZombiesInLane(world: any, lane: number, plantX: number): boole
 	return false
 end
 
--- Spawn a pea projectile
-local function spawnPea(world: any, plantId: number, lane: number, startX: number, isFrozen: boolean?): number
+-- Spawn a pea projectile (data-driven from PlantData)
+local function spawnPea(world: any, plantId: number, lane: number, startX: number, plantType: string): number
 	local z = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	
+	-- Read stats from PlantData (data-driven)
+	local stats = PlantData[plantType]
+	local damage = (stats and stats.Damage) or ProjectileDefaults.DAMAGE
+	local isFrozen = (stats and stats.IsFrozen) or false
+	local slowPercent = (stats and stats.SlowPercent) or ProjectileDefaults.SLOW_PERCENT
+	local slowDuration = (stats and stats.SlowDuration) or ProjectileDefaults.SLOW_DURATION
 	
 	local entityId = world:spawn(
 		PositionComponent({
@@ -67,14 +74,14 @@ local function spawnPea(world: any, plantId: number, lane: number, startX: numbe
 			Z = z
 		}),
 		ProjectileComponent({
-			Damage = ProjectileConfig.DAMAGE,
-			Speed = ProjectileConfig.SPEED,
+			Damage = damage,
+			Speed = ProjectileDefaults.SPEED,
 			SourceEntity = plantId,
 			Lane = lane,
 			SpawnX = startX,
-			IsFrozen = isFrozen or false,
-			SlowPercent = if isFrozen then ProjectileConfig.SLOW_PERCENT else nil,
-			SlowDuration = if isFrozen then ProjectileConfig.SLOW_DURATION else nil,
+			IsFrozen = isFrozen,
+			SlowPercent = if isFrozen then slowPercent else nil,
+			SlowDuration = if isFrozen then slowDuration else nil,
 		})
 	)
 	
@@ -101,8 +108,8 @@ local function ProjectileSystem(world)
 				local pos = world:get(plantId, PositionComponent)
 				local plant = world:get(plantId, PlantTypeComponent)
 				if pos and plant then
-					spawnPea(world, plantId, plant.Lane, pos.X, false)
-					Logger.Debug("Projectile", `Repeater {plantId} fired second pea`)
+					spawnPea(world, plantId, plant.Lane, pos.X, plant.PlantType)
+					Logger.Debug("Projectile", `{plant.PlantType} {plantId} fired second pea`)
 				end
 			end
 			_repeaterSecondShot[plantId] = nil
@@ -111,17 +118,18 @@ local function ProjectileSystem(world)
 	
 	-- Process plants that can shoot
 	for plantId, pos, plant in world:query(PositionComponent, PlantTypeComponent) do
-		-- Check if this plant type can shoot
+		-- Get plant stats and check if this plant type can shoot
 		local plantType = plant.PlantType
-		local canShoot = plantType == "Peashooter" or plantType == "SnowPea" or plantType == "Repeater"
+		local stats = PlantData[plantType]
 		
-		if not canShoot then
+		if not stats or not stats.CanShoot then
 			continue
 		end
 		
-		-- Check fire cooldown
+		-- Check fire cooldown (use AttackSpeed from PlantData if available)
+		local fireInterval = if stats.AttackSpeed > 0 then (1 / stats.AttackSpeed) else ProjectileDefaults.FIRE_INTERVAL
 		local lastFire = _plantFireTimes[plantId] or 0
-		if currentTime - lastFire < ProjectileConfig.FIRE_INTERVAL then
+		if currentTime - lastFire < fireInterval then
 			continue
 		end
 		
@@ -130,14 +138,14 @@ local function ProjectileSystem(world)
 			continue
 		end
 		
-		-- Fire based on plant type
-		local isFrozen = plantType == "SnowPea"
-		spawnPea(world, plantId, plant.Lane, pos.X, isFrozen)
+		-- Fire projectile (data-driven)
+		spawnPea(world, plantId, plant.Lane, pos.X, plantType)
 		_plantFireTimes[plantId] = currentTime
 		
-		-- Repeater fires a second pea after short delay
-		if plantType == "Repeater" then
-			_repeaterSecondShot[plantId] = currentTime + ProjectileConfig.REPEATER_DELAY
+		-- Multi-shot plants fire additional pea after short delay (data-driven)
+		if stats.IsRepeater then
+			local shotDelay = stats.ShotDelay or ProjectileDefaults.SHOT_DELAY
+			_repeaterSecondShot[plantId] = currentTime + shotDelay
 		end
 		
 		Logger.Debug("Projectile", `{plantType} {plantId} fired pea in lane {plant.Lane}`)
@@ -148,7 +156,7 @@ local function ProjectileSystem(world)
 		local newX = pos.X + proj.Speed * dt
 		
 		-- Check max range
-		if newX - proj.SpawnX > ProjectileConfig.MAX_RANGE then
+		if newX - proj.SpawnX > ProjectileDefaults.MAX_RANGE then
 			world:despawn(projId)
 			continue
 		end
