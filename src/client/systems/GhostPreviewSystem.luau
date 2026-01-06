@@ -4,11 +4,11 @@
 	
 	Priority: 50 (Input phase)
 	
-	Shows a semi-transparent preview of the selected plant at cursor position.
-	- Green = valid placement (cell empty, can afford)
-	- Red = invalid placement (cell occupied, can't afford, out of bounds)
+	Shows a semi-transparent preview of the REAL plant model at cursor position.
+	- Green tint = valid placement (cell empty, can afford)
+	- Red tint = invalid placement (cell occupied, can't afford, out of bounds)
 	
-	Uses mouse/touch position raycasted onto the grid plane.
+	Uses the actual plant model from Assets for better visual feedback.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +29,10 @@ local Client = script.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)
+
+-- Assets
+local Assets = ReplicatedStorage:WaitForChild("Assets", 5)
+local PlantAssets = Assets and Assets:FindFirstChild("Plants")
 
 -- VFX/Audio services (lazy loaded)
 local _vfxService: any = nil
@@ -66,7 +70,8 @@ local _requestId = 0
 local _pendingPlacements: {[number]: {plantType: string, cost: number}} = {}
 
 -- Ghost visual state
-local _ghostPart: Part? = nil
+local _ghostModel: Model? = nil
+local _ghostPlantType: string? = nil  -- Track which plant type is currently shown
 local _currentCell: {Column: number, Lane: number}? = nil
 local _isValid = false
 
@@ -74,47 +79,122 @@ local _isValid = false
 local VALID_COLOR = Color3.fromRGB(100, 255, 100)   -- Green
 local INVALID_COLOR = Color3.fromRGB(255, 100, 100) -- Red
 local GHOST_TRANSPARENCY = 0.5
-local GHOST_SIZE = Vector3.new(4, 4, 4)
 
-local function createGhostPart(): Part
-	local part = Instance.new("Part")
-	part.Name = "PlantGhost"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
-	part.Size = GHOST_SIZE
-	part.Transparency = GHOST_TRANSPARENCY
-	part.Color = VALID_COLOR
-	part.Parent = Workspace
-	return part
-end
-
-local function updateGhostVisibility(visible: boolean)
-	if _ghostPart then
-		_ghostPart.Transparency = visible and GHOST_TRANSPARENCY or 1
+--[[
+	Apply ghost effect to all parts in a model (transparent + tinted)
+]]
+local function applyGhostEffect(model: Model, color: Color3)
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Transparency = GHOST_TRANSPARENCY
+			descendant.Color = color
+			descendant.Material = Enum.Material.Neon
+			descendant.CanCollide = false
+			descendant.CanTouch = false
+			descendant.CanQuery = false
+			descendant.CastShadow = false
+		end
+	end
+	-- Also apply to PrimaryPart if exists
+	if model.PrimaryPart then
+		model.PrimaryPart.Transparency = 1 -- Root is always invisible
 	end
 end
 
-local function updateGhostPosition(column: number, lane: number, valid: boolean)
-	if not _ghostPart then
-		_ghostPart = createGhostPart()
+--[[
+	Update ghost color based on validity
+]]
+local function updateGhostColor(valid: boolean)
+	if not _ghostModel then return end
+	
+	local color = if valid then VALID_COLOR else INVALID_COLOR
+	for _, descendant in _ghostModel:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant.Name ~= "Root" then
+			descendant.Color = color
+		end
+	end
+end
+
+--[[
+	Create ghost model from plant assets
+]]
+local function createGhostModel(plantType: string): Model?
+	if not PlantAssets then return nil end
+	
+	local template = PlantAssets:FindFirstChild(plantType)
+	if not template or not template:IsA("Model") then
+		return nil
 	end
 	
+	local ghost = template:Clone()
+	ghost.Name = "PlantGhost_" .. plantType
+	
+	-- Apply ghost effect (transparent green)
+	applyGhostEffect(ghost, VALID_COLOR)
+	
+	ghost.Parent = Workspace
+	return ghost
+end
+
+--[[
+	Ensure we have the correct ghost model for the selected plant
+]]
+local function ensureGhostModel(plantType: string): Model?
+	-- If wrong plant type, destroy old ghost
+	if _ghostModel and _ghostPlantType ~= plantType then
+		_ghostModel:Destroy()
+		_ghostModel = nil
+		_ghostPlantType = nil
+	end
+	
+	-- Create if needed
+	if not _ghostModel then
+		_ghostModel = createGhostModel(plantType)
+		_ghostPlantType = plantType
+		
+		if not _ghostModel then
+			Logger.Warn("GhostPreview", `Could not create ghost for {plantType}`)
+		end
+	end
+	
+	return _ghostModel
+end
+
+local function updateGhostPosition(column: number, lane: number, valid: boolean, plantType: string)
+	local ghost = ensureGhostModel(plantType)
+	if not ghost then return end
+	
 	local worldPos = GridUtils.GridToWorld(column, lane)
-	_ghostPart.Position = worldPos + Vector3.new(0, 2, 0) -- Raise above ground
-	_ghostPart.Color = valid and VALID_COLOR or INVALID_COLOR
-	_ghostPart.Transparency = GHOST_TRANSPARENCY
+	
+	-- Position using PrimaryPart with 180° rotation (same as PlantRenderSystem)
+	if ghost.PrimaryPart then
+		local facingRotation = CFrame.Angles(0, math.rad(180), 0)
+		ghost:SetPrimaryPartCFrame(CFrame.new(worldPos) * facingRotation)
+	end
+	
+	-- Update color based on validity
+	updateGhostColor(valid)
 	
 	_currentCell = { Column = column, Lane = lane }
 	_isValid = valid
 end
 
 local function hideGhost()
-	if _ghostPart then
-		_ghostPart.Transparency = 1
+	if _ghostModel then
+		-- Move off-screen instead of destroying (for reuse)
+		if _ghostModel.PrimaryPart then
+			_ghostModel:SetPrimaryPartCFrame(CFrame.new(0, -1000, 0))
+		end
+	end
+	_currentCell = nil
+	_isValid = false
+end
+
+local function destroyGhost()
+	if _ghostModel then
+		_ghostModel:Destroy()
+		_ghostModel = nil
+		_ghostPlantType = nil
 	end
 	_currentCell = nil
 	_isValid = false
@@ -198,8 +278,8 @@ local function GhostPreviewSystem(world)
 	-- Check validity
 	local isValid = checkPlacementValid(column, lane, selectedPlant)
 	
-	-- Update ghost visual
-	updateGhostPosition(column, lane, isValid)
+	-- Update ghost visual with the real plant model
+	updateGhostPosition(column, lane, isValid, selectedPlant)
 end
 
 -- Handle click/tap to place
@@ -271,7 +351,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2
 		or input.KeyCode == Enum.KeyCode.Escape then
 		SelectionState.Select(nil)
-		hideGhost()
+		destroyGhost() -- Fully destroy when canceling
 	end
 end)
 

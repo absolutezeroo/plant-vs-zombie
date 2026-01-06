@@ -8,6 +8,16 @@
 	- Death effects
 	- Collection sparkles
 	- Damage feedback
+	
+	Model-aware VFX system:
+	- First checks model's VFX folder for custom particles
+	- Falls back to generic VFX if not found
+	- Supports: Shoot, Death, Idle particles per model
+	
+	Attachment-based positioning:
+	- Uses AttachmentUtils to find semantic points (Muzzle, Center, Overhead)
+	- NEVER uses hardcoded Vector3 offsets
+	- Attachments are the "spatial contract" between Artists and Code
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +27,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 
 -- VFX container
 local _vfxFolder: Folder = nil
@@ -372,6 +383,229 @@ function VFXService.ScreenShake(intensity: number?, duration: number?)
 			task.wait()
 		end
 	end)
+end
+
+--[[
+	===========================================
+	MODEL-AWARE VFX SYSTEM (Attachment-Based)
+	===========================================
+	These functions use Attachments as "spatial contracts":
+	- Muzzle: Projectile spawn point
+	- Center: Mass center for effects
+	- Overhead: Health bar position
+	
+	RULE: Never use hardcoded Vector3 offsets.
+	The Attachment IS the position.
+]]
+
+--[[
+	🔫 PLANT SHOOT VFX - Model-aware + Attachment-based
+	Position is read from "Muzzle" Attachment
+	Checks model.VFX.Shoot first, falls back to generic pea splat
+]]
+function VFXService.PlayPlantShootFromModel(model: Model, isFrozen: boolean?)
+	-- Get position from Muzzle Attachment (never hardcode!)
+	local position = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Muzzle)
+	
+	-- Try model-specific VFX first
+	local vfxFolder = model:FindFirstChild("VFX")
+	local shootVFX = vfxFolder and vfxFolder:FindFirstChild("Shoot")
+	
+	if shootVFX and shootVFX:IsA("ParticleEmitter") then
+		local part = createVFXPart(position)
+		local clone = shootVFX:Clone()
+		clone.Parent = part
+		clone:Emit(clone:GetAttribute("EmitCount") or 8)
+		Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+		return
+	end
+	
+	-- Fallback: Generic pea shoot
+	local part = createVFXPart(position)
+	local color = if isFrozen 
+		then ColorSequence.new(Color3.fromRGB(150, 220, 255))
+		else ColorSequence.new(Color3.fromRGB(100, 200, 50))
+	
+	local emitter = createEmitter({
+		Color = color,
+		Size = NumberSequence.new(0.3, 0),
+		Lifetime = NumberRange.new(0.1, 0.2),
+		Speed = NumberRange.new(5, 10),
+		SpreadAngle = Vector2.new(30, 30),
+		Drag = 5,
+	})
+	emitter.Parent = part
+	emitter:Emit(5)
+	Debris:AddItem(part, 0.5)
+end
+
+--[[
+	🔫 PLANT SHOOT VFX - Legacy (position provided)
+	Kept for backward compatibility
+]]
+function VFXService.PlayPlantShoot(model: Model?, position: Vector3, isFrozen: boolean?)
+	-- If model provided, prefer Attachment-based position
+	if model then
+		local muzzlePos = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Muzzle, false)
+		position = muzzlePos
+	end
+	
+	-- Try model-specific VFX first
+	if model then
+		local vfxFolder = model:FindFirstChild("VFX")
+		local shootVFX = vfxFolder and vfxFolder:FindFirstChild("Shoot")
+		
+		if shootVFX and shootVFX:IsA("ParticleEmitter") then
+			local part = createVFXPart(position)
+			local clone = shootVFX:Clone()
+			clone.Parent = part
+			clone:Emit(clone:GetAttribute("EmitCount") or 8)
+			Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+			return
+		end
+	end
+	
+	-- Fallback: Generic pea shoot
+	local part = createVFXPart(position)
+	local color = if isFrozen 
+		then ColorSequence.new(Color3.fromRGB(150, 220, 255))
+		else ColorSequence.new(Color3.fromRGB(100, 200, 50))
+	
+	local emitter = createEmitter({
+		Color = color,
+		Size = NumberSequence.new(0.3, 0),
+		Lifetime = NumberRange.new(0.1, 0.2),
+		Speed = NumberRange.new(5, 10),
+		SpreadAngle = Vector2.new(30, 30),
+		Drag = 5,
+	})
+	emitter.Parent = part
+	emitter:Emit(5)
+	Debris:AddItem(part, 0.5)
+end
+
+--[[
+	💀 PLANT DEATH VFX - Model-aware + Attachment-based
+	Position is read from "Center" Attachment
+]]
+function VFXService.PlayPlantDeathFromModel(model: Model)
+	-- Get position from Center Attachment (never hardcode!)
+	local position = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Center)
+	
+	-- Try model-specific VFX first
+	local vfxFolder = model:FindFirstChild("VFX")
+	local deathVFX = vfxFolder and vfxFolder:FindFirstChild("Death")
+	
+	if deathVFX and deathVFX:IsA("ParticleEmitter") then
+		local part = createVFXPart(position)
+		local clone = deathVFX:Clone()
+		clone.Parent = part
+		clone:Emit(clone:GetAttribute("EmitCount") or 15)
+		Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+		return
+	end
+	
+	-- Fallback: Generic plant death
+	local part = createVFXPart(position)
+	local emitter = createEmitter({
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 100)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 120, 80)),
+		}),
+		Size = NumberSequence.new(0.5, 0),
+		Lifetime = NumberRange.new(0.4, 0.8),
+		Speed = NumberRange.new(5, 12),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 4,
+	})
+	emitter.Parent = part
+	emitter:Emit(12)
+	Debris:AddItem(part, 1)
+end
+
+--[[
+	💀 PLANT DEATH VFX - Legacy (position provided)
+	Kept for backward compatibility
+]]
+function VFXService.PlayPlantDeath(model: Model?, position: Vector3)
+	-- If model provided, prefer Attachment-based position
+	if model then
+		local centerPos = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Center, false)
+		position = centerPos
+	end
+	
+	-- Try model-specific VFX first
+	if model then
+		local vfxFolder = model:FindFirstChild("VFX")
+		local deathVFX = vfxFolder and vfxFolder:FindFirstChild("Death")
+		
+		if deathVFX and deathVFX:IsA("ParticleEmitter") then
+			local part = createVFXPart(position)
+			local clone = deathVFX:Clone()
+			clone.Parent = part
+			clone:Emit(clone:GetAttribute("EmitCount") or 15)
+			Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+			return
+		end
+	end
+	
+	-- Fallback: Generic plant death
+	local part = createVFXPart(position)
+	local emitter = createEmitter({
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 100)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 120, 80)),
+		}),
+		Size = NumberSequence.new(0.5, 0),
+		Lifetime = NumberRange.new(0.4, 0.8),
+		Speed = NumberRange.new(5, 12),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 4,
+	})
+	emitter.Parent = part
+	emitter:Emit(12)
+	Debris:AddItem(part, 1)
+end
+
+--[[
+	🌿 ATTACH IDLE VFX - Model-aware
+	Clones model.VFX.Idle and parents to the model's Visual
+	Returns the emitter for cleanup later
+]]
+function VFXService.AttachIdleVFX(model: Model): ParticleEmitter?
+	local vfxFolder = model:FindFirstChild("VFX")
+	local idleVFX = vfxFolder and vfxFolder:FindFirstChild("Idle")
+	
+	if idleVFX and idleVFX:IsA("ParticleEmitter") then
+		local visual = model:FindFirstChild("Visual")
+		local targetPart = visual and visual:FindFirstChildWhichIsA("BasePart")
+		
+		if targetPart then
+			local clone = idleVFX:Clone()
+			clone.Name = "IdleVFX_Active"
+			clone.Parent = targetPart
+			-- Idle VFX uses Rate, not Emit
+			clone.Enabled = true
+			return clone
+		end
+	end
+	
+	return nil
+end
+
+--[[
+	Stop idle VFX attached to a model
+]]
+function VFXService.DetachIdleVFX(model: Model)
+	local visual = model:FindFirstChild("Visual")
+	if visual then
+		for _, part in visual:GetDescendants() do
+			if part:IsA("ParticleEmitter") and part.Name == "IdleVFX_Active" then
+				part.Enabled = false
+				Debris:AddItem(part, part.Lifetime.Max)
+			end
+		end
+	end
 end
 
 return VFXService

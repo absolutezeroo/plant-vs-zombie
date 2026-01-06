@@ -5,8 +5,9 @@
 	Priority: 405 (Render phase - before zombies)
 	
 	Receives plant spawn/death events from server via Zap.
-	Creates visual plant representations.
-	Uses simple Part-based visuals for MVP (no Humanoid).
+	Creates visual plant representations using real models from Assets.
+	Uses AnimationService for idle/spawn/death animations (no Humanoid).
+	Falls back to colored cube if model not found.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,83 +24,154 @@ local Client = script.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local Network = require(Client.network.generated)
 
--- VFX service (lazy loaded)
+-- Assets folder
+local Assets = ReplicatedStorage:WaitForChild("Assets", 5)
+local PlantAssets = Assets and Assets:FindFirstChild("Plants")
+
+-- Services (lazy loaded)
 local _vfxService: any = nil
+local _animService: any = nil
+
 local function getVFXService()
 	if not _vfxService then
 		local success, result = pcall(function()
 			return require(Modules.VFXService)
 		end)
-		if success then
-			_vfxService = result
-		end
+		if success then _vfxService = result end
 	end
 	return _vfxService
 end
 
+local function getAnimService()
+	if not _animService then
+		local success, result = pcall(function()
+			return require(Modules.AnimationService)
+		end)
+		if success then _animService = result end
+	end
+	return _animService
+end
+
 -- Plant visual cache: entityId -> visual data
 type PlantVisual = {
-	Part: Part,
+	Model: Model?,       -- Real model (if available)
+	Part: Part?,         -- Fallback cube (if no model)
 	PlantType: string,
 	Column: number,
 	Lane: number,
 }
 local _plantVisuals: {[number]: PlantVisual} = {}
 
--- Visual config
-local PLANT_SIZE = Vector3.new(4, 4, 4)
-local PLANT_COLORS = {
-	Sunflower = Color3.fromRGB(255, 220, 50),    -- Yellow
-	Peashooter = Color3.fromRGB(100, 200, 100),  -- Green
-	WallNut = Color3.fromRGB(180, 130, 80),      -- Brown
-	SnowPea = Color3.fromRGB(150, 200, 255),     -- Light blue
-	CherryBomb = Color3.fromRGB(255, 50, 50),    -- Red
-	PotatoMine = Color3.fromRGB(150, 100, 50),   -- Brown-ish
-	Repeater = Color3.fromRGB(60, 180, 60),      -- Darker green (double pea)
+-- Fallback visual config (when model not found)
+local FALLBACK_SIZE = Vector3.new(4, 4, 4)
+local FALLBACK_COLORS = {
+	Sunflower = Color3.fromRGB(255, 220, 50),
+	Peashooter = Color3.fromRGB(100, 200, 100),
+	WallNut = Color3.fromRGB(180, 130, 80),
+	SnowPea = Color3.fromRGB(150, 200, 255),
+	CherryBomb = Color3.fromRGB(255, 50, 50),
+	PotatoMine = Color3.fromRGB(150, 100, 50),
+	Repeater = Color3.fromRGB(60, 180, 60),
 }
 
+--[[
+	Create plant visual from real model or fallback to cube
+]]
 local function createPlantVisual(entityId: number, plantType: string, column: number, lane: number): PlantVisual
-	local part = Instance.new("Part")
-	part.Name = `Plant_{entityId}_{plantType}`
-	part.Size = PLANT_SIZE
-	part.Color = PLANT_COLORS[plantType] or Color3.fromRGB(100, 200, 100)
-	part.Material = Enum.Material.SmoothPlastic
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = true
-	part.CastShadow = true
-	
-	-- Position at grid cell center
 	local worldPos = GridUtils.GridToWorld(column, lane)
-	part.Position = worldPos + Vector3.new(0, PLANT_SIZE.Y / 2, 0)
 	
-	-- Add attribute for entity tracking
-	part:SetAttribute("EntityId", entityId)
-	part:SetAttribute("PlantType", plantType)
+	-- Try to get real model from Assets
+	local modelTemplate = PlantAssets and PlantAssets:FindFirstChild(plantType)
 	
-	-- Spawn animation
-	part.Size = Vector3.new(0.1, 0.1, 0.1)
-	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	local tween = TweenService:Create(part, tweenInfo, {
-		Size = PLANT_SIZE
-	})
-	
-	part.Parent = Workspace
-	tween:Play()
-	
-	return {
-		Part = part,
-		PlantType = plantType,
-		Column = column,
-		Lane = lane,
-	}
+	if modelTemplate and modelTemplate:IsA("Model") then
+		-- Clone real model
+		local model = modelTemplate:Clone()
+		model.Name = `Plant_{entityId}_{plantType}`
+		
+		-- Position using PrimaryPart (Root)
+		-- Rotate 180° on Y axis so plants face RIGHT (toward zombies coming from +X)
+		if model.PrimaryPart then
+			local facingRotation = CFrame.Angles(0, math.rad(180), 0)
+			model:SetPrimaryPartCFrame(CFrame.new(worldPos) * facingRotation)
+		else
+			Logger.Warn("PlantRender", `Model {plantType} has no PrimaryPart`)
+		end
+		
+		-- Add entity tracking attributes
+		model:SetAttribute("EntityId", entityId)
+		
+		model.Parent = Workspace
+		
+		-- Play spawn animation via AnimationService
+		local animService = getAnimService()
+		if animService then
+			animService.PlaySpawn(model)
+			-- Start idle animation
+			animService.StartIdle(model)
+		end
+		
+		-- Attach idle VFX if available
+		local vfx = getVFXService()
+		if vfx then vfx.AttachIdleVFX(model) end
+		
+		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) using real model`)
+		
+		return {
+			Model = model,
+			Part = nil,
+			PlantType = plantType,
+			Column = column,
+			Lane = lane,
+		}
+	else
+		-- Fallback: Create colored cube
+		local part = Instance.new("Part")
+		part.Name = `Plant_{entityId}_{plantType}`
+		part.Size = FALLBACK_SIZE
+		part.Color = FALLBACK_COLORS[plantType] or Color3.fromRGB(100, 200, 100)
+		part.Material = Enum.Material.SmoothPlastic
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = true
+		part.CastShadow = true
+		
+		part.Position = worldPos + Vector3.new(0, FALLBACK_SIZE.Y / 2, 0)
+		part:SetAttribute("EntityId", entityId)
+		part:SetAttribute("PlantType", plantType)
+		
+		-- Spawn animation (scale up)
+		part.Size = Vector3.new(0.1, 0.1, 0.1)
+		local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(part, tweenInfo, { Size = FALLBACK_SIZE })
+		
+		part.Parent = Workspace
+		tween:Play()
+		
+		Logger.Warn("PlantRender", `Plant {entityId} ({plantType}) using fallback cube - model not found`)
+		
+		return {
+			Model = nil,
+			Part = part,
+			PlantType = plantType,
+			Column = column,
+			Lane = lane,
+		}
+	end
 end
 
+--[[
+	Destroy plant visual and cleanup animations/VFX
+]]
 local function destroyPlantVisual(entityId: number)
 	local visual = _plantVisuals[entityId]
 	if visual then
-		visual.Part:Destroy()
+		if visual.Model then
+			visual.Model:Destroy()
+		end
+		if visual.Part then
+			visual.Part:Destroy()
+		end
 		_plantVisuals[entityId] = nil
 	end
 end
@@ -119,9 +191,21 @@ Network.PlantSpawned.On(function(data)
 	_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
 	
 	-- Play placement VFX
-	local worldPos = GridUtils.GridToWorld(column, lane)
+	-- Use Center Attachment if model available, otherwise fallback to grid position
+	local visual = _plantVisuals[entityId]
 	local vfx = getVFXService()
-	if vfx then vfx.PlayPlantPlaced(worldPos + Vector3.new(0, 1, 0)) end
+	if vfx then
+		if visual.Model then
+			-- Model-aware: use Center Attachment (spatial contract)
+			local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+			local vfxPos = AttachmentUtils.GetWorldPosition(visual.Model, AttachmentUtils.Names.Center, false)
+			vfx.PlayPlantPlaced(vfxPos)
+		else
+			-- Fallback for cube: use grid center
+			local worldPos = GridUtils.GridToWorld(column, lane)
+			vfx.PlayPlantPlaced(worldPos)
+		end
+	end
 	
 	Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
 end)
@@ -131,17 +215,43 @@ Network.EntityDied.On(function(data)
 	local visual = _plantVisuals[entityId]
 	
 	if visual then
-		-- Death animation
-		local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-		local tween = TweenService:Create(visual.Part, tweenInfo, {
-			Size = Vector3.new(0.1, 0.1, 0.1),
-			Transparency = 1
-		})
+		local animService = getAnimService()
+		local vfx = getVFXService()
 		
-		tween:Play()
-		tween.Completed:Connect(function()
-			destroyPlantVisual(entityId)
-		end)
+		if visual.Model then
+			-- Stop idle animation and VFX
+			if animService then animService.StopIdle(visual.Model) end
+			if vfx then vfx.DetachIdleVFX(visual.Model) end
+			
+			-- Get position for death VFX
+			local pos = visual.Model.PrimaryPart and visual.Model.PrimaryPart.Position 
+				or GridUtils.GridToWorld(visual.Column, visual.Lane)
+			
+			-- Play death VFX (model-aware)
+			if vfx then vfx.PlayPlantDeath(visual.Model, pos) end
+			
+			-- Play death animation then destroy
+			if animService then
+				task.spawn(function()
+					animService.PlayDeath(visual.Model)
+					destroyPlantVisual(entityId)
+				end)
+			else
+				destroyPlantVisual(entityId)
+			end
+		elseif visual.Part then
+			-- Fallback cube death animation
+			local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+			local tween = TweenService:Create(visual.Part, tweenInfo, {
+				Size = Vector3.new(0.1, 0.1, 0.1),
+				Transparency = 1
+			})
+			
+			tween:Play()
+			tween.Completed:Connect(function()
+				destroyPlantVisual(entityId)
+			end)
+		end
 		
 		-- Remove from tracking immediately
 		_plantVisuals[entityId] = nil
@@ -153,18 +263,56 @@ end)
 -- Damage flash effect
 Network.EntityDamaged.On(function(data)
 	local visual = _plantVisuals[data.EntityId]
-	if visual then
-		-- Flash red briefly
-		local originalColor = visual.Part.Color
-		visual.Part.Color = Color3.fromRGB(255, 100, 100)
+	if not visual then return end
+	
+	local vfx = getVFXService()
+	
+	if visual.Model then
+		-- Flash all parts in the model
+		local partsToFlash: {BasePart} = {}
+		local originalColors: {Color3} = {}
+		
+		for _, part in visual.Model:GetDescendants() do
+			if part:IsA("BasePart") and part.Transparency < 1 then
+				table.insert(partsToFlash, part)
+				table.insert(originalColors, part.Color)
+				part.Color = Color3.fromRGB(255, 100, 100)
+			end
+		end
 		
 		task.delay(0.1, function()
-			if visual.Part and visual.Part.Parent then
-				visual.Part.Color = originalColor
+			for i, part in partsToFlash do
+				if part and part.Parent then
+					part.Color = originalColors[i]
+				end
 			end
 		end)
+	elseif visual.Part then
+		-- Flash fallback cube
+		if vfx then
+			vfx.FlashDamage(visual.Part)
+		else
+			local originalColor = visual.Part.Color
+			visual.Part.Color = Color3.fromRGB(255, 100, 100)
+			task.delay(0.1, function()
+				if visual.Part and visual.Part.Parent then
+					visual.Part.Color = originalColor
+				end
+			end)
+		end
 	end
 end)
+
+--[[
+	Get the visual Model/Part for an entity (used by other systems for VFX)
+]]
+local function getPlantVisual(entityId: number): (Model?, Part?)
+	local visual = _plantVisuals[entityId]
+	if visual then
+		return visual.Model, visual.Part
+	end
+	return nil, nil
+end
 
 local function PlantRenderSystem(world)
 	-- Plants are static, no per-frame updates needed
@@ -174,4 +322,5 @@ end
 return {
 	system = PlantRenderSystem,
 	priority = 405,
+	getPlantVisual = getPlantVisual,
 }

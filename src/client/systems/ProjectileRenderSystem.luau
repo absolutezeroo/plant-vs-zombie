@@ -6,6 +6,11 @@
 	
 	Receives projectile spawn events from server via Zap.
 	Creates visual pea projectiles with movement.
+	
+	Attachment-based positioning:
+	- If a source plant visual exists, spawns projectile at "Muzzle" Attachment
+	- This respects the "spatial contract" between Artists and Code
+	- Fallback to server-provided StartX if no model/attachment found
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +19,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
+local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 local Logger = require(Shared.utils.Logger)
 
 local Client = script.Parent.Parent
@@ -65,6 +71,30 @@ local function getLaneZ(lane: number): number
 	return (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
 end
 
+--[[
+	Find source plant model to get Muzzle Attachment position
+	RULE: Never use hardcoded Vector3 offsets
+]]
+local function findPlantModelInLane(lane: number, nearX: number): Model?
+	-- Look for plant visuals in workspace
+	for _, child in Workspace:GetChildren() do
+		if child:IsA("Model") and child.Name:find("Plant_") then
+			local root = child.PrimaryPart
+			if root then
+				-- Check if in same lane (approximately same Z)
+				local expectedZ = getLaneZ(lane)
+				if math.abs(root.Position.Z - expectedZ) < 3 then
+					-- Check if close to startX
+					if math.abs(root.Position.X - nearX) < 5 then
+						return child
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
 local function createProjectileVisual(entityId: number, lane: number, startX: number): ProjectileVisual
 	local part = Instance.new("Part")
 	part.Name = `Pea_{entityId}`
@@ -78,9 +108,19 @@ local function createProjectileVisual(entityId: number, lane: number, startX: nu
 	part.CanQuery = false
 	part.CastShadow = false
 	
+	-- Try to find source plant and use its Muzzle Attachment
 	local z = getLaneZ(lane)
-	part.Position = Vector3.new(startX, 2.5, z)
+	local spawnPos = Vector3.new(startX, 2.5, z) -- Default fallback
 	
+	local plantModel = findPlantModelInLane(lane, startX - 2) -- startX is already offset
+	if plantModel then
+		-- Use Muzzle Attachment position (the spatial contract!)
+		local muzzlePos = AttachmentUtils.GetWorldPosition(plantModel, AttachmentUtils.Names.Muzzle, false)
+		spawnPos = muzzlePos
+		Logger.Debug("ProjectileRender", `Pea {entityId} spawning from Muzzle attachment`)
+	end
+	
+	part.Position = spawnPos
 	part:SetAttribute("EntityId", entityId)
 	part.Parent = Workspace
 	

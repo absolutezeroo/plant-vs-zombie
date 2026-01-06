@@ -1758,6 +1758,89 @@ end
 
 ---
 
+#### Pattern 4: Attachment-Based Spatial Contracts
+
+**Purpose:** Separate visual assets from game logic, enabling Artists and Developers to work independently without breaking each other's code.
+
+**Core Principle:** Code is geometry-blind — code NEVER knows model dimensions or uses hardcoded `Vector3` offsets. Attachments serve as the bridge.
+
+**Standard Model Structure:**
+
+```
+{EntityType} (Model)
+├── Root (Part) ────────── PrimaryPart (invisible, anchored)
+├── Visual (Model) ─────── All visible parts
+├── VFX (Folder) ───────── Optional particle templates
+│   ├── Shoot (ParticleEmitter)
+│   ├── Death (ParticleEmitter)
+│   └── Idle (ParticleEmitter)
+└── [Attributes]
+    ├── EntityType = "{Type}"
+    └── Anim_* = animation parameters
+```
+
+**Standard Attachments (on Root):**
+
+| Attachment | Purpose |
+|------------|---------|
+| `Muzzle` | Projectile spawn point |
+| `Center` | Mass center (targeting, effects) |
+| `Overhead` | Health bar / indicator position |
+| `Torso` | Enemy targeting point (zombies) |
+
+**Implementation Rules:**
+
+```lua
+-- ❌ FORBIDDEN: Hardcoded offsets
+local pos = part.Position + Vector3.new(0, 2, 0) -- NEVER!
+
+-- ✅ REQUIRED: Attachment-based positioning
+local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+local pos = AttachmentUtils.GetWorldPosition(model, "Muzzle")
+```
+
+**AttachmentUtils API:**
+
+```lua
+-- Get position from Attachment, with fallback to model center
+local pos = AttachmentUtils.GetWorldPosition(model, "Muzzle")
+
+-- Get CFrame for orientation (projectile direction)
+local cf = AttachmentUtils.GetWorldCFrame(model, "Muzzle")
+
+-- Check if model has an attachment
+local hasMuzzle = AttachmentUtils.HasAttachment(model, "Muzzle")
+
+-- Standard attachment names
+AttachmentUtils.Names.Muzzle   -- "Muzzle"
+AttachmentUtils.Names.Center   -- "Center"
+AttachmentUtils.Names.Overhead -- "Overhead"
+AttachmentUtils.Names.Torso    -- "Torso"
+```
+
+**Integration Points:**
+
+| System | Attachment | Usage |
+|--------|------------|-------|
+| **ProjectileRenderSystem** | `Muzzle` | Spawn pea visuals at muzzle position |
+| **VFXService** | `Muzzle`, `Center` | Shoot VFX at muzzle, death VFX at center |
+| **GhostPreviewSystem** | N/A | Clone real model with transparent tint |
+| **FloatingTextUI** | `Overhead` | Position damage numbers above entity |
+
+**Fallback Safety:**
+
+If an Attachment is missing, `GetWorldPosition` returns model center + logs a warning. This ensures code never breaks due to missing Attachments while alerting Artists to add them.
+
+**Artist Workflow:**
+
+1. Create model with `Root` Part as PrimaryPart
+2. Add Attachments to Root at semantic points
+3. Place visuals in `Visual` subfolder
+4. Add particle templates to `VFX` folder
+5. Code automatically uses the Attachments — no coordination needed
+
+---
+
 ### Standard Implementation Patterns
 
 These conventions apply to all code across the project.

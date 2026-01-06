@@ -20,6 +20,9 @@ _bmad-output/
 *.rbxmx
 !*.rbxm.source
 !*.rbxlx.source
+*.rbxl.lock
+*.rbxm.lock
+*.rbxlx.lock
 
 # ================================
 # Wally (Package Manager)
