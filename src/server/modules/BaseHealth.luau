@@ -26,6 +26,7 @@ local Config = {
 -- State
 local _currentHealth = Config.MAX_HEALTH
 local _isDefeated = false
+local _damageEventCount = 0  -- Track how many times base was hit (for star rating)
 
 local BaseHealth = {}
 
@@ -48,6 +49,7 @@ function BaseHealth.TakeDamage(amount: number)
 	
 	local oldHealth = _currentHealth
 	_currentHealth = math.max(0, _currentHealth - amount)
+	_damageEventCount += 1  -- Track damage events for star rating
 	
 	Logger.Warn("BaseHealth", `Base took {amount} damage! ({oldHealth} -> {_currentHealth}/{Config.MAX_HEALTH})`)
 	
@@ -75,9 +77,28 @@ function BaseHealth.OnZombieReachedHouse()
 	BaseHealth.TakeDamage(Config.ZOMBIE_DAMAGE)
 end
 
+-- Star Rating System
+-- 3 stars: No damage taken (perfect run)
+-- 2 stars: 1-2 damage events (lawn mowers used)
+-- 1 star: 3+ damage events (survived)
+function BaseHealth.GetStarRating(): number
+	if _damageEventCount == 0 then
+		return 3
+	elseif _damageEventCount <= 2 then
+		return 2
+	else
+		return 1
+	end
+end
+
+function BaseHealth.GetDamageEventCount(): number
+	return _damageEventCount
+end
+
 function BaseHealth.Reset()
 	_currentHealth = Config.MAX_HEALTH
 	_isDefeated = false
+	_damageEventCount = 0  -- Reset damage tracking
 	
 	Logger.Info("BaseHealth", `Base health reset to {Config.MAX_HEALTH}`)
 	

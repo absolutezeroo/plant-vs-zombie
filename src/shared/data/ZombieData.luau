@@ -11,7 +11,7 @@ export type ZombieStats = {
 	Speed: number,          -- Studs per second
 	Damage: number,         -- Damage per bite
 	AttackSpeed: number,    -- Seconds between attacks
-	Category: string,       -- "Normal", "Armored", "Special"
+	Category: string,       -- "Normal", "Armored", "Special", "Boss"
 	
 	-- Wave spawn config (data-driven)
 	SpawnCost: number,      -- Budget cost to spawn this zombie
@@ -20,11 +20,20 @@ export type ZombieStats = {
 	CanJump: boolean?,      -- Can vault over first plant (Pole Vaulter)
 	HasRage: boolean?,      -- Speeds up when armor destroyed (Newspaper)
 	IsFlagBearer: boolean?, -- Spawns at wave start (Flag zombie)
+	IsFlying: boolean?,     -- Flies over ground plants (Balloon)
+	IsBoss: boolean?,       -- Boss type - spawns Imp on half health (Gargantuar)
 	
 	-- Rage stats (for HasRage zombies)
 	RageSpeed: number?,     -- Speed when enraged
 	RageAttackSpeed: number?, -- Attack speed when enraged
 	ArmorHealth: number?,   -- Health of removable armor (newspaper, cone, bucket)
+	
+	-- Flying stats (for IsFlying zombies)
+	FlyHeight: number?,     -- Y offset when flying (default 3)
+	
+	-- Boss stats (for IsBoss zombies)
+	SpawnsOnHalfHealth: string?, -- Zombie type to spawn at 50% HP
+	SpawnCount: number?,    -- How many to spawn
 }
 
 local ZombieData: {[string]: ZombieStats} = {
@@ -118,6 +127,54 @@ local ZombieData: {[string]: ZombieStats} = {
 		SpawnCost = 10,
 		-- Behavior
 		IsFlagBearer = true,
+	},
+	
+	-- ============================================
+	-- Flying Zombies
+	-- ============================================
+	
+	-- Balloon zombie - flies over ground plants, only hit by Cactus/Cattail
+	Balloon = {
+		Health = 75,        -- Fragile when popped
+		Speed = 1.2,        -- Slower than walking
+		Damage = 20,
+		AttackSpeed = 1.0,
+		Category = "Special",
+		SpawnCost = 20,
+		-- Flying behavior
+		IsFlying = true,
+		FlyHeight = 4,      -- Studs above ground
+	},
+	
+	-- ============================================
+	-- Boss Zombies
+	-- ============================================
+	
+	-- Gargantuar - massive boss, throws Imp at half health
+	Gargantuar = {
+		Health = 3000,      -- Extremely tanky
+		Speed = 0.8,        -- Slow but devastating
+		Damage = 100,       -- Instant-kills most plants
+		AttackSpeed = 1.5,  -- Slow swings
+		Category = "Boss",
+		SpawnCost = 150,    -- Equivalent to 15 basics
+		-- Boss behavior
+		IsBoss = true,
+		SpawnsOnHalfHealth = "Imp",
+		SpawnCount = 1,
+	},
+	
+	-- Mini-Gargantuar for easier waves
+	MiniGargantuar = {
+		Health = 1500,
+		Speed = 1.0,
+		Damage = 50,
+		AttackSpeed = 1.2,
+		Category = "Boss",
+		SpawnCost = 80,
+		IsBoss = true,
+		SpawnsOnHalfHealth = "Imp",
+		SpawnCount = 1,
 	},
 }
 

@@ -39,6 +39,7 @@ return {
 	ChewingComponent = require(Combat.ChewingComponent),
 	EnhancedProjectileComponent = require(Combat.EnhancedProjectileComponent),
 	HidingComponent = require(Combat.HidingComponent),
+	PlantFoodComponent = require(Combat.PlantFoodComponent),
 	ProjectileComponent = require(Combat.ProjectileComponent),
 	SlowComponent = require(Combat.SlowComponent),
 	SplashComponent = require(Combat.SplashComponent),

@@ -22,6 +22,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
+local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
 
@@ -207,7 +208,16 @@ local function CombatSystem(world: MatterWorld)
 		-- Check for multi-directional projectiles (Starfruit)
 		local isMultiDir = proj.DirectionZ and proj.DirectionZ ~= 0
 		
+		-- Check if projectile can hit flying zombies
+		local canHitFlying = proj.CanHitFlying or false
+		
 		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+			-- Check if zombie is flying and projectile can't hit flying
+			local zombieStats = ZombieData[zombie.ZombieType]
+			if zombieStats and zombieStats.IsFlying and not canHitFlying then
+				continue -- Skip flying zombies for non-flying projectiles
+			end
+			
 			local inRange = false
 			
 			if isMultiDir then

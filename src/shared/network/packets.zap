@@ -338,6 +338,7 @@ event GameEndRewards = {
         ZombiesKilled: u16,
         WavesCompleted: u8,
         BonusCoins: u16,
+        StarRating: u8,  -- 1-3 stars based on base damage taken
     }
 }
 
@@ -351,6 +352,54 @@ event ExplosionVFX = {
         PositionY: f32,
         PositionZ: f32,
         Radius: f32,
+    }
+}
+
+-- ===================
+-- PLANT FOOD SYSTEM
+-- ===================
+
+-- Client requests to use Plant Food on a plant
+event PlantFoodRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantEntityId: EntityId,  -- Target plant to power up
+    }
+}
+
+-- Server notifies Plant Food charge collected
+event PlantFoodCollected = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        CollectorId: f64,         -- Player who collected it
+        NewChargeCount: u8,       -- Updated charge count (0-3)
+        ZombieEntityId: EntityId, -- Zombie that dropped it
+    }
+}
+
+-- Server notifies Plant Food activated on a plant
+event PlantFoodActivated = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PlantEntityId: EntityId,  -- Plant that was powered up
+        PlantType: PlantType,     -- For ability VFX
+        OwnerId: f64,             -- Player who activated it
+    }
+}
+
+-- Server updates player's Plant Food charges
+event PlantFoodChargeUpdate = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        ChargeCount: u8,  -- Current charges (0-3)
     }
 }
 

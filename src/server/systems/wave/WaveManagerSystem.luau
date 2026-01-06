@@ -56,6 +56,17 @@ local PositionComponent = Components.PositionComponent
 local HealthComponent = Components.HealthComponent
 local MovementComponent = Components.MovementComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
+local PlantFoodComponent = Components.PlantFoodComponent
+
+-- Lazy-load PlantFoodSystem for glowing zombie checks
+local _plantFoodSystem: any = nil
+local function getPlantFoodSystem()
+	if not _plantFoodSystem then
+		local Systems = script.Parent.Parent
+		_plantFoodSystem = require(Systems.combat.PlantFoodSystem)
+	end
+	return _plantFoodSystem
+end
 
 -- Wave configuration
 local WaveConfig = {
@@ -140,6 +151,9 @@ function WaveManager.SetGameState(state: GameState)
 		local PlayerDataService = getPlayerDataService()
 		local EntityDeathSystem = getEntityDeathSystem()
 		
+		-- Get star rating from BaseHealth module
+		local starRating = if isVictory then BaseHealth.GetStarRating() else 0
+		
 		for _, player in Players:GetPlayers() do
 			-- Get session stats
 			local sessionStats = EntityDeathSystem.API.GetSessionStats(player)
@@ -162,6 +176,7 @@ function WaveManager.SetGameState(state: GameState)
 				ZombiesKilled = sessionStats.ZombiesKilled,
 				WavesCompleted = _currentWave,
 				BonusCoins = bonusCoins,
+				StarRating = starRating,
 			})
 		end
 		
@@ -253,6 +268,15 @@ local function spawnZombie(world: any, zombieType: string, lane: number): number
 		})
 	)
 	
+	-- Check if this zombie should be a Plant Food carrier (glowing)
+	local PlantFoodSystemAPI = getPlantFoodSystem().API
+	if PlantFoodSystemAPI.ShouldZombieBeGlowing() then
+		world:insert(entityId, PlantFoodComponent({
+			IsGlowing = true,
+		}))
+		Logger.Info("WaveManager", `[Wave {_currentWave}] 🌟 GLOWING {zombieType} in lane {lane}`)
+	end
+	
 	-- Broadcast to clients
 	Network.ZombieSpawned.FireAll({
 		EntityId = entityId,
@@ -297,6 +321,10 @@ local function startWave(waveNumber: number)
 	_spawnQueue = {}
 	_lastSpawnTime = os.clock()
 	_waveStartTime = os.clock()
+	
+	-- Reset Plant Food glowing tracking for this wave
+	local PlantFoodSystemAPI = getPlantFoodSystem().API
+	PlantFoodSystemAPI.ResetWaveTracking()
 	
 	Logger.Info("WaveManager", `=== WAVE {waveNumber} START === Budget: {math.floor(_totalBudget)}`)
 	

@@ -115,6 +115,7 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	local stunChance = (stats and stats.StunChance) or 0
 	local stunDuration = (stats and stats.StunDuration) or 0
 	local range = (stats and stats.Range) or 0 -- 0 = unlimited
+	local canHitFlying = (stats and stats.CanHitFlying) or false
 	
 	-- Projectile spawn offset (data-driven with defaults)
 	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
@@ -144,6 +145,7 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 			StunChance = stunChance,
 			StunDuration = stunDuration,
 			MaxRange = if range > 0 then range else ProjectileDefaults.MAX_RANGE,
+			CanHitFlying = canHitFlying,
 		})
 	)
 	
