@@ -50,6 +50,8 @@ local ProjectileDefaults = {
 	SLOW_DURATION = 3,       -- Default slow duration
 	SHOT_DELAY = 0.1,        -- Default delay for multi-shot plants
 	CATAPULT_SPEED = 10,     -- Slower for arcing projectiles
+	SPAWN_OFFSET_X = 2,      -- Default X offset from plant center
+	SPAWN_OFFSET_Y = 2.5,    -- Default Y (height) of projectile spawn
 }
 
 -- Track last fire time per plant
@@ -114,12 +116,17 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	local stunDuration = (stats and stats.StunDuration) or 0
 	local range = (stats and stats.Range) or 0 -- 0 = unlimited
 	
+	-- Projectile spawn offset (data-driven with defaults)
+	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
+	local offsetX = if spawnOffset then spawnOffset.X else ProjectileDefaults.SPAWN_OFFSET_X
+	local offsetY = if spawnOffset then spawnOffset.Y else ProjectileDefaults.SPAWN_OFFSET_Y
+	
 	local speed = if isCatapult then ProjectileDefaults.CATAPULT_SPEED else ProjectileDefaults.SPEED
 	
 	local entityId = world:spawn(
 		PositionComponent({
-			X = startX + (2 * dir), -- Slightly ahead/behind plant
-			Y = 2.5,                -- At plant height
+			X = startX + (offsetX * dir), -- Offset from plant center (direction-aware)
+			Y = offsetY,                  -- Height from config
 			Z = z
 		}),
 		ProjectileComponent({
@@ -186,6 +193,11 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	local stats = PlantData[plantType]
 	local damage = (stats and stats.Damage) or ProjectileDefaults.DAMAGE
 	
+	-- Projectile spawn offset (data-driven with defaults)
+	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
+	local offsetX = if spawnOffset then spawnOffset.X else ProjectileDefaults.SPAWN_OFFSET_X
+	local offsetY = if spawnOffset then spawnOffset.Y else ProjectileDefaults.SPAWN_OFFSET_Y
+	
 	local directions = {
 		{dx = 1, dz = 0},    -- Right
 		{dx = -1, dz = 0},   -- Left
@@ -197,9 +209,9 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	for _, dir in directions do
 		local entityId = world:spawn(
 			PositionComponent({
-				X = startX + dir.dx * 2,
-				Y = 2.5,
-				Z = z + dir.dz * 2
+				X = startX + dir.dx * offsetX,
+				Y = offsetY,
+				Z = z + dir.dz * offsetX
 			}),
 			ProjectileComponent({
 				Damage = damage,
@@ -216,7 +228,7 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 		Network.ProjectileSpawned.FireAll({
 			EntityId = entityId,
 			Lane = lane :: any,
-			StartX = startX + dir.dx * 2,
+			StartX = startX + dir.dx * offsetX,
 			TargetEntityId = nil,
 		})
 	end

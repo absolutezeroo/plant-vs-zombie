@@ -25,7 +25,7 @@ local Logger = require(Shared.utils.Logger)
 -- Network
 local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
-local GridState = require(Server.modules.GridState)
+local GridService = require(Server.services.GridService)
 
 -- Components
 local PositionComponent = Components.PositionComponent

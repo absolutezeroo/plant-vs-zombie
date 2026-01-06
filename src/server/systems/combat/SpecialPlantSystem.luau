@@ -28,7 +28,7 @@ local Logger = require(Shared.utils.Logger)
 -- Network (script.Parent.Parent.Parent = server root, since we're in systems/combat/)
 local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
-local GridState = require(Server.modules.GridState)
+local GridService = require(Server.services.GridService)
 
 -- Components (via index module)
 local PositionComponent = Components.PositionComponent
@@ -199,9 +199,9 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	-- Clear grid cell
 	local plant = world:get(entityId, PlantTypeComponent)
 	if plant then
-		GridState.Clear(plant.Column, plant.Lane)
+		GridService.Clear(plant.Column, plant.Lane)
 	end
-	
+
 	-- Broadcast entity death
 	Network.EntityDied.FireAll({
 		EntityId = entityId,
@@ -227,9 +227,9 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 	-- Clear grid cell
 	local plant = world:get(mineId, PlantTypeComponent)
 	if plant then
-		GridState.Clear(plant.Column, plant.Lane)
+		GridService.Clear(plant.Column, plant.Lane)
 	end
-	
+
 	-- Broadcast explosion VFX
 	Network.ExplosionVFX.FireAll({
 		PositionX = minePos.X,
@@ -395,7 +395,7 @@ local function SpecialPlantSystem(world)
 				end
 				
 				-- Squash dies after landing
-				GridState.Clear(plant.Column, plant.Lane)
+				GridService.Clear(plant.Column, plant.Lane)
 				Network.EntityDied.FireAll({ EntityId = plantId })
 				world:despawn(plantId)
 			end

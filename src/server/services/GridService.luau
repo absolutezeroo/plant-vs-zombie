@@ -1,16 +1,18 @@
 --!strict
 --[[
-	GridState.luau - Server-authoritative grid occupancy tracking
+	GridService.luau - Server-authoritative grid occupancy tracking (Singleton)
 	
 	Tracks which cells are occupied by plants.
 	PHILOSOPHY: "Single source of truth" - only server modifies this.
+	
+	This is a Service (Singleton), not a utility module.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
 
-local GridState = {}
+local GridService = {}
 
 -- 2D array: _occupancy[column][lane] = entityId or nil
 local _occupancy: {{number?}} = {}
@@ -34,7 +36,7 @@ initGrid()
 	@param lane number - Lane index (1-5)
 	@return boolean - True if cell has a plant
 ]]
-function GridState.IsOccupied(column: number, lane: number): boolean
+function GridService.IsOccupied(column: number, lane: number): boolean
 	if not _occupancy[column] then
 		return false
 	end
@@ -48,11 +50,16 @@ end
 	@param lane number - Lane index (1-5)
 	@return number? - Entity ID or nil if empty
 ]]
-function GridState.GetEntityAt(column: number, lane: number): number?
+function GridService.GetEntityAt(column: number, lane: number): number?
 	if not _occupancy[column] then
 		return nil
 	end
 	return _occupancy[column][lane]
+end
+
+-- Alias for GetEntityAt (backwards compatibility)
+function GridService.GetEntity(column: number, lane: number): number?
+	return GridService.GetEntityAt(column, lane)
 end
 
 --[[
@@ -63,8 +70,8 @@ end
 	@param entityId number - Entity ID of the plant
 	@return boolean - True if successful, false if already occupied
 ]]
-function GridState.Occupy(column: number, lane: number, entityId: number): boolean
-	if GridState.IsOccupied(column, lane) then
+function GridService.Occupy(column: number, lane: number, entityId: number): boolean
+	if GridService.IsOccupied(column, lane) then
 		return false
 	end
 	
@@ -82,7 +89,7 @@ end
 	@param column number - Column index (1-9)
 	@param lane number - Lane index (1-5)
 ]]
-function GridState.Clear(column: number, lane: number)
+function GridService.Clear(column: number, lane: number)
 	if _occupancy[column] then
 		_occupancy[column][lane] = nil
 	end
@@ -94,7 +101,7 @@ end
 	@param entityId number - Entity ID to remove
 	@return boolean - True if found and removed
 ]]
-function GridState.ClearByEntity(entityId: number): boolean
+function GridService.ClearByEntity(entityId: number): boolean
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do
 			if _occupancy[column] and _occupancy[column][lane] == entityId then
@@ -109,7 +116,7 @@ end
 --[[
 	Reset entire grid (for new game)
 ]]
-function GridState.Reset()
+function GridService.Reset()
 	initGrid()
 end
 
@@ -118,7 +125,7 @@ end
 	
 	@return number - Number of plants on grid
 ]]
-function GridState.GetPlantCount(): number
+function GridService.GetPlantCount(): number
 	local count = 0
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do
@@ -135,7 +142,7 @@ end
 	
 	@return {{Column: number, Lane: number, EntityId: number}}
 ]]
-function GridState.GetAllOccupied(): {{Column: number, Lane: number, EntityId: number}}
+function GridService.GetAllOccupied(): {{Column: number, Lane: number, EntityId: number}}
 	local occupied = {}
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do
@@ -152,4 +159,4 @@ function GridState.GetAllOccupied(): {{Column: number, Lane: number, EntityId: n
 	return occupied
 end
 
-return GridState
+return GridService

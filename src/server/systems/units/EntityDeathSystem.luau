@@ -26,7 +26,7 @@ local ProgressionData = require(Shared.data.ProgressionData)
 -- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
 local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
-local GridState = require(Server.modules.GridState)
+local GridService = require(Server.services.GridService)
 
 -- Components (via index module)
 local HealthComponent = Components.HealthComponent
@@ -77,7 +77,7 @@ local function EntityDeathSystem(world)
 			-- Check if it's a plant (need to clear grid)
 			local plant = world:get(id, PlantTypeComponent)
 			if plant then
-				GridState.Clear(plant.Column, plant.Lane)
+				GridService.Clear(plant.Column, plant.Lane)
 				Logger.Info("EntityDeath", `Plant {id} ({plant.PlantType}) died at ({plant.Column}, {plant.Lane})`)
 			end
 			

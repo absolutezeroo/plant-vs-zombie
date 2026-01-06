@@ -35,6 +35,7 @@ export type PlantStats = {
 	SlowPercent: number?,    -- Slow multiplier for IsFrozen (default 0.5)
 	SlowDuration: number?,   -- Slow duration in seconds (default 3)
 	ShotDelay: number?,      -- Delay between multi-shots for IsRepeater (default 0.1)
+	ProjectileSpawnOffset: Vector3?, -- Offset from plant center for projectile spawn (default Vector3.new(2, 2.5, 0))
 	
 	-- Explosive stats (for IsExplosive plants)
 	FuseTime: number?,       -- Seconds before explosion for ExplodesOnPlace (default 0.5)

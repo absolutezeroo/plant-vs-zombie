@@ -34,7 +34,7 @@ local OwnerComponent = Components.OwnerComponent
 
 -- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
 local Server = script.Parent.Parent.Parent
-local GridState = require(Server.modules.GridState)
+local GridService = require(Server.services.GridService)
 local Network = require(Server.network.generated)
 
 -- Player sun tracking (temporary until ProfileStore integration)
@@ -77,7 +77,7 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	end
 	
 	-- Get what's currently in the cell
-	local existingEntityId = GridState.GetEntity(column, lane)
+	local existingEntityId = GridService.GetEntity(column, lane)
 	local existingPlant = nil
 	local existingStats = nil
 	
@@ -165,9 +165,9 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	local worldPos = GridUtils.GridToWorld(column, lane)
 	
 	-- Check for special stacking cases
-	local existingEntityId = GridState.GetEntity(column, lane)
-	
-	-- Handle Coffee Bean - wakes mushroom and disappears
+	local existingEntityId = GridService.GetEntity(column, lane)
+
+	-- Handle Coffee Bean- wakes mushroom and disappears
 	if stats.CanStackOnMushroom and stats.WakesMushrooms then
 		if existingEntityId and world:contains(existingEntityId) then
 			local Systems = script.Parent.Parent
@@ -209,7 +209,7 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	
 	-- Mark cell as occupied (only if not stacking)
 	if not stats.CanStackOnPlant and not existingEntityId then
-		GridState.Occupy(column, lane, entityId)
+		GridService.Occupy(column, lane, entityId)
 	end
 	
 	-- Deduct sun
