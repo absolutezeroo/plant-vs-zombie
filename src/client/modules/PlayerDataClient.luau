@@ -35,6 +35,11 @@ local PlayerData = {
 	-- Current deck (up to 6 plants)
 	Deck = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
 	
+	-- Stage progression
+	CurrentStage = Value(_scope, "1-1"),
+	TotalStars = Value(_scope, 0),
+	CompletedStages = Value(_scope, {} :: {[string]: number}), -- StageId -> Stars
+	
 	-- Session stats (reset per game)
 	SessionCoinsEarned = Value(_scope, 0),
 	SessionZombiesKilled = Value(_scope, 0),
@@ -221,6 +226,49 @@ function PlayerDataClient.SetDeckLocal(deck: {string})
 	PlayerData.Deck:set(deck)
 end
 
+-- ============================================
+-- STAGE SYSTEM
+-- ============================================
+
+-- Get current stage (reactive Value)
+function PlayerDataClient.GetCurrentStageValue()
+	return PlayerData.CurrentStage
+end
+
+-- Get current stage
+function PlayerDataClient.GetCurrentStage(): string
+	return Fusion.peek(PlayerData.CurrentStage)
+end
+
+-- Get total stars (reactive Value)
+function PlayerDataClient.GetTotalStarsValue()
+	return PlayerData.TotalStars
+end
+
+-- Get completed stages (reactive Value)
+function PlayerDataClient.GetCompletedStagesValue()
+	return PlayerData.CompletedStages
+end
+
+-- Get stars for a specific stage
+function PlayerDataClient.GetStageStars(stageId: string): number
+	local completed = Fusion.peek(PlayerData.CompletedStages)
+	return completed[stageId] or 0
+end
+
+-- Check if stage is completed
+function PlayerDataClient.IsStageCompleted(stageId: string): boolean
+	return PlayerDataClient.GetStageStars(stageId) > 0
+end
+
+-- Request to start a stage
+function PlayerDataClient.RequestStartStage(stageId: string)
+	Logger.Debug("PlayerData", `Requesting start stage: {stageId}`)
+	Network.StartStageRequest.Fire({
+		StageId = stageId,
+	})
+end
+
 -- Initialize and connect to server events
 function PlayerDataClient.Initialize()
 	-- Handle full data sync from server (SingleAsync = SetCallback)
@@ -281,7 +329,7 @@ function PlayerDataClient.Initialize()
 	end)
 	
 	-- Handle deck sync from server
-	Network.DeckSync.On(function(data)
+	Network.DeckSync.SetCallback(function(data)
 		local deck = {}
 		if data.Slot1 then table.insert(deck, tostring(data.Slot1)) end
 		if data.Slot2 then table.insert(deck, tostring(data.Slot2)) end
@@ -295,12 +343,55 @@ function PlayerDataClient.Initialize()
 	end)
 	
 	-- Handle deck save response
-	Network.DeckSaved.On(function(data)
+	Network.DeckSaved.SetCallback(function(data)
 		if data.Success then
 			Logger.Info("PlayerData", "Deck saved successfully")
 		else
 			Logger.Warn("PlayerData", `Failed to save deck: {data.Error or "unknown error"}`)
 		end
+	end)
+	
+	-- Handle stage progress sync from server
+	Network.StageProgressSync.SetCallback(function(data)
+		PlayerData.CurrentStage:set(data.CurrentStage)
+		PlayerData.TotalStars:set(data.TotalStars)
+		
+		-- Build completed stages map from parallel arrays
+		local completed: {[string]: number} = {}
+		for i, stageId in data.CompletedStageIds do
+			completed[stageId] = data.CompletedStageStars[i] or 0
+		end
+		PlayerData.CompletedStages:set(completed)
+		
+		Logger.Info("PlayerData", `Received stage progress: {data.CurrentStage}, {data.TotalStars} total stars`)
+	end)
+	
+	-- Handle stage started event
+	Network.StageStarted.On(function(data)
+		PlayerData.CurrentStage:set(data.StageId)
+		Logger.Info("PlayerData", `Stage started: {data.StageName} ({data.WaveCount} waves)`)
+	end)
+	
+	-- Handle stage complete event
+	Network.StageComplete.SetCallback(function(data)
+		if data.Victory then
+			-- Update completed stages
+			local completed = Fusion.peek(PlayerData.CompletedStages)
+			local newCompleted = table.clone(completed)
+			if data.Stars > (newCompleted[data.StageId] or 0) then
+				newCompleted[data.StageId] = data.Stars
+				PlayerData.CompletedStages:set(newCompleted)
+			end
+			
+			-- Update total stars
+			local totalStars = 0
+			for _, stars in newCompleted do
+				totalStars += stars
+			end
+			PlayerData.TotalStars:set(totalStars)
+		end
+		
+		Logger.Info("PlayerData", `Stage complete: {data.StageId} - {if data.Victory then "Victory" else "Defeat"} ({data.Stars} stars)`)
 	end)
 	
 	Logger.Info("PlayerData", "PlayerDataClient initialized")

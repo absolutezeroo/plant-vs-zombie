@@ -23,6 +23,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
+local StageData = require(Shared.data.StageData)
 local ProgressionData = require(Shared.data.ProgressionData)
 local Logger = require(Shared.utils.Logger)
 
@@ -68,7 +69,7 @@ local function getPlantFoodSystem()
 	return _plantFoodSystem
 end
 
--- Wave configuration
+-- Wave configuration (defaults, overridden by StageData)
 local WaveConfig = {
 	TOTAL_WAVES = 10,         -- Total waves to complete for victory
 	BASE_BUDGET = 50,         -- Base budget multiplier
@@ -91,6 +92,10 @@ local WaveConfig = {
 -- Default spawn cost fallback (if ZombieData doesn't specify)
 local DEFAULT_SPAWN_COST = 10
 
+-- Current stage configuration (set when starting a stage)
+local _currentStageId: string = "1-1"
+local _currentStageConfig: StageData.StageConfig? = nil
+
 -- Get zombie spawn cost from ZombieData (data-driven)
 local function getZombieCost(zombieType: string): number
 	local stats = ZombieData[zombieType]
@@ -101,12 +106,48 @@ local function getZombieCost(zombieType: string): number
 	return DEFAULT_SPAWN_COST
 end
 
--- Spawn pool per phase (weighted)
-local SpawnPools = {
-	Trickle = {"Basic", "Basic", "Basic", "Cone", "Imp"},
-	Assault = {"Basic", "Basic", "Cone", "Cone", "Bucket", "Imp", "Imp"},
-	Flag = {"Cone", "Cone", "Bucket", "Bucket", "Pole", "Imp"},
-}
+-- Get zombie health with stage multiplier
+local function getZombieHealth(zombieType: string): number
+	local stats = ZombieData[zombieType]
+	if not stats then return 100 end
+	
+	local baseHealth = stats.Health
+	local mult = if _currentStageConfig then (_currentStageConfig.ZombieHealthMult or 1) else 1
+	return math.floor(baseHealth * mult)
+end
+
+-- Get zombie speed with stage multiplier
+local function getZombieSpeed(zombieType: string): number
+	local stats = ZombieData[zombieType]
+	if not stats then return 1.5 end
+	
+	local baseSpeed = stats.Speed
+	local mult = if _currentStageConfig then (_currentStageConfig.ZombieSpeedMult or 1) else 1
+	return baseSpeed * mult
+end
+
+-- Build spawn pools from stage zombie pool
+local function buildSpawnPools(): {Trickle: {string}, Assault: {string}, Flag: {string}}
+	if _currentStageConfig and _currentStageConfig.ZombiePool then
+		local pool = _currentStageConfig.ZombiePool
+		-- Use stage pool for all phases, with some weighting
+		return {
+			Trickle = pool,
+			Assault = pool,
+			Flag = pool,
+		}
+	end
+	
+	-- Default fallback pools
+	return {
+		Trickle = {"Basic", "Basic", "Basic", "Cone", "Imp"},
+		Assault = {"Basic", "Basic", "Cone", "Cone", "Bucket", "Imp", "Imp"},
+		Flag = {"Cone", "Cone", "Bucket", "Bucket", "Pole", "Imp"},
+	}
+end
+
+-- Dynamic spawn pools (rebuilt when stage changes)
+local SpawnPools = buildSpawnPools()
 
 -- Game state
 export type GameState = "Waiting" | "Playing" | "Intermission" | "Victory" | "Defeat"
@@ -154,13 +195,39 @@ function WaveManager.SetGameState(state: GameState)
 		-- Get star rating from BaseHealth module
 		local starRating = if isVictory then BaseHealth.GetStarRating() else 0
 		
+		-- Get stage rewards
+		local stageCoins = 0
+		local stageXP = 0
+		local firstClearBonus = 0
+		
+		if _currentStageConfig then
+			stageCoins = _currentStageConfig.CoinReward or 0
+			stageXP = _currentStageConfig.XPReward or 0
+			if _currentStageConfig.FirstClearBonus then
+				firstClearBonus = _currentStageConfig.FirstClearBonus
+			end
+		end
+		
 		for _, player in Players:GetPlayers() do
 			-- Get session stats
 			local sessionStats = EntityDeathSystem.API.GetSessionStats(player)
 			
-			-- Award victory bonus coins
-			if bonusCoins > 0 then
-				PlayerDataService.AddCoins(player, bonusCoins)
+			-- Check if first clear
+			local previousStars = PlayerDataService.GetStageStars(player, _currentStageId)
+			local isFirstClear, isNewBest = false, false
+			
+			if isVictory then
+				isFirstClear, isNewBest = PlayerDataService.CompleteStage(player, _currentStageId, starRating)
+			end
+			
+			-- Calculate total coins
+			local totalCoins = sessionStats.CoinsEarned + bonusCoins
+			if isVictory then
+				totalCoins += stageCoins
+				if isFirstClear then
+					totalCoins += firstClearBonus
+				end
+				PlayerDataService.AddCoins(player, stageCoins + (if isFirstClear then firstClearBonus else 0) + bonusCoins)
 			end
 			
 			-- Calculate XP earned
@@ -168,6 +235,7 @@ function WaveManager.SetGameState(state: GameState)
 			xpEarned += sessionStats.ZombiesKilled * ProgressionData.XP_PER_ZOMBIE
 			xpEarned += _currentWave * ProgressionData.XP_PER_WAVE
 			if isVictory then
+				xpEarned += stageXP
 				xpEarned += ProgressionData.XP_VICTORY_BONUS
 				xpEarned += starRating * ProgressionData.XP_PER_STAR
 			end
@@ -189,10 +257,22 @@ function WaveManager.SetGameState(state: GameState)
 				PlayerDataService.IncrementStat(player, "GamesWon", 1)
 			end
 			
+			-- Send stage complete event
+			Network.StageComplete.Fire(player, {
+				StageId = _currentStageId,
+				Victory = isVictory,
+				Stars = starRating,
+				CoinsEarned = totalCoins,
+				XPEarned = xpEarned,
+				IsFirstClear = isFirstClear,
+				IsNewBest = isNewBest,
+				PreviousStars = previousStars,
+			})
+			
 			-- Send detailed end game summary
 			Network.GameEndRewards.Fire(player, {
 				Victory = isVictory,
-				CoinsEarned = sessionStats.CoinsEarned + bonusCoins,
+				CoinsEarned = totalCoins,
 				ZombiesKilled = sessionStats.ZombiesKilled,
 				WavesCompleted = _currentWave,
 				BonusCoins = bonusCoins,
@@ -245,12 +325,69 @@ function WaveManager.StartGame()
 	Logger.Info("WaveManager", `Game started! First wave in {WaveConfig.FIRST_WAVE_DELAY}s`)
 end
 
+-- Start a specific stage
+function WaveManager.StartStage(stageId: string): boolean
+	if _gameState ~= "Waiting" then
+		Logger.Warn("WaveManager", `Cannot start stage - game already in progress`)
+		return false
+	end
+	
+	local stageConfig = StageData.GetStage(stageId)
+	if not stageConfig then
+		Logger.Error("WaveManager", `Invalid stage ID: {stageId}`)
+		return false
+	end
+	
+	-- Set current stage
+	_currentStageId = stageId
+	_currentStageConfig = stageConfig
+	
+	-- Update wave config from stage
+	WaveConfig.TOTAL_WAVES = stageConfig.WaveCount
+	WaveConfig.FIRST_WAVE_DELAY = 15 -- Slightly faster start for stages
+	
+	-- Adjust spawn intervals based on stage
+	local spawnInterval = stageConfig.SpawnInterval or 2.5
+	WaveConfig.TRICKLE_INTERVAL = spawnInterval + 1.5
+	WaveConfig.ASSAULT_INTERVAL = spawnInterval
+	WaveConfig.FLAG_INTERVAL = spawnInterval - 0.5
+	
+	-- Rebuild spawn pools with stage zombie types
+	SpawnPools = buildSpawnPools()
+	
+	-- Start the game
+	_currentWave = 0
+	_gameState = "Playing"
+	_waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
+	
+	Logger.Info("WaveManager", `=== STAGE {stageId}: {stageConfig.Name} ===`)
+	Logger.Info("WaveManager", `Waves: {stageConfig.WaveCount}, Budget: {stageConfig.BaseBudget}+{stageConfig.BudgetPerWave}/wave`)
+	Logger.Info("WaveManager", `Zombies: {table.concat(stageConfig.ZombiePool, ", ")}`)
+	
+	-- Broadcast stage started
+	Network.StageStarted.FireAll({
+		StageId = stageId,
+		StageName = stageConfig.Name,
+		WaveCount = stageConfig.WaveCount,
+	})
+	
+	return true
+end
+
 function WaveManager.OnZombieDied()
 	_zombiesKilledThisWave += 1
 end
 
--- Calculate wave budget
+-- Get current stage ID
+function WaveManager.GetCurrentStageId(): string
+	return _currentStageId
+end
+
+-- Calculate wave budget (uses stage config if available)
 local function calculateBudget(wave: number): number
+	if _currentStageConfig then
+		return _currentStageConfig.BaseBudget + (wave - 1) * _currentStageConfig.BudgetPerWave
+	end
 	return WaveConfig.BASE_BUDGET * math.pow(WaveConfig.BUDGET_EXPONENT, wave)
 end
 
@@ -272,6 +409,10 @@ local function spawnZombie(world: any, zombieType: string, lane: number): number
 	
 	local spawnPos = getSpawnPosition(lane)
 	
+	-- Apply stage difficulty multipliers
+	local health = getZombieHealth(zombieType)
+	local speed = getZombieSpeed(zombieType)
+	
 	local entityId = world:spawn(
 		PositionComponent({
 			X = spawnPos.X,
@@ -279,11 +420,11 @@ local function spawnZombie(world: any, zombieType: string, lane: number): number
 			Z = spawnPos.Z
 		}),
 		HealthComponent({
-			Current = stats.Health,
-			Max = stats.Health
+			Current = health,
+			Max = health
 		}),
 		MovementComponent({
-			VelocityX = -stats.Speed,
+			VelocityX = -speed,
 			VelocityY = 0,
 			VelocityZ = 0
 		}),

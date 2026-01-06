@@ -25,6 +25,7 @@ local PlantData = require(Shared.data.PlantData)
 local CardDeck = require(script.Parent.CardDeck)
 local ShopUI = require(script.Parent.ShopUI)
 local DeckBuilder = require(script.Parent.DeckBuilder)
+local StageSelectUI = require(script.Parent.StageSelectUI)
 local PvZTheme = require(script.Parent.PvZTheme)
 
 -- Client modules
@@ -69,6 +70,7 @@ function HUDController.new()
 	self._victory = Value(self._scope, false)
 	self._shopVisible = Value(self._scope, false) -- Shop visibility state
 	self._deckBuilderVisible = Value(self._scope, false) -- DeckBuilder visibility state
+	self._stageSelectVisible = Value(self._scope, false) -- StageSelect visibility state
 	self._mounted = false
 	self._gui = nil :: ScreenGui?
 	
@@ -127,7 +129,7 @@ function HUDController:Mount()
 			PvZTheme.WoodPanel(self._scope, {
 				Name = "ResourcePanel",
 				Position = UDim2.fromOffset(15, 15),
-				Size = UDim2.fromOffset(160, 220),
+				Size = UDim2.fromOffset(160, 260),
 				children = {
 					-- Sun Counter Row
 					New(self._scope, "Frame")({
@@ -287,6 +289,17 @@ function HUDController:Mount()
 						Text = PvZTheme.Icons.Plant,
 						OnClick = function()
 							self._deckBuilderVisible:set(true)
+						end,
+					}),
+					
+					-- Stage Select Button (Map)
+					PvZTheme.WoodButton(self._scope, {
+						Name = "StageButton",
+						Position = UDim2.fromOffset(10, 218),
+						Size = UDim2.new(1, -20, 0, 35),
+						Text = PvZTheme.Icons.Map .. " STAGES",
+						OnClick = function()
+							self._stageSelectVisible:set(true)
 						end,
 					}),
 				},
@@ -481,6 +494,20 @@ function HUDController:Mount()
 				Visible = self._deckBuilderVisible,
 				OnClose = function()
 					self._deckBuilderVisible:set(false)
+				end,
+			}),
+			
+			-- Stage Select UI (overlay)
+			StageSelectUI.Create(self._scope, {
+				Visible = self._stageSelectVisible,
+				OnClose = function()
+					self._stageSelectVisible:set(false)
+				end,
+				OnStartStage = function(stageId: string)
+					-- Request server to start the stage
+					PlayerDataClient.RequestStartStage(stageId)
+					-- Close UI
+					self._stageSelectVisible:set(false)
 				end,
 			}),
 		},

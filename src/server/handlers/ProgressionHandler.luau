@@ -6,6 +6,7 @@
 	- Player data sync on join
 	- UnlockPlant requests
 	- PurchaseUpgrade requests
+	- Stage progression and requests
 ]]
 
 local Players = game:GetService("Players")
@@ -13,10 +14,22 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local StageData = require(Shared.data.StageData)
 
 local Server = script.Parent.Parent
 local Network = require(Server.network.generated)
 local PlayerDataService = require(Server.services.PlayerDataService)
+
+-- Lazy-load WaveManager to avoid circular deps
+local _waveManager: any = nil
+local function getWaveManager()
+	if not _waveManager then
+		local Systems = Server:WaitForChild("systems")
+		local WaveSystem = require(Systems.wave.WaveManagerSystem)
+		_waveManager = WaveSystem.WaveManager
+	end
+	return _waveManager
+end
 
 local ProgressionHandler = {}
 
@@ -154,6 +167,71 @@ local function handleSaveDeck(player: Player, data: {Slot1: any?, Slot2: any?, S
 	end
 end
 
+-- Sync stage progress to client
+local function syncStageProgress(player: Player)
+	local data = PlayerDataService.GetProfile(player)
+	if not data then
+		Logger.Warn("Progression", `Cannot sync stage progress for {player.Name} - profile not loaded`)
+		return
+	end
+	
+	local currentStage = data.CurrentStage or "1-1"
+	local completedStages = data.CompletedStages or {}
+	
+	-- Build parallel arrays for Zap serialization
+	local stageIds: {string} = {}
+	local stageStars: {number} = {}
+	local totalStars = 0
+	
+	for stageId, stars in completedStages do
+		table.insert(stageIds, stageId)
+		table.insert(stageStars, stars)
+		totalStars += stars
+	end
+	
+	Network.StageProgressSync.Fire(player, {
+		CurrentStage = currentStage,
+		TotalStars = totalStars,
+		CompletedStageIds = stageIds,
+		CompletedStageStars = stageStars,
+	})
+	
+	Logger.Debug("Progression", `Synced stage progress to {player.Name}: {#stageIds} completed, {totalStars} stars`)
+end
+
+-- Handle start stage request
+local function handleStartStageRequest(player: Player, data: {StageId: string})
+	local stageId = data.StageId
+	
+	-- Validate stage exists
+	local stageConfig = StageData.GetStage(stageId)
+	if not stageConfig then
+		Logger.Warn("Progression", `{player.Name} requested invalid stage: {stageId}`)
+		return
+	end
+	
+	-- Check if stage is unlocked
+	local completedStages = PlayerDataService.GetCompletedStages(player)
+	local isUnlocked = StageData.IsStageUnlocked(stageId, completedStages)
+	
+	if not isUnlocked then
+		Logger.Warn("Progression", `{player.Name} tried to start locked stage: {stageId}`)
+		return
+	end
+	
+	-- Update current stage in profile
+	PlayerDataService.SetCurrentStage(player, stageId)
+	
+	-- Start the stage via WaveManager
+	local WaveManager = getWaveManager()
+	if WaveManager and WaveManager.StartStage then
+		WaveManager.StartStage(stageId)
+		Logger.Info("Progression", `{player.Name} started stage {stageId}`)
+	else
+		Logger.Error("Progression", "WaveManager.StartStage not available")
+	end
+end
+
 -- Initialize handlers
 function ProgressionHandler.Initialize()
 	-- Register data change callback to sync on any change
@@ -175,6 +253,7 @@ function ProgressionHandler.Initialize()
 		
 		syncPlayerData(player)
 		syncDeck(player)
+		syncStageProgress(player)
 	end)
 	
 	-- Handle existing players (for Studio hot-reload)
@@ -183,6 +262,7 @@ function ProgressionHandler.Initialize()
 			task.wait(0.5)
 			syncPlayerData(player)
 			syncDeck(player)
+			syncStageProgress(player)
 		end)
 	end
 	
@@ -190,6 +270,7 @@ function ProgressionHandler.Initialize()
 	Network.UnlockPlantRequest.SetCallback(handleUnlockPlant)
 	Network.PurchaseUpgradeRequest.SetCallback(handlePurchaseUpgrade)
 	Network.SaveDeckRequest.SetCallback(handleSaveDeck)
+	Network.StartStageRequest.SetCallback(handleStartStageRequest)
 	
 	Logger.Info("Progression", "ProgressionHandler initialized")
 end

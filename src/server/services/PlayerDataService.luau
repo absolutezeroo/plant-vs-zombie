@@ -30,6 +30,10 @@ local PROFILE_TEMPLATE = {
 	XP = 0,
 	Level = 1,
 	
+	-- Stage progression
+	CurrentStage = "1-1",                    -- Last selected stage
+	CompletedStages = {} :: {[string]: number}, -- StageId -> Stars (1-3)
+	
 	-- Unlocked plants (starter plants are unlocked by default)
 	UnlockedPlants = {
 		Sunflower = true,
@@ -458,6 +462,78 @@ function PlayerDataService.SaveDeck(player: Player, deck: {string}): (boolean, s
 	PlayerDataService._notifyDataChanged(player)
 	
 	return true, nil
+end
+
+-- ============================================
+-- STAGE SYSTEM
+-- ============================================
+
+-- Get current stage
+function PlayerDataService.GetCurrentStage(player: Player): string
+	local data = PlayerDataService.GetProfile(player)
+	return if data then (data.CurrentStage or "1-1") else "1-1"
+end
+
+-- Set current stage
+function PlayerDataService.SetCurrentStage(player: Player, stageId: string): boolean
+	local profile = _profiles[player]
+	if not profile then
+		return false
+	end
+	
+	profile.Data.CurrentStage = stageId
+	Logger.Debug("PlayerData", `{player.Name} selected stage {stageId}`)
+	
+	return true
+end
+
+-- Get completed stages
+function PlayerDataService.GetCompletedStages(player: Player): {[string]: number}
+	local data = PlayerDataService.GetProfile(player)
+	return if data then (data.CompletedStages or {}) else {}
+end
+
+-- Get stars for a specific stage
+function PlayerDataService.GetStageStars(player: Player, stageId: string): number
+	local data = PlayerDataService.GetProfile(player)
+	if not data or not data.CompletedStages then
+		return 0
+	end
+	return data.CompletedStages[stageId] or 0
+end
+
+-- Complete a stage with stars (only updates if better)
+function PlayerDataService.CompleteStage(player: Player, stageId: string, stars: number): (boolean, boolean)
+	local profile = _profiles[player]
+	if not profile then
+		return false, false
+	end
+	
+	if not profile.Data.CompletedStages then
+		profile.Data.CompletedStages = {}
+	end
+	
+	local currentStars = profile.Data.CompletedStages[stageId] or 0
+	local isFirstClear = currentStars == 0
+	local isNewBest = stars > currentStars
+	
+	if isNewBest then
+		profile.Data.CompletedStages[stageId] = stars
+		Logger.Info("PlayerData", `{player.Name} completed {stageId} with {stars} stars (previous: {currentStars})`)
+		PlayerDataService._notifyDataChanged(player)
+	end
+	
+	return isFirstClear, isNewBest
+end
+
+-- Get total stars earned across all stages
+function PlayerDataService.GetTotalStars(player: Player): number
+	local completedStages = PlayerDataService.GetCompletedStages(player)
+	local total = 0
+	for _, stars in completedStages do
+		total += stars
+	end
+	return total
 end
 
 -- ============================================

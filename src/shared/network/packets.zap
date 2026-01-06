@@ -518,3 +518,60 @@ event DeckSync = {
         Slot6: PlantType?,
     }
 }
+
+-- ===================
+-- STAGE SYSTEM
+-- ===================
+
+-- Client requests to start a specific stage
+event StartStageRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        StageId: string.utf8,
+    }
+}
+
+-- Server confirms stage started (sent to all players in game)
+event StageStarted = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        StageId: string.utf8,
+        StageName: string.utf8,
+        WaveCount: u8,
+    }
+}
+
+-- Server notifies stage completion with rewards
+event StageComplete = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        StageId: string.utf8,
+        Victory: boolean,
+        Stars: u8,
+        CoinsEarned: u32,
+        XPEarned: u32,
+        IsFirstClear: boolean,
+        IsNewBest: boolean,
+        PreviousStars: u8,
+    }
+}
+
+-- Server syncs stage progression data (on join)
+event StageProgressSync = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        CurrentStage: string.utf8,
+        TotalStars: u16,
+        -- Completed stages as parallel arrays
+        CompletedStageIds: string.utf8[],
+        CompletedStageStars: u8[],
+    }
+}
