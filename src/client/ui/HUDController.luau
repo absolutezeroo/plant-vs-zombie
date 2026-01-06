@@ -24,6 +24,7 @@ local PlantData = require(Shared.data.PlantData)
 -- UI Components
 local CardDeck = require(script.Parent.CardDeck)
 local ShopUI = require(script.Parent.ShopUI)
+local DeckBuilder = require(script.Parent.DeckBuilder)
 local PvZTheme = require(script.Parent.PvZTheme)
 
 -- Client modules
@@ -67,6 +68,7 @@ function HUDController.new()
 	self._gameOver = Value(self._scope, false)
 	self._victory = Value(self._scope, false)
 	self._shopVisible = Value(self._scope, false) -- Shop visibility state
+	self._deckBuilderVisible = Value(self._scope, false) -- DeckBuilder visibility state
 	self._mounted = false
 	self._gui = nil :: ScreenGui?
 	
@@ -269,10 +271,22 @@ function HUDController:Mount()
 					PvZTheme.WoodButton(self._scope, {
 						Name = "ShopButton",
 						Position = UDim2.fromOffset(10, 178),
-						Size = UDim2.new(1, -20, 0, 35),
-						Text = PvZTheme.Icons.Shop .. " SHOP",
+						Size = UDim2.new(0.5, -15, 0, 35),
+						Text = PvZTheme.Icons.Shop,
 						OnClick = function()
 							self._shopVisible:set(true)
+						end,
+					}),
+					
+					-- Deck Builder Button
+					PvZTheme.WoodButton(self._scope, {
+						Name = "DeckButton",
+						Position = UDim2.fromOffset(80, 178),
+						Size = UDim2.new(0.5, -15, 0, 35),
+						AnchorPoint = Vector2.new(0, 0),
+						Text = PvZTheme.Icons.Plant,
+						OnClick = function()
+							self._deckBuilderVisible:set(true)
 						end,
 					}),
 				},
@@ -459,6 +473,14 @@ function HUDController:Mount()
 				Visible = self._shopVisible,
 				OnClose = function()
 					self._shopVisible:set(false)
+				end,
+			}),
+			
+			-- Deck Builder UI (overlay)
+			DeckBuilder.Create(self._scope, {
+				Visible = self._deckBuilderVisible,
+				OnClose = function()
+					self._deckBuilderVisible:set(false)
 				end,
 			}),
 		},

@@ -32,6 +32,8 @@ local PlayerData = {
 	UnlockedPlants = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
 	-- Upgrades: [PlantType] = { Damage = level, Health = level, Cooldown = level }
 	PlantUpgrades = Value(_scope, {} :: {[string]: {Damage: number, Health: number, Cooldown: number}}),
+	-- Current deck (up to 6 plants)
+	Deck = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
 	
 	-- Session stats (reset per game)
 	SessionCoinsEarned = Value(_scope, 0),
@@ -179,6 +181,46 @@ function PlayerDataClient.ResetSessionStats()
 	PlayerData.SessionZombiesKilled:set(0)
 end
 
+-- ============================================
+-- DECK SYSTEM
+-- ============================================
+
+-- Get deck (reactive Value)
+function PlayerDataClient.GetDeckValue()
+	return PlayerData.Deck
+end
+
+-- Get deck (current list)
+function PlayerDataClient.GetDeck(): {string}
+	return Fusion.peek(PlayerData.Deck)
+end
+
+-- Check if a plant is in the deck
+function PlayerDataClient.IsInDeck(plantType: string): boolean
+	local deck = Fusion.peek(PlayerData.Deck)
+	return table.find(deck, plantType) ~= nil
+end
+
+-- Save deck to server
+function PlayerDataClient.RequestSaveDeck(deck: {string})
+	Logger.Debug("PlayerData", `Requesting save deck: {table.concat(deck, ", ")}`)
+	
+	-- Build request with slots
+	Network.SaveDeckRequest.Fire({
+		Slot1 = deck[1] :: any,
+		Slot2 = deck[2] :: any,
+		Slot3 = deck[3] :: any,
+		Slot4 = deck[4] :: any,
+		Slot5 = deck[5] :: any,
+		Slot6 = deck[6] :: any,
+	})
+end
+
+-- Optimistic deck update (update UI immediately, will sync from server)
+function PlayerDataClient.SetDeckLocal(deck: {string})
+	PlayerData.Deck:set(deck)
+end
+
 -- Initialize and connect to server events
 function PlayerDataClient.Initialize()
 	-- Handle full data sync from server (SingleAsync = SetCallback)
@@ -236,6 +278,29 @@ function PlayerDataClient.Initialize()
 		end
 		
 		Logger.Debug("PlayerData", `+{data.Amount} coins (Total: {data.TotalCoins})`)
+	end)
+	
+	-- Handle deck sync from server
+	Network.DeckSync.On(function(data)
+		local deck = {}
+		if data.Slot1 then table.insert(deck, tostring(data.Slot1)) end
+		if data.Slot2 then table.insert(deck, tostring(data.Slot2)) end
+		if data.Slot3 then table.insert(deck, tostring(data.Slot3)) end
+		if data.Slot4 then table.insert(deck, tostring(data.Slot4)) end
+		if data.Slot5 then table.insert(deck, tostring(data.Slot5)) end
+		if data.Slot6 then table.insert(deck, tostring(data.Slot6)) end
+		
+		PlayerData.Deck:set(deck)
+		Logger.Info("PlayerData", `Received deck: {table.concat(deck, ", ")}`)
+	end)
+	
+	-- Handle deck save response
+	Network.DeckSaved.On(function(data)
+		if data.Success then
+			Logger.Info("PlayerData", "Deck saved successfully")
+		else
+			Logger.Warn("PlayerData", `Failed to save deck: {data.Error or "unknown error"}`)
+		end
 	end)
 	
 	Logger.Info("PlayerData", "PlayerDataClient initialized")

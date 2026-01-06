@@ -55,6 +55,14 @@ local PROFILE_TEMPLATE = {
 		MusicVolume = 1.0,
 		SFXVolume = 1.0,
 	},
+	
+	-- Deck loadout (6 plant slots)
+	Deck = {
+		"Sunflower",
+		"Peashooter",
+		"WallNut",
+		-- Slots 4-6 empty by default
+	},
 }
 
 -- ProfileStore setup
@@ -398,6 +406,63 @@ function PlayerDataService.PurchaseUpgrade(player: Player, plantType: string, up
 	
 	return true, nil
 end
+
+-- ============================================
+-- DECK SYSTEM
+-- ============================================
+
+-- Get player's current deck
+function PlayerDataService.GetDeck(player: Player): {string}
+	local data = PlayerDataService.GetProfile(player)
+	if not data then
+		return {"Sunflower", "Peashooter", "WallNut"} -- Default starters
+	end
+	return data.Deck or {"Sunflower", "Peashooter", "WallNut"}
+end
+
+-- Save player's deck (validates plants are unlocked)
+function PlayerDataService.SaveDeck(player: Player, deck: {string}): (boolean, string?)
+	local profile = _profiles[player]
+	if not profile then
+		return false, "Profile not loaded"
+	end
+	
+	-- Validate deck size
+	if #deck < 1 then
+		return false, "Deck must have at least 1 plant"
+	end
+	
+	if #deck > 6 then
+		return false, "Deck cannot have more than 6 plants"
+	end
+	
+	-- Validate all plants are unlocked
+	for _, plantType in deck do
+		if not profile.Data.UnlockedPlants[plantType] then
+			return false, `Plant {plantType} is not unlocked`
+		end
+	end
+	
+	-- Check for duplicates
+	local seen = {}
+	for _, plantType in deck do
+		if seen[plantType] then
+			return false, `Duplicate plant: {plantType}`
+		end
+		seen[plantType] = true
+	end
+	
+	-- Save deck
+	profile.Data.Deck = deck
+	Logger.Info("PlayerData", `{player.Name} saved deck: {table.concat(deck, ", ")}`)
+	PlayerDataService._notifyDataChanged(player)
+	
+	return true, nil
+end
+
+-- ============================================
+-- STATS
+-- ============================================
 
 -- Increment a stat
 function PlayerDataService.IncrementStat(player: Player, statName: string, amount: number?)

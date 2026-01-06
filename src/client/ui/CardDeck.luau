@@ -262,10 +262,10 @@ end
 local function CardDeck(props: CardDeckProps)
 	local scope = props.Scope
 	
-	-- Get unlocked plants sorted by cost
-	local sortedUnlockedPlants = Computed(scope, function(use)
-		local unlocked = use(PlayerDataClient.GetUnlockedPlantsValue())
-		local sorted = table.clone(unlocked)
+	-- Get player's saved deck (sorted by cost for display)
+	local sortedDeckPlants = Computed(scope, function(use)
+		local deck = use(PlayerDataClient.GetDeckValue())
+		local sorted = table.clone(deck)
 		table.sort(sorted, function(a, b)
 			local statsA = PlantData[a]
 			local statsB = PlantData[b]
@@ -276,10 +276,10 @@ local function CardDeck(props: CardDeckProps)
 		return sorted
 	end)
 	
-	-- Calculate deck size based on unlocked plants
+	-- Calculate deck size based on saved deck
 	local deckSize = Computed(scope, function(use)
-		local unlocked = use(sortedUnlockedPlants)
-		local numPlants = #unlocked
+		local deck = use(sortedDeckPlants)
+		local numPlants = #deck
 		return UDim2.fromOffset(
 			numPlants * (CARD_SIZE.X.Offset + CARD_SPACING) - CARD_SPACING + 20,
 			CARD_SIZE.Y.Offset + 20
@@ -315,8 +315,8 @@ local function CardDeck(props: CardDeckProps)
 				PaddingBottom = UDim.new(0, 10),
 			}),
 			
-			-- Reactive plant cards based on unlocked plants
-			ForValues(scope, sortedUnlockedPlants, function(use, innerScope, plantType)
+			-- Reactive plant cards based on saved deck
+			ForValues(scope, sortedDeckPlants, function(use, innerScope, plantType)
 				local stats = PlantData[plantType]
 				local layoutOrder = if stats then stats.Cost else 999
 				

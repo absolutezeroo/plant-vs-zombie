@@ -110,6 +110,50 @@ local function handlePurchaseUpgrade(player: Player, data: {RequestId: number, P
 	end
 end
 
+-- Sync deck to client
+local function syncDeck(player: Player)
+	local deck = PlayerDataService.GetDeck(player)
+	
+	-- Build deck data (up to 6 slots)
+	local deckData = {
+		Slot1 = deck[1],
+		Slot2 = deck[2],
+		Slot3 = deck[3],
+		Slot4 = deck[4],
+		Slot5 = deck[5],
+		Slot6 = deck[6],
+	}
+	
+	Network.DeckSync.Fire(player, deckData)
+	Logger.Debug("Progression", `Synced deck to {player.Name}: {table.concat(deck, ", ")}`)
+end
+
+-- Handle save deck request
+local function handleSaveDeck(player: Player, data: {Slot1: any?, Slot2: any?, Slot3: any?, Slot4: any?, Slot5: any?, Slot6: any?})
+	-- Build deck from slots
+	local deck = {}
+	if data.Slot1 then table.insert(deck, tostring(data.Slot1)) end
+	if data.Slot2 then table.insert(deck, tostring(data.Slot2)) end
+	if data.Slot3 then table.insert(deck, tostring(data.Slot3)) end
+	if data.Slot4 then table.insert(deck, tostring(data.Slot4)) end
+	if data.Slot5 then table.insert(deck, tostring(data.Slot5)) end
+	if data.Slot6 then table.insert(deck, tostring(data.Slot6)) end
+	
+	local success, reason = PlayerDataService.SaveDeck(player, deck)
+	
+	-- Send response
+	Network.DeckSaved.Fire(player, {
+		Success = success,
+		Error = reason,
+	})
+	
+	if success then
+		Logger.Info("Progression", `{player.Name} saved deck: {table.concat(deck, ", ")}`)
+	else
+		Logger.Debug("Progression", `{player.Name} failed to save deck: {reason}`)
+	end
+end
+
 -- Initialize handlers
 function ProgressionHandler.Initialize()
 	-- Register data change callback to sync on any change
@@ -130,6 +174,7 @@ function ProgressionHandler.Initialize()
 		end
 		
 		syncPlayerData(player)
+		syncDeck(player)
 	end)
 	
 	-- Handle existing players (for Studio hot-reload)
@@ -137,12 +182,14 @@ function ProgressionHandler.Initialize()
 		task.spawn(function()
 			task.wait(0.5)
 			syncPlayerData(player)
+			syncDeck(player)
 		end)
 	end
 	
 	-- Register network handlers
 	Network.UnlockPlantRequest.SetCallback(handleUnlockPlant)
 	Network.PurchaseUpgradeRequest.SetCallback(handlePurchaseUpgrade)
+	Network.SaveDeckRequest.SetCallback(handleSaveDeck)
 	
 	Logger.Info("Progression", "ProgressionHandler initialized")
 end

@@ -10,7 +10,24 @@ type RequestId = u16
 type EntityId = u32
 type Lane = u8(1..5)           -- Lane index 1-5 (ranged integer)
 type Column = u8(1..9)         -- Column index 1-9 (ranged integer)
-type PlantType = enum { Peashooter, Sunflower, WallNut, SnowPea, CherryBomb, PotatoMine, Repeater }
+type PlantType = enum { 
+    -- Starters
+    Sunflower, Peashooter, WallNut,
+    -- Tier 1
+    PotatoMine, PuffShroom, SunShroom, Chomper, SnowPea,
+    -- Tier 2
+    Repeater, FumeShroom, Squash, Garlic, CherryBomb, TallNut,
+    -- Tier 3
+    Threepeater, Jalapeno, Spikeweed, Torchwood, CabbagePult, Pumpkin, ScaredyShroom, HypnoShroom,
+    -- Tier 4
+    SplitPea, KernelPult, Starfruit, Cactus, Blover, SeaShroom, TwinSunflower, MelonPult,
+    -- Tier 5
+    GatlingPea, GloomShroom, Cattail, WinterMelon, IceShroom, DoomShroom,
+    -- Tier 6
+    CobCannon, Marigold, GoldMagnet, Imitater,
+    -- Utility
+    LilyPad, FlowerPot, TangleKelp, GraveBuster, Plantern, UmbrellaLeaf, CoffeeBean, ExplodeONut
+}
 type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football, Imp, Flag }
 type GamePhase = enum { Pregame, Wave, Intermission, GameOver }
 
@@ -454,5 +471,50 @@ event GemsEarned = {
         Amount: u8,
         TotalGems: u32,
         Reason: u8,  -- 0=LevelUp, 1=3StarVictory, 2=FirstClear
+    }
+}
+
+-- ===================
+-- DECK SYSTEM
+-- ===================
+
+-- Client requests to save their deck loadout
+event SaveDeckRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Slot1: PlantType?,
+        Slot2: PlantType?,
+        Slot3: PlantType?,
+        Slot4: PlantType?,
+        Slot5: PlantType?,
+        Slot6: PlantType?,
+    }
+}
+
+-- Server confirms deck saved
+event DeckSaved = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Success: boolean,
+        Error: string.utf8?,
+    }
+}
+
+-- Server sends player's current deck (on join or after save)
+event DeckSync = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Slot1: PlantType?,
+        Slot2: PlantType?,
+        Slot3: PlantType?,
+        Slot4: PlantType?,
+        Slot5: PlantType?,
+        Slot6: PlantType?,
     }
 }
