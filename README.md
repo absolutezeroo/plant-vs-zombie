@@ -66,20 +66,72 @@ zap src/shared/network/packets.zap
 
 ```
 src/
-├── client/                 # Client-side code
-│   ├── init.client.luau    # Client bootstrap
-│   ├── systems/            # Client ECS systems
-│   ├── ui/                 # Fusion UI components
-│   └── network/            # Zap generated (gitignored)
-├── server/                 # Server-side code
-│   ├── init.server.luau    # Server bootstrap
-│   ├── systems/            # Server ECS systems
-│   └── network/            # Zap generated (gitignored)
-└── shared/                 # Shared code
-    ├── components/         # Matter components
-    ├── config/             # Game configuration
-    ├── network/            # Zap schema (packets.zap)
-    └── utils/              # Utilities
+├── client/                      # Client-side code
+│   ├── init.client.luau         # Client bootstrap (recursive system loading)
+│   ├── modules/                 # Client services (VFX, Audio, Selection)
+│   ├── ui/                      # Fusion UI components
+│   ├── network/                 # Zap generated (gitignored)
+│   └── systems/                 # Client ECS systems (domain-driven)
+│       ├── input/               # Player interaction
+│       │   └── GhostPreviewSystem.luau
+│       ├── rendering/           # Visual rendering
+│       │   ├── PlantRenderSystem.luau
+│       │   ├── ZombieRenderSystem.luau
+│       │   ├── ProjectileRenderSystem.luau
+│       │   ├── SunRenderSystem.luau
+│       │   └── GridVisualizationSystem.luau
+│       └── presentation/        # VFX & Audio
+│           └── VFXAudioSystem.luau
+│
+├── server/                      # Server-side code
+│   ├── init.server.luau         # Server bootstrap (recursive system loading)
+│   ├── services/                # Singletons (PlayerDataService)
+│   ├── handlers/                # Network handlers
+│   ├── modules/                 # Server modules (GridState, BaseHealth)
+│   ├── network/                 # Zap generated (gitignored)
+│   └── systems/                 # Server ECS systems (domain-driven)
+│       ├── combat/              # Damage, projectiles, special abilities
+│       │   ├── CombatSystem.luau
+│       │   ├── ProjectileSystem.luau
+│       │   └── SpecialPlantSystem.luau
+│       ├── economy/             # Sun, coins, resources
+│       │   ├── SunSpawnSystem.luau
+│       │   ├── SunCollectionSystem.luau
+│       │   └── SunflowerProductionSystem.luau
+│       ├── units/               # Entity lifecycle
+│       │   ├── PlacementSystem.luau
+│       │   ├── EntityDeathSystem.luau
+│       │   ├── ZombieSpawnSystem.luau
+│       │   └── ZombieMovementSystem.luau
+│       ├── wave/                # Wave progression
+│       │   └── WaveManagerSystem.luau
+│       └── core/                # Infrastructure
+│           ├── SafetySystem.luau
+│           ├── PerformanceMonitorSystem.luau
+│           ├── FullStateSyncSystem.luau
+│           └── EventCleanupSystem.luau
+│
+└── shared/                      # Shared code
+    ├── config/                  # Game configuration
+    ├── data/                    # Plant/Zombie data definitions
+    ├── utils/                   # Utilities (Logger, GridUtils, AttachmentUtils)
+    ├── network/                 # Zap schema (packets.zap)
+    └── components/              # Matter components (domain-driven)
+        ├── init.luau            # Central index module
+        ├── core/                # Base (Position, Health, Movement, Tags)
+        ├── combat/              # Combat (Projectile, Armed, Slow, Target)
+        ├── units/               # Entity types (PlantType, ZombieType, Ghost)
+        ├── economy/             # Resources (Sun, Coin)
+        └── events/              # Ephemeral events (Damage, Death, Spawn)
+```
+
+### Component Import Pattern
+
+```lua
+-- Use the central index module for clean imports
+local Components = require(Shared.components)
+local HealthComponent = Components.HealthComponent
+local PositionComponent = Components.PositionComponent
 ```
 
 ## ⚡ Performance Targets
