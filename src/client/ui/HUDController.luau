@@ -4,7 +4,7 @@
 	
 	Manages:
 	- Sun counter display
-	- Plant selection bar
+	- Plant selection bar (CardDeck)
 	- Wave indicator
 	- Game state overlays
 	
@@ -19,6 +19,14 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local PlantData = require(Shared.data.PlantData)
+
+-- UI Components
+local CardDeck = require(script.Parent.CardDeck)
+
+-- Client modules
+local Client = script.Parent.Parent
+local SelectionState = require(Client.modules.SelectionState)
 
 -- Fusion primitives
 local New = Fusion.New
@@ -27,26 +35,19 @@ local Value = Fusion.Value
 local Computed = Fusion.Computed
 local OnEvent = Fusion.OnEvent
 
--- Types
-export type HUDController = {
-	Mount: (self: HUDController) -> (),
-	Unmount: (self: HUDController) -> (),
-	SetSunCount: (self: HUDController, count: number) -> (),
-	SetWaveNumber: (self: HUDController, wave: number) -> (),
-	SetSelectedPlant: (self: HUDController, plantType: string?) -> (),
-}
-
-local HUDController = {} :: HUDController
+local HUDController = {}
 HUDController.__index = HUDController
 
-function HUDController.new(): HUDController
+function HUDController.new()
 	local self = setmetatable({}, HUDController)
 	
-	-- Reactive state
+	-- Use shared selection state
 	self._scope = Fusion.scoped({})
-	self._sunCount = Value(self._scope, 50)
 	self._waveNumber = Value(self._scope, 0)
-	self._selectedPlant = Value(self._scope, nil :: string?)
+	self._baseHealth = Value(self._scope, 1000)
+	self._baseMaxHealth = Value(self._scope, 1000)
+	self._gameOver = Value(self._scope, false)
+	self._victory = Value(self._scope, false)
 	self._mounted = false
 	self._gui = nil :: ScreenGui?
 	
@@ -62,6 +63,33 @@ function HUDController:Mount()
 	end
 	
 	local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	
+	-- Callback for card selection
+	local function onCardSelect(plantType: string)
+		local currentSelection = Fusion.peek(SelectionState.SelectedPlant)
+		
+		-- Toggle selection
+		if currentSelection == plantType then
+			SelectionState.Select(nil)
+			Logger.Debug("HUDController", "Deselected plant")
+		else
+			-- Check if on cooldown
+			if SelectionState.IsOnCooldown(plantType) then
+				Logger.Debug("HUDController", `{plantType} is on cooldown`)
+				return
+			end
+			
+			-- Check if can afford
+			local stats = PlantData[plantType]
+			if stats and not SelectionState.CanAfford(stats.Cost) then
+				Logger.Debug("HUDController", `Cannot afford {plantType}`)
+				return
+			end
+			
+			SelectionState.Select(plantType)
+			Logger.Debug("HUDController", `Selected {plantType}`)
+		end
+	end
 	
 	-- Create the main ScreenGui
 	self._gui = New(self._scope, "ScreenGui")({
@@ -89,7 +117,7 @@ function HUDController:Mount()
 						Size = UDim2.fromScale(0.9, 0.8),
 						BackgroundTransparency = 1,
 						Text = Computed(self._scope, function(use)
-							return `☀️ {use(self._sunCount)}`
+							return `☀️ {use(SelectionState.SunCount)}`
 						end),
 						TextColor3 = Color3.fromRGB(255, 220, 50),
 						TextScaled = true,
@@ -118,32 +146,130 @@ function HUDController:Mount()
 				Font = Enum.Font.GothamBold,
 			}),
 			
-			-- Placeholder for plant bar (will be expanded later)
+			-- Base Health Bar (top-right)
 			New(self._scope, "Frame")({
-				Name = "PlantBar",
-				Position = UDim2.new(0.5, 0, 1, -80),
-				AnchorPoint = Vector2.new(0.5, 1),
-				Size = UDim2.fromOffset(400, 70),
-				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+				Name = "HealthBar",
+				Position = UDim2.new(1, -20, 0, 20),
+				AnchorPoint = Vector2.new(1, 0),
+				Size = UDim2.fromOffset(200, 30),
+				BackgroundColor3 = Color3.fromRGB(60, 60, 60),
 				BackgroundTransparency = 0.3,
 				
 				[Children] = {
-					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
+					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 6) }),
+					
+					-- Health fill bar
+					New(self._scope, "Frame")({
+						Name = "Fill",
+						Position = UDim2.fromOffset(2, 2),
+						Size = Computed(self._scope, function(use)
+							local health = use(self._baseHealth)
+							local maxHealth = use(self._baseMaxHealth)
+							local ratio = math.clamp(health / maxHealth, 0, 1)
+							return UDim2.new(ratio, -4, 1, -4)
+						end),
+						BackgroundColor3 = Computed(self._scope, function(use)
+							local health = use(self._baseHealth)
+							local maxHealth = use(self._baseMaxHealth)
+							local ratio = health / maxHealth
+							if ratio > 0.5 then
+								return Color3.fromRGB(80, 200, 80)
+							elseif ratio > 0.25 then
+								return Color3.fromRGB(200, 200, 80)
+							else
+								return Color3.fromRGB(200, 80, 80)
+							end
+						end),
+						
+						[Children] = {
+							New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 4) }),
+						},
+					}),
+					
+					-- Health text
 					New(self._scope, "TextLabel")({
-						Size = UDim2.fromScale(1, 1),
+						Name = "HealthText",
+						Position = UDim2.fromScale(0.5, 0.5),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Size = UDim2.fromScale(0.9, 0.8),
 						BackgroundTransparency = 1,
-						Text = "🌱 Plant Bar (MVP placeholder)",
-						TextColor3 = Color3.fromRGB(200, 200, 200),
+						Text = Computed(self._scope, function(use)
+							return `🏠 {use(self._baseHealth)}/{use(self._baseMaxHealth)}`
+						end),
+						TextColor3 = Color3.fromRGB(255, 255, 255),
 						TextScaled = true,
-						Font = Enum.Font.Gotham,
+						Font = Enum.Font.GothamBold,
 					}),
 				},
+			}),
+			
+			-- Game Over Overlay
+			New(self._scope, "Frame")({
+				Name = "GameOverOverlay",
+				Position = UDim2.fromScale(0, 0),
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+				BackgroundTransparency = Computed(self._scope, function(use)
+					return if use(self._gameOver) then 0.5 else 1
+				end),
+				Visible = Computed(self._scope, function(use)
+					return use(self._gameOver)
+				end),
+				ZIndex = 100,
+				
+				[Children] = {
+					-- Game Over text
+					New(self._scope, "TextLabel")({
+						Name = "GameOverText",
+						Position = UDim2.fromScale(0.5, 0.4),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Size = UDim2.fromOffset(400, 80),
+						BackgroundTransparency = 1,
+						Text = Computed(self._scope, function(use)
+							return if use(self._victory) then "🏆 VICTORY!" else "💀 DEFEAT"
+						end),
+						TextColor3 = Computed(self._scope, function(use)
+							return if use(self._victory) 
+								then Color3.fromRGB(255, 215, 0) 
+								else Color3.fromRGB(200, 50, 50)
+						end),
+						TextScaled = true,
+						Font = Enum.Font.GothamBlack,
+					}),
+					
+					-- Wave reached text
+					New(self._scope, "TextLabel")({
+						Name = "WaveReachedText",
+						Position = UDim2.fromScale(0.5, 0.55),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Size = UDim2.fromOffset(300, 40),
+						BackgroundTransparency = 1,
+						Text = Computed(self._scope, function(use)
+							local wave = use(self._waveNumber)
+							return if use(self._victory) 
+								then "All waves completed!" 
+								else `Reached Wave {wave}`
+						end),
+						TextColor3 = Color3.fromRGB(200, 200, 200),
+						TextScaled = true,
+						Font = Enum.Font.GothamMedium,
+					}),
+				},
+			}),
+			
+			-- Card Deck (bottom-center)
+			CardDeck({
+				Scope = self._scope,
+				SelectedPlant = SelectionState.SelectedPlant,
+				SunCount = SelectionState.SunCount,
+				Cooldowns = SelectionState.Cooldowns,
+				OnSelect = onCardSelect,
 			}),
 		},
 	})
 	
 	self._mounted = true
-	Logger.Info("HUDController", "HUD mounted")
+	Logger.Info("HUDController", "HUD mounted with CardDeck")
 end
 
 function HUDController:Unmount()
@@ -156,17 +282,20 @@ function HUDController:Unmount()
 	Logger.Info("HUDController", "HUD unmounted")
 end
 
-function HUDController:SetSunCount(count: number)
-	Fusion.peek(self._sunCount)  -- Access current for debug
-	self._sunCount:set(count)
-end
-
 function HUDController:SetWaveNumber(wave: number)
 	self._waveNumber:set(wave)
 end
 
-function HUDController:SetSelectedPlant(plantType: string?)
-	self._selectedPlant:set(plantType)
+function HUDController:SetBaseHealth(current: number, max: number)
+	self._baseHealth:set(current)
+	self._baseMaxHealth:set(max)
+end
+
+function HUDController:SetGameOver(victory: boolean, waveReached: number)
+	self._gameOver:set(true)
+	self._victory:set(victory)
+	self._waveNumber:set(waveReached)
+	Logger.Info("HUDController", `Game over: {if victory then "VICTORY" else "DEFEAT"} at wave {waveReached}`)
 end
 
 return HUDController

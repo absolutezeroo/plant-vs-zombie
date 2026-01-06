@@ -81,29 +81,22 @@ loop:begin({
 Logger.Info("Client", `Client ECS loop started at {NetworkConfig.TICK_RATE} Hz`)
 
 --[[
-	Initialize Fusion UI Root
+	Initialize HUD using HUDController
 	
-	Fusion components will be mounted to PlayerGui
-	The main HUD controller module handles UI creation
+	The HUD includes:
+	- Sun counter (reactive)
+	- Card deck (plant selection)
+	- Wave indicator
 ]]
 
--- Fusion scopes for cleanup
-local scope = Fusion.scoped({
-	-- Will add Fusion primitives here as needed
-})
+local UI = script:WaitForChild("ui")
+local HUDController = require(UI.HUDController)
 
--- Store UI state (for reactivity)
-local UIState = {
-	SunCount = Fusion.Value(scope, 50),  -- Starting sun
-	SelectedPlant = Fusion.Value(scope, nil :: string?),
-	WaveNumber = Fusion.Value(scope, 0),
-	GamePhase = Fusion.Value(scope, "pregame"),  -- pregame, wave, intermission, gameover
-}
+-- Create and mount HUD
+local hud = HUDController.new()
+hud:Mount()
 
--- Export UIState for other modules
-_G.ClientUIState = UIState
-
-Logger.Info("Client", "Fusion UI state initialized")
+Logger.Info("Client", "HUD mounted")
 
 -- Performance monitoring (less frequent on client to save cycles)
 local frameCount = 0
@@ -124,6 +117,41 @@ RunService.RenderStepped:Connect(function(deltaTime)
 		
 		frameCount = 0
 		lastMonitorTime = now
+	end
+end)
+
+-- Connect network events to HUD
+local ClientNetwork = script:WaitForChild("network")
+local Network = require(ClientNetwork.generated)
+
+-- Wave started event
+Network.WaveStarted.On(function(data)
+	hud:SetWaveNumber(data.WaveNumber)
+	Logger.Info("Client", `Wave {data.WaveNumber} started`)
+end)
+
+-- Base health updated event
+Network.BaseHealthUpdated.On(function(data)
+	hud:SetBaseHealth(data.CurrentHealth, data.MaxHealth)
+	if data.DamageAmount > 0 then
+		Logger.Warn("Client", `Base took {data.DamageAmount} damage! ({data.CurrentHealth}/{data.MaxHealth})`)
+	end
+end)
+
+-- Game over event
+Network.GameOver.On(function(data)
+	hud:SetGameOver(data.Victory, data.WaveReached)
+end)
+
+-- Wave completed event
+Network.WaveCompleted.On(function(data)
+	Logger.Info("Client", `Wave {data.WaveNumber} completed!`)
+end)
+
+-- Request response (for placement/collection confirmations)
+Network.RequestResponse.On(function(data)
+	if not data.Success and data.ErrorCode then
+		Logger.Debug("Client", `Request {data.RequestId} failed with error code {data.ErrorCode}`)
 	end
 end)
 

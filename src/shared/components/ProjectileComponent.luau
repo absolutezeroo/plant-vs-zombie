@@ -1,18 +1,21 @@
 --!strict
 --[[
-	ProjectileComponent.lua - Projectile entity data
+	ProjectileComponent.luau - Projectile entity data
 	
 	Projectiles travel from source plant toward target.
-	Hit detection handled by ProjectileSystem.
+	Hit detection handled by CombatSystem.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
-return Matter.component("ProjectileComponent", {
-	Damage = 20,         -- Damage on hit
-	Speed = 30,          -- Movement speed (studs/second)
-	SourcePlant = 0,     -- Entity ID of firing plant
-	DamageType = "Normal", -- "Normal", "Ice", "Explosive"
-})
+export type ProjectileComponent = {
+	Damage: number,         -- Damage on hit
+	Speed: number,          -- Movement speed (studs/second)
+	SourceEntity: number,   -- Entity ID of firing plant
+	Lane: number,           -- Lane the projectile travels in
+	SpawnX: number,         -- X position when spawned (for max range check)
+}
+
+return Matter.component("Projectile")

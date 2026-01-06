@@ -8,8 +8,8 @@ opt client_output = "../../client/network/generated.luau"
 -- Types for reusability
 type RequestId = u16
 type EntityId = u32
-type Lane = u8[1..5]           -- Lane index 1-5
-type Column = u8[1..9]         -- Column index 1-9
+type Lane = u8(1..5)           -- Lane index 1-5 (ranged integer)
+type Column = u8(1..9)         -- Column index 1-9 (ranged integer)
 type PlantType = enum { Peashooter, Sunflower, WallNut, SnowPea, CherryBomb, PotatoMine }
 type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football }
 type GamePhase = enum { Pregame, Wave, Intermission, GameOver }
@@ -150,7 +150,54 @@ event SunSpawned = {
         EntityId: EntityId,
         PositionX: f32,
         PositionY: f32,
+        PositionZ: f32,
         Value: u8,  -- Sun value (typically 25 or 50)
+        TargetY: f32, -- Y position to stop falling
+    }
+}
+
+-- Sun position update (for falling animation)
+event SunPositionUpdate = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        PositionY: f32,
+        Falling: boolean,
+    }
+}
+
+-- Sun despawned (timeout or collected by another player)
+event SunDespawned = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+    }
+}
+
+-- Base health updated (zombie reached house)
+event BaseHealthUpdated = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        CurrentHealth: u16,
+        MaxHealth: u16,
+        DamageAmount: u16,
+    }
+}
+
+-- Game over (victory or defeat)
+event GameOver = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Victory: boolean,
+        WaveReached: u8,
     }
 }
 

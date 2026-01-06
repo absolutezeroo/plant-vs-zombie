@@ -1,0 +1,168 @@
+--!strict
+--[[
+	SunSpawnSystem.luau - Server-side sun resource spawning
+	
+	Priority: 300 (Resource phase)
+	
+	Spawns sun orbs from the sky at regular intervals.
+	Sun falls with simulated gravity until reaching ground level.
+	Despawns after lifetime expires if not collected.
+	
+	Broadcasts sun events to all clients via Zap.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Matter = require(Packages:WaitForChild("Matter"))
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Components = Shared.components
+local GridConfig = require(Shared.config.GridConfig)
+local Logger = require(Shared.utils.Logger)
+
+-- Network
+local Server = script.Parent.Parent
+local Network = require(Server.network.generated)
+
+-- Components
+local PositionComponent = require(Components.PositionComponent)
+local SunComponent = require(Components.SunComponent)
+
+-- Sun spawning config
+local SunConfig = {
+	SPAWN_INTERVAL = 7,       -- Seconds between sky sun spawns
+	SPAWN_INTERVAL_VARIANCE = 3, -- +/- variance (so 4-10 seconds)
+	SUN_VALUE = 25,           -- Sun value when collected
+	LIFE_TIME = 12,           -- Seconds until despawn
+	SPAWN_HEIGHT = 30,        -- Y height to spawn at
+	FALL_SPEED = 4,           -- Studs per second
+	MIN_GROUND_Y = 2,         -- Y position to stop falling
+}
+
+-- State
+local _lastSpawnTime = 0
+local _nextSpawnDelay = 0
+
+local function getRandomGridPosition(): (number, number, number)
+	-- Random column and lane within grid
+	local column = math.random(1, GridConfig.GRID_COLUMNS)
+	local lane = math.random(1, GridConfig.GRID_LANES)
+	
+	-- Convert to world position
+	local cellCenterX = (column - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_X
+	local cellCenterZ = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	
+	-- Add some random offset within cell
+	local offsetX = (math.random() - 0.5) * GridConfig.CELL_SIZE * 0.6
+	local offsetZ = (math.random() - 0.5) * GridConfig.CELL_SIZE * 0.6
+	
+	return cellCenterX + offsetX, SunConfig.SPAWN_HEIGHT, cellCenterZ + offsetZ
+end
+
+local function spawnSkySun(world: any): number
+	local x, y, z = getRandomGridPosition()
+	local targetY = SunConfig.MIN_GROUND_Y + math.random() * 2
+	
+	local entityId = world:spawn(
+		PositionComponent({
+			X = x,
+			Y = y,
+			Z = z
+		}),
+		SunComponent({
+			Value = SunConfig.SUN_VALUE,
+			SpawnTime = os.clock(),
+			Lifetime = SunConfig.LIFE_TIME,
+			IsFalling = true,
+			TargetY = targetY,
+			SourceType = "Sky",
+		})
+	)
+	
+	-- Broadcast to all clients
+	Network.SunSpawned.FireAll({
+		EntityId = entityId,
+		PositionX = x,
+		PositionY = y,
+		PositionZ = z,
+		Value = SunConfig.SUN_VALUE,
+		TargetY = targetY,
+	})
+	
+	Logger.Debug("SunSpawnSystem", `Spawned sky sun entity {entityId} at ({math.floor(x)}, {math.floor(y)}, {math.floor(z)})`)
+	
+	return entityId
+end
+
+local function SunSpawnSystem(world)
+	local currentTime = os.clock()
+	
+	-- Check if it's time to spawn new sun
+	if currentTime - _lastSpawnTime >= _nextSpawnDelay then
+		spawnSkySun(world)
+		_lastSpawnTime = currentTime
+		_nextSpawnDelay = SunConfig.SPAWN_INTERVAL + (math.random() - 0.5) * 2 * SunConfig.SPAWN_INTERVAL_VARIANCE
+	end
+	
+	-- Process falling sun and despawning
+	for id, pos, sun in world:query(PositionComponent, SunComponent) do
+		-- Despawn check
+		local age = currentTime - sun.SpawnTime
+		if age >= sun.Lifetime then
+			world:despawn(id)
+			
+			-- Broadcast despawn to all clients
+			Network.SunDespawned.FireAll({
+				EntityId = id,
+			})
+			
+			Logger.Debug("SunSpawnSystem", `Sun {id} despawned (lifetime expired)`)
+			continue
+		end
+		
+		-- Falling physics
+		if sun.IsFalling then
+			local newY = pos.Y - SunConfig.FALL_SPEED * (1/60) -- Assume 60 FPS
+			local targetY = sun.TargetY or SunConfig.MIN_GROUND_Y
+			
+			if newY <= targetY then
+				-- Landed
+				world:insert(id, 
+					PositionComponent({
+						X = pos.X,
+						Y = targetY,
+						Z = pos.Z
+					}),
+					SunComponent({
+						Value = sun.Value,
+						SpawnTime = sun.SpawnTime,
+						Lifetime = sun.Lifetime,
+						IsFalling = false,
+						TargetY = targetY,
+						SourceType = sun.SourceType,
+					})
+				)
+				
+				-- Broadcast landed state
+				Network.SunPositionUpdate.FireAll({
+					EntityId = id,
+					PositionY = targetY,
+					Falling = false,
+				})
+			else
+				-- Still falling - update position
+				world:insert(id, PositionComponent({
+					X = pos.X,
+					Y = newY,
+					Z = pos.Z
+				}))
+			end
+		end
+	end
+end
+
+return {
+	system = SunSpawnSystem,
+	priority = 300, -- Resource phase
+}

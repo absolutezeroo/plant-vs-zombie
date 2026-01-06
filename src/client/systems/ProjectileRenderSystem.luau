@@ -1,0 +1,129 @@
+--!strict
+--[[
+	ProjectileRenderSystem.luau - Client-side projectile rendering
+	
+	Priority: 420 (Render phase - after zombies)
+	
+	Receives projectile spawn events from server via Zap.
+	Creates visual pea projectiles with movement.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GridConfig = require(Shared.config.GridConfig)
+local Logger = require(Shared.utils.Logger)
+
+local Client = script.Parent.Parent
+local Network = require(Client.network.generated)
+
+-- Projectile visual cache
+type ProjectileVisual = {
+	Part: Part,
+	Lane: number,
+	Speed: number,
+}
+local _projectileVisuals: {[number]: ProjectileVisual} = {}
+
+-- Visual config
+local PEA_SIZE = Vector3.new(1, 1, 1)
+local PEA_COLOR = Color3.fromRGB(100, 200, 100) -- Green pea
+local PEA_SPEED = 15 -- Match server
+
+local function getLaneZ(lane: number): number
+	return (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+end
+
+local function createProjectileVisual(entityId: number, lane: number, startX: number): ProjectileVisual
+	local part = Instance.new("Part")
+	part.Name = `Pea_{entityId}`
+	part.Shape = Enum.PartType.Ball
+	part.Size = PEA_SIZE
+	part.Color = PEA_COLOR
+	part.Material = Enum.Material.SmoothPlastic
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.CastShadow = false
+	
+	local z = getLaneZ(lane)
+	part.Position = Vector3.new(startX, 2.5, z)
+	
+	part:SetAttribute("EntityId", entityId)
+	part.Parent = Workspace
+	
+	return {
+		Part = part,
+		Lane = lane,
+		Speed = PEA_SPEED,
+	}
+end
+
+local function destroyProjectileVisual(entityId: number)
+	local visual = _projectileVisuals[entityId]
+	if visual then
+		visual.Part:Destroy()
+		_projectileVisuals[entityId] = nil
+	end
+end
+
+-- Network event handlers
+Network.ProjectileSpawned.On(function(data)
+	local entityId = data.EntityId
+	local lane = data.Lane
+	local startX = data.StartX
+	
+	if not _projectileVisuals[entityId] then
+		_projectileVisuals[entityId] = createProjectileVisual(entityId, lane, startX)
+		Logger.Debug("ProjectileRender", `Pea {entityId} spawned in lane {lane}`)
+	end
+end)
+
+-- Also handle projectile despawn via EntityDied (reuse the event)
+-- Projectiles don't have health so they won't trigger EntityDied normally
+-- We'll clean up when they go off-screen
+
+local function ProjectileRenderSystem(world)
+	local dt = 1/60
+	
+	-- Move projectiles
+	for entityId, visual in _projectileVisuals do
+		local currentX = visual.Part.Position.X
+		local newX = currentX + visual.Speed * dt
+		
+		-- Check if off-screen (past grid)
+		if newX > GridConfig.GRID_WIDTH + 50 then
+			destroyProjectileVisual(entityId)
+		else
+			local z = getLaneZ(visual.Lane)
+			visual.Part.Position = Vector3.new(newX, 2.5, z)
+		end
+	end
+end
+
+-- Clean up on EntityDied (for any entity)
+Network.EntityDied.On(function(data)
+	-- Check if this was a projectile we're tracking
+	if _projectileVisuals[data.EntityId] then
+		-- Hit animation (quick scale down)
+		local visual = _projectileVisuals[data.EntityId]
+		local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
+		local tween = TweenService:Create(visual.Part, tweenInfo, {
+			Size = Vector3.new(0.1, 0.1, 0.1),
+			Transparency = 1
+		})
+		tween:Play()
+		tween.Completed:Connect(function()
+			destroyProjectileVisual(data.EntityId)
+		end)
+		_projectileVisuals[data.EntityId] = nil
+	end
+end)
+
+return {
+	system = ProjectileRenderSystem,
+	priority = 420,
+}
