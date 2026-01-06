@@ -6,9 +6,11 @@
 	Coffee Bean removes this component.
 ]]
 
-return function()
-	return {
-		IsSleeping = true,      -- Currently sleeping?
-		WokeAt = nil,           -- os.clock() when woken (nil if still sleeping)
-	}
-end
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Matter = require(Packages:WaitForChild("Matter"))
+
+return Matter.component("SleepingComponent", {
+	IsSleeping = true,      -- Currently sleeping?
+	WokeAt = nil :: number?,-- os.clock() when woken (nil if still sleeping)
+})

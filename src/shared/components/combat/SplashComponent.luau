@@ -5,9 +5,11 @@
 	When projectile hits, deals splash damage to nearby zombies.
 ]]
 
-return function()
-	return {
-		SplashRadius = 0,      -- Studs - radius of splash damage
-		SplashDamage = 0,      -- Damage dealt to splash targets (usually less than direct hit)
-	}
-end
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Matter = require(Packages:WaitForChild("Matter"))
+
+return Matter.component("SplashComponent", {
+	SplashRadius = 0,      -- Studs - radius of splash damage
+	SplashDamage = 0,      -- Damage dealt to splash targets (usually less than direct hit)
+})

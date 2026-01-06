@@ -23,6 +23,10 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
+local Types = require(Shared.Types)
+
+-- Type alias for world parameter
+type MatterWorld = Types.MatterWorld
 
 -- Network (script.Parent.Parent.Parent = server root, since we're in systems/combat/)
 local Server = script.Parent.Parent.Parent
@@ -51,8 +55,40 @@ local CombatConfig = {
 -- Track zombie attack timers
 local _zombieAttackTimes: {[number]: number} = {}
 
+-- Combat stats aggregator (logged once per frame, not per entity)
+local _frameStats = {
+	projectileHits = 0,
+	splashHits = 0,
+	stunsApplied = 0,
+	stunsExpired = 0,
+	slowsApplied = 0,
+	slowsExpired = 0,
+	thawsApplied = 0,
+	zombieBites = 0,
+	plantsDestroyed = 0,
+}
+
+local function resetFrameStats()
+	_frameStats.projectileHits = 0
+	_frameStats.splashHits = 0
+	_frameStats.stunsApplied = 0
+	_frameStats.stunsExpired = 0
+	_frameStats.slowsApplied = 0
+	_frameStats.slowsExpired = 0
+	_frameStats.thawsApplied = 0
+	_frameStats.zombieBites = 0
+	_frameStats.plantsDestroyed = 0
+end
+
+local function logFrameStats()
+	local hasActivity = _frameStats.projectileHits > 0 or _frameStats.zombieBites > 0 or _frameStats.stunsApplied > 0
+	if hasActivity then
+		Logger.Debug("Combat", `Frame: {_frameStats.projectileHits} hits, {_frameStats.splashHits} splash, {_frameStats.stunsApplied} stuns, {_frameStats.slowsApplied} slows, {_frameStats.zombieBites} bites`)
+	end
+end
+
 -- Apply damage to an entity (returns true if killed)
-local function applyDamage(world: any, entityId: number, damage: number, piercesShields: boolean?): boolean
+local function applyDamage(world: MatterWorld, entityId: number, damage: number, piercesShields: boolean?): boolean
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return false
@@ -87,7 +123,7 @@ local function applyDamage(world: any, entityId: number, damage: number, pierces
 end
 
 -- Apply splash damage to zombies near impact point
-local function applySplashDamage(world: any, impactX: number, impactZ: number, splash: any, proj: any)
+local function applySplashDamage(world: MatterWorld, impactX: number, impactZ: number, splash: any, proj: any)
 	local hitCount = 0
 	
 	for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
@@ -106,17 +142,16 @@ local function applySplashDamage(world: any, impactX: number, impactZ: number, s
 					Duration = proj.SlowDuration,
 					AppliedAt = os.clock(),
 				}))
+				_frameStats.slowsApplied += 1
 			end
 		end
 	end
 	
-	if hitCount > 0 then
-		Logger.Debug("Combat", `Splash hit {hitCount} zombies for {splash.SplashDamage} damage`)
-	end
+	_frameStats.splashHits += hitCount
 end
 
 -- Try to apply stun effect (butter from Kernel-pult)
-local function tryApplyStun(world: any, zombieId: number, proj: any)
+local function tryApplyStun(world: MatterWorld, zombieId: number, proj: any): boolean
 	if not proj.CanStun or proj.StunChance <= 0 then
 		return false
 	end
@@ -127,7 +162,7 @@ local function tryApplyStun(world: any, zombieId: number, proj: any)
 			Duration = proj.StunDuration,
 			AppliedAt = os.clock(),
 		}))
-		Logger.Debug("Combat", `Butter stunned zombie {zombieId} for {proj.StunDuration}s`)
+		_frameStats.stunsApplied += 1
 		return true
 	end
 	
@@ -135,7 +170,7 @@ local function tryApplyStun(world: any, zombieId: number, proj: any)
 end
 
 -- Find plant at grid position
-local function findPlantAtPosition(world: any, column: number, lane: number): number?
+local function findPlantAtPosition(world: MatterWorld, column: number, lane: number): number?
 	for id, plant in world:query(PlantTypeComponent) do
 		if plant.Column == column and plant.Lane == lane then
 			return id
@@ -150,14 +185,17 @@ local function getColumnFromX(x: number): number
 	return math.floor(localX / GridConfig.CELL_SIZE) + 1
 end
 
-local function CombatSystem(world)
+local function CombatSystem(world: MatterWorld)
 	local currentTime = os.clock()
+	
+	-- Reset frame stats at start of combat processing
+	resetFrameStats()
 	
 	-- Process stun effect expiration
 	for zombieId, stun in world:query(StunComponent) do
 		if currentTime - stun.AppliedAt >= stun.Duration then
 			world:remove(zombieId, StunComponent)
-			Logger.Debug("Combat", `Zombie {zombieId} stun expired`)
+			_frameStats.stunsExpired += 1
 		end
 	end
 	
@@ -194,7 +232,7 @@ local function CombatSystem(world)
 					-- Remove slow from zombie
 					if world:get(zombieId, SlowComponent) then
 						world:remove(zombieId, SlowComponent)
-						Logger.Debug("Combat", `Fire pea thawed frozen zombie {zombieId}`)
+						_frameStats.thawsApplied += 1
 					end
 				end
 				
@@ -215,7 +253,7 @@ local function CombatSystem(world)
 							Duration = proj.SlowDuration,
 							AppliedAt = currentTime,
 						}))
-						Logger.Debug("Combat", `Frozen pea slowed zombie {zombieId} by {proj.SlowPercent * 100}%`)
+						_frameStats.slowsApplied += 1
 					end
 				end
 				
@@ -224,7 +262,7 @@ local function CombatSystem(world)
 					tryApplyStun(world, zombieId, proj)
 				end
 				
-				Logger.Debug("Combat", `Projectile hit zombie {zombieId} for {damage} damage (killed={killed})`)
+				_frameStats.projectileHits += 1
 				
 				hitZombie = true
 				hitZombieId = zombieId
@@ -248,7 +286,7 @@ local function CombatSystem(world)
 	for zombieId, slow in world:query(SlowComponent) do
 		if currentTime - slow.AppliedAt >= slow.Duration then
 			world:remove(zombieId, SlowComponent)
-			Logger.Debug("Combat", `Zombie {zombieId} slow effect expired`)
+			_frameStats.slowsExpired += 1
 		end
 	end
 	
@@ -289,8 +327,7 @@ local function CombatSystem(world)
 				-- Bite!
 				local killed = applyDamage(world, target.TargetEntity, stats.Damage)
 				_zombieAttackTimes[zombieId] = currentTime
-				
-				Logger.Debug("Combat", `Zombie {zombieId} bit plant {target.TargetEntity} for {stats.Damage} damage`)
+				_frameStats.zombieBites += 1
 				
 				if killed then
 					-- Plant destroyed, resume moving
@@ -301,6 +338,7 @@ local function CombatSystem(world)
 						VelocityZ = 0
 					}))
 					_zombieAttackTimes[zombieId] = nil
+					_frameStats.plantsDestroyed += 1
 				end
 			end
 		else
@@ -335,8 +373,6 @@ local function CombatSystem(world)
 							}))
 							
 							_zombieAttackTimes[zombieId] = currentTime
-							
-							Logger.Debug("Combat", `Zombie {zombieId} started eating plant {plantId}`)
 							break
 						end
 					end
@@ -351,6 +387,9 @@ local function CombatSystem(world)
 			_zombieAttackTimes[zombieId] = nil
 		end
 	end
+	
+	-- Log aggregated frame stats (single log per frame, not per entity)
+	logFrameStats()
 end
 
 return {
