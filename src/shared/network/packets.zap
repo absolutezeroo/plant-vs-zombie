@@ -81,6 +81,32 @@ event StartWaveRequest = {
 }
 
 -- ===================
+-- LOBBY EVENTS
+-- ===================
+
+-- Player requests teleport to Arena (Lobby -> Server)
+event TeleportToArenaRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        StageId: string.utf8(..50),
+        Deck: PlantType[6],  -- Max 6 plants in deck
+    }
+}
+
+-- Server confirms teleport is starting (Server -> Client)
+event TeleportToArenaResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        ErrorCode: u8?,  -- 0=None, 1=InvalidStage, 2=InvalidDeck, 3=NotUnlocked
+    }
+}
+
+-- ===================
 -- SERVER -> CLIENT
 -- ===================
 

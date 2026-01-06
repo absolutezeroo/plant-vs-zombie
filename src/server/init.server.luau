@@ -12,6 +12,8 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 
 -- Wait for packages to be available
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -24,6 +26,7 @@ local ErrorHandler = require(Shared.utils.ErrorHandler)
 local EntityPool = require(Shared.utils.EntityPool)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
+local TeleportData = require(Shared.TeleportData)
 
 -- Import components via index module
 local Components = require(Shared.components)
@@ -131,5 +134,86 @@ RunService.Heartbeat:Connect(function(deltaTime)
 		end
 	end
 end)
+
+-- ============================================
+-- ARENA: Handle players teleporting from Lobby
+-- ============================================
+
+-- Storage for player teleport data (stageId, deck)
+local playerTeleportData: { [Player]: TeleportData.ArenaJoinData } = {}
+
+local function onPlayerAdded(player: Player)
+	Logger.Info("Server", `Player {player.Name} joined Arena`)
+	
+	-- Get teleport data (if coming from Lobby)
+	local joinData = player:GetJoinData()
+	local teleportData = joinData.TeleportData
+	
+	if teleportData then
+		local isValid, err = TeleportData.ValidateArenaJoinData(teleportData)
+		if isValid then
+			playerTeleportData[player] = teleportData :: TeleportData.ArenaJoinData
+			Logger.Info("Server", `{player.Name} teleported from Lobby`, {
+				stageId = teleportData.StageId,
+				deckSize = #teleportData.Deck,
+			})
+			
+			-- TODO: Initialize match with this stage/deck
+			-- MatchService.StartMatch(player, teleportData.StageId, teleportData.Deck)
+		else
+			Logger.Warn("Server", `Invalid teleport data for {player.Name}: {err}`)
+			-- Teleport back to lobby with error
+			-- TeleportService:Teleport(TeleportData.PlaceIds.Lobby, player)
+		end
+	else
+		Logger.Info("Server", `{player.Name} joined directly (no teleport data)`)
+		-- Player joined without going through Lobby
+		-- For testing, allow direct join. In production, teleport to Lobby.
+	end
+end
+
+local function onPlayerRemoving(player: Player)
+	playerTeleportData[player] = nil
+end
+
+-- Get player's current match data
+local function getPlayerMatchData(player: Player): TeleportData.ArenaJoinData?
+	return playerTeleportData[player]
+end
+
+-- Teleport player back to Lobby with results
+local function sendPlayerToLobby(player: Player, victory: boolean, stars: number, coins: number, xp: number)
+	local teleportOptions = Instance.new("TeleportOptions")
+	local returnData = TeleportData.CreateLobbyReturnData(
+		playerTeleportData[player] and playerTeleportData[player].StageId or "unknown",
+		victory,
+		stars,
+		coins,
+		xp
+	)
+	teleportOptions:SetTeleportData(returnData)
+	
+	local success, err = pcall(function()
+		TeleportService:TeleportAsync(TeleportData.PlaceIds.Lobby, { player }, teleportOptions)
+	end)
+	
+	if not success then
+		Logger.Error("Server", `Failed to teleport {player.Name} to Lobby: {err}`)
+	end
+end
+
+-- Connect player events
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+-- Handle players already in game (Studio testing)
+for _, player in Players:GetPlayers() do
+	task.spawn(onPlayerAdded, player)
+end
+
+-- Export functions for other modules
+-- Note: In a real implementation, these would be in a separate ArenaService
+_G.ArenaGetPlayerMatchData = getPlayerMatchData
+_G.ArenaSendPlayerToLobby = sendPlayerToLobby
 
 Logger.Info("Server", "Server bootstrap complete")

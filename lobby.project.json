@@ -1,0 +1,50 @@
+{
+  "name": "plant-vs-zombie-lobby",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Packages": {
+        "$path": "Packages"
+      }
+    },
+
+    "ServerScriptService": {
+      "LobbyServer": {
+        "$path": "src/lobby/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LobbyClient": {
+          "$path": "src/lobby/client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Ambient": [0.3, 0.3, 0.3],
+        "Brightness": 2,
+        "GlobalShadows": true,
+        "Technology": "Voxel"
+      }
+    },
+
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}
