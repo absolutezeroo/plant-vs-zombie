@@ -24,6 +24,9 @@ local Logger = require(Shared.utils.Logger)
 local Client = script.Parent.Parent
 local PlayerDataClient = require(Client.modules.PlayerDataClient)
 
+-- Theme
+local PvZTheme = require(script.Parent.PvZTheme)
+
 -- Fusion primitives
 local New = Fusion.New
 local Children = Fusion.Children
@@ -186,15 +189,25 @@ local function PlantShopCard(props: {
 		Size = CARD_SIZE,
 		BackgroundColor3 = Computed(scope, function(use)
 			if use(isUnlocked) then
-				return Color3.fromRGB(50, 80, 50)
+				return PvZTheme.Colors.WoodBrown
 			else
-				return Color3.fromRGB(60, 60, 60)
+				return PvZTheme.Colors.Disabled
 			end
 		end),
 		BorderSizePixel = 0,
 		
 		[Children] = {
-			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 10) }),
+			New(scope, "UIStroke")({
+				Color = Computed(scope, function(use)
+					if use(isUnlocked) then
+						return PvZTheme.Colors.WoodDark
+					else
+						return Color3.fromRGB(60, 60, 60)
+					end
+				end),
+				Thickness = 2,
+			}),
 			
 			-- Plant icon
 			New(scope, "Frame")({
@@ -261,23 +274,29 @@ local function PlantShopCard(props: {
 						},
 					})
 				else
-					-- Show unlock button
+					-- Show unlock button (PvZ style)
 					return New(scope, "TextButton")({
 						Name = "UnlockButton",
 						Position = UDim2.new(0.5, 0, 0.75, 0),
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.new(0.8, 0, 0.25, 0),
+						Size = UDim2.new(0.85, 0, 0.25, 0),
 						BackgroundColor3 = Computed(scope, function(use2)
 							if use2(canAffordUnlock) then
-								return Color3.fromRGB(80, 180, 80)
+								return PvZTheme.Colors.GrassGreen
 							else
-								return Color3.fromRGB(100, 100, 100)
+								return PvZTheme.Colors.Disabled
 							end
 						end),
 						BorderSizePixel = 0,
 						AutoButtonColor = canAffordUnlock,
-						Text = `🪙 {unlockInfo.Cost}`,
-						TextColor3 = Color3.new(1, 1, 1),
+						Text = PvZTheme.Icons.Coin .. " " .. tostring(unlockInfo.Cost),
+						TextColor3 = Computed(scope, function(use2)
+							if use2(canAffordUnlock) then
+								return PvZTheme.Colors.CoinGold
+							else
+								return Color3.fromRGB(150, 150, 150)
+							end
+						end),
 						TextScaled = true,
 						Font = Enum.Font.GothamBold,
 						
@@ -288,7 +307,11 @@ local function PlantShopCard(props: {
 						end,
 						
 						[Children] = {
-							New(scope, "UICorner")({ CornerRadius = UDim.new(0, 6) }),
+							New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+							New(scope, "UIStroke")({
+								Color = PvZTheme.Colors.LeafGreen,
+								Thickness = 2,
+							}),
 						},
 					})
 				end
@@ -336,73 +359,69 @@ local function ShopUI(props: ShopUIProps)
 		ZIndex = 50,
 		
 		[Children] = {
-			-- Shop container
-			New(scope, "Frame")({
+			-- Shop container (PvZ Wood Style)
+			PvZTheme.WoodPanel(scope, {
 				Name = "Container",
 				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(800, 520),
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(800, 500),
-				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-				BorderSizePixel = 0,
-				
-				[Children] = {
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
-					
-					-- Header
+				children = {
+					-- Header (Green Banner)
 					New(scope, "Frame")({
 						Name = "Header",
 						Position = UDim2.fromOffset(0, 0),
 						Size = UDim2.new(1, 0, 0, 60),
-						BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+						BackgroundColor3 = PvZTheme.Colors.GrassGreen,
 						BorderSizePixel = 0,
 						
 						[Children] = {
 							New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
 							
-							-- Title
-							New(scope, "TextLabel")({
+							-- Title with stroke
+							PvZTheme.StrokedText(scope, {
+								Name = "Title",
 								Position = UDim2.fromOffset(20, 0),
 								Size = UDim2.new(0.5, 0, 1, 0),
-								BackgroundTransparency = 1,
-								Text = "🛒 Plant Shop",
-								TextColor3 = Color3.new(1, 1, 1),
+								AnchorPoint = Vector2.zero,
+								Text = PvZTheme.Icons.Shop .. " PLANT SHOP",
+								TextColor3 = PvZTheme.Colors.TextWhite,
 								TextXAlignment = Enum.TextXAlignment.Left,
-								TextSize = 28,
-								Font = Enum.Font.GothamBold,
 							}),
 							
 							-- Coin display
-							New(scope, "TextLabel")({
-								Position = UDim2.new(1, -120, 0.5, 0),
+							PvZTheme.StrokedText(scope, {
+								Name = "CoinDisplay",
+								Position = UDim2.new(1, -130, 0.5, 0),
+								Size = UDim2.fromOffset(110, 35),
 								AnchorPoint = Vector2.new(0, 0.5),
-								Size = UDim2.fromOffset(100, 30),
-								BackgroundTransparency = 1,
 								Text = Computed(scope, function(use)
-									return `🪙 {use(PlayerDataClient.GetCoinsValue())}`
+									return PvZTheme.Icons.Coin .. " " .. tostring(use(PlayerDataClient.GetCoinsValue()))
 								end),
-								TextColor3 = Color3.fromRGB(255, 200, 50),
+								TextColor3 = PvZTheme.Colors.CoinGold,
 								TextXAlignment = Enum.TextXAlignment.Right,
-								TextSize = 22,
-								Font = Enum.Font.GothamBold,
 							}),
 							
-							-- Close button
+							-- Close button (Red)
 							New(scope, "TextButton")({
 								Name = "CloseButton",
 								Position = UDim2.new(1, -10, 0.5, 0),
 								AnchorPoint = Vector2.new(1, 0.5),
-								Size = UDim2.fromOffset(40, 40),
-								BackgroundColor3 = Color3.fromRGB(200, 60, 60),
+								Size = UDim2.fromOffset(44, 44),
+								BackgroundColor3 = PvZTheme.Colors.HealthRed,
 								BorderSizePixel = 0,
 								Text = "✕",
 								TextColor3 = Color3.new(1, 1, 1),
-								TextSize = 24,
+								TextSize = 26,
 								Font = Enum.Font.GothamBold,
 								
 								[OnEvent("Activated")] = props.OnClose,
 								
 								[Children] = {
-									New(scope, "UICorner")({ CornerRadius = UDim.new(0, 6) }),
+									New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+									New(scope, "UIStroke")({
+										Color = Color3.fromRGB(180, 40, 40),
+										Thickness = 2,
+									}),
 								},
 							}),
 						},
@@ -411,11 +430,11 @@ local function ShopUI(props: ShopUIProps)
 					-- Plant grid
 					New(scope, "ScrollingFrame")({
 						Name = "PlantGrid",
-						Position = UDim2.fromOffset(20, 80),
-						Size = UDim2.new(1, -40, 1, -100),
+						Position = UDim2.fromOffset(20, 75),
+						Size = UDim2.new(1, -40, 1, -90),
 						BackgroundTransparency = 1,
-						ScrollBarThickness = 6,
-						ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100),
+						ScrollBarThickness = 8,
+						ScrollBarImageColor3 = PvZTheme.Colors.WoodLight,
 						CanvasSize = UDim2.fromOffset(0, 0),
 						AutomaticCanvasSize = Enum.AutomaticSize.Y,
 						

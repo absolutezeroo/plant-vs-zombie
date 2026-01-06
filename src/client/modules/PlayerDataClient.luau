@@ -25,6 +25,10 @@ local Value = Fusion.Value
 -- Player data state (reactive)
 local PlayerData = {
 	Coins = Value(_scope, 0),
+	Gems = Value(_scope, 0),
+	XP = Value(_scope, 0),
+	Level = Value(_scope, 1),
+	LevelProgress = Value(_scope, 0),  -- 0.0 to 1.0
 	UnlockedPlants = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
 	-- Upgrades: [PlantType] = { Damage = level, Health = level, Cooldown = level }
 	PlantUpgrades = Value(_scope, {} :: {[string]: {Damage: number, Health: number, Cooldown: number}}),
@@ -57,6 +61,36 @@ end
 -- Get coins (current value)
 function PlayerDataClient.GetCoins(): number
 	return Fusion.peek(PlayerData.Coins)
+end
+
+-- Get gems (reactive Value)
+function PlayerDataClient.GetGemsValue()
+	return PlayerData.Gems
+end
+
+-- Get gems (current value)
+function PlayerDataClient.GetGems(): number
+	return Fusion.peek(PlayerData.Gems)
+end
+
+-- Get XP (reactive Value)
+function PlayerDataClient.GetXPValue()
+	return PlayerData.XP
+end
+
+-- Get Level (reactive Value)
+function PlayerDataClient.GetLevelValue()
+	return PlayerData.Level
+end
+
+-- Get Level Progress (reactive Value, 0.0 to 1.0)
+function PlayerDataClient.GetLevelProgressValue()
+	return PlayerData.LevelProgress
+end
+
+-- Get current level
+function PlayerDataClient.GetLevel(): number
+	return Fusion.peek(PlayerData.Level)
 end
 
 -- Get unlocked plants (reactive Value)
@@ -149,10 +183,16 @@ end
 function PlayerDataClient.Initialize()
 	-- Handle full data sync from server (SingleAsync = SetCallback)
 	Network.PlayerDataSync.SetCallback(function(data)
-		Logger.Info("PlayerData", `Received player data: {data.Coins} coins, {#data.UnlockedPlants} plants`)
+		Logger.Info("PlayerData", `Received player data: {data.Coins} coins, {data.Gems} gems, Lv{data.Level}`)
 		
-		-- Update coins
+		-- Update currencies
 		PlayerData.Coins:set(data.Coins)
+		PlayerData.Gems:set(data.Gems or 0)
+		
+		-- Update XP/Level
+		PlayerData.XP:set(data.XP or 0)
+		PlayerData.Level:set(data.Level or 1)
+		PlayerData.LevelProgress:set(data.LevelProgress or 0)
 		
 		-- Update unlocked plants
 		local unlockedList = {}

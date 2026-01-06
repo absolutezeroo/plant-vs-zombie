@@ -23,6 +23,12 @@ local Logger = require(Shared.utils.Logger)
 local PROFILE_TEMPLATE = {
 	Coins = 0,
 	TotalCoinsEarned = 0,
+	Gems = 0,
+	TotalGemsEarned = 0,
+	
+	-- XP and Level system
+	XP = 0,
+	Level = 1,
 	
 	-- Unlocked plants (starter plants are unlocked by default)
 	UnlockedPlants = {
@@ -111,6 +117,141 @@ function PlayerDataService.SpendCoins(player: Player, amount: number): boolean
 	PlayerDataService._notifyDataChanged(player)
 	
 	return true
+end
+
+-- ============================================
+-- GEMS SYSTEM
+-- ============================================
+
+-- Get gems for a player
+function PlayerDataService.GetGems(player: Player): number
+	local data = PlayerDataService.GetProfile(player)
+	return if data then data.Gems else 0
+end
+
+-- Add gems to a player
+function PlayerDataService.AddGems(player: Player, amount: number): boolean
+	local profile = _profiles[player]
+	if not profile then
+		return false
+	end
+	
+	profile.Data.Gems += amount
+	profile.Data.TotalGemsEarned += amount
+	
+	Logger.Info("PlayerData", `{player.Name} +{amount} gems (Total: {profile.Data.Gems})`)
+	PlayerDataService._notifyDataChanged(player)
+	
+	return true
+end
+
+-- Spend gems (returns false if not enough)
+function PlayerDataService.SpendGems(player: Player, amount: number): boolean
+	local profile = _profiles[player]
+	if not profile then
+		return false
+	end
+	
+	if profile.Data.Gems < amount then
+		return false
+	end
+	
+	profile.Data.Gems -= amount
+	Logger.Debug("PlayerData", `{player.Name} -{amount} gems (Remaining: {profile.Data.Gems})`)
+	PlayerDataService._notifyDataChanged(player)
+	
+	return true
+end
+
+-- ============================================
+-- XP / LEVEL SYSTEM
+-- ============================================
+
+-- Get current XP and level
+function PlayerDataService.GetXP(player: Player): number
+	local data = PlayerDataService.GetProfile(player)
+	return if data then data.XP else 0
+end
+
+function PlayerDataService.GetLevel(player: Player): number
+	local data = PlayerDataService.GetProfile(player)
+	return if data then data.Level else 1
+end
+
+-- Add XP and handle level ups (returns levels gained)
+function PlayerDataService.AddXP(player: Player, amount: number): number
+	local profile = _profiles[player]
+	if not profile then
+		return 0
+	end
+	
+	local oldLevel = profile.Data.Level
+	profile.Data.XP += amount
+	
+	-- Check for level ups
+	local levelsGained = 0
+	while profile.Data.Level < ProgressionData.MAX_LEVEL do
+		local xpNeeded = ProgressionData.GetXPForLevel(profile.Data.Level + 1)
+		local currentLevelXP = profile.Data.XP - ProgressionData.GetTotalXPForLevel(profile.Data.Level)
+		
+		if currentLevelXP >= xpNeeded then
+			profile.Data.Level += 1
+			levelsGained += 1
+			
+			Logger.Info("PlayerData", `🎉 {player.Name} leveled up to {profile.Data.Level}!`)
+			
+			-- Award level-up gems
+			profile.Data.Gems += ProgressionData.GEMS_PER_LEVEL_UP
+			profile.Data.TotalGemsEarned += ProgressionData.GEMS_PER_LEVEL_UP
+			
+			-- Check for milestone rewards
+			local reward = ProgressionData.LevelRewards[profile.Data.Level]
+			if reward then
+				if reward.Coins then
+					profile.Data.Coins += reward.Coins
+					profile.Data.TotalCoinsEarned += reward.Coins
+					Logger.Info("PlayerData", `  Bonus: +{reward.Coins} coins`)
+				end
+				if reward.Gems then
+					profile.Data.Gems += reward.Gems
+					profile.Data.TotalGemsEarned += reward.Gems
+					Logger.Info("PlayerData", `  Bonus: +{reward.Gems} gems`)
+				end
+				if reward.UnlockPlant then
+					profile.Data.UnlockedPlants[reward.UnlockPlant] = true
+					Logger.Info("PlayerData", `  Unlocked: {reward.UnlockPlant}!`)
+				end
+			end
+		else
+			break
+		end
+	end
+	
+	if levelsGained > 0 or amount > 0 then
+		Logger.Debug("PlayerData", `{player.Name} +{amount} XP (Level {profile.Data.Level}, Total: {profile.Data.XP})`)
+		PlayerDataService._notifyDataChanged(player)
+	end
+	
+	return levelsGained
+end
+
+-- Get XP progress to next level (0.0 - 1.0)
+function PlayerDataService.GetLevelProgress(player: Player): number
+	local data = PlayerDataService.GetProfile(player)
+	if not data then
+		return 0
+	end
+	
+	if data.Level >= ProgressionData.MAX_LEVEL then
+		return 1.0
+	end
+	
+	local currentLevelTotalXP = ProgressionData.GetTotalXPForLevel(data.Level)
+	local nextLevelTotalXP = ProgressionData.GetTotalXPForLevel(data.Level + 1)
+	local xpInCurrentLevel = data.XP - currentLevelTotalXP
+	local xpNeededForLevel = nextLevelTotalXP - currentLevelTotalXP
+	
+	return math.clamp(xpInCurrentLevel / xpNeededForLevel, 0, 1)
 end
 
 -- Check if plant is unlocked

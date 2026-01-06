@@ -305,6 +305,10 @@ event PlayerDataSync = {
     call: SingleAsync,
     data: struct {
         Coins: u32,
+        Gems: u32,
+        XP: u32,
+        Level: u8,
+        LevelProgress: f32,
         UnlockedPlants: PlantType[..10],
         -- Upgrades sent as parallel arrays (PlantType, Damage, Health, Cooldown)
         UpgradePlantTypes: PlantType[..10],
@@ -339,6 +343,10 @@ event GameEndRewards = {
         WavesCompleted: u8,
         BonusCoins: u16,
         StarRating: u8,  -- 1-3 stars based on base damage taken
+        XPEarned: u16,   -- Total XP earned this game
+        GemsEarned: u8,  -- Gems earned (3-star bonus, level ups)
+        NewLevel: u8,    -- Player's new level (if leveled up)
+        LevelsGained: u8, -- Number of levels gained this game
     }
 }
 
@@ -403,3 +411,48 @@ event PlantFoodChargeUpdate = {
     }
 }
 
+-- ===================
+-- XP / LEVEL SYSTEM
+-- ===================
+
+-- Server notifies player of XP gain
+event XPGained = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Amount: u16,
+        TotalXP: u32,
+        CurrentLevel: u8,
+        LevelProgress: f32,  -- 0.0 to 1.0 progress to next level
+    }
+}
+
+-- Server notifies player of level up
+event LevelUp = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        NewLevel: u8,
+        RewardCoins: u16?,
+        RewardGems: u8?,
+        UnlockedPlant: PlantType?,
+    }
+}
+
+-- ===================
+-- GEMS SYSTEM
+-- ===================
+
+-- Server notifies player of gems earned
+event GemsEarned = {
+    from: Server,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Amount: u8,
+        TotalGems: u32,
+        Reason: u8,  -- 0=LevelUp, 1=3StarVictory, 2=FirstClear
+    }
+}

@@ -20,6 +20,9 @@ local Logger = require(Shared.utils.Logger)
 local Client = script.Parent.Parent
 local PlayerDataClient = require(Client.modules.PlayerDataClient)
 
+-- Theme
+local PvZTheme = require(script.Parent.PvZTheme)
+
 -- Fusion primitives
 local New = Fusion.New
 local Children = Fusion.Children
@@ -110,25 +113,25 @@ local function PlantCard(props: {
 		return use(cooldownRemaining) > 0
 	end)
 	
-	-- Card background color
+	-- Card background color (PvZ style)
 	local backgroundColor = Computed(scope, function(use)
 		if use(isOnCooldown) then
-			return Color3.fromRGB(80, 80, 80) -- Grey when on cooldown
+			return PvZTheme.Colors.Disabled
 		elseif not use(canAfford) then
-			return Color3.fromRGB(120, 60, 60) -- Red when can't afford
+			return Color3.fromRGB(140, 80, 60) -- Brownish red when can't afford
 		elseif use(isSelected) then
-			return Color3.fromRGB(100, 180, 100) -- Green when selected
+			return PvZTheme.Colors.GrassGreen
 		else
-			return Color3.fromRGB(60, 120, 60) -- Default green
+			return PvZTheme.Colors.WoodBrown
 		end
 	end)
 	
-	-- Border color
+	-- Border color (PvZ style)
 	local borderColor = Computed(scope, function(use)
 		if use(isSelected) then
-			return Color3.fromRGB(255, 255, 0) -- Yellow border when selected
+			return PvZTheme.Colors.SunYellow
 		else
-			return Color3.fromRGB(40, 80, 40)
+			return PvZTheme.Colors.WoodDark
 		end
 	end)
 	
@@ -203,7 +206,7 @@ local function PlantCard(props: {
 				},
 			}),
 			
-			-- Cost display
+			-- Cost display with stroke
 			New(scope, "TextLabel")({
 				Name = "Cost",
 				Position = UDim2.new(0.5, 0, 0.75, 0),
@@ -214,18 +217,25 @@ local function PlantCard(props: {
 					if use(isOnCooldown) then
 						return string.format("%.1fs", use(cooldownRemaining))
 					else
-						return `☀️ {stats.Cost}`
+						return PvZTheme.Icons.Sun .. " " .. tostring(stats.Cost)
 					end
 				end),
 				TextColor3 = Computed(scope, function(use)
 					if use(canAfford) and not use(isOnCooldown) then
-						return Color3.new(1, 1, 1)
+						return PvZTheme.Colors.SunYellow
 					else
 						return Color3.fromRGB(255, 150, 150)
 					end
 				end),
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
+				
+				[Children] = {
+					New(scope, "UIStroke")({
+						Color = Color3.fromRGB(0, 0, 0),
+						Thickness = 1,
+					}),
+				},
 			}),
 			
 			-- Cooldown overlay
@@ -278,15 +288,19 @@ local function CardDeck(props: CardDeckProps)
 	
 	return New(scope, "Frame")({
 		Name = "CardDeck",
-		Position = UDim2.new(0.5, 0, 1, -20),
+		Position = UDim2.new(0.5, 0, 1, -15),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Size = deckSize,
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-		BackgroundTransparency = 0.3,
+		BackgroundColor3 = PvZTheme.Colors.WoodBrown,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		
 		[Children] = {
-			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
+			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 14) }),
+			New(scope, "UIStroke")({
+				Color = PvZTheme.Colors.WoodDark,
+				Thickness = 3,
+			}),
 			New(scope, "UIListLayout")({
 				FillDirection = Enum.FillDirection.Horizontal,
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,

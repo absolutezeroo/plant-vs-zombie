@@ -51,6 +51,10 @@ local function syncPlayerData(player: Player)
 	
 	Network.PlayerDataSync.Fire(player, {
 		Coins = data.Coins,
+		Gems = data.Gems or 0,
+		XP = data.XP or 0,
+		Level = data.Level or 1,
+		LevelProgress = PlayerDataService.GetLevelProgress(player),
 		UnlockedPlants = unlockedPlants,
 		UpgradePlantTypes = upgradePlantTypes,
 		UpgradeDamage = upgradeDamage,

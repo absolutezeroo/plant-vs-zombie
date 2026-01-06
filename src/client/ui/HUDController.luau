@@ -24,6 +24,7 @@ local PlantData = require(Shared.data.PlantData)
 -- UI Components
 local CardDeck = require(script.Parent.CardDeck)
 local ShopUI = require(script.Parent.ShopUI)
+local PvZTheme = require(script.Parent.PvZTheme)
 
 -- Client modules
 local Client = script.Parent.Parent
@@ -118,164 +119,267 @@ function HUDController:Mount()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		
 		[Children] = {
-			-- Sun Counter (top-left, in-game currency)
-			New(self._scope, "Frame")({
-				Name = "SunCounter",
-				Position = UDim2.fromOffset(20, 20),
-				Size = UDim2.fromOffset(120, 50),
-				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-				BackgroundTransparency = 0.3,
-				
-				[Children] = {
-					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
-					New(self._scope, "TextLabel")({
-						Name = "SunText",
-						Position = UDim2.fromScale(0.5, 0.5),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.fromScale(0.9, 0.8),
-						BackgroundTransparency = 1,
-						Text = Computed(self._scope, function(use)
-							return `☀️ {use(SelectionState.SunCount)}`
-						end),
-						TextColor3 = Color3.fromRGB(255, 220, 50),
-						TextScaled = true,
-						Font = Enum.Font.GothamBold,
-					}),
-				},
-			}),
-			
-			-- Coin Counter (below sun counter, persistent currency)
-			New(self._scope, "Frame")({
-				Name = "CoinCounter",
-				Position = UDim2.fromOffset(20, 80),
-				Size = UDim2.fromOffset(120, 40),
-				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-				BackgroundTransparency = 0.3,
-				
-				[Children] = {
-					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
-					New(self._scope, "TextLabel")({
-						Name = "CoinText",
-						Position = UDim2.fromScale(0.5, 0.5),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.fromScale(0.9, 0.8),
-						BackgroundTransparency = 1,
-						Text = Computed(self._scope, function(use)
-							return `🪙 {use(PlayerDataClient.GetCoinsValue())}`
-						end),
-						TextColor3 = Color3.fromRGB(255, 200, 50),
-						TextScaled = true,
-						Font = Enum.Font.GothamBold,
-					}),
-				},
-			}),
-			
-			-- Shop Button (below coin counter)
-			New(self._scope, "TextButton")({
-				Name = "ShopButton",
-				Position = UDim2.fromOffset(20, 130),
-				Size = UDim2.fromOffset(120, 40),
-				BackgroundColor3 = Color3.fromRGB(80, 120, 180),
-				BorderSizePixel = 0,
-				Text = "🛒 Shop",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextScaled = true,
-				Font = Enum.Font.GothamBold,
-				
-				[OnEvent("Activated")] = function()
-					self._shopVisible:set(true)
-				end,
-				
-				[Children] = {
-					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
-				},
-			}),
-			
-			-- Wave Indicator (top-center)
-			New(self._scope, "TextLabel")({
-				Name = "WaveIndicator",
-				Position = UDim2.new(0.5, 0, 0, 20),
-				AnchorPoint = Vector2.new(0.5, 0),
-				Size = UDim2.fromOffset(200, 40),
-				BackgroundTransparency = 1,
-				Text = Computed(self._scope, function(use)
-					local wave = use(self._waveNumber)
-					if wave == 0 then
-						return "Prepare Your Defenses!"
-					else
-						return `Wave {wave}`
-					end
-				end),
-				TextColor3 = Color3.fromRGB(255, 255, 255),
-				TextScaled = true,
-				Font = Enum.Font.GothamBold,
-			}),
-			
-			-- Base Health Bar (top-right)
-			New(self._scope, "Frame")({
-				Name = "HealthBar",
-				Position = UDim2.new(1, -20, 0, 20),
-				AnchorPoint = Vector2.new(1, 0),
-				Size = UDim2.fromOffset(200, 30),
-				BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-				BackgroundTransparency = 0.3,
-				
-				[Children] = {
-					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 6) }),
-					
-					-- Health fill bar
+			-- ============================================
+			-- LEFT PANEL: Resources & Player Stats (PvZ Style)
+			-- ============================================
+			PvZTheme.WoodPanel(self._scope, {
+				Name = "ResourcePanel",
+				Position = UDim2.fromOffset(15, 15),
+				Size = UDim2.fromOffset(160, 220),
+				children = {
+					-- Sun Counter Row
 					New(self._scope, "Frame")({
-						Name = "Fill",
-						Position = UDim2.fromOffset(2, 2),
-						Size = Computed(self._scope, function(use)
-							local health = use(self._baseHealth)
-							local maxHealth = use(self._baseMaxHealth)
-							local ratio = math.clamp(health / maxHealth, 0, 1)
-							return UDim2.new(ratio, -4, 1, -4)
-						end),
-						BackgroundColor3 = Computed(self._scope, function(use)
-							local health = use(self._baseHealth)
-							local maxHealth = use(self._baseMaxHealth)
-							local ratio = health / maxHealth
-							if ratio > 0.5 then
-								return Color3.fromRGB(80, 200, 80)
-							elseif ratio > 0.25 then
-								return Color3.fromRGB(200, 200, 80)
-							else
-								return Color3.fromRGB(200, 80, 80)
-							end
-						end),
+						Name = "SunRow",
+						Position = UDim2.fromOffset(10, 10),
+						Size = UDim2.new(1, -20, 0, 40),
+						BackgroundColor3 = PvZTheme.Colors.WoodDark,
+						BackgroundTransparency = 0.5,
 						
 						[Children] = {
-							New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 4) }),
+							New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+							New(self._scope, "TextLabel")({
+								Name = "SunIcon",
+								Position = UDim2.fromOffset(5, 0),
+								Size = UDim2.new(0, 35, 1, 0),
+								BackgroundTransparency = 1,
+								Text = PvZTheme.Icons.Sun,
+								TextScaled = true,
+							}),
+							PvZTheme.StrokedText(self._scope, {
+								Name = "SunValue",
+								Position = UDim2.new(0, 45, 0.5, 0),
+								Size = UDim2.new(1, -50, 0.7, 0),
+								AnchorPoint = Vector2.new(0, 0.5),
+								Text = Computed(self._scope, function(use)
+									return tostring(use(SelectionState.SunCount))
+								end),
+								TextColor3 = PvZTheme.Colors.SunYellow,
+								TextXAlignment = Enum.TextXAlignment.Left,
+							}),
 						},
 					}),
 					
-					-- Health text
-					New(self._scope, "TextLabel")({
-						Name = "HealthText",
-						Position = UDim2.fromScale(0.5, 0.5),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.fromScale(0.9, 0.8),
-						BackgroundTransparency = 1,
-						Text = Computed(self._scope, function(use)
-							return `🏠 {use(self._baseHealth)}/{use(self._baseMaxHealth)}`
-						end),
-						TextColor3 = Color3.fromRGB(255, 255, 255),
-						TextScaled = true,
-						Font = Enum.Font.GothamBold,
+					-- Coins Counter Row
+					New(self._scope, "Frame")({
+						Name = "CoinsRow",
+						Position = UDim2.fromOffset(10, 55),
+						Size = UDim2.new(1, -20, 0, 35),
+						BackgroundColor3 = PvZTheme.Colors.WoodDark,
+						BackgroundTransparency = 0.5,
+						
+						[Children] = {
+							New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+							New(self._scope, "TextLabel")({
+								Name = "CoinIcon",
+								Position = UDim2.fromOffset(5, 0),
+								Size = UDim2.new(0, 30, 1, 0),
+								BackgroundTransparency = 1,
+								Text = PvZTheme.Icons.Coin,
+								TextScaled = true,
+							}),
+							PvZTheme.StrokedText(self._scope, {
+								Name = "CoinValue",
+								Position = UDim2.new(0, 40, 0.5, 0),
+								Size = UDim2.new(1, -45, 0.7, 0),
+								AnchorPoint = Vector2.new(0, 0.5),
+								Text = Computed(self._scope, function(use)
+									return tostring(use(PlayerDataClient.GetCoinsValue()))
+								end),
+								TextColor3 = PvZTheme.Colors.CoinGold,
+								TextXAlignment = Enum.TextXAlignment.Left,
+							}),
+						},
+					}),
+					
+					-- Gems Counter Row
+					New(self._scope, "Frame")({
+						Name = "GemsRow",
+						Position = UDim2.fromOffset(10, 95),
+						Size = UDim2.new(1, -20, 0, 35),
+						BackgroundColor3 = PvZTheme.Colors.WoodDark,
+						BackgroundTransparency = 0.5,
+						
+						[Children] = {
+							New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+							New(self._scope, "TextLabel")({
+								Name = "GemIcon",
+								Position = UDim2.fromOffset(5, 0),
+								Size = UDim2.new(0, 30, 1, 0),
+								BackgroundTransparency = 1,
+								Text = PvZTheme.Icons.Gem,
+								TextScaled = true,
+							}),
+							PvZTheme.StrokedText(self._scope, {
+								Name = "GemValue",
+								Position = UDim2.new(0, 40, 0.5, 0),
+								Size = UDim2.new(1, -45, 0.7, 0),
+								AnchorPoint = Vector2.new(0, 0.5),
+								Text = Computed(self._scope, function(use)
+									return tostring(use(PlayerDataClient.GetGemsValue()))
+								end),
+								TextColor3 = PvZTheme.Colors.GemCyan,
+								TextXAlignment = Enum.TextXAlignment.Left,
+							}),
+						},
+					}),
+					
+					-- Level & XP Display
+					New(self._scope, "Frame")({
+						Name = "LevelSection",
+						Position = UDim2.fromOffset(10, 135),
+						Size = UDim2.new(1, -20, 0, 35),
+						BackgroundColor3 = PvZTheme.Colors.WoodDark,
+						BackgroundTransparency = 0.5,
+						
+						[Children] = {
+							New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+							New(self._scope, "TextLabel")({
+								Name = "StarIcon",
+								Position = UDim2.fromOffset(5, 0),
+								Size = UDim2.new(0, 28, 1, 0),
+								BackgroundTransparency = 1,
+								Text = PvZTheme.Icons.Star,
+								TextScaled = true,
+							}),
+							PvZTheme.StrokedText(self._scope, {
+								Name = "LevelText",
+								Position = UDim2.new(0, 38, 0.5, 0),
+								Size = UDim2.new(0, 50, 0.6, 0),
+								AnchorPoint = Vector2.new(0, 0.5),
+								Text = Computed(self._scope, function(use)
+									return "Lv." .. tostring(use(PlayerDataClient.GetLevelValue()))
+								end),
+								TextColor3 = PvZTheme.Colors.TextGold,
+								TextXAlignment = Enum.TextXAlignment.Left,
+							}),
+							-- XP Progress Bar
+							PvZTheme.ProgressBar(self._scope, {
+								Name = "XPBar",
+								Position = UDim2.new(0, 90, 0.5, 0),
+								Size = UDim2.new(1, -100, 0.4, 0),
+								AnchorPoint = Vector2.new(0, 0.5),
+								Progress = PlayerDataClient.GetLevelProgressValue(),
+								FillColor = PvZTheme.Colors.XPPurple,
+								BackgroundColor = Color3.fromRGB(60, 40, 60),
+							}),
+						},
+					}),
+					
+					-- Shop Button (PvZ Style)
+					PvZTheme.WoodButton(self._scope, {
+						Name = "ShopButton",
+						Position = UDim2.fromOffset(10, 178),
+						Size = UDim2.new(1, -20, 0, 35),
+						Text = PvZTheme.Icons.Shop .. " SHOP",
+						OnClick = function()
+							self._shopVisible:set(true)
+						end,
 					}),
 				},
 			}),
 			
-			-- Game Over Overlay
+			-- ============================================
+			-- TOP CENTER: Wave Banner (PvZ Style)
+			-- ============================================
+			PvZTheme.Banner(self._scope, {
+				Name = "WaveBanner",
+				Position = UDim2.new(0.5, 0, 0, 15),
+				Size = UDim2.fromOffset(220, 45),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Text = Computed(self._scope, function(use)
+					local wave = use(self._waveNumber)
+					if wave == 0 then
+						return PvZTheme.Icons.Plant .. " GET READY!"
+					else
+						return PvZTheme.Icons.Wave .. " WAVE " .. tostring(wave)
+					end
+				end),
+			}),
+			
+			-- ============================================
+			-- TOP RIGHT: Base Health (PvZ Style)
+			-- ============================================
+			PvZTheme.WoodPanel(self._scope, {
+				Name = "HealthPanel",
+				Position = UDim2.new(1, -15, 0, 15),
+				Size = UDim2.fromOffset(200, 50),
+				AnchorPoint = Vector2.new(1, 0),
+				children = {
+					-- Heart icon
+					New(self._scope, "TextLabel")({
+						Name = "HeartIcon",
+						Position = UDim2.fromOffset(8, 0),
+						Size = UDim2.new(0, 35, 1, 0),
+						BackgroundTransparency = 1,
+						Text = PvZTheme.Icons.Heart,
+						TextScaled = true,
+					}),
+					
+					-- Health bar container
+					New(self._scope, "Frame")({
+						Name = "HealthBarBG",
+						Position = UDim2.new(0, 48, 0.5, 0),
+						Size = UDim2.new(1, -58, 0.5, 0),
+						AnchorPoint = Vector2.new(0, 0.5),
+						BackgroundColor3 = PvZTheme.Colors.WoodDark,
+						
+						[Children] = {
+							New(self._scope, "UICorner")({ CornerRadius = UDim.new(1, 0) }),
+							
+							-- Health fill bar
+							New(self._scope, "Frame")({
+								Name = "Fill",
+								Size = Computed(self._scope, function(use)
+									local health = use(self._baseHealth)
+									local maxHealth = use(self._baseMaxHealth)
+									local ratio = math.clamp(health / maxHealth, 0, 1)
+									return UDim2.fromScale(ratio, 1)
+								end),
+								BackgroundColor3 = Computed(self._scope, function(use)
+									local health = use(self._baseHealth)
+									local maxHealth = use(self._baseMaxHealth)
+									local ratio = health / maxHealth
+									if ratio > 0.5 then
+										return PvZTheme.Colors.HealthGreen
+									elseif ratio > 0.25 then
+										return PvZTheme.Colors.SunYellow
+									else
+										return PvZTheme.Colors.HealthRed
+									end
+								end),
+								
+								[Children] = {
+									New(self._scope, "UICorner")({ CornerRadius = UDim.new(1, 0) }),
+								},
+							}),
+							
+							-- Health text overlay
+							PvZTheme.StrokedText(self._scope, {
+								Name = "HealthText",
+								Position = UDim2.fromScale(0.5, 0.5),
+								Size = UDim2.fromScale(0.95, 0.9),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								Text = Computed(self._scope, function(use)
+									return use(self._baseHealth) .. "/" .. use(self._baseMaxHealth)
+								end),
+								TextColor3 = PvZTheme.Colors.TextWhite,
+								Font = Enum.Font.GothamBold,
+							}),
+						},
+					}),
+				},
+			}),
+			
+			-- ============================================
+			-- GAME OVER OVERLAY (PvZ Style)
+			-- ============================================
 			New(self._scope, "Frame")({
 				Name = "GameOverOverlay",
 				Position = UDim2.fromScale(0, 0),
 				Size = UDim2.fromScale(1, 1),
 				BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 				BackgroundTransparency = Computed(self._scope, function(use)
-					return if use(self._gameOver) then 0.5 else 1
+					return if use(self._gameOver) then 0.4 else 1
 				end),
 				Visible = Computed(self._scope, function(use)
 					return use(self._gameOver)
@@ -283,40 +387,58 @@ function HUDController:Mount()
 				ZIndex = 100,
 				
 				[Children] = {
-					-- Game Over text
-					New(self._scope, "TextLabel")({
-						Name = "GameOverText",
-						Position = UDim2.fromScale(0.5, 0.4),
+					-- Victory/Defeat banner panel
+					PvZTheme.WoodPanel(self._scope, {
+						Name = "GameOverPanel",
+						Position = UDim2.fromScale(0.5, 0.35),
+						Size = UDim2.fromOffset(400, 100),
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.fromOffset(400, 80),
-						BackgroundTransparency = 1,
-						Text = Computed(self._scope, function(use)
-							return if use(self._victory) then "🏆 VICTORY!" else "💀 DEFEAT"
-						end),
-						TextColor3 = Computed(self._scope, function(use)
-							return if use(self._victory) 
-								then Color3.fromRGB(255, 215, 0) 
-								else Color3.fromRGB(200, 50, 50)
-						end),
-						TextScaled = true,
-						Font = Enum.Font.GothamBlack,
+						children = {
+							-- Trophy/Skull icon
+							New(self._scope, "TextLabel")({
+								Name = "ResultIcon",
+								Position = UDim2.fromScale(0.5, 0.3),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								Size = UDim2.fromOffset(50, 50),
+								BackgroundTransparency = 1,
+								Text = Computed(self._scope, function(use)
+									return if use(self._victory) then PvZTheme.Icons.Trophy else PvZTheme.Icons.Skull
+								end),
+								TextScaled = true,
+							}),
+							
+							-- Game Over text
+							PvZTheme.StrokedText(self._scope, {
+								Name = "GameOverText",
+								Position = UDim2.fromScale(0.5, 0.7),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								Size = UDim2.fromOffset(350, 45),
+								Text = Computed(self._scope, function(use)
+									return if use(self._victory) then "VICTORY!" else "DEFEAT..."
+								end),
+								TextColor3 = Computed(self._scope, function(use)
+									return if use(self._victory) 
+										then PvZTheme.Colors.Victory 
+										else PvZTheme.Colors.Defeat
+								end),
+								Font = Enum.Font.GothamBlack,
+							}),
+						},
 					}),
 					
-					-- Wave reached text
-					New(self._scope, "TextLabel")({
+					-- Wave reached subtitle
+					PvZTheme.StrokedText(self._scope, {
 						Name = "WaveReachedText",
-						Position = UDim2.fromScale(0.5, 0.55),
+						Position = UDim2.fromScale(0.5, 0.48),
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.fromOffset(300, 40),
-						BackgroundTransparency = 1,
+						Size = UDim2.fromOffset(300, 35),
 						Text = Computed(self._scope, function(use)
 							local wave = use(self._waveNumber)
 							return if use(self._victory) 
 								then "All waves completed!" 
-								else `Reached Wave {wave}`
+								else "Reached Wave " .. tostring(wave)
 						end),
-						TextColor3 = Color3.fromRGB(200, 200, 200),
-						TextScaled = true,
+						TextColor3 = PvZTheme.Colors.TextWhite,
 						Font = Enum.Font.GothamMedium,
 					}),
 				},
@@ -372,7 +494,7 @@ function HUDController:SetGameOver(victory: boolean, waveReached: number)
 	Logger.Info("HUDController", `Game over: {if victory then "VICTORY" else "DEFEAT"} at wave {waveReached}`)
 end
 
--- Show floating coin gain text (simple version, can be enhanced with VFX later)
+-- Show floating coin gain text (PvZ Style)
 function HUDController:ShowCoinGain(amount: number, worldX: number?, worldZ: number?)
 	if not self._gui then
 		return
@@ -382,31 +504,38 @@ function HUDController:ShowCoinGain(amount: number, worldX: number?, worldZ: num
 	local audio = getAudioService()
 	if audio then audio.PlayCoinCollect() end
 	
-	-- Create floating text at coin counter location
+	-- Create floating text at coin counter location with stroke
 	local floatingText = New(self._scope, "TextLabel")({
 		Name = "CoinGain",
 		Parent = self._gui,
-		Position = UDim2.fromOffset(150, 90), -- Near coin counter
-		Size = UDim2.fromOffset(60, 30),
+		Position = UDim2.fromOffset(140, 70),
+		Size = UDim2.fromOffset(70, 35),
 		BackgroundTransparency = 1,
-		Text = `+{amount}`,
-		TextColor3 = Color3.fromRGB(255, 215, 0),
+		Text = "+" .. tostring(amount),
+		TextColor3 = PvZTheme.Colors.CoinGold,
 		TextScaled = true,
-		Font = Enum.Font.GothamBold,
+		Font = Enum.Font.GothamBlack,
 		ZIndex = 50,
+		
+		[Children] = {
+			New(self._scope, "UIStroke")({
+				Color = Color3.fromRGB(0, 0, 0),
+				Thickness = 2,
+			}),
+		},
 	})
 	
 	-- Animate upward and fade out
 	task.spawn(function()
 		local startTime = tick()
-		local duration = 1.0
+		local duration = 1.2
 		
 		while tick() - startTime < duration do
 			local progress = (tick() - startTime) / duration
-			local yOffset = 90 - (progress * 40) -- Move up
+			local yOffset = 70 - (progress * 50) -- Move up
 			local alpha = 1 - progress -- Fade out
 			
-			floatingText.Position = UDim2.fromOffset(150, yOffset)
+			floatingText.Position = UDim2.fromOffset(140, yOffset)
 			floatingText.TextTransparency = 1 - alpha
 			
 			task.wait()
@@ -416,7 +545,7 @@ function HUDController:ShowCoinGain(amount: number, worldX: number?, worldZ: num
 	end)
 end
 
--- Show end game rewards summary
+-- Show end game rewards summary (PvZ Style)
 function HUDController:ShowEndGameRewards(data: {
 	Victory: boolean,
 	CoinsEarned: number,
@@ -428,115 +557,113 @@ function HUDController:ShowEndGameRewards(data: {
 		return
 	end
 	
-	-- Create rewards summary panel that appears after game over text
-	local rewardsPanel = New(self._scope, "Frame")({
+	-- Create rewards summary panel with wood theme
+	local rewardsPanel = PvZTheme.WoodPanel(self._scope, {
 		Name = "RewardsSummary",
-		Parent = self._gui,
-		Position = UDim2.fromScale(0.5, 0.65),
+		Position = UDim2.fromScale(0.5, 0.68),
+		Size = UDim2.fromOffset(320, 200),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Size = UDim2.fromOffset(300, 180),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-		BackgroundTransparency = 0.2,
-		ZIndex = 101,
-		
-		[Children] = {
-			New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
-			
-			-- Title
-			New(self._scope, "TextLabel")({
-				Position = UDim2.fromOffset(0, 10),
-				Size = UDim2.new(1, 0, 0, 30),
-				BackgroundTransparency = 1,
-				Text = "📊 Game Summary",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextSize = 20,
-				Font = Enum.Font.GothamBold,
+		children = {
+			-- Title banner
+			New(self._scope, "Frame")({
+				Name = "TitleBar",
+				Position = UDim2.fromOffset(0, 0),
+				Size = UDim2.new(1, 0, 0, 40),
+				BackgroundColor3 = PvZTheme.Colors.GrassGreen,
+				
+				[Children] = {
+					New(self._scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
+					PvZTheme.StrokedText(self._scope, {
+						Name = "Title",
+						Text = PvZTheme.Icons.Trophy .. " GAME SUMMARY",
+						TextColor3 = PvZTheme.Colors.TextWhite,
+					}),
+				},
 			}),
 			
 			-- Stats container
 			New(self._scope, "Frame")({
-				Position = UDim2.fromOffset(20, 50),
-				Size = UDim2.new(1, -40, 0, 120),
+				Position = UDim2.fromOffset(15, 50),
+				Size = UDim2.new(1, -30, 0, 140),
 				BackgroundTransparency = 1,
 				
 				[Children] = {
 					New(self._scope, "UIListLayout")({
-						Padding = UDim.new(0, 8),
+						Padding = UDim.new(0, 6),
 						SortOrder = Enum.SortOrder.LayoutOrder,
 					}),
 					
 					-- Zombies killed
-					New(self._scope, "TextLabel")({
-						Size = UDim2.new(1, 0, 0, 22),
-						BackgroundTransparency = 1,
-						Text = `💀 Zombies Killed: {data.ZombiesKilled}`,
-						TextColor3 = Color3.fromRGB(200, 200, 200),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextSize = 16,
-						Font = Enum.Font.GothamMedium,
-						LayoutOrder = 1,
-					}),
+					self:_createRewardRow(PvZTheme.Icons.Skull, "Zombies Killed", data.ZombiesKilled, PvZTheme.Colors.TextWhite, 1),
 					
 					-- Waves completed
-					New(self._scope, "TextLabel")({
-						Size = UDim2.new(1, 0, 0, 22),
-						BackgroundTransparency = 1,
-						Text = `🌊 Waves Completed: {data.WavesCompleted}`,
-						TextColor3 = Color3.fromRGB(200, 200, 200),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextSize = 16,
-						Font = Enum.Font.GothamMedium,
-						LayoutOrder = 2,
-					}),
+					self:_createRewardRow(PvZTheme.Icons.Wave, "Waves Completed", data.WavesCompleted, PvZTheme.Colors.SkyBlue, 2),
 					
 					-- Coins earned
-					New(self._scope, "TextLabel")({
-						Size = UDim2.new(1, 0, 0, 22),
-						BackgroundTransparency = 1,
-						Text = `🪙 Coins Earned: {data.CoinsEarned - data.BonusCoins}`,
-						TextColor3 = Color3.fromRGB(255, 200, 50),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextSize = 16,
-						Font = Enum.Font.GothamMedium,
-						LayoutOrder = 3,
-					}),
+					self:_createRewardRow(PvZTheme.Icons.Coin, "Coins Earned", data.CoinsEarned - data.BonusCoins, PvZTheme.Colors.CoinGold, 3),
 					
-					-- Victory bonus
-					if data.BonusCoins > 0 then New(self._scope, "TextLabel")({
-						Size = UDim2.new(1, 0, 0, 22),
-						BackgroundTransparency = 1,
-						Text = `🏆 Victory Bonus: +{data.BonusCoins}`,
-						TextColor3 = Color3.fromRGB(255, 215, 0),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextSize = 16,
-						Font = Enum.Font.GothamBold,
-						LayoutOrder = 4,
-					}) else nil,
+					-- Victory bonus (if any)
+					if data.BonusCoins > 0 then self:_createRewardRow(PvZTheme.Icons.Trophy, "Victory Bonus", "+" .. tostring(data.BonusCoins), PvZTheme.Colors.Victory, 4) else nil,
 					
 					-- Total
-					New(self._scope, "TextLabel")({
-						Size = UDim2.new(1, 0, 0, 24),
-						BackgroundTransparency = 1,
-						Text = `💰 Total: {data.CoinsEarned}`,
-						TextColor3 = Color3.fromRGB(100, 255, 100),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextSize = 18,
-						Font = Enum.Font.GothamBlack,
-						LayoutOrder = 5,
-					}),
+					self:_createRewardRow(PvZTheme.Icons.Star, "TOTAL", data.CoinsEarned, PvZTheme.Colors.GrassGreen, 5, true),
 				},
 			}),
 		},
 	})
 	
+	rewardsPanel.Parent = self._gui
+	rewardsPanel.ZIndex = 101
+	
 	-- Fade in animation
 	rewardsPanel.BackgroundTransparency = 1
 	task.spawn(function()
 		for i = 1, 10 do
-			rewardsPanel.BackgroundTransparency = 1 - (i / 10) * 0.8
+			rewardsPanel.BackgroundTransparency = 1 - (i / 10)
 			task.wait(0.03)
 		end
 	end)
+end
+
+-- Helper to create reward stat rows
+function HUDController:_createRewardRow(icon: string, label: string, value: any, color: Color3, order: number, isBold: boolean?): Frame
+	return New(self._scope, "Frame")({
+		Size = UDim2.new(1, 0, 0, 24),
+		BackgroundTransparency = 1,
+		LayoutOrder = order,
+		
+		[Children] = {
+			-- Icon
+			New(self._scope, "TextLabel")({
+				Size = UDim2.fromOffset(24, 24),
+				BackgroundTransparency = 1,
+				Text = icon,
+				TextScaled = true,
+			}),
+			
+			-- Label
+			PvZTheme.StrokedText(self._scope, {
+				Position = UDim2.fromOffset(28, 0),
+				Size = UDim2.new(0.5, -30, 1, 0),
+				AnchorPoint = Vector2.zero,
+				Text = label,
+				TextColor3 = PvZTheme.Colors.TextWhite,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Font = if isBold then Enum.Font.GothamBlack else Enum.Font.GothamMedium,
+			}),
+			
+			-- Value
+			PvZTheme.StrokedText(self._scope, {
+				Position = UDim2.new(1, 0, 0, 0),
+				Size = UDim2.new(0.4, 0, 1, 0),
+				AnchorPoint = Vector2.new(1, 0),
+				Text = tostring(value),
+				TextColor3 = color,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				Font = if isBold then Enum.Font.GothamBlack else Enum.Font.GothamBold,
+			}),
+		},
+	})
 end
 
 return HUDController

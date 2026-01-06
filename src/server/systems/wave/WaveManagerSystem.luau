@@ -158,9 +158,29 @@ function WaveManager.SetGameState(state: GameState)
 			-- Get session stats
 			local sessionStats = EntityDeathSystem.API.GetSessionStats(player)
 			
-			-- Award victory bonus
+			-- Award victory bonus coins
 			if bonusCoins > 0 then
 				PlayerDataService.AddCoins(player, bonusCoins)
+			end
+			
+			-- Calculate XP earned
+			local xpEarned = 0
+			xpEarned += sessionStats.ZombiesKilled * ProgressionData.XP_PER_ZOMBIE
+			xpEarned += _currentWave * ProgressionData.XP_PER_WAVE
+			if isVictory then
+				xpEarned += ProgressionData.XP_VICTORY_BONUS
+				xpEarned += starRating * ProgressionData.XP_PER_STAR
+			end
+			
+			-- Award XP and get levels gained
+			local levelsGained = PlayerDataService.AddXP(player, xpEarned)
+			local newLevel = PlayerDataService.GetLevel(player)
+			
+			-- Award gems for 3-star victory
+			local gemsEarned = 0
+			if isVictory and starRating == 3 then
+				gemsEarned = ProgressionData.GEMS_VICTORY_3_STAR
+				PlayerDataService.AddGems(player, gemsEarned)
 			end
 			
 			-- Increment games played/won
@@ -177,7 +197,13 @@ function WaveManager.SetGameState(state: GameState)
 				WavesCompleted = _currentWave,
 				BonusCoins = bonusCoins,
 				StarRating = starRating,
+				XPEarned = xpEarned,
+				GemsEarned = gemsEarned,
+				NewLevel = newLevel,
+				LevelsGained = levelsGained,
 			})
+			
+			Logger.Info("WaveManager", `{player.Name}: +{xpEarned} XP, +{gemsEarned} gems, {levelsGained} level(s) gained`)
 		end
 		
 		-- Reset session stats for next game
