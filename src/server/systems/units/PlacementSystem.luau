@@ -64,7 +64,7 @@ for _, player in Players:GetPlayers() do
 end
 
 -- Validate placement request
-local function validatePlacement(player: Player, column: number, lane: number, plantType: string): (boolean, string?)
+local function validatePlacement(player: Player, column: number, lane: number, plantType: string, world: any?): (boolean, string?)
 	-- Check plant type exists
 	local stats = PlantData[plantType]
 	if not stats then
@@ -76,9 +76,64 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		return false, "Cell out of bounds"
 	end
 	
-	-- Check cell not occupied
-	if GridState.IsOccupied(column, lane) then
-		return false, "Cell already occupied"
+	-- Get what's currently in the cell
+	local existingEntityId = GridState.GetEntity(column, lane)
+	local existingPlant = nil
+	local existingStats = nil
+	
+	if existingEntityId and world and world:contains(existingEntityId) then
+		existingPlant = world:get(existingEntityId, PlantTypeComponent)
+		if existingPlant then
+			existingStats = PlantData[existingPlant.PlantType]
+		end
+	end
+	
+	-- Platform requirements (RequiresLilyPad, RequiresWater)
+	-- TODO: Implement water detection based on level type
+	-- For now, skip water validation
+	
+	-- Check stacking rules
+	if stats.CanStackOnPlant then
+		-- Pumpkin can be placed on top of another plant
+		if existingEntityId then
+			if existingStats and existingStats.IsShell then
+				return false, "Cannot stack shells"
+			end
+			-- Allow stacking on non-shell plants
+		else
+			return false, "Pumpkin requires a plant to protect"
+		end
+	elseif stats.CanStackOnMushroom then
+		-- Coffee Bean can only be placed on sleeping mushrooms
+		if existingEntityId and existingStats and existingStats.IsMushroom then
+			-- Check if mushroom is sleeping
+			local Systems = script.Parent.Parent
+			local MushroomSystem = require(Systems.units.MushroomSystem)
+			if world then
+				local SleepingComponent = Components.SleepingComponent
+				local sleeping = world:get(existingEntityId, SleepingComponent)
+				if not sleeping or not sleeping.IsSleeping then
+					return false, "Mushroom is already awake"
+				end
+			end
+			-- Allow placing Coffee Bean on sleeping mushroom
+		else
+			return false, "Coffee Bean requires a sleeping mushroom"
+		end
+	elseif stats.IsPlatform then
+		-- Platforms (LilyPad, FlowerPot) can be placed on empty cells only
+		if existingEntityId then
+			return false, "Platform cannot stack"
+		end
+	else
+		-- Normal plant - cell must be empty OR have a platform
+		if existingEntityId then
+			if existingStats and existingStats.IsPlatform and existingStats.AllowsPlantOnTop then
+				-- Can place on platform - this is valid
+			else
+				return false, "Cell already occupied"
+			end
+		end
 	end
 	
 	-- Check player has enough sun
@@ -109,6 +164,29 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	
 	local worldPos = GridUtils.GridToWorld(column, lane)
 	
+	-- Check for special stacking cases
+	local existingEntityId = GridState.GetEntity(column, lane)
+	
+	-- Handle Coffee Bean - wakes mushroom and disappears
+	if stats.CanStackOnMushroom and stats.WakesMushrooms then
+		if existingEntityId and world:contains(existingEntityId) then
+			local Systems = script.Parent.Parent
+			local MushroomSystem = require(Systems.units.MushroomSystem)
+			MushroomSystem.API.WakeMushroom(world, existingEntityId)
+			
+			-- Coffee Bean is consumed - don't spawn entity
+			-- Deduct sun and start cooldown
+			playerSun[player] = (playerSun[player] or 0) - stats.Cost
+			local cooldowns = playerCooldowns[player]
+			if cooldowns then
+				cooldowns[plantType] = os.clock() + stats.Cooldown
+			end
+			
+			Logger.Info("PlacementSystem", `Coffee Bean woke mushroom at ({column}, {lane}) for {player.Name}`)
+			return -1 -- No entity spawned
+		end
+	end
+	
 	local entityId = world:spawn(
 		PositionComponent({
 			X = worldPos.X,
@@ -129,8 +207,10 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		})
 	)
 	
-	-- Mark cell as occupied
-	GridState.Occupy(column, lane, entityId)
+	-- Mark cell as occupied (only if not stacking)
+	if not stats.CanStackOnPlant and not existingEntityId then
+		GridState.Occupy(column, lane, entityId)
+	end
 	
 	-- Deduct sun
 	playerSun[player] = (playerSun[player] or 0) - stats.Cost
@@ -144,31 +224,27 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	Logger.Info("PlacementSystem", `Spawned {plantType} at ({column}, {lane}) for {player.Name} - Entity {entityId}`)
 	
 	-- Broadcast to all clients
-	local plantTypeEnum = ({
-		Peashooter = "Peashooter",
-		Sunflower = "Sunflower",
-		WallNut = "WallNut",
-		SnowPea = "SnowPea",
-		CherryBomb = "CherryBomb",
-		PotatoMine = "PotatoMine",
-		Repeater = "Repeater",
-	})[plantType] or "Peashooter"
-	
 	Network.PlantSpawned.FireAll({
 		EntityId = entityId,
-		PlantType = plantTypeEnum :: any,
+		PlantType = plantType :: any,
 		Lane = lane :: any,
 		Column = column :: any,
 		OwnerId = player.UserId,
 	})
 	
-	-- Notify special plant system if this is an explosive plant (data-driven)
-	-- SpecialPlantSystem is in systems/combat/
-	local stats = PlantData[plantType]
+	-- Notify special systems based on plant type (data-driven)
 	local Systems = script.Parent.Parent
-	local SpecialPlantSystem = require(Systems.combat.SpecialPlantSystem)
-	if stats and stats.IsExplosive then
+	
+	-- Explosive plants
+	if stats.IsExplosive or stats.NeedsArming then
+		local SpecialPlantSystem = require(Systems.combat.SpecialPlantSystem)
 		SpecialPlantSystem.API.OnPlantPlaced(world, entityId, plantType)
+	end
+	
+	-- Mushroom plants
+	if stats.IsMushroom then
+		local MushroomSystem = require(Systems.units.MushroomSystem)
+		MushroomSystem.API.OnMushroomPlaced(world, entityId, plantType)
 	end
 	
 	return entityId
@@ -178,7 +254,7 @@ end
 local PlacementAPI = {}
 
 function PlacementAPI.RequestPlacement(world: any, player: Player, column: number, lane: number, plantType: string): (boolean, string?)
-	local success, reason = validatePlacement(player, column, lane, plantType)
+	local success, reason = validatePlacement(player, column, lane, plantType, world)
 	
 	if not success then
 		Logger.Warn("PlacementSystem", `Placement denied for {player.Name}: {reason}`)
@@ -186,7 +262,8 @@ function PlacementAPI.RequestPlacement(world: any, player: Player, column: numbe
 	end
 	
 	local entityId = spawnPlant(world, player, column, lane, plantType)
-	if entityId < 0 then
+	if entityId < 0 and not PlantData[plantType].CanStackOnMushroom then
+		-- entityId -1 is valid for Coffee Bean (consumed on use)
 		return false, "Spawn failed"
 	end
 	

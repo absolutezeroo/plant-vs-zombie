@@ -6,6 +6,9 @@
 	
 	Handles:
 	- Projectile-Zombie collision detection
+	- Splash damage (Melon-pult, Winter Melon)
+	- Stun effects (Kernel-pult butter)
+	- Shield piercing (Fume-shroom)
 	- Zombie eating plants
 	- Damage application
 ]]
@@ -34,6 +37,9 @@ local ProjectileComponent = Components.ProjectileComponent
 local TargetComponent = Components.TargetComponent
 local MovementComponent = Components.MovementComponent
 local SlowComponent = Components.SlowComponent
+local SplashComponent = Components.SplashComponent
+local StunComponent = Components.StunComponent
+local EnhancedProjectileComponent = Components.EnhancedProjectileComponent
 
 -- Combat config
 local CombatConfig = {
@@ -45,11 +51,22 @@ local CombatConfig = {
 -- Track zombie attack timers
 local _zombieAttackTimes: {[number]: number} = {}
 
--- Apply damage to an entity
-local function applyDamage(world: any, entityId: number, damage: number): boolean
+-- Apply damage to an entity (returns true if killed)
+local function applyDamage(world: any, entityId: number, damage: number, piercesShields: boolean?): boolean
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return false
+	end
+	
+	-- Check if zombie has shield and projectile doesn't pierce
+	local zombie = world:get(entityId, ZombieTypeComponent)
+	if zombie and not piercesShields then
+		local zombieStats = ZombieData[zombie.ZombieType]
+		if zombieStats and zombieStats.HasShield and zombieStats.ShieldHealth then
+			-- TODO: Implement shield damage reduction
+			-- For now, shields just reduce damage by 50%
+			damage = math.floor(damage * 0.5)
+		end
 	end
 	
 	local newHealth = math.max(0, health.Current - damage)
@@ -67,6 +84,54 @@ local function applyDamage(world: any, entityId: number, damage: number): boolea
 	})
 	
 	return newHealth <= 0 -- Return true if dead
+end
+
+-- Apply splash damage to zombies near impact point
+local function applySplashDamage(world: any, impactX: number, impactZ: number, splash: any, proj: any)
+	local hitCount = 0
+	
+	for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+		local dx = zombiePos.X - impactX
+		local dz = zombiePos.Z - impactZ
+		local distance = math.sqrt(dx * dx + dz * dz)
+		
+		if distance <= splash.SplashRadius then
+			local killed = applyDamage(world, zombieId, splash.SplashDamage, proj.PiercesShields)
+			hitCount += 1
+			
+			-- Apply slow if frozen splash
+			if proj.IsFrozen and not killed and proj.SlowPercent then
+				world:insert(zombieId, SlowComponent({
+					SlowPercent = proj.SlowPercent,
+					Duration = proj.SlowDuration,
+					AppliedAt = os.clock(),
+				}))
+			end
+		end
+	end
+	
+	if hitCount > 0 then
+		Logger.Debug("Combat", `Splash hit {hitCount} zombies for {splash.SplashDamage} damage`)
+	end
+end
+
+-- Try to apply stun effect (butter from Kernel-pult)
+local function tryApplyStun(world: any, zombieId: number, proj: any)
+	if not proj.CanStun or proj.StunChance <= 0 then
+		return false
+	end
+	
+	-- Roll for stun chance
+	if math.random() <= proj.StunChance then
+		world:insert(zombieId, StunComponent({
+			Duration = proj.StunDuration,
+			AppliedAt = os.clock(),
+		}))
+		Logger.Debug("Combat", `Butter stunned zombie {zombieId} for {proj.StunDuration}s`)
+		return true
+	end
+	
+	return false
 end
 
 -- Find plant at grid position
@@ -88,40 +153,92 @@ end
 local function CombatSystem(world)
 	local currentTime = os.clock()
 	
+	-- Process stun effect expiration
+	for zombieId, stun in world:query(StunComponent) do
+		if currentTime - stun.AppliedAt >= stun.Duration then
+			world:remove(zombieId, StunComponent)
+			Logger.Debug("Combat", `Zombie {zombieId} stun expired`)
+		end
+	end
+	
 	-- Process projectile-zombie collisions
 	for projId, projPos, proj in world:query(PositionComponent, ProjectileComponent) do
 		local hitZombie = false
+		local hitZombieId = nil
+		
+		-- Check for multi-directional projectiles (Starfruit)
+		local isMultiDir = proj.DirectionZ and proj.DirectionZ ~= 0
 		
 		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-			-- Check same lane
-			if zombie.Lane ~= proj.Lane then
-				continue
+			local inRange = false
+			
+			if isMultiDir then
+				-- Multi-directional: check 3D distance
+				local dx = math.abs(projPos.X - zombiePos.X)
+				local dz = math.abs(projPos.Z - zombiePos.Z)
+				local distance = math.sqrt(dx * dx + dz * dz)
+				inRange = distance <= CombatConfig.PROJECTILE_HIT_RADIUS * 1.5
+			else
+				-- Normal: check same lane and X distance
+				if zombie.Lane ~= proj.Lane then
+					continue
+				end
+				local distance = math.abs(projPos.X - zombiePos.X)
+				inRange = distance <= CombatConfig.PROJECTILE_HIT_RADIUS
 			end
 			
-			-- Check distance
-			local distance = math.abs(projPos.X - zombiePos.X)
-			if distance <= CombatConfig.PROJECTILE_HIT_RADIUS then
-				-- Hit!
-				local killed = applyDamage(world, zombieId, proj.Damage)
-				
-				-- Apply slow effect if frozen projectile
-				if proj.IsFrozen and not killed and proj.SlowPercent and proj.SlowDuration then
-					world:insert(zombieId, SlowComponent({
-						SlowPercent = proj.SlowPercent,
-						Duration = proj.SlowDuration,
-						AppliedAt = currentTime,
-					}))
-					Logger.Debug("Combat", `Frozen pea slowed zombie {zombieId} by {proj.SlowPercent * 100}%`)
+			if inRange then
+				-- Check if fire pea thaws frozen zombies
+				local enhanced = world:get(projId, EnhancedProjectileComponent)
+				if enhanced and enhanced.IsFirePea and enhanced.ThawsFrozen then
+					-- Remove slow from zombie
+					if world:get(zombieId, SlowComponent) then
+						world:remove(zombieId, SlowComponent)
+						Logger.Debug("Combat", `Fire pea thawed frozen zombie {zombieId}`)
+					end
 				end
 				
-				Logger.Debug("Combat", `Pea hit zombie {zombieId} for {proj.Damage} damage (killed={killed})`)
+				-- Calculate damage (with fire multiplier if applicable)
+				local damage = proj.Damage
+				if enhanced and enhanced.DamageMultiplier then
+					damage = math.floor(damage * enhanced.DamageMultiplier)
+				end
+				
+				-- Apply damage
+				local killed = applyDamage(world, zombieId, damage, proj.PiercesShields)
+				
+				-- Apply slow effect if frozen projectile (and not fire pea)
+				if proj.IsFrozen and not killed and proj.SlowPercent and proj.SlowDuration then
+					if not (enhanced and enhanced.IsFirePea) then
+						world:insert(zombieId, SlowComponent({
+							SlowPercent = proj.SlowPercent,
+							Duration = proj.SlowDuration,
+							AppliedAt = currentTime,
+						}))
+						Logger.Debug("Combat", `Frozen pea slowed zombie {zombieId} by {proj.SlowPercent * 100}%`)
+					end
+				end
+				
+				-- Try to apply stun (Kernel-pult butter)
+				if not killed then
+					tryApplyStun(world, zombieId, proj)
+				end
+				
+				Logger.Debug("Combat", `Projectile hit zombie {zombieId} for {damage} damage (killed={killed})`)
 				
 				hitZombie = true
+				hitZombieId = zombieId
 				break
 			end
 		end
 		
 		if hitZombie then
+			-- Check for splash damage (Melon-pult, Winter Melon)
+			local splash = world:get(projId, SplashComponent)
+			if splash and splash.SplashRadius > 0 then
+				applySplashDamage(world, projPos.X, projPos.Z, splash, proj)
+			end
+			
 			-- Despawn projectile
 			world:despawn(projId)
 		end
@@ -135,8 +252,15 @@ local function CombatSystem(world)
 		end
 	end
 	
+	-- Skip stunned zombies from attacking
 	-- Process zombie eating plants
 	for zombieId, zombiePos, zombie, zombieHealth in world:query(PositionComponent, ZombieTypeComponent, HealthComponent) do
+		-- Skip stunned zombies
+		local stun = world:get(zombieId, StunComponent)
+		if stun then
+			continue
+		end
+		
 		local stats = ZombieData[zombie.ZombieType]
 		if not stats then
 			continue

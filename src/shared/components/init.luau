@@ -36,13 +36,20 @@ return {
 	
 	-- Combat components
 	ArmedComponent = require(Combat.ArmedComponent),
+	ChewingComponent = require(Combat.ChewingComponent),
+	EnhancedProjectileComponent = require(Combat.EnhancedProjectileComponent),
+	HidingComponent = require(Combat.HidingComponent),
 	ProjectileComponent = require(Combat.ProjectileComponent),
 	SlowComponent = require(Combat.SlowComponent),
+	SplashComponent = require(Combat.SplashComponent),
+	StunComponent = require(Combat.StunComponent),
 	TargetComponent = require(Combat.TargetComponent),
 	
 	-- Unit type components
 	GhostComponent = require(Units.GhostComponent),
+	JumpingComponent = require(Units.JumpingComponent),
 	PlantTypeComponent = require(Units.PlantTypeComponent),
+	SleepingComponent = require(Units.SleepingComponent),
 	ZombieTypeComponent = require(Units.ZombieTypeComponent),
 	
 	-- Economy components

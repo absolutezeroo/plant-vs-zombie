@@ -91,18 +91,21 @@ src/
 │   ├── network/                 # Zap generated (gitignored)
 │   └── systems/                 # Server ECS systems (domain-driven)
 │       ├── combat/              # Damage, projectiles, special abilities
-│       │   ├── CombatSystem.luau
-│       │   ├── ProjectileSystem.luau
-│       │   └── SpecialPlantSystem.luau
+│       │   ├── CombatSystem.luau         # Projectile hits, splash, stun
+│       │   ├── ProjectileSystem.luau     # Multi-shot, catapult, multi-direction
+│       │   ├── SpecialPlantSystem.luau   # Explosives, instant-kill, freeze
+│       │   ├── TrapSystem.luau           # Spikeweed, Garlic diversion
+│       │   └── EnhancementSystem.luau    # Torchwood fire peas
 │       ├── economy/             # Sun, coins, resources
 │       │   ├── SunSpawnSystem.luau
 │       │   ├── SunCollectionSystem.luau
 │       │   └── SunflowerProductionSystem.luau
 │       ├── units/               # Entity lifecycle
-│       │   ├── PlacementSystem.luau
+│       │   ├── PlacementSystem.luau      # Stacking, platforms validation
 │       │   ├── EntityDeathSystem.luau
 │       │   ├── ZombieSpawnSystem.luau
-│       │   └── ZombieMovementSystem.luau
+│       │   ├── ZombieMovementSystem.luau
+│       │   └── MushroomSystem.luau       # Sleep, hide, grow behaviors
 │       ├── wave/                # Wave progression
 │       │   └── WaveManagerSystem.luau
 │       └── core/                # Infrastructure
@@ -113,14 +116,14 @@ src/
 │
 └── shared/                      # Shared code
     ├── config/                  # Game configuration
-    ├── data/                    # Plant/Zombie data definitions
+    ├── data/                    # Plant/Zombie data definitions (50+ plants!)
     ├── utils/                   # Utilities (Logger, GridUtils, AttachmentUtils)
     ├── network/                 # Zap schema (packets.zap)
     └── components/              # Matter components (domain-driven)
         ├── init.luau            # Central index module
         ├── core/                # Base (Position, Health, Movement, Tags)
-        ├── combat/              # Combat (Projectile, Armed, Slow, Target)
-        ├── units/               # Entity types (PlantType, ZombieType, Ghost)
+        ├── combat/              # Combat (Projectile, Armed, Slow, Stun, Splash, Chewing, Hiding, Enhanced)
+        ├── units/               # Entity types (PlantType, ZombieType, Ghost, Sleeping, Jumping)
         ├── economy/             # Resources (Sun, Coin)
         └── events/              # Ephemeral events (Damage, Death, Spawn)
 ```
