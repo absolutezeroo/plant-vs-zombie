@@ -92,6 +92,9 @@ function PvZTheme.WoodPanel(scope: any, props: {
 	AnchorPoint: Vector2?,
 	children: {any}?,
 }): Frame
+	-- Support both props.children and props[Children]
+	local childElements = props.children or props[Children] or {}
+	
 	return New(scope, "Frame")({
 		Name = props.Name or "WoodPanel",
 		Position = props.Position or UDim2.fromScale(0, 0),
@@ -124,7 +127,7 @@ function PvZTheme.WoodPanel(scope: any, props: {
 			}),
 			
 			-- Children
-			unpack(props.children or {}),
+			unpack(childElements),
 		},
 	})
 end
@@ -137,6 +140,9 @@ function PvZTheme.GrassPanel(scope: any, props: {
 	AnchorPoint: Vector2?,
 	children: {any}?,
 }): Frame
+	-- Support both props.children and props[Children]
+	local childElements = props.children or props[Children] or {}
+	
 	return New(scope, "Frame")({
 		Name = props.Name or "GrassPanel",
 		Position = props.Position or UDim2.fromScale(0, 0),
@@ -151,7 +157,7 @@ function PvZTheme.GrassPanel(scope: any, props: {
 				Color = PvZTheme.Colors.LeafGreen,
 				Thickness = 2,
 			}),
-			unpack(props.children or {}),
+			unpack(childElements),
 		},
 	})
 end

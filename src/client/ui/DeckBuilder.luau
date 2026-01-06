@@ -39,9 +39,8 @@ local function PlantGridCard(scope, props: {
 	PlantType: string,
 	IsInDeck: any, -- Fusion.Value<boolean>
 	OnClick: () -> (),
-})
-	local isHovered = Value(scope, false)
-	local data = PlantData.GetPlant(props.PlantType)
+})local isHovered = Value(scope, false)
+	local data = PlantData[props.PlantType]
 	local displayName = if data then data.Name else props.PlantType
 	
 	return New(scope, "TextButton") {
@@ -217,7 +216,7 @@ local function DeckSlot(scope, props: {
 				Text = Computed(scope, function(use)
 					local plant = use(props.PlantType)
 					if plant then
-						local data = PlantData.GetPlant(plant)
+						local data = PlantData[plant]
 						return if data then data.Name else plant
 					end
 					return "Empty"
@@ -363,13 +362,28 @@ function DeckBuilder.Create(scope, props: {
 					}),
 					
 					-- Close button
-					PvZTheme.WoodButton(scope, {
-						Size = UDim2.new(0, 40, 0, 40),
-						Position = UDim2.new(1, -10, 0, 10),
+					New(scope, "TextButton") {
+						Name = "CloseButton",
+						Size = UDim2.new(0, 36, 0, 36),
+						Position = UDim2.new(1, -8, 0, 8),
 						AnchorPoint = Vector2.new(1, 0),
-						Text = "✕",
-						OnClick = props.OnClose,
-					}),
+						BackgroundColor3 = PvZTheme.Colors.HealthRed,
+						Text = "X",
+						TextColor3 = PvZTheme.Colors.TextWhite,
+						TextSize = 20,
+						Font = Enum.Font.GothamBold,
+						AutoButtonColor = true,
+						
+						[OnEvent "Activated"] = props.OnClose,
+						
+						[Children] = {
+							New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
+							New(scope, "UIStroke") {
+								Color = Color3.fromRGB(180, 40, 40),
+								Thickness = 2,
+							},
+						},
+					},
 					
 					-- Deck slots section
 					New(scope, "Frame") {

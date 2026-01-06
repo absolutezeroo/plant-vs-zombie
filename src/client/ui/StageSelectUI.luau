@@ -390,13 +390,28 @@ function StageSelectUI.Create(scope, props: {
 					}),
 					
 					-- Close button
-					PvZTheme.WoodButton(scope, {
-						Size = UDim2.new(0, 40, 0, 40),
-						Position = UDim2.new(1, -10, 0, 10),
+					New(scope, "TextButton") {
+						Name = "CloseButton",
+						Size = UDim2.new(0, 36, 0, 36),
+						Position = UDim2.new(1, -8, 0, 8),
 						AnchorPoint = Vector2.new(1, 0),
-						Text = "✕",
-						OnClick = props.OnClose,
-					}),
+						BackgroundColor3 = PvZTheme.Colors.HealthRed,
+						Text = "X",
+						TextColor3 = PvZTheme.Colors.TextWhite,
+						TextSize = 20,
+						Font = Enum.Font.GothamBold,
+						AutoButtonColor = true,
+						
+						[OnEvent "Activated"] = props.OnClose,
+						
+						[Children] = {
+							New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
+							New(scope, "UIStroke") {
+								Color = Color3.fromRGB(180, 40, 40),
+								Thickness = 2,
+							},
+						},
+					},
 					
 					-- World tabs
 					New(scope, "Frame") {
