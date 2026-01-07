@@ -21,9 +21,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local StageData = require(Shared.data.StageData)
 
--- Import lobby shared config
-local LobbyShared = ReplicatedStorage:WaitForChild("LobbyShared")
-local LobbyConfig = require(LobbyShared.LobbyConfig)
+-- Import lobby config (now in Shared.config)
+local LobbyConfig = require(Shared.config.LobbyConfig)
 
 export type PadConfig = {
     Model: Model,

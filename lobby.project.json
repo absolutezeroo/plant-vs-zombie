@@ -1,14 +1,11 @@
 {
-  "name": "plant-vs-zombie-lobby",
+  "name": "garden-swarm-lobby",
   "tree": {
     "$className": "DataModel",
 
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared"
-      },
-      "LobbyShared": {
-        "$path": "src/lobby/shared"
       },
       "Packages": {
         "$path": "Packages"

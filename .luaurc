@@ -18,7 +18,9 @@
     "aliases": {
         "Packages": "Packages",
         "Shared": "src/shared",
-        "Server": "src/server",
-        "Client": "src/client"
+        "ArenaServer": "src/arena/server",
+        "ArenaClient": "src/arena/client",
+        "LobbyServer": "src/lobby/server",
+        "LobbyClient": "src/lobby/client"
     }
 }

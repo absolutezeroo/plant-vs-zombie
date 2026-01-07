@@ -2,8 +2,8 @@
 -- IDL definition for Plant vs Zombie network packets
 -- Generated code will be type-safe Luau
 
-opt server_output = "../../server/network/generated.luau"
-opt client_output = "../../client/network/generated.luau"
+opt server_output = "server/network/generated.luau"
+opt client_output = "client/network/generated.luau"
 
 -- Types for reusability
 type RequestId = u16

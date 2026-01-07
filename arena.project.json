@@ -1,5 +1,5 @@
 {
-  "name": "plant-vs-zombie",
+  "name": "garden-swarm-arena",
   "tree": {
     "$className": "DataModel",
 
@@ -14,14 +14,14 @@
 
     "ServerScriptService": {
       "Server": {
-        "$path": "src/server"
+        "$path": "src/arena/server"
       }
     },
 
     "StarterPlayer": {
       "StarterPlayerScripts": {
         "Client": {
-          "$path": "src/client"
+          "$path": "src/arena/client"
         }
       }
     },

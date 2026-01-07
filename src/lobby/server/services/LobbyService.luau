@@ -24,9 +24,8 @@ local _StageData = require(Shared.data.StageData) -- Reserved for future use
 local PadManager = require(script.Parent.Parent.modules.PadManager)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 
--- Import config
-local LobbyShared = ReplicatedStorage:WaitForChild("LobbyShared")
-local LobbyConfig = require(LobbyShared.LobbyConfig)
+-- Import config (now in Shared.config)
+local LobbyConfig = require(Shared.config.LobbyConfig)
 
 export type PadState = {
     Config: PadManager.PadConfig,
