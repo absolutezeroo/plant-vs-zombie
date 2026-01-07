@@ -16,11 +16,11 @@ if not _G.__ZAP then
 	_G.__ZAP = { ["ZAP"] = {} }
 elseif not _G.__ZAP["ZAP"] then
 	_G.__ZAP["ZAP"] = {}
-elseif _G.__ZAP["ZAP"]["ZAP"] ~= nil then
-	error(`There is already an instance of Zap with the same remote_scope of ZAP, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ZAP"]}. Change the remote_scope or remote_folder option of both Zap instances`)
+elseif _G.__ZAP["ZAP"]["LOBBY"] ~= nil then
+	error(`There is already an instance of Zap with the same remote_scope of LOBBY, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["LOBBY"]}. Change the remote_scope or remote_folder option of both Zap instances`)
 end
 
-_G.__ZAP["ZAP"]["ZAP"] = "0.6.28"
+_G.__ZAP["ZAP"]["LOBBY"] = "0.6.28"
 
 local outgoing_buff: buffer
 local outgoing_used: number
@@ -168,6 +168,23 @@ if not RunService:IsRunning() then
 			FireList = noop,
 			FireSet = noop
 		}),
+		LeftPad = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		LeavePadRequest = table.freeze({
+			SetCallback = noop
+		}),
+		JoinedPad = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
 		DeckChanged = table.freeze({
 			Fire = noop,
 			FireAll = noop,
@@ -185,10 +202,10 @@ if remotes == nil then
 	remotes.Parent = ReplicatedStorage
 end
 
-local reliable = remotes:FindFirstChild("ZAP_RELIABLE")
+local reliable = remotes:FindFirstChild("LOBBY_RELIABLE")
 if reliable == nil then
 	reliable = Instance.new("RemoteEvent")
-	reliable.Name = "ZAP_RELIABLE"
+	reliable.Name = "LOBBY_RELIABLE"
 	reliable.Parent = remotes
 end
 
@@ -225,7 +242,7 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(2)
+local reliable_events = table.create(3)
 reliable.OnServerEvent:Connect(function(player, buff, inst)
 	incoming_buff = buff
 	incoming_inst = inst
@@ -350,7 +367,7 @@ reliable.OnServerEvent:Connect(function(player, buff, inst)
 			if reliable_events[0] then
 				task.spawn(reliable_events[0], player, value)
 			end
-		elseif id == 1 then -- SaveDeck
+		elseif id == 2 then -- SaveDeck
 			local value
 			value = {  }
 			local len_3 = buffer.readu8(incoming_buff, read(1)) + 1
@@ -459,6 +476,12 @@ reliable.OnServerEvent:Connect(function(player, buff, inst)
 				end
 				value["Deck"][i_2] = val_2
 			end
+			if reliable_events[2] then
+				task.spawn(reliable_events[2], player, value)
+			end
+		elseif id == 1 then -- LeavePadRequest
+			local value
+			value = {  }
 			if reliable_events[1] then
 				task.spawn(reliable_events[1], player, value)
 			end
@@ -988,9 +1011,9 @@ local returns = {
 		SetCallback = function(Callback: (Player: Player, Value: ({
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		})) -> ()): () -> ()
-			reliable_events[1] = Callback
+			reliable_events[2] = Callback
 			return function()
-				reliable_events[1] = nil
+				reliable_events[2] = nil
 			end
 		end,
 	},
@@ -1002,6 +1025,7 @@ local returns = {
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
 			["IsLocked"]: (boolean),
+			["PlayerNames"]: ((string)?),
 		}))
 			load_player(Player)
 			alloc(1)
@@ -1034,6 +1058,16 @@ local returns = {
 			if Value["IsLocked"] then
 				bool_11 = bit32.bor(bool_11, 0b0000000000000010)
 			end
+			if Value["PlayerNames"] ~= nil then
+				bool_11 = bit32.bor(bool_11, 0b0000000000000100)
+				local len_16 = #Value["PlayerNames"]
+				assert(len_16 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_16)
+				alloc(len_16)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_16)
+			end
 			buffer.writeu8(outgoing_buff, bool_11_pos_1, bool_11)
 			player_map[Player] = save()
 		end,
@@ -1044,26 +1078,27 @@ local returns = {
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
 			["IsLocked"]: (boolean),
+			["PlayerNames"]: ((string)?),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
 			local bool_12 = 0
 			local bool_12_pos_1 = alloc(1)
-			local len_16 = #Value["PadId"]
-			assert(len_16 <= 400, "value is more than 400!")
+			local len_17 = #Value["PadId"]
+			assert(len_17 <= 400, "value is more than 400!")
 			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_16)
-			alloc(len_16)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_16)
-			local len_17 = #Value["StageId"]
-			assert(len_17 <= 200, "value is more than 200!")
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_17)
+			alloc(len_17)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_17)
+			local len_18 = #Value["StageId"]
+			assert(len_18 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_17)
-			alloc(len_17)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_17)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_18)
+			alloc(len_18)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_18)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
 			alloc(1)
@@ -1075,6 +1110,16 @@ local returns = {
 			end
 			if Value["IsLocked"] then
 				bool_12 = bit32.bor(bool_12, 0b0000000000000010)
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_12 = bit32.bor(bool_12, 0b0000000000000100)
+				local len_19 = #Value["PlayerNames"]
+				assert(len_19 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_19)
+				alloc(len_19)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_19)
 			end
 			buffer.writeu8(outgoing_buff, bool_12_pos_1, bool_12)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -1093,26 +1138,27 @@ local returns = {
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
 			["IsLocked"]: (boolean),
+			["PlayerNames"]: ((string)?),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
 			local bool_13 = 0
 			local bool_13_pos_1 = alloc(1)
-			local len_18 = #Value["PadId"]
-			assert(len_18 <= 400, "value is more than 400!")
+			local len_20 = #Value["PadId"]
+			assert(len_20 <= 400, "value is more than 400!")
 			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_18)
-			alloc(len_18)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_18)
-			local len_19 = #Value["StageId"]
-			assert(len_19 <= 200, "value is more than 200!")
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_20)
+			alloc(len_20)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_20)
+			local len_21 = #Value["StageId"]
+			assert(len_21 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_19)
-			alloc(len_19)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_19)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_21)
+			alloc(len_21)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_21)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
 			alloc(1)
@@ -1124,6 +1170,16 @@ local returns = {
 			end
 			if Value["IsLocked"] then
 				bool_13 = bit32.bor(bool_13, 0b0000000000000010)
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_13 = bit32.bor(bool_13, 0b0000000000000100)
+				local len_22 = #Value["PlayerNames"]
+				assert(len_22 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_22)
+				alloc(len_22)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_22)
 			end
 			buffer.writeu8(outgoing_buff, bool_13_pos_1, bool_13)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -1144,26 +1200,27 @@ local returns = {
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
 			["IsLocked"]: (boolean),
+			["PlayerNames"]: ((string)?),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
 			local bool_14 = 0
 			local bool_14_pos_1 = alloc(1)
-			local len_20 = #Value["PadId"]
-			assert(len_20 <= 400, "value is more than 400!")
+			local len_23 = #Value["PadId"]
+			assert(len_23 <= 400, "value is more than 400!")
 			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_20)
-			alloc(len_20)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_20)
-			local len_21 = #Value["StageId"]
-			assert(len_21 <= 200, "value is more than 200!")
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_23)
+			alloc(len_23)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_23)
+			local len_24 = #Value["StageId"]
+			assert(len_24 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_21)
-			alloc(len_21)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_21)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_24)
+			alloc(len_24)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_24)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
 			alloc(1)
@@ -1175,6 +1232,16 @@ local returns = {
 			end
 			if Value["IsLocked"] then
 				bool_14 = bit32.bor(bool_14, 0b0000000000000010)
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_14 = bit32.bor(bool_14, 0b0000000000000100)
+				local len_25 = #Value["PlayerNames"]
+				assert(len_25 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_25)
+				alloc(len_25)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_25)
 			end
 			buffer.writeu8(outgoing_buff, bool_14_pos_1, bool_14)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -1193,26 +1260,27 @@ local returns = {
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
 			["IsLocked"]: (boolean),
+			["PlayerNames"]: ((string)?),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
 			local bool_15 = 0
 			local bool_15_pos_1 = alloc(1)
-			local len_22 = #Value["PadId"]
-			assert(len_22 <= 400, "value is more than 400!")
+			local len_26 = #Value["PadId"]
+			assert(len_26 <= 400, "value is more than 400!")
 			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_22)
-			alloc(len_22)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_22)
-			local len_23 = #Value["StageId"]
-			assert(len_23 <= 200, "value is more than 200!")
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_26)
+			alloc(len_26)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_26)
+			local len_27 = #Value["StageId"]
+			assert(len_27 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_23)
-			alloc(len_23)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_23)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_27)
+			alloc(len_27)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_27)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
 			alloc(1)
@@ -1225,7 +1293,275 @@ local returns = {
 			if Value["IsLocked"] then
 				bool_15 = bit32.bor(bool_15, 0b0000000000000010)
 			end
+			if Value["PlayerNames"] ~= nil then
+				bool_15 = bit32.bor(bool_15, 0b0000000000000100)
+				local len_28 = #Value["PlayerNames"]
+				assert(len_28 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_28)
+				alloc(len_28)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_28)
+			end
 			buffer.writeu8(outgoing_buff, bool_15_pos_1, bool_15)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	LeftPad = {
+		Fire = function(Player: Player, Value: ({
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	LeavePadRequest = {
+		SetCallback = function(Callback: (Player: Player, Value: ({
+		})) -> ()): () -> ()
+			reliable_events[1] = Callback
+			return function()
+				reliable_events[1] = nil
+			end
+		end,
+	},
+	JoinedPad = {
+		Fire = function(Player: Player, Value: ({
+			["PadId"]: (string),
+			["StageId"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_29 = #Value["PadId"]
+			assert(len_29 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_29)
+			alloc(len_29)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_29)
+			local len_30 = #Value["StageId"]
+			assert(len_30 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_30)
+			alloc(len_30)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_30)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["PadId"]: (string),
+			["StageId"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_31 = #Value["PadId"]
+			assert(len_31 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_31)
+			alloc(len_31)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_31)
+			local len_32 = #Value["StageId"]
+			assert(len_32 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_32)
+			alloc(len_32)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_32)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["PadId"]: (string),
+			["StageId"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_33 = #Value["PadId"]
+			assert(len_33 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_33)
+			alloc(len_33)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_33)
+			local len_34 = #Value["StageId"]
+			assert(len_34 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_34)
+			alloc(len_34)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_34)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["PadId"]: (string),
+			["StageId"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_35 = #Value["PadId"]
+			assert(len_35 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_35)
+			alloc(len_35)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_35)
+			local len_36 = #Value["StageId"]
+			assert(len_36 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_36)
+			alloc(len_36)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_36)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["PadId"]: (string),
+			["StageId"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_37 = #Value["PadId"]
+			assert(len_37 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_37)
+			alloc(len_37)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_37)
+			local len_38 = #Value["StageId"]
+			assert(len_38 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_38)
+			alloc(len_38)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_38)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -1242,13 +1578,13 @@ local returns = {
 		}))
 			load_player(Player)
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_24 = #Value["Deck"]
-			assert(len_24 >= 1, "value is less than 1!")
-			assert(len_24 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_39 = #Value["Deck"]
+			assert(len_39 >= 1, "value is less than 1!")
+			assert(len_39 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_24 - 1)
-			for i_3 = 1, len_24 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_39 - 1)
+			for i_3 = 1, len_39 do
 				local val_3 = Value["Deck"][i_3]
 				if val_3 == "Sunflower" then
 					alloc(1)
@@ -1405,13 +1741,13 @@ local returns = {
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_25 = #Value["Deck"]
-			assert(len_25 >= 1, "value is less than 1!")
-			assert(len_25 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_40 = #Value["Deck"]
+			assert(len_40 >= 1, "value is less than 1!")
+			assert(len_40 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_25 - 1)
-			for i_4 = 1, len_25 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_40 - 1)
+			for i_4 = 1, len_40 do
 				local val_4 = Value["Deck"][i_4]
 				if val_4 == "Sunflower" then
 					alloc(1)
@@ -1575,13 +1911,13 @@ local returns = {
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_26 = #Value["Deck"]
-			assert(len_26 >= 1, "value is less than 1!")
-			assert(len_26 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_41 = #Value["Deck"]
+			assert(len_41 >= 1, "value is less than 1!")
+			assert(len_41 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_26 - 1)
-			for i_5 = 1, len_26 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_41 - 1)
+			for i_5 = 1, len_41 do
 				local val_5 = Value["Deck"][i_5]
 				if val_5 == "Sunflower" then
 					alloc(1)
@@ -1747,13 +2083,13 @@ local returns = {
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_27 = #Value["Deck"]
-			assert(len_27 >= 1, "value is less than 1!")
-			assert(len_27 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_42 = #Value["Deck"]
+			assert(len_42 >= 1, "value is less than 1!")
+			assert(len_42 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_27 - 1)
-			for i_6 = 1, len_27 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_42 - 1)
+			for i_6 = 1, len_42 do
 				local val_6 = Value["Deck"][i_6]
 				if val_6 == "Sunflower" then
 					alloc(1)
@@ -1917,13 +2253,13 @@ local returns = {
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_28 = #Value["Deck"]
-			assert(len_28 >= 1, "value is less than 1!")
-			assert(len_28 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_43 = #Value["Deck"]
+			assert(len_43 >= 1, "value is less than 1!")
+			assert(len_43 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_28 - 1)
-			for i_7 = 1, len_28 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_43 - 1)
+			for i_7 = 1, len_43 do
 				local val_7 = Value["Deck"][i_7]
 				if val_7 == "Sunflower" then
 					alloc(1)

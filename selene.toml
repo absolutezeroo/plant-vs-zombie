@@ -2,3 +2,34 @@ std = "roblox"
 
 [lints]
 global_usage = "allow"
+unused_variable = "allow"
+shadowing = "allow"
+empty_if = "warn"
+if_same_then_else = "warn"
+manual_table_clone = "warn"
+mismatched_arg_count = "warn"
+roblox_incorrect_color3_new_bounds = "deny"
+roblox_incorrect_roact_usage = "deny"
+suspicious_reverse_loop = "deny"
+unbalanced_assignments = "warn"
+undefined_variable = "deny"
+unscoped_variables = "deny"
+incorrect_standard_library_use = "warn"
+divide_by_zero = "warn"
+duplicate_keys = "deny"
+type_check_inside_call = "warn"
+parenthese_conditions = "allow"
+almost_swapped = "warn"
+deprecated = "warn"
+high_cyclomatic_complexity = "allow"
+multiple_statements = "allow"
+bad_string_escape = "deny"
+compare_nan = "deny"
+constant_table_comparison = "warn"
+
+[config]
+# Patterns de fichiers générés à ignorer
+exclude = ["**/generated.luau", "**/Packages/**"]
+
+# Autoriser les variables préfixées par _
+allow_unused_prefixed_with = "_"

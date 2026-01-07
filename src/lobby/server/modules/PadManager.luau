@@ -31,6 +31,7 @@ export type PadConfig = {
     StageId: string,
     MinPlayers: number,
     MaxPlayers: number,
+    CountdownDuration: number,
     IsValid: boolean,
 }
 
@@ -45,6 +46,7 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
         StageId = "",
         MinPlayers = LobbyConfig.DEFAULT_MIN_PLAYERS,
         MaxPlayers = LobbyConfig.DEFAULT_MAX_PLAYERS,
+        CountdownDuration = LobbyConfig.COUNTDOWN_DURATION,
         IsValid = false,
     }
     
@@ -110,12 +112,19 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
         config.MaxPlayers = math.max(config.MinPlayers, maxPlayersValue.Value)
     end
     
+    -- Read CountdownDuration (optional)
+    local countdownValue = configFolder:FindFirstChild("CountdownDuration")
+    if countdownValue and countdownValue:IsA("IntValue") then
+        config.CountdownDuration = math.max(1, countdownValue.Value)
+    end
+    
     config.IsValid = true
     
     Logger.Info("PadManager", `Loaded pad: {padModel.Name}`, {
         stageId = config.StageId,
         minPlayers = config.MinPlayers,
         maxPlayers = config.MaxPlayers,
+        countdownDuration = config.CountdownDuration,
     })
     
     return config

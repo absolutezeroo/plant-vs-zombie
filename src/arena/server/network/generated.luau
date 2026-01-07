@@ -16,11 +16,11 @@ if not _G.__ZAP then
 	_G.__ZAP = { ["ZAP"] = {} }
 elseif not _G.__ZAP["ZAP"] then
 	_G.__ZAP["ZAP"] = {}
-elseif _G.__ZAP["ZAP"]["ZAP"] ~= nil then
-	error(`There is already an instance of Zap with the same remote_scope of ZAP, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ZAP"]}. Change the remote_scope or remote_folder option of both Zap instances`)
+elseif _G.__ZAP["ZAP"]["ARENA"] ~= nil then
+	error(`There is already an instance of Zap with the same remote_scope of ARENA, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ARENA"]}. Change the remote_scope or remote_folder option of both Zap instances`)
 end
 
-_G.__ZAP["ZAP"]["ZAP"] = "0.6.28"
+_G.__ZAP["ZAP"]["ARENA"] = "0.6.28"
 
 local outgoing_buff: buffer
 local outgoing_used: number
@@ -412,10 +412,10 @@ if remotes == nil then
 	remotes.Parent = ReplicatedStorage
 end
 
-local reliable = remotes:FindFirstChild("ZAP_RELIABLE")
+local reliable = remotes:FindFirstChild("ARENA_RELIABLE")
 if reliable == nil then
 	reliable = Instance.new("RemoteEvent")
-	reliable.Name = "ZAP_RELIABLE"
+	reliable.Name = "ARENA_RELIABLE"
 	reliable.Parent = remotes
 end
 
@@ -431,11 +431,11 @@ local function getOrCreateUnreliableRemote(name: string): UnreliableRemoteEvent
 	return remote
 end
 
-local unreliable = { getOrCreateUnreliableRemote("ZAP_UNRELIABLE_0"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_1"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_2"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_3") }
-assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_0 to be an UnreliableRemoteEvent")
-assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to be an UnreliableRemoteEvent")
-assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
-assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
+local unreliable = { getOrCreateUnreliableRemote("ARENA_UNRELIABLE_0"), getOrCreateUnreliableRemote("ARENA_UNRELIABLE_1"), getOrCreateUnreliableRemote("ARENA_UNRELIABLE_2"), getOrCreateUnreliableRemote("ARENA_UNRELIABLE_3") }
+assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_0 to be an UnreliableRemoteEvent")
+assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_1 to be an UnreliableRemoteEvent")
+assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_2 to be an UnreliableRemoteEvent")
+assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_3 to be an UnreliableRemoteEvent")
 local player_map = {}
 
 local function load_player(player: Player)
@@ -449,14 +449,14 @@ end
 Players.PlayerRemoving:Connect(function(player)
 	player_map[player] = nil
 end)
-export type Lane = (number)
-export type UpgradeType = ("Damage" | "Health" | "Cooldown")
-export type Column = (number)
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
 export type EntityId = (number)
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
+export type Column = (number)
+export type Lane = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
-export type RequestId = (number)
 export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
+export type UpgradeType = ("Damage" | "Health" | "Cooldown")
+export type RequestId = (number)
 
 local function SendEvents()
 	for player, outgoing in player_map do

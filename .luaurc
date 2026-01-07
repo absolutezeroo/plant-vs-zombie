@@ -1,8 +1,12 @@
 {
     "languageMode": "strict",
     "lint": {
-        "*": true
+        "*": true,
+        "LocalUnused": "disabled",
+        "FunctionUnused": "disabled",
+        "ImportUnused": "disabled"
     },
+    "lintErrors": false,
     "globals": [
         "game",
         "workspace",
@@ -13,7 +17,8 @@
         "os",
         "utf8",
         "bit32",
-        "buffer"
+        "buffer",
+        "_G"
     ],
     "aliases": {
         "Packages": "Packages",
@@ -21,6 +26,9 @@
         "ArenaServer": "src/arena/server",
         "ArenaClient": "src/arena/client",
         "LobbyServer": "src/lobby/server",
-        "LobbyClient": "src/lobby/client"
+        "LobbyClient": "src/lobby/client",
+        "LobbyManagers": "src/lobby/server/managers",
+        "LobbyModules": "src/lobby/server/modules",
+        "LobbyNetwork": "src/lobby/server/network"
     }
 }

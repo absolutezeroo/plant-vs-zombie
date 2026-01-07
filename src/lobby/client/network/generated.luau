@@ -14,11 +14,11 @@ if not _G.__ZAP then
 	_G.__ZAP = { ["ZAP"] = {} }
 elseif not _G.__ZAP["ZAP"] then
 	_G.__ZAP["ZAP"] = {}
-elseif _G.__ZAP["ZAP"]["ZAP"] ~= nil then
-	error(`There is already an instance of Zap with the same remote_scope of ZAP, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ZAP"]}. Change the remote_scope or remote_folder option of both Zap instances`)
+elseif _G.__ZAP["ZAP"]["LOBBY"] ~= nil then
+	error(`There is already an instance of Zap with the same remote_scope of LOBBY, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["LOBBY"]}. Change the remote_scope or remote_folder option of both Zap instances`)
 end
 
-_G.__ZAP["ZAP"]["ZAP"] = "0.6.28"
+_G.__ZAP["ZAP"]["LOBBY"] = "0.6.28"
 
 local outgoing_buff: buffer
 local outgoing_used: number
@@ -150,6 +150,15 @@ if not RunService:IsRunning() then
 		PadStateUpdate = table.freeze({
 			On = noop
 		}),
+		LeftPad = table.freeze({
+			On = noop
+		}),
+		LeavePadRequest = table.freeze({
+			Fire = noop
+		}),
+		JoinedPad = table.freeze({
+			On = noop
+		}),
 		DeckChanged = table.freeze({
 			On = noop
 		}),
@@ -157,8 +166,8 @@ if not RunService:IsRunning() then
 end
 local remotes = ReplicatedStorage:WaitForChild("ZAP")
 
-local reliable = remotes:WaitForChild("ZAP_RELIABLE")
-assert(reliable:IsA("RemoteEvent"), "Expected ZAP_RELIABLE to be a RemoteEvent")
+local reliable = remotes:WaitForChild("LOBBY_RELIABLE")
+assert(reliable:IsA("RemoteEvent"), "Expected LOBBY_RELIABLE to be a RemoteEvent")
 
 export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
 
@@ -178,8 +187,8 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(5)
-local reliable_event_queue: { [number]: { any } } = table.create(5)
+local reliable_events = table.create(7)
+local reliable_event_queue: { [number]: { any } } = table.create(7)
 reliable_events[0] = {}
 reliable_event_queue[0] = {}
 reliable_events[1] = {}
@@ -188,8 +197,12 @@ reliable_events[2] = {}
 reliable_event_queue[2] = {}
 reliable_events[3] = {}
 reliable_event_queue[3] = {}
+reliable_events[5] = {}
+reliable_event_queue[5] = {}
 reliable_events[4] = {}
 reliable_event_queue[4] = {}
+reliable_events[6] = {}
+reliable_event_queue[6] = {}
 reliable.OnClientEvent:Connect(function(buff, inst)
 	incoming_buff = buff
 	incoming_inst = inst
@@ -285,6 +298,14 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				value["CountdownRemaining"] = nil
 			end
 			value["IsLocked"] = bit32.btest(bool_3, 0b0000000000000010)
+			if bit32.btest(bool_3, 0b0000000000000100) then
+				local len_5 = buffer.readu16(incoming_buff, read(2))
+				assert(len_5 <= 800, "value is more than 800!")
+				value["PlayerNames"] = buffer.readstring(incoming_buff, read(len_5), len_5)
+				assert(utf8.len(value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+			else
+				value["PlayerNames"] = nil
+			end
 			if reliable_events[3][1] then
 				for _, cb in reliable_events[3] do
 					task.spawn(cb, value)
@@ -295,14 +316,49 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 					warn(`[ZAP] {#reliable_event_queue[3]} events in queue for PadStateUpdate. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 4 then -- DeckChanged
+		elseif id == 5 then -- LeftPad
 			local value
 			value = {  }
-			local len_5 = buffer.readu8(incoming_buff, read(1)) + 1
-			assert(len_5 >= 1, "value is less than 1!")
-			assert(len_5 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_5)
-			for i_1 = 1, len_5 do
+			if reliable_events[5][1] then
+				for _, cb in reliable_events[5] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[5], value)
+				if #reliable_event_queue[5] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[5]} events in queue for LeftPad. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 4 then -- JoinedPad
+			local value
+			value = {  }
+			local len_6 = buffer.readu16(incoming_buff, read(2))
+			assert(len_6 <= 400, "value is more than 400!")
+			value["PadId"] = buffer.readstring(incoming_buff, read(len_6), len_6)
+			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
+			local len_7 = buffer.readu8(incoming_buff, read(1))
+			assert(len_7 <= 200, "value is more than 200!")
+			value["StageId"] = buffer.readstring(incoming_buff, read(len_7), len_7)
+			assert(utf8.len(value["StageId"]) ~= nil, "value is not valid utf-8")
+			value["Position"] = Vector3.new(buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)))
+			if reliable_events[4][1] then
+				for _, cb in reliable_events[4] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[4], value)
+				if #reliable_event_queue[4] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[4]} events in queue for JoinedPad. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 6 then -- DeckChanged
+			local value
+			value = {  }
+			local len_8 = buffer.readu8(incoming_buff, read(1)) + 1
+			assert(len_8 >= 1, "value is less than 1!")
+			assert(len_8 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_8)
+			for i_1 = 1, len_8 do
 				local val_1
 				local variant_1 = buffer.readu8(incoming_buff, read(1))
 				if variant_1 == 0 then
@@ -404,14 +460,14 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["Deck"][i_1] = val_1
 			end
-			if reliable_events[4][1] then
-				for _, cb in reliable_events[4] do
+			if reliable_events[6][1] then
+				for _, cb in reliable_events[6] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[4], value)
-				if #reliable_event_queue[4] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[4]} events in queue for DeckChanged. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[6], value)
+				if #reliable_event_queue[6] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[6]} events in queue for DeckChanged. Did you forget to attach a listener?`)
 				end
 			end
 		else
@@ -447,19 +503,19 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 0)
-			local len_6 = #Value["StageId"]
-			assert(len_6 <= 200, "value is more than 200!")
+			local len_9 = #Value["StageId"]
+			assert(len_9 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_6)
-			alloc(len_6)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_6)
-			local len_7 = #Value["Deck"]
-			assert(len_7 >= 1, "value is less than 1!")
-			assert(len_7 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_9)
+			alloc(len_9)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_9)
+			local len_10 = #Value["Deck"]
+			assert(len_10 >= 1, "value is less than 1!")
+			assert(len_10 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_7 - 1)
-			for i_2 = 1, len_7 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_10 - 1)
+			for i_2 = 1, len_10 do
 				local val_2 = Value["Deck"][i_2]
 				if val_2 == "Sunflower" then
 					alloc(1)
@@ -651,13 +707,13 @@ local returns = {
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-			local len_8 = #Value["Deck"]
-			assert(len_8 >= 1, "value is less than 1!")
-			assert(len_8 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			local len_11 = #Value["Deck"]
+			assert(len_11 >= 1, "value is less than 1!")
+			assert(len_11 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_8 - 1)
-			for i_3 = 1, len_8 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_11 - 1)
+			for i_3 = 1, len_11 do
 				local val_3 = Value["Deck"][i_3]
 				if val_3 == "Sunflower" then
 					alloc(1)
@@ -817,6 +873,7 @@ local returns = {
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
 			["IsLocked"]: (boolean),
+			["PlayerNames"]: ((string)?),
 		})) -> ())
 			table.insert(reliable_events[3], Callback)
 			for _, value in reliable_event_queue[3] do
@@ -828,9 +885,31 @@ local returns = {
 			end
 		end,
 	},
-	DeckChanged = {
+	LeftPad = {
 		On = function(Callback: (Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		})) -> ())
+			table.insert(reliable_events[5], Callback)
+			for _, value in reliable_event_queue[5] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[5] = {}
+			return function()
+				table.remove(reliable_events[5], table.find(reliable_events[5], Callback))
+			end
+		end,
+	},
+	LeavePadRequest = {
+		Fire = function(Value: ({
+		}))
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+		end,
+	},
+	JoinedPad = {
+		On = function(Callback: (Value: ({
+			["PadId"]: (string),
+			["StageId"]: (string),
+			["Position"]: (Vector3),
 		})) -> ())
 			table.insert(reliable_events[4], Callback)
 			for _, value in reliable_event_queue[4] do
@@ -839,6 +918,20 @@ local returns = {
 			reliable_event_queue[4] = {}
 			return function()
 				table.remove(reliable_events[4], table.find(reliable_events[4], Callback))
+			end
+		end,
+	},
+	DeckChanged = {
+		On = function(Callback: (Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		})) -> ())
+			table.insert(reliable_events[6], Callback)
+			for _, value in reliable_event_queue[6] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[6] = {}
+			return function()
+				table.remove(reliable_events[6], table.find(reliable_events[6], Callback))
 			end
 		end,
 	},

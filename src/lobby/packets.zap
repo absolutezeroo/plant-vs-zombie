@@ -3,6 +3,7 @@
 
 opt server_output = "server/network/generated.luau"
 opt client_output = "client/network/generated.luau"
+opt remote_scope = "LOBBY"
 
 -- Plant type enum (same as arena)
 type PlantType = enum { 
@@ -98,7 +99,36 @@ event PadStateUpdate = {
         MaxPlayers: u8,
         CountdownRemaining: u8?,    -- nil = no countdown
         IsLocked: boolean,           -- Stage not unlocked for this player
+        PlayerNames: string.utf8(..200)?, -- Comma-separated player names
     }
+}
+
+-- Server tells client they joined a pad (lock movement, show UI)
+event JoinedPad = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PadId: string.utf8(..100),
+        StageId: string.utf8(..50),
+        Position: Vector3,  -- Center of pad to teleport to
+    }
+}
+
+-- Server tells client they left a pad (unlock movement)
+event LeftPad = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {}
+}
+
+-- Client requests to leave the current pad
+event LeavePadRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {}
 }
 
 -- Player changed their deck

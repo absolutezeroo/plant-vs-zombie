@@ -1,247 +1,192 @@
 --!strict
 --[[
-    LobbyService.luau - Manages teleport pads, queues, and countdowns
+    LobbyService.luau - Orchestrates teleport pad functionality
     
-    Responsibilities:
-    - Scan workspace for TeleportPad Models
-    - Track players on each pad (queue management)
-    - Handle countdown logic (start/cancel/complete)
-    - Teleport groups when ready
-    - Broadcast pad state updates to clients
+    Single Responsibility: Coordinate managers for pad operations
+    
+    This is a thin orchestrator that delegates to:
+    - PadManager: Read pad configuration from workspace
+    - PadQueueManager: Track player queues
+    - PlayerLockManager: Handle player movement locking
+    - CountdownManager: Handle countdown timers
+    - TeleportManager: Handle teleportation
+    - PadBroadcaster: Handle network updates
+    - PadTouchHandler: Handle touch detection
 ]]
 
 local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local TeleportData = require(Shared.TeleportData)
-local _StageData = require(Shared.data.StageData) -- Reserved for future use
-
--- Import modules
-local PadManager = require(script.Parent.Parent.modules.PadManager)
-local PlayerDataService = require(script.Parent.PlayerDataService)
-
--- Import config (now in Shared.config)
 local LobbyConfig = require(Shared.config.LobbyConfig)
 
-export type PadState = {
-    Config: PadManager.PadConfig,
-    PlayersInQueue: {Player},
-    CountdownActive: boolean,
-    CountdownRemaining: number,
-    LastTouchTime: {[Player]: number}, -- Track AFK
-}
+-- Managers
+local PadManager = require(script.Parent.Parent.modules.PadManager)
+local PlayerLockManager = require(script.Parent.Parent.managers.PlayerLockManager)
+local PadQueueManager = require(script.Parent.Parent.managers.PadQueueManager)
+local CountdownManager = require(script.Parent.Parent.managers.CountdownManager)
+local TeleportManager = require(script.Parent.Parent.managers.TeleportManager)
+local PadBroadcaster = require(script.Parent.Parent.managers.PadBroadcaster)
+local PadTouchHandler = require(script.Parent.Parent.managers.PadTouchHandler)
 
+-- Types
+export type PadConfig = PadManager.PadConfig
+
+-- Module
 local LobbyService = {}
 
--- State tracking
-local _pads: {[Model]: PadState} = {}
-local _playerCurrentPad: {[Player]: Model?} = {}
+-- State
 local _initialized = false
+local _padConfigs: {[string]: PadConfig} = {} -- padId -> config
+local _lastBroadcastTime: {[string]: number} = {} -- padId -> last broadcast time
 
--- Network (set after Initialize)
+-- Zap server reference
 local ZapServer: any = nil
 
--- Helper: Get player's current deck from profile
-local function getPlayerDeck(player: Player): {string}?
-    local profile = PlayerDataService.GetProfile(player)
-    if not profile then return nil end
-    
-    -- Use Deck if set, otherwise default starter deck
-    local deck = profile.Data.Deck
-    if not deck or #deck == 0 then
-        deck = {"Sunflower", "Peashooter", "WallNut"} -- Default deck
-    end
-    
-    return deck
-end
+-- Manager instances
+local _playerLockManager: PlayerLockManager.PlayerLockManager
+local _queueManager: PadQueueManager.PadQueueManager
+local _countdownManager: CountdownManager.CountdownManager
+local _teleportManager: TeleportManager.TeleportManager
+local _broadcaster: PadBroadcaster.PadBroadcaster
+local _touchHandler: PadTouchHandler.PadTouchHandler
 
--- Helper: Check if player can join pad (stage unlocked)
-local function canPlayerJoinPad(player: Player, stageId: string): (boolean, string?)
-    local profile = PlayerDataService.GetProfile(player)
-    if not profile then
-        return false, "Profile not loaded"
-    end
-    
-    -- Check if stage is unlocked
-    -- For now, allow all stages (TODO: implement progression)
-    return true, nil
-end
+--[[ ============================================
+    PRIVATE: Core pad operations
+============================================ ]]--
 
--- Add player to pad queue
-function LobbyService.PlayerJoinedPad(player: Player, padModel: Model)
-    local padState = _pads[padModel]
-    if not padState then
-        Logger.Warn("LobbyService", `Unknown pad: {padModel.Name}`)
+-- Handle player joining a pad
+local function handlePlayerJoin(player: Player, padModel: Model)
+    local padId = PadManager.GetPadId(padModel)
+    local config = _padConfigs[padId]
+    
+    if not config then
+        Logger.Warn("LobbyService", `Unknown pad: {padId}`)
         return
     end
     
-    -- Check if player can join
-    local canJoin, reason = canPlayerJoinPad(player, padState.Config.StageId)
-    if not canJoin then
-        Logger.Warn("LobbyService", `{player.Name} cannot join pad: {reason}`)
-        -- TODO: Send error to client
+    -- Check if already on a pad
+    local currentPadId = _queueManager:GetPlayerPad(player)
+    if currentPadId then
+        if currentPadId == padId then
+            return -- Already on this pad
+        end
+        -- Leave current pad first
+        handlePlayerLeave(player)
+    end
+    
+    -- Try to join queue
+    local joined = _queueManager:JoinPad(player, padId, config)
+    if not joined then
         return
     end
     
-    -- Remove from previous pad if any
-    local previousPad = _playerCurrentPad[player]
-    if previousPad then
-        LobbyService.PlayerLeftPad(player, previousPad)
-    end
+    -- Lock player on pad center
+    local centerPos = config.Platform.Position + Vector3.new(0, 3, 0)
+    _playerLockManager:LockPlayer(player, centerPos)
     
-    -- Add to queue
-    if not table.find(padState.PlayersInQueue, player) then
-        table.insert(padState.PlayersInQueue, player)
-        _playerCurrentPad[player] = padModel
-        padState.LastTouchTime[player] = os.clock()
-        
-        Logger.Info("LobbyService", `{player.Name} joined pad {padModel.Name}`, {
-            queueSize = #padState.PlayersInQueue,
+    -- Notify client
+    if ZapServer then
+        ZapServer.JoinedPad.Fire(player, {
+            PadId = padId,
+            StageId = config.StageId,
+            Position = centerPos,
         })
-        
-        -- Check if should start countdown
-        LobbyService._UpdateCountdown(padState)
-        LobbyService._BroadcastPadState(padState)
     end
-end
-
--- Remove player from pad queue
-function LobbyService.PlayerLeftPad(player: Player, padModel: Model)
-    local padState = _pads[padModel]
-    if not padState then return end
     
-    local index = table.find(padState.PlayersInQueue, player)
-    if index then
-        table.remove(padState.PlayersInQueue, index)
-        padState.LastTouchTime[player] = nil
-        _playerCurrentPad[player] = nil
-        
-        Logger.Info("LobbyService", `{player.Name} left pad {padModel.Name}`, {
-            queueSize = #padState.PlayersInQueue,
-        })
-        
-        -- Re-evaluate countdown
-        LobbyService._UpdateCountdown(padState)
-        LobbyService._BroadcastPadState(padState)
-    end
-end
-
--- Update countdown logic for a pad
-function LobbyService._UpdateCountdown(padState: PadState)
-    local queueSize = #padState.PlayersInQueue
-    local config = padState.Config
-    
-    -- Instant teleport if max players reached
-    if queueSize >= config.MaxPlayers then
-        Logger.Info("LobbyService", `Max players reached on {config.Model.Name}, instant teleport`)
-        LobbyService._TeleportGroup(padState)
-        return
-    end
+    Logger.Info("LobbyService", `{player.Name} joined pad {padId}`)
     
     -- Start countdown if min players met
-    if queueSize >= config.MinPlayers and not padState.CountdownActive then
-        padState.CountdownActive = true
-        padState.CountdownRemaining = LobbyConfig.COUNTDOWN_DURATION
-        Logger.Info("LobbyService", `Countdown started on {config.Model.Name}`)
+    updateCountdown(padId, config)
+    
+    -- Broadcast state
+    _broadcaster:BroadcastPadState(padId, config)
+end
+
+-- Handle player leaving a pad
+local function handlePlayerLeave(player: Player)
+    local padId = _queueManager:LeavePad(player)
+    if not padId then
+        return
     end
     
-    -- Cancel countdown if below min players
-    if queueSize < config.MinPlayers and padState.CountdownActive then
-        padState.CountdownActive = false
-        padState.CountdownRemaining = 0
-        Logger.Info("LobbyService", `Countdown cancelled on {config.Model.Name}`)
+    local config = _padConfigs[padId]
+    
+    -- Unlock player
+    _playerLockManager:UnlockPlayer(player)
+    
+    -- Notify client
+    if ZapServer then
+        ZapServer.LeftPad.Fire(player, {})
+    end
+    
+    Logger.Info("LobbyService", `{player.Name} left pad {padId}`)
+    
+    -- Update countdown
+    if config then
+        updateCountdown(padId, config)
+        _broadcaster:BroadcastPadState(padId, config)
     end
 end
 
--- Teleport all players in pad queue
-function LobbyService._TeleportGroup(padState: PadState)
-    local players = padState.PlayersInQueue
+-- Update countdown state for a pad
+function updateCountdown(padId: string, config: PadConfig)
+    local playerCount = _queueManager:GetPlayerCount(padId)
+    local isActive = _countdownManager:IsCountdownActive(padId)
+    
+    -- Should start countdown?
+    if playerCount >= config.MinPlayers and not isActive then
+        _countdownManager:StartCountdown(padId, config.CountdownDuration, {
+            OnTick = function(id, remaining)
+                -- Broadcast every tick
+                _broadcaster:BroadcastPadState(id, config)
+            end,
+            OnComplete = function(id)
+                -- Teleport group
+                teleportPadGroup(id, config)
+            end,
+            OnCancel = function(id)
+                _broadcaster:BroadcastPadState(id, config)
+            end,
+        })
+        Logger.Info("LobbyService", `Countdown started for pad {padId} ({config.CountdownDuration}s)`)
+    end
+    
+    -- Should cancel countdown?
+    if playerCount < config.MinPlayers and isActive then
+        _countdownManager:CancelCountdown(padId)
+        Logger.Info("LobbyService", `Countdown cancelled for pad {padId}`)
+    end
+end
+
+-- Teleport all players on a pad
+function teleportPadGroup(padId: string, config: PadConfig)
+    local players = _queueManager:GetPlayersOnPad(padId)
     if #players == 0 then return end
     
-    local config = padState.Config
-    Logger.Info("LobbyService", `Teleporting {#players} players from {config.Model.Name}`)
+    Logger.Info("LobbyService", `Teleporting {#players} players from pad {padId}`)
     
-    -- Get each player's deck
-    for _, player in players do
-        local deck = getPlayerDeck(player)
-        if not deck then
-            Logger.Warn("LobbyService", `{player.Name} has no deck, skipping teleport`)
-            continue
-        end
-        
-        -- Create teleport data
-        local teleportOptions = Instance.new("TeleportOptions")
-        local arenaData = TeleportData.CreateArenaJoinData(config.StageId, deck)
-        teleportOptions:SetTeleportData(arenaData)
-        
-        -- Teleport
-        local success, err = pcall(function()
-            TeleportService:TeleportAsync(
-                TeleportData.PlaceIds.Arena,
-                {player},
-                teleportOptions
-            )
-        end)
-        
-        if not success then
-            Logger.Error("LobbyService", `Teleport failed for {player.Name}: {err}`)
-        end
+    -- Set cooldowns and teleport each player
+    for _, player in ipairs(players) do
+        _touchHandler:SetCooldown(player)
+        _teleportManager:TeleportPlayer(player, config.StageId)
     end
     
-    -- Clear queue
-    padState.PlayersInQueue = {}
-    padState.LastTouchTime = {}
-    padState.CountdownActive = false
-    padState.CountdownRemaining = 0
+    -- Clear the queue
+    _queueManager:ClearPad(padId)
     
-    LobbyService._BroadcastPadState(padState)
+    -- Broadcast cleared state
+    _broadcaster:BroadcastPadState(padId, config)
 end
 
--- Broadcast pad state to all clients
-function LobbyService._BroadcastPadState(padState: PadState)
-    if not ZapServer then return end
-    
-    local config = padState.Config
-    local padId = PadManager.GetPadId(config.Model)
-    
-    -- Send to all players
-    ZapServer.PadStateUpdate.FireAll({
-        PadId = padId,
-        StageId = config.StageId,
-        PlayersCount = #padState.PlayersInQueue,
-        MaxPlayers = config.MaxPlayers,
-        CountdownRemaining = if padState.CountdownActive then padState.CountdownRemaining else nil,
-        IsLocked = false, -- TODO: Check stage unlock status
-    })
-end
+--[[ ============================================
+    PRIVATE: Initialization helpers
+============================================ ]]--
 
--- Heartbeat: Update countdowns and check for teleports
-local function onHeartbeat(dt: number)
-    for padModel, padState in _pads do
-        if padState.CountdownActive then
-            padState.CountdownRemaining -= dt
-            
-            if padState.CountdownRemaining <= 0 then
-                -- Countdown complete, teleport!
-                LobbyService._TeleportGroup(padState)
-            end
-        end
-        
-        -- Check AFK players
-        for player, lastTouch in padState.LastTouchTime do
-            if os.clock() - lastTouch > LobbyConfig.AFK_TIMEOUT then
-                Logger.Warn("LobbyService", `{player.Name} AFK on pad, removing`)
-                LobbyService.PlayerLeftPad(player, padModel)
-            end
-        end
-    end
-end
-
--- Scan workspace for TeleportPad Models
+-- Scan workspace for teleport pads
 local function scanForPads()
     local workspace = game:GetService("Workspace")
     local teleportPadsFolder = workspace:FindFirstChild("TeleportPads")
@@ -255,47 +200,36 @@ local function scanForPads()
         if child:IsA("Model") then
             local config = PadManager.ReadPadConfig(child)
             if config and config.IsValid then
-                _pads[child] = {
-                    Config = config,
-                    PlayersInQueue = {},
-                    CountdownActive = false,
-                    CountdownRemaining = 0,
-                    LastTouchTime = {},
-                }
+                local padId = PadManager.GetPadId(child)
+                _padConfigs[padId] = config
                 
                 -- Setup touch detection
-                config.Platform.Touched:Connect(function(hit)
-                    local humanoid = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        local player = Players:GetPlayerFromCharacter(hit.Parent)
-                        if player then
-                            LobbyService.PlayerJoinedPad(player, child)
-                        end
-                    end
-                end)
-                
-                config.Platform.TouchEnded:Connect(function(hit)
-                    local humanoid = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        local player = Players:GetPlayerFromCharacter(hit.Parent)
-                        if player then
-                            LobbyService.PlayerLeftPad(player, child)
-                        end
-                    end
+                _touchHandler:SetupPadTouch(child, config.Platform, function(player, padModel)
+                    handlePlayerJoin(player, padModel)
                 end)
             end
         end
     end
     
-    -- Count pads (can't use # on dictionary)
     local padCount = 0
-    for _ in _pads do
+    for _ in _padConfigs do
         padCount += 1
     end
     Logger.Info("LobbyService", `Loaded {padCount} teleport pads`)
 end
 
--- Initialize service
+-- Broadcast all pad states (for new players or initial sync)
+local function broadcastAllPadStates()
+    for padId, config in pairs(_padConfigs) do
+        _broadcaster:BroadcastPadState(padId, config)
+    end
+end
+
+--[[ ============================================
+    PUBLIC: API
+============================================ ]]--
+
+-- Initialize the lobby service
 function LobbyService.Initialize(zapServer: any)
     if _initialized then
         Logger.Warn("LobbyService", "Already initialized")
@@ -304,27 +238,55 @@ function LobbyService.Initialize(zapServer: any)
     
     ZapServer = zapServer
     
-    -- Scan for pads
+    -- Get manager instances
+    _playerLockManager = PlayerLockManager.GetInstance()
+    _queueManager = PadQueueManager.GetInstance()
+    _countdownManager = CountdownManager.GetInstance()
+    _teleportManager = TeleportManager.GetInstance()
+    _broadcaster = PadBroadcaster.GetInstance()
+    _touchHandler = PadTouchHandler.GetInstance()
+    
+    -- Scan for pads in workspace
     scanForPads()
     
-    -- Start heartbeat
-    RunService.Heartbeat:Connect(onHeartbeat)
+    -- Broadcast initial state for all pads
+    task.defer(broadcastAllPadStates)
     
-    -- Handle player leaving
+    -- Handle new players - send them all pad states
+    Players.PlayerAdded:Connect(function(player)
+        task.wait(1)
+        broadcastAllPadStates()
+    end)
+    
+    -- Handle player leaving game
     Players.PlayerRemoving:Connect(function(player)
-        local padModel = _playerCurrentPad[player]
-        if padModel then
-            LobbyService.PlayerLeftPad(player, padModel)
-        end
+        handlePlayerLeave(player)
+        _playerLockManager:Cleanup(player)
+        _touchHandler:Cleanup(player)
+    end)
+    
+    -- Handle LeavePadRequest from clients
+    ZapServer.LeavePadRequest.SetCallback(function(player)
+        handlePlayerLeave(player)
     end)
     
     _initialized = true
     Logger.Info("LobbyService", "Lobby service initialized")
 end
 
--- Get pad state (for debugging)
-function LobbyService.GetPadState(padModel: Model): PadState?
-    return _pads[padModel]
+-- Get pad config (for debugging)
+function LobbyService.GetPadConfig(padId: string): PadConfig?
+    return _padConfigs[padId]
+end
+
+-- Manual player join (for testing)
+function LobbyService.PlayerJoinedPad(player: Player, padModel: Model)
+    handlePlayerJoin(player, padModel)
+end
+
+-- Manual player leave (for testing)
+function LobbyService.PlayerLeftPad(player: Player)
+    handlePlayerLeave(player)
 end
 
 return LobbyService
