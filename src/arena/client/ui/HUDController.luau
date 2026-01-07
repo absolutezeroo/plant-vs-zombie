@@ -23,9 +23,6 @@ local PlantData = require(Shared.data.PlantData)
 
 -- UI Components
 local CardDeck = require(script.Parent.CardDeck)
-local ShopUI = require(script.Parent.ShopUI)
-local DeckBuilder = require(script.Parent.DeckBuilder)
-local StageSelectUI = require(script.Parent.StageSelectUI)
 local PvZTheme = require(script.Parent.PvZTheme)
 
 -- Client modules
@@ -72,9 +69,6 @@ function HUDController.new()
 	self._coinsEarned = Value(self._scope, 0)
 	self._xpEarned = Value(self._scope, 0)
 	self._gemsEarned = Value(self._scope, 0)
-	self._shopVisible = Value(self._scope, false) -- Shop visibility state
-	self._deckBuilderVisible = Value(self._scope, false) -- DeckBuilder visibility state
-	self._stageSelectVisible = Value(self._scope, false) -- StageSelect visibility state
 	self._preparationPhase = Value(self._scope, true) -- Show Ready button during preparation
 	self._preparationTime = Value(self._scope, 20) -- Countdown timer
 	self._intermissionTime = Value(self._scope, 0) -- Intermission countdown
@@ -136,8 +130,9 @@ function HUDController:Mount()
 			-- ============================================
 			PvZTheme.WoodPanel(self._scope, {
 				Name = "ResourcePanel",
-				Position = UDim2.fromOffset(15, 15),
-				Size = UDim2.fromOffset(160, 260),
+				Position = UDim2.new(0, 15, 1, -200),
+				Size = UDim2.fromOffset(160, 185),
+				AnchorPoint = Vector2.new(0, 1),
 				children = {
 					-- Sun Counter Row
 					New(self._scope, "Frame")({
@@ -275,40 +270,6 @@ function HUDController:Mount()
 								BackgroundColor = Color3.fromRGB(60, 40, 60),
 							}),
 						},
-					}),
-					
-					-- Shop Button (PvZ Style)
-					PvZTheme.WoodButton(self._scope, {
-						Name = "ShopButton",
-						Position = UDim2.fromOffset(10, 178),
-						Size = UDim2.new(0.5, -15, 0, 35),
-						Text = PvZTheme.Icons.Shop,
-						OnClick = function()
-							self._shopVisible:set(true)
-						end,
-					}),
-					
-					-- Deck Builder Button
-					PvZTheme.WoodButton(self._scope, {
-						Name = "DeckButton",
-						Position = UDim2.fromOffset(80, 178),
-						Size = UDim2.new(0.5, -15, 0, 35),
-						AnchorPoint = Vector2.new(0, 0),
-						Text = PvZTheme.Icons.Plant,
-						OnClick = function()
-							self._deckBuilderVisible:set(true)
-						end,
-					}),
-					
-					-- Stage Select Button (Map)
-					PvZTheme.WoodButton(self._scope, {
-						Name = "StageButton",
-						Position = UDim2.fromOffset(10, 218),
-						Size = UDim2.new(1, -20, 0, 35),
-						Text = PvZTheme.Icons.Map .. " STAGES",
-						OnClick = function()
-							self._stageSelectVisible:set(true)
-						end,
 					}),
 				},
 			}),
@@ -861,37 +822,6 @@ function HUDController:Mount()
 				OnShovelToggle = function()
 					SelectionState.ToggleShovel()
 					Logger.Debug("HUDController", `Shovel mode: {Fusion.peek(SelectionState.ShovelMode)}`)
-				end,
-			}),
-			
-			-- Shop UI (overlay)
-			ShopUI({
-				Scope = self._scope,
-				Visible = self._shopVisible,
-				OnClose = function()
-					self._shopVisible:set(false)
-				end,
-			}),
-			
-			-- Deck Builder UI (overlay)
-			DeckBuilder.Create(self._scope, {
-				Visible = self._deckBuilderVisible,
-				OnClose = function()
-					self._deckBuilderVisible:set(false)
-				end,
-			}),
-			
-			-- Stage Select UI (overlay)
-			StageSelectUI.Create(self._scope, {
-				Visible = self._stageSelectVisible,
-				OnClose = function()
-					self._stageSelectVisible:set(false)
-				end,
-				OnStartStage = function(stageId: string)
-					-- Request server to start the stage
-					PlayerDataClient.RequestStartStage(stageId)
-					-- Close UI
-					self._stageSelectVisible:set(false)
 				end,
 			}),
 		},

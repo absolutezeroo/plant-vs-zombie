@@ -21,6 +21,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
@@ -82,10 +83,16 @@ local _currentCell: {Column: number, Lane: number}? = nil
 local _isValid = false
 local _warnedPlantTypes: {[string]: boolean} = {} -- Track warned plant types to avoid spam
 
+-- Shovel highlight state
+local _highlightedPlant: Model? = nil
+local _originalPartData: {[BasePart]: {Color: Color3, Material: Enum.Material, Transparency: number}} = {}
+
 -- Colors
 local VALID_COLOR = Color3.fromRGB(100, 255, 100)   -- Green
 local INVALID_COLOR = Color3.fromRGB(255, 100, 100) -- Red
+local SHOVEL_COLOR = Color3.fromRGB(255, 80, 80)    -- Red for shovel target
 local GHOST_TRANSPARENCY = 0.5
+local SHOVEL_TRANSPARENCY = 0.3
 
 --[[
 	Apply ghost effect to all parts in a model (transparent + tinted)
@@ -216,6 +223,105 @@ local function destroyGhost()
 	_isValid = false
 end
 
+--[[
+	Restore original appearance of highlighted plant
+]]
+local function restoreHighlightedPlant()
+	if _highlightedPlant then
+		for part, data in _originalPartData do
+			if part and part.Parent then
+				part.Color = data.Color
+				part.Material = data.Material
+				part.Transparency = data.Transparency
+			end
+		end
+		_highlightedPlant = nil
+		table.clear(_originalPartData)
+	end
+end
+
+--[[
+	Apply shovel highlight effect to a plant model
+]]
+local function applyShovelHighlight(plantModel: Model)
+	-- If same plant, do nothing
+	if _highlightedPlant == plantModel then
+		return
+	end
+	
+	-- Restore previous highlight
+	restoreHighlightedPlant()
+	
+	-- Save original appearance and apply red highlight
+	_highlightedPlant = plantModel
+	for _, descendant in plantModel:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant.Name ~= "Root" then
+			-- Save original
+			_originalPartData[descendant] = {
+				Color = descendant.Color,
+				Material = descendant.Material,
+				Transparency = descendant.Transparency,
+			}
+			-- Apply highlight
+			descendant.Color = SHOVEL_COLOR
+			descendant.Material = Enum.Material.Neon
+			descendant.Transparency = SHOVEL_TRANSPARENCY
+		end
+	end
+end
+
+--[[
+	Find plant model under cursor for shovel mode
+]]
+local function getPlantUnderCursor(): Model?
+	local camera = Workspace.CurrentCamera
+	if not camera then return nil end
+	
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
+	
+	-- Raycast all objects (plants are in Workspace root with EntityId attribute)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = {} -- Hit everything
+	
+	local rayResult = Workspace:Raycast(ray.Origin, ray.Direction * 1000, rayParams)
+	
+	if rayResult and rayResult.Instance then
+		-- Find the plant model (parent with EntityId attribute)
+		local current: Instance? = rayResult.Instance
+		while current and current ~= Workspace do
+			if current:IsA("Model") and current:GetAttribute("EntityId") then
+				-- Verify it's a plant (not a zombie or other entity)
+				local entityId = current:GetAttribute("EntityId")
+				if entityId and typeof(entityId) == "number" then
+					-- Check if name starts with Plant_ or matches plant types
+					local name = current.Name
+					if name:find("^Plant_") or PlantData[name] then
+						return current :: Model
+					end
+				end
+			end
+			current = current.Parent
+		end
+	end
+	
+	return nil
+end
+
+--[[
+	Update shovel preview - highlight plant under cursor
+]]
+local function updateShovelPreview()
+	local plantModel = getPlantUnderCursor()
+	
+	if plantModel then
+		applyShovelHighlight(plantModel)
+	else
+		restoreHighlightedPlant()
+	end
+end
+
 local function getMouseWorldPosition(): Vector3?
 	local camera = Workspace.CurrentCamera
 	if not camera then
@@ -225,8 +331,8 @@ local function getMouseWorldPosition(): Vector3?
 	local mouseLocation = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
 	
-	-- Raycast to grid plane (Y = 0)
-	local gridY = GridConfig.GRID_ORIGIN_Y
+	-- Raycast to grid plane (Y = actual grid height from MapConfig)
+	local gridY = MapConfig.GetConfig().GridY
 	if ray.Direction.Y >= 0 then
 		return nil -- Looking up, no intersection
 	end
@@ -269,11 +375,15 @@ local function checkPlacementValid(column: number, lane: number, plantType: stri
 end
 
 local function GhostPreviewSystem(world)
-	-- In shovel mode, hide ghost and show cursor differently
+	-- In shovel mode, show red highlight on targeted plant
 	if SelectionState.IsShovelActive() then
 		hideGhost()
+		updateShovelPreview()
 		return
 	end
+	
+	-- Not in shovel mode, restore any highlighted plant
+	restoreHighlightedPlant()
 	
 	local selectedPlant = Fusion.peek(SelectionState.SelectedPlant)
 	
@@ -323,65 +433,36 @@ local function handleShovel()
 		return
 	end
 	
-	-- Find plant model at this position via raycast
-	local camera = Workspace.CurrentCamera
-	if not camera then return end
+	-- Find plant model under cursor (reuse the same logic as preview)
+	local plantModel = getPlantUnderCursor()
 	
-	local mouseLocation = UserInputService:GetMouseLocation()
-	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-	
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Include
-	-- Look for plants in workspace
-	local plantsFolder = Workspace:FindFirstChild("Plants")
-	if plantsFolder then
-		rayParams.FilterDescendantsInstances = {plantsFolder}
-	else
-		-- No plants folder, look at all parts
-		rayParams.FilterType = Enum.RaycastFilterType.Exclude
-		rayParams.FilterDescendantsInstances = {}
-	end
-	
-	local rayResult = Workspace:Raycast(ray.Origin, ray.Direction * 1000, rayParams)
-	
-	if rayResult and rayResult.Instance then
-		-- Find the plant model (parent with EntityId attribute)
-		local part = rayResult.Instance
-		local plantModel: Model? = nil
-		local current: Instance? = part
-		
-		while current and current ~= Workspace do
-			if current:IsA("Model") and current:GetAttribute("EntityId") then
-				plantModel = current :: Model
-				break
+	if plantModel then
+		local entityId = plantModel:GetAttribute("EntityId")
+		if entityId and typeof(entityId) == "number" then
+			Logger.Info("GhostPreview", `Shovel: removing plant entity {entityId}`)
+			
+			-- Clear highlight state (plant will be destroyed by server)
+			_highlightedPlant = nil
+			table.clear(_originalPartData)
+			
+			-- Send shovel request to server
+			_requestId = (_requestId + 1) % 65535
+			Network.ShovelPlantRequest.Fire({
+				RequestId = _requestId,
+				PlantEntityId = entityId,
+			})
+			
+			-- Play shovel sound
+			local audio = getAudioService()
+			if audio and audio.PlayShovel then
+				audio.PlayShovel()
+			elseif audio and audio.PlayPlantPlaced then
+				audio.PlayPlantPlaced() -- Fallback
 			end
-			current = current.Parent
-		end
-		
-		if plantModel then
-			local entityId = plantModel:GetAttribute("EntityId")
-			if entityId and typeof(entityId) == "number" then
-				Logger.Info("GhostPreview", `Shovel: removing plant entity {entityId}`)
-				
-				-- Send shovel request to server
-				_requestId = (_requestId + 1) % 65535
-				Network.ShovelPlantRequest.Fire({
-					RequestId = _requestId,
-					PlantEntityId = entityId,
-				})
-				
-				-- Play shovel sound
-				local audio = getAudioService()
-				if audio and audio.PlayShovel then
-					audio.PlayShovel()
-				elseif audio and audio.PlayPlantPlaced then
-					audio.PlayPlantPlaced() -- Fallback
-				end
-				
-				-- Deactivate shovel mode after use
-				SelectionState.DeactivateShovel()
-				return
-			end
+			
+			-- Deactivate shovel mode after use
+			SelectionState.DeactivateShovel()
+			return
 		end
 	end
 	
@@ -469,6 +550,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		SelectionState.Select(nil)
 		SelectionState.DeactivateShovel()
 		destroyGhost() -- Fully destroy when canceling
+		restoreHighlightedPlant() -- Restore any highlighted plant
 	end
 end)
 
