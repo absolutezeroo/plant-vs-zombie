@@ -16,11 +16,11 @@ if not _G.__ZAP then
 	_G.__ZAP = { ["ZAP"] = {} }
 elseif not _G.__ZAP["ZAP"] then
 	_G.__ZAP["ZAP"] = {}
-elseif _G.__ZAP["ZAP"]["ARENA"] ~= nil then
-	error(`There is already an instance of Zap with the same remote_scope of ARENA, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ARENA"]}. Change the remote_scope or remote_folder option of both Zap instances`)
+elseif _G.__ZAP["ZAP"]["ZAP"] ~= nil then
+	error(`There is already an instance of Zap with the same remote_scope of ZAP, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ZAP"]}. Change the remote_scope or remote_folder option of both Zap instances`)
 end
 
-_G.__ZAP["ZAP"]["ARENA"] = "0.6.28"
+_G.__ZAP["ZAP"]["ZAP"] = "0.6.28"
 
 local outgoing_buff: buffer
 local outgoing_used: number
@@ -267,6 +267,13 @@ if not RunService:IsRunning() then
 			FireList = noop,
 			FireSet = noop
 		}),
+		PreparationTime = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
 		PlayerDataSync = table.freeze({
 			Fire = noop,
 			FireAll = noop,
@@ -309,6 +316,13 @@ if not RunService:IsRunning() then
 			SetCallback = noop
 		}),
 		LevelUp = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		IntermissionTime = table.freeze({
 			Fire = noop,
 			FireAll = noop,
 			FireExcept = noop,
@@ -412,10 +426,10 @@ if remotes == nil then
 	remotes.Parent = ReplicatedStorage
 end
 
-local reliable = remotes:FindFirstChild("ARENA_RELIABLE")
+local reliable = remotes:FindFirstChild("ZAP_RELIABLE")
 if reliable == nil then
 	reliable = Instance.new("RemoteEvent")
-	reliable.Name = "ARENA_RELIABLE"
+	reliable.Name = "ZAP_RELIABLE"
 	reliable.Parent = remotes
 end
 
@@ -431,11 +445,13 @@ local function getOrCreateUnreliableRemote(name: string): UnreliableRemoteEvent
 	return remote
 end
 
-local unreliable = { getOrCreateUnreliableRemote("ARENA_UNRELIABLE_0"), getOrCreateUnreliableRemote("ARENA_UNRELIABLE_1"), getOrCreateUnreliableRemote("ARENA_UNRELIABLE_2"), getOrCreateUnreliableRemote("ARENA_UNRELIABLE_3") }
-assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_0 to be an UnreliableRemoteEvent")
-assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_1 to be an UnreliableRemoteEvent")
-assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_2 to be an UnreliableRemoteEvent")
-assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_3 to be an UnreliableRemoteEvent")
+local unreliable = { getOrCreateUnreliableRemote("ZAP_UNRELIABLE_0"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_1"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_2"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_3"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_4"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_5") }
+assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_0 to be an UnreliableRemoteEvent")
+assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to be an UnreliableRemoteEvent")
+assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
+assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
+assert(unreliable[5]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_4 to be an UnreliableRemoteEvent")
+assert(unreliable[6]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_5 to be an UnreliableRemoteEvent")
 local player_map = {}
 
 local function load_player(player: Player)
@@ -449,13 +465,13 @@ end
 Players.PlayerRemoving:Connect(function(player)
 	player_map[player] = nil
 end)
-export type EntityId = (number)
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
-export type Column = (number)
 export type Lane = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
-export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
 export type UpgradeType = ("Damage" | "Health" | "Cooldown")
+export type EntityId = (number)
+export type Column = (number)
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
+export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
 export type RequestId = (number)
 
 local function SendEvents()
@@ -1861,7 +1877,7 @@ local returns = {
 			end
 			local buff = buffer.create(outgoing_used)
 			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
-			unreliable[4]:FireClient(Player, buff, outgoing_inst)
+			unreliable[6]:FireClient(Player, buff, outgoing_inst)
 		end,
 		FireAll = function(Value: ({
 			["EntityIds"]: ({ (number) }),
@@ -1888,7 +1904,7 @@ local returns = {
 			end
 			local buff = buffer.create(outgoing_used)
 			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
-			unreliable[4]:FireAllClients(buff, outgoing_inst)
+			unreliable[6]:FireAllClients(buff, outgoing_inst)
 		end,
 		FireExcept = function(Except: Player, Value: ({
 			["EntityIds"]: ({ (number) }),
@@ -1917,7 +1933,7 @@ local returns = {
 			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
-					unreliable[4]:FireClient(player, buff, outgoing_inst)
+					unreliable[6]:FireClient(player, buff, outgoing_inst)
 				end
 			end
 		end,
@@ -1947,7 +1963,7 @@ local returns = {
 			local buff = buffer.create(outgoing_used)
 			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
 			for _, player in List do
-				unreliable[4]:FireClient(player, buff, outgoing_inst)
+				unreliable[6]:FireClient(player, buff, outgoing_inst)
 			end
 		end,
 		FireSet = function(Set: { [Player]: any }, Value: ({
@@ -1976,7 +1992,7 @@ local returns = {
 			local buff = buffer.create(outgoing_used)
 			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
 			for player in Set do
-				unreliable[4]:FireClient(player, buff, outgoing_inst)
+				unreliable[6]:FireClient(player, buff, outgoing_inst)
 			end
 		end,
 	},
@@ -3981,6 +3997,66 @@ local returns = {
 			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
 			for player in Set do
 				unreliable[2]:FireClient(player, buff, outgoing_inst)
+			end
+		end,
+	},
+	PreparationTime = {
+		Fire = function(Player: Player, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			unreliable[4]:FireClient(Player, buff, outgoing_inst)
+		end,
+		FireAll = function(Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			unreliable[4]:FireAllClients(buff, outgoing_inst)
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					unreliable[4]:FireClient(player, buff, outgoing_inst)
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for _, player in List do
+				unreliable[4]:FireClient(player, buff, outgoing_inst)
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for player in Set do
+				unreliable[4]:FireClient(player, buff, outgoing_inst)
 			end
 		end,
 	},
@@ -8676,6 +8752,66 @@ local returns = {
 				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
 				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
 				player_map[player] = save()
+			end
+		end,
+	},
+	IntermissionTime = {
+		Fire = function(Player: Player, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			unreliable[5]:FireClient(Player, buff, outgoing_inst)
+		end,
+		FireAll = function(Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			unreliable[5]:FireAllClients(buff, outgoing_inst)
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					unreliable[5]:FireClient(player, buff, outgoing_inst)
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for _, player in List do
+				unreliable[5]:FireClient(player, buff, outgoing_inst)
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["TimeRemaining"]: (number),
+		}))
+			load_empty()
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["TimeRemaining"])
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for player in Set do
+				unreliable[5]:FireClient(player, buff, outgoing_inst)
 			end
 		end,
 	},

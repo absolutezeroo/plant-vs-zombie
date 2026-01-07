@@ -14,11 +14,11 @@ if not _G.__ZAP then
 	_G.__ZAP = { ["ZAP"] = {} }
 elseif not _G.__ZAP["ZAP"] then
 	_G.__ZAP["ZAP"] = {}
-elseif _G.__ZAP["ZAP"]["ARENA"] ~= nil then
-	error(`There is already an instance of Zap with the same remote_scope of ARENA, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ARENA"]}. Change the remote_scope or remote_folder option of both Zap instances`)
+elseif _G.__ZAP["ZAP"]["ZAP"] ~= nil then
+	error(`There is already an instance of Zap with the same remote_scope of ZAP, remote_folder of ZAP and the version of {_G.__ZAP["ZAP"]["ZAP"]}. Change the remote_scope or remote_folder option of both Zap instances`)
 end
 
-_G.__ZAP["ZAP"]["ARENA"] = "0.6.28"
+_G.__ZAP["ZAP"]["ZAP"] = "0.6.28"
 
 local outgoing_buff: buffer
 local outgoing_used: number
@@ -201,6 +201,9 @@ if not RunService:IsRunning() then
 		ProjectileSpawned = table.freeze({
 			On = noop
 		}),
+		PreparationTime = table.freeze({
+			On = noop
+		}),
 		PlayerDataSync = table.freeze({
 			SetCallback = noop
 		}),
@@ -224,6 +227,9 @@ if not RunService:IsRunning() then
 		}),
 		LevelUp = table.freeze({
 			SetCallback = noop
+		}),
+		IntermissionTime = table.freeze({
+			On = noop
 		}),
 		GemsEarned = table.freeze({
 			SetCallback = noop
@@ -268,21 +274,23 @@ if not RunService:IsRunning() then
 end
 local remotes = ReplicatedStorage:WaitForChild("ZAP")
 
-local reliable = remotes:WaitForChild("ARENA_RELIABLE")
-assert(reliable:IsA("RemoteEvent"), "Expected ARENA_RELIABLE to be a RemoteEvent")
+local reliable = remotes:WaitForChild("ZAP_RELIABLE")
+assert(reliable:IsA("RemoteEvent"), "Expected ZAP_RELIABLE to be a RemoteEvent")
 
-local unreliable = { remotes:WaitForChild("ARENA_UNRELIABLE_0"), remotes:WaitForChild("ARENA_UNRELIABLE_1"), remotes:WaitForChild("ARENA_UNRELIABLE_2"), remotes:WaitForChild("ARENA_UNRELIABLE_3") }
-assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_0 to be an UnreliableRemoteEvent")
-assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_1 to be an UnreliableRemoteEvent")
-assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_2 to be an UnreliableRemoteEvent")
-assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ARENA_UNRELIABLE_3 to be an UnreliableRemoteEvent")
-export type EntityId = (number)
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
-export type Column = (number)
+local unreliable = { remotes:WaitForChild("ZAP_UNRELIABLE_0"), remotes:WaitForChild("ZAP_UNRELIABLE_1"), remotes:WaitForChild("ZAP_UNRELIABLE_2"), remotes:WaitForChild("ZAP_UNRELIABLE_3"), remotes:WaitForChild("ZAP_UNRELIABLE_4"), remotes:WaitForChild("ZAP_UNRELIABLE_5") }
+assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_0 to be an UnreliableRemoteEvent")
+assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to be an UnreliableRemoteEvent")
+assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
+assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
+assert(unreliable[5]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_4 to be an UnreliableRemoteEvent")
+assert(unreliable[6]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_5 to be an UnreliableRemoteEvent")
 export type Lane = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
-export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
 export type UpgradeType = ("Damage" | "Health" | "Cooldown")
+export type EntityId = (number)
+export type Column = (number)
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
+export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
 export type RequestId = (number)
 
 local function SendEvents()
@@ -303,12 +311,12 @@ RunService.Heartbeat:Connect(SendEvents)
 
 local reliable_events = table.create(30)
 local reliable_event_queue: { [number]: { any } } = table.create(30)
-local unreliable_events = table.create(4)
-local unreliable_event_queue: { [number]: { any } } = table.create(4)
+local unreliable_events = table.create(6)
+local unreliable_event_queue: { [number]: { any } } = table.create(6)
 reliable_events[3] = {}
 reliable_event_queue[3] = {}
-unreliable_events[3] = {}
-unreliable_event_queue[3] = {}
+unreliable_events[5] = {}
+unreliable_event_queue[5] = {}
 reliable_event_queue[21] = {}
 reliable_events[10] = {}
 reliable_event_queue[10] = {}
@@ -334,6 +342,8 @@ reliable_events[1] = {}
 reliable_event_queue[1] = {}
 unreliable_events[1] = {}
 unreliable_event_queue[1] = {}
+unreliable_events[3] = {}
+unreliable_event_queue[3] = {}
 reliable_event_queue[14] = {}
 reliable_events[2] = {}
 reliable_event_queue[2] = {}
@@ -343,6 +353,8 @@ reliable_event_queue[20] = {}
 reliable_events[19] = {}
 reliable_event_queue[19] = {}
 reliable_event_queue[22] = {}
+unreliable_events[4] = {}
+unreliable_event_queue[4] = {}
 reliable_event_queue[23] = {}
 reliable_events[12] = {}
 reliable_event_queue[12] = {}
@@ -2084,7 +2096,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 		end
 	end
 end)
-unreliable[4].OnClientEvent:Connect(function(buff, inst) -- ZombiePositionBatch
+unreliable[6].OnClientEvent:Connect(function(buff, inst) -- ZombiePositionBatch
 	incoming_buff = buff
 	incoming_inst = inst
 	incoming_read = 0
@@ -2107,14 +2119,14 @@ unreliable[4].OnClientEvent:Connect(function(buff, inst) -- ZombiePositionBatch
 		val_9 = buffer.readf32(incoming_buff, read(4))
 		value["PositionsX"][i_9] = val_9
 	end
-	if unreliable_events[3][1] then
-		for _, cb in unreliable_events[3] do
+	if unreliable_events[5][1] then
+		for _, cb in unreliable_events[5] do
 			task.spawn(cb, value)
 		end
 	else
-		table.insert(unreliable_event_queue[3], value)
-		if #unreliable_event_queue[3] > 64 then
-			warn(`[ZAP] {#unreliable_event_queue[3]} events in queue for ZombiePositionBatch. Did you forget to attach a listener?`)
+		table.insert(unreliable_event_queue[5], value)
+		if #unreliable_event_queue[5] > 64 then
+			warn(`[ZAP] {#unreliable_event_queue[5]} events in queue for ZombiePositionBatch. Did you forget to attach a listener?`)
 		end
 	end
 end)
@@ -2169,6 +2181,44 @@ unreliable[2].OnClientEvent:Connect(function(buff, inst) -- ProjectileSpawned
 		end
 	end
 end)
+unreliable[4].OnClientEvent:Connect(function(buff, inst) -- PreparationTime
+	incoming_buff = buff
+	incoming_inst = inst
+	incoming_read = 0
+	incoming_ipos = 0
+	local value
+	value = {  }
+	value["TimeRemaining"] = buffer.readf32(incoming_buff, read(4))
+	if unreliable_events[3][1] then
+		for _, cb in unreliable_events[3] do
+			task.spawn(cb, value)
+		end
+	else
+		table.insert(unreliable_event_queue[3], value)
+		if #unreliable_event_queue[3] > 64 then
+			warn(`[ZAP] {#unreliable_event_queue[3]} events in queue for PreparationTime. Did you forget to attach a listener?`)
+		end
+	end
+end)
+unreliable[5].OnClientEvent:Connect(function(buff, inst) -- IntermissionTime
+	incoming_buff = buff
+	incoming_inst = inst
+	incoming_read = 0
+	incoming_ipos = 0
+	local value
+	value = {  }
+	value["TimeRemaining"] = buffer.readf32(incoming_buff, read(4))
+	if unreliable_events[4][1] then
+		for _, cb in unreliable_events[4] do
+			task.spawn(cb, value)
+		end
+	else
+		table.insert(unreliable_event_queue[4], value)
+		if #unreliable_event_queue[4] > 64 then
+			warn(`[ZAP] {#unreliable_event_queue[4]} events in queue for IntermissionTime. Did you forget to attach a listener?`)
+		end
+	end
+end)
 unreliable[1].OnClientEvent:Connect(function(buff, inst) -- EntityDamaged
 	incoming_buff = buff
 	incoming_inst = inst
@@ -2217,13 +2267,13 @@ local returns = {
 			["EntityIds"]: ({ (number) }),
 			["PositionsX"]: ({ (number) }),
 		})) -> ())
-			table.insert(unreliable_events[3], Callback)
-			for _, value in unreliable_event_queue[3] do
+			table.insert(unreliable_events[5], Callback)
+			for _, value in unreliable_event_queue[5] do
 				task.spawn(Callback, value)
 			end
-			unreliable_event_queue[3] = {}
+			unreliable_event_queue[5] = {}
 			return function()
-				table.remove(unreliable_events[3], table.find(unreliable_events[3], Callback))
+				table.remove(unreliable_events[5], table.find(unreliable_events[5], Callback))
 			end
 		end,
 	},
@@ -3908,6 +3958,20 @@ local returns = {
 			end
 		end,
 	},
+	PreparationTime = {
+		On = function(Callback: (Value: ({
+			["TimeRemaining"]: (number),
+		})) -> ())
+			table.insert(unreliable_events[3], Callback)
+			for _, value in unreliable_event_queue[3] do
+				task.spawn(Callback, value)
+			end
+			unreliable_event_queue[3] = {}
+			return function()
+				table.remove(unreliable_events[3], table.find(unreliable_events[3], Callback))
+			end
+		end,
+	},
 	PlayerDataSync = {
 		SetCallback = function(Callback: (Value: ({
 			["Coins"]: (number),
@@ -4187,6 +4251,20 @@ local returns = {
 			reliable_event_queue[22] = {}
 			return function()
 				reliable_events[22] = nil
+			end
+		end,
+	},
+	IntermissionTime = {
+		On = function(Callback: (Value: ({
+			["TimeRemaining"]: (number),
+		})) -> ())
+			table.insert(unreliable_events[4], Callback)
+			for _, value in unreliable_event_queue[4] do
+				task.spawn(Callback, value)
+			end
+			unreliable_event_queue[4] = {}
+			return function()
+				table.remove(unreliable_events[4], table.find(unreliable_events[4], Callback))
 			end
 		end,
 	},

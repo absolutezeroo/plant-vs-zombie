@@ -18,6 +18,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
@@ -186,19 +187,20 @@ function TrapAPI.OnGarlicEaten(world: any, garlicId: number, zombieId: number)
 				Lane = newLane,
 			}))
 			
-			-- Update Z position for new lane
+			-- Update Z position for new lane (using MapConfig)
 			local pos = world:get(zombieId, PositionComponent)
 			if pos then
-				local newZ = (newLane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+				local laneCenter = MapConfig.GridToWorld(1, newLane)
 				world:insert(zombieId, PositionComponent({
 					X = pos.X,
 					Y = pos.Y,
-					Z = newZ,
+					Z = laneCenter.Z,
 				}))
 			end
 			
 			Logger.Info("Trap", `Garlic diverted zombie {zombieId} from lane {currentLane} to {newLane}`)
 		end
+
 		
 		-- Reset bite count
 		_garlicBites[key] = nil

@@ -11,7 +11,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local StageData = require(Shared.data.StageData)
 local Logger = require(Shared.utils.Logger)
@@ -50,7 +50,7 @@ WaveSpawner.__index = WaveSpawner
 
 -- Constants
 local DEFAULT_SPAWN_COST = 10
-local SPAWN_X_OFFSET = 10
+-- Note: SPAWN_X_OFFSET is now handled by MapConfig via ZombieSpawns Attachments
 
 -- State
 local _stageConfig: StageData.StageConfig? = nil
@@ -160,10 +160,8 @@ end
 
 -- Get spawn position for lane
 function WaveSpawner:GetSpawnPosition(lane: number): Vector3
-    local x = GridConfig.GRID_WIDTH + SPAWN_X_OFFSET + GridConfig.GRID_ORIGIN_X
-    local y = 0
-    local z = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
-    return Vector3.new(x, y, z)
+    -- Use MapConfig for spawn position (reads from Workspace Attachments or defaults)
+    return MapConfig.GetZombieSpawn(lane)
 end
 
 -- Pick a random affordable zombie from pool
@@ -196,6 +194,9 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
     local health = self:GetZombieHealth(zombieType)
     local speed = self:GetZombieSpeed(zombieType)
     
+    -- Get zombie direction from MapConfig (adapts to visual config)
+    local direction = MapConfig.GetZombieDirection()
+    
     local entityId = world:spawn(
         PositionComponent({
             X = spawnPos.X,
@@ -207,9 +208,9 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
             Max = health
         }),
         MovementComponent({
-            VelocityX = -speed,
+            VelocityX = direction.X * speed,
             VelocityY = 0,
-            VelocityZ = 0
+            VelocityZ = direction.Z * speed
         }),
         ZombieTypeComponent({
             ZombieType = zombieType,

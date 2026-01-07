@@ -37,6 +37,12 @@ export type StageConfig = {
 	ZombieSpeedMult: number?,     -- Zombie speed multiplier (default 1.0)
 	SunStarting: number?,         -- Starting sun (default 50)
 	
+	-- Grid Origin (world position of grid center)
+	-- Allows different map layouts per world
+	GridOriginX: number?,         -- World X offset (default 0)
+	GridOriginZ: number?,         -- World Z offset (default 0)
+	GridOriginY: number?,         -- Ground level (default 0)
+	
 	-- Star rating thresholds
 	Star1Health: number,          -- Minimum base health % for 1 star
 	Star2Health: number,          -- Minimum base health % for 2 stars

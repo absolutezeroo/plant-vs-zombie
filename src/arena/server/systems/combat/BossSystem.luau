@@ -18,6 +18,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
@@ -47,6 +48,8 @@ local function spawnMinion(world: MatterWorld, bossId: number, minionType: strin
 	end
 	
 	-- Spawn the minion slightly behind the boss
+	local direction = MapConfig.GetZombieDirection()
+	
 	local minionId = world:spawn(
 		PositionComponent({
 			X = posX + 2, -- Behind the boss
@@ -58,9 +61,9 @@ local function spawnMinion(world: MatterWorld, bossId: number, minionType: strin
 			Max = minionStats.Health,
 		}),
 		MovementComponent({
-			VelocityX = -minionStats.Speed,
+			VelocityX = direction.X * minionStats.Speed,
 			VelocityY = 0,
-			VelocityZ = 0,
+			VelocityZ = direction.Z * minionStats.Speed,
 		}),
 		ZombieTypeComponent({
 			ZombieType = minionType,

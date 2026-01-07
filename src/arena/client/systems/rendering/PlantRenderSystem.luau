@@ -16,6 +16,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local GridUtils = require(Shared.utils.GridUtils)
 local Logger = require(Shared.utils.Logger)
@@ -94,10 +95,14 @@ local function createPlantVisual(entityId: number, plantType: string, column: nu
 		model.Name = `Plant_{entityId}_{plantType}`
 		
 		-- Position using PrimaryPart (Root)
-		-- Rotate 180° on Y axis so plants face RIGHT (toward zombies coming from +X)
+		-- Rotate to face toward zombie spawns (opposite of zombie direction)
 		if model.PrimaryPart then
-			local facingRotation = CFrame.Angles(0, math.rad(180), 0)
-			model:SetPrimaryPartCFrame(CFrame.new(worldPos) * facingRotation)
+			local zombieDir = MapConfig.GetZombieDirection()
+			-- Plants face OPPOSITE of zombie movement (toward where zombies come from)
+			local facingDir = Vector3.new(-zombieDir.X, 0, -zombieDir.Z)
+			local facingCFrame = CFrame.lookAt(worldPos, worldPos + facingDir)
+			-- Add 90° rotation to correct model orientation
+			model:SetPrimaryPartCFrame(facingCFrame * CFrame.Angles(0, math.rad(-90), 0))
 		else
 			Logger.Warn("PlantRender", `Model {plantType} has no PrimaryPart`)
 		end

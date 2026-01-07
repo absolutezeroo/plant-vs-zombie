@@ -19,6 +19,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
 
 -- Network (script.Parent.Parent.Parent = server root, since we're in systems/economy/)
@@ -59,15 +60,15 @@ local function getRandomGridPosition(): (number, number, number)
 	local column = math.random(1, GridConfig.GRID_COLUMNS)
 	local lane = math.random(1, GridConfig.GRID_LANES)
 	
-	-- Convert to world position
-	local cellCenterX = (column - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_X
-	local cellCenterZ = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	-- Convert to world position using MapConfig (visual config or defaults)
+	local cellCenter = MapConfig.GridToWorld(column, lane)
+	local cellW, cellD = MapConfig.GetCellSize()
 	
 	-- Add some random offset within cell
-	local offsetX = (math.random() - 0.5) * GridConfig.CELL_SIZE * 0.6
-	local offsetZ = (math.random() - 0.5) * GridConfig.CELL_SIZE * 0.6
+	local offsetX = (math.random() - 0.5) * cellW * 0.6
+	local offsetZ = (math.random() - 0.5) * cellD * 0.6
 	
-	return cellCenterX + offsetX, SunConfig.SPAWN_HEIGHT, cellCenterZ + offsetZ
+	return cellCenter.X + offsetX, SunConfig.SPAWN_HEIGHT, cellCenter.Z + offsetZ
 end
 
 local function spawnSkySun(world: any): number
@@ -108,12 +109,13 @@ end
 local function SunSpawnSystem(world)
 	local currentTime = os.clock()
 	
-	-- Only spawn sun during "Playing" state (not Waiting, Preparation, Victory, or Defeat)
+	-- Only spawn sun during "Playing" state (not Waiting, Preparation, Intermission, Victory, or Defeat)
 	local WaveManager = getWaveManager()
 	local gameState = WaveManager.GetGameState()
 	
 	if gameState ~= "Playing" then
-		-- Don't spawn sun during preparation or other non-playing states
+		-- Reset spawn timer when not playing so sun spawns quickly when game starts
+		_lastSpawnTime = currentTime
 		return
 	end
 	

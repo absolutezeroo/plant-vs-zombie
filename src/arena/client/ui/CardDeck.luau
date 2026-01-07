@@ -34,16 +34,6 @@ local ForValues = Fusion.ForValues
 -- Card configuration
 local CARD_SIZE = UDim2.fromOffset(60, 80) -- Smaller cards to fit 7 on mobile
 local CARD_SPACING = 6
--- Full deck with all Epic 5 plants ordered by cost
-local DECK_PLANTS = { 
-	"PotatoMine",   -- 25 sun
-	"Sunflower",    -- 50 sun  
-	"WallNut",      -- 50 sun
-	"Peashooter",   -- 100 sun
-	"CherryBomb",   -- 150 sun
-	"SnowPea",      -- 175 sun
-	"Repeater",     -- 200 sun
-}
 
 -- Custom icon colors per plant type
 local PLANT_ICON_COLORS: {[string]: Color3} = {
@@ -61,7 +51,9 @@ export type CardDeckProps = {
 	SelectedPlant: any, -- Fusion.Value<string?>
 	SunCount: any, -- Fusion.Value<number>
 	Cooldowns: any, -- Fusion.Value<{[string]: number}>
+	ShovelMode: any, -- Fusion.Value<boolean>
 	OnSelect: (plantType: string) -> (),
+	OnShovelToggle: () -> (),
 }
 
 local function PlantCard(props: {
@@ -276,14 +268,27 @@ local function CardDeck(props: CardDeckProps)
 		return sorted
 	end)
 	
-	-- Calculate deck size based on saved deck
+	-- Calculate deck size based on saved deck (+1 for shovel button)
 	local deckSize = Computed(scope, function(use)
 		local deck = use(sortedDeckPlants)
-		local numPlants = #deck
+		local numPlants = #deck + 1 -- +1 for shovel
 		return UDim2.fromOffset(
 			numPlants * (CARD_SIZE.X.Offset + CARD_SPACING) - CARD_SPACING + 20,
 			CARD_SIZE.Y.Offset + 20
 		)
+	end)
+	
+	-- Shovel button style
+	local shovelBgColor = Computed(scope, function(use)
+		return if use(props.ShovelMode) 
+			then PvZTheme.Colors.HealthRed -- Active = red
+			else PvZTheme.Colors.WoodBrown
+	end)
+	
+	local shovelBorderColor = Computed(scope, function(use)
+		return if use(props.ShovelMode)
+			then PvZTheme.Colors.SunYellow
+			else PvZTheme.Colors.WoodDark
 	end)
 	
 	return New(scope, "Frame")({
@@ -330,6 +335,64 @@ local function CardDeck(props: CardDeckProps)
 					LayoutOrder = layoutOrder,
 				})
 			end),
+			
+			-- Shovel Button (at the end)
+			New(scope, "TextButton")({
+				Name = "ShovelButton",
+				Size = CARD_SIZE,
+				BackgroundColor3 = shovelBgColor,
+				BorderSizePixel = 0,
+				AutoButtonColor = false,
+				LayoutOrder = 99999, -- Always last
+				
+				[OnEvent("Activated")] = function()
+					props.OnShovelToggle()
+				end,
+				
+				[Children] = {
+					-- Border
+					New(scope, "UIStroke")({
+						Color = shovelBorderColor,
+						Thickness = 3,
+					}),
+					
+					-- Corner rounding
+					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+					
+					-- Shovel icon (emoji)
+					New(scope, "TextLabel")({
+						Name = "Icon",
+						Position = UDim2.new(0.5, 0, 0.4, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Size = UDim2.fromOffset(40, 40),
+						BackgroundTransparency = 1,
+						Text = "🪓", -- Axe emoji as shovel alternative
+						TextScaled = true,
+					}),
+					
+					-- Label
+					New(scope, "TextLabel")({
+						Name = "Label",
+						Position = UDim2.new(0.5, 0, 0.78, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Size = UDim2.new(0.9, 0, 0.2, 0),
+						BackgroundTransparency = 1,
+						Text = Computed(scope, function(use)
+							return if use(props.ShovelMode) then "CANCEL" else "DIG"
+						end),
+						TextColor3 = PvZTheme.Colors.TextWhite,
+						TextScaled = true,
+						Font = Enum.Font.GothamBold,
+						
+						[Children] = {
+							New(scope, "UIStroke")({
+								Color = Color3.fromRGB(0, 0, 0),
+								Thickness = 1,
+							}),
+						},
+					}),
+				},
+			}),
 		},
 	})
 end

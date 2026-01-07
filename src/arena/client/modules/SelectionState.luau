@@ -18,6 +18,9 @@ local scope = Fusion.scoped({})
 -- Currently selected plant type (nil = nothing selected)
 SelectionState.SelectedPlant = Fusion.Value(scope, nil :: string?)
 
+-- Shovel mode active (mutually exclusive with plant selection)
+SelectionState.ShovelMode = Fusion.Value(scope, false)
+
 -- Card cooldowns: PlantType -> timestamp when available again
 SelectionState.Cooldowns = Fusion.Value(scope, {} :: {[string]: number})
 
@@ -29,7 +32,40 @@ SelectionState.SunCount = Fusion.Value(scope, 50) -- Start with 50 sun
 	@param plantType string? - Plant type to select, nil to deselect
 ]]
 function SelectionState.Select(plantType: string?)
+	-- Deactivate shovel mode when selecting a plant
+	if plantType then
+		SelectionState.ShovelMode:set(false)
+	end
 	SelectionState.SelectedPlant:set(plantType)
+end
+
+--[[
+	Toggle shovel mode
+]]
+function SelectionState.ToggleShovel()
+	local currentShovel = Fusion.peek(SelectionState.ShovelMode)
+	if currentShovel then
+		SelectionState.ShovelMode:set(false)
+	else
+		-- Deselect plant and activate shovel
+		SelectionState.SelectedPlant:set(nil)
+		SelectionState.ShovelMode:set(true)
+	end
+end
+
+--[[
+	Check if shovel mode is active
+	@return boolean
+]]
+function SelectionState.IsShovelActive(): boolean
+	return Fusion.peek(SelectionState.ShovelMode)
+end
+
+--[[
+	Deactivate shovel mode
+]]
+function SelectionState.DeactivateShovel()
+	SelectionState.ShovelMode:set(false)
 end
 
 --[[

@@ -23,6 +23,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
@@ -98,8 +99,15 @@ end
 
 -- Spawn a projectile (data-driven from PlantData)
 local function spawnProjectile(world: any, plantId: number, lane: number, startX: number, plantType: string, direction: number?)
-	local dir = direction or 1 -- 1 = forward, -1 = backward
-	local z = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	-- Get the direction plants should shoot (opposite of zombie direction)
+	local zombieDir = MapConfig.GetZombieDirection()
+	-- Plants shoot in the opposite direction (toward zombie spawns)
+	local forwardDirX = -zombieDir.X
+	local forwardDirZ = -zombieDir.Z
+	
+	local dir = direction or 1 -- 1 = forward (toward zombies), -1 = backward (toward base)
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local z = laneCenter.Z
 	
 	-- Read stats from PlantData (data-driven)
 	local stats = PlantData[plantType]
@@ -124,15 +132,21 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	
 	local speed = if isCatapult then ProjectileDefaults.CATAPULT_SPEED else ProjectileDefaults.SPEED
 	
+	-- Calculate actual projectile direction (using forward direction from MapConfig)
+	local actualDirX = forwardDirX * dir
+	local actualDirZ = forwardDirZ * dir
+	
 	local entityId = world:spawn(
 		PositionComponent({
-			X = startX + (offsetX * dir), -- Offset from plant center (direction-aware)
-			Y = offsetY,                  -- Height from config
-			Z = z
+			X = startX + (offsetX * actualDirX), -- Offset in shooting direction
+			Y = offsetY,                         -- Height from config
+			Z = z + (offsetX * actualDirZ)       -- Also offset Z if needed
 		}),
 		ProjectileComponent({
 			Damage = damage,
-			Speed = speed * dir,  -- Negative speed for backward
+			Speed = speed,  -- Always positive, direction is in DirectionX/Z
+			DirectionX = actualDirX,
+			DirectionZ = actualDirZ,
 			SourceEntity = plantId,
 			Lane = lane,
 			SpawnX = startX,
@@ -188,9 +202,10 @@ end
 
 -- Fire in multiple directions for Starfruit
 local function fireMultiDirection(world: any, plantId: number, lane: number, startX: number, plantType: string)
-	-- Starfruit fires 5 stars: up-left, up-right, right, down-right, down-left
-	-- Simplified: we fire in current lane + adjacent lanes in both directions
-	local z = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	-- Starfruit fires 5 stars in relative directions
+	-- "Forward" = toward zombie spawns, "Backward" = toward base
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local z = laneCenter.Z
 	
 	local stats = PlantData[plantType]
 	local damage = (stats and stats.Damage) or ProjectileDefaults.DAMAGE
@@ -200,20 +215,32 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	local offsetX = if spawnOffset then spawnOffset.X else ProjectileDefaults.SPAWN_OFFSET_X
 	local offsetY = if spawnOffset then spawnOffset.Y else ProjectileDefaults.SPAWN_OFFSET_Y
 	
+	-- Get forward direction (opposite of zombie movement)
+	local zombieDir = MapConfig.GetZombieDirection()
+	local fwdX, fwdZ = -zombieDir.X, -zombieDir.Z
+	-- Perpendicular direction (for "up/down" relative to forward)
+	local perpX, perpZ = -fwdZ, fwdX
+	
+	-- 5 directions relative to forward
 	local directions = {
-		{dx = 1, dz = 0},    -- Right
-		{dx = -1, dz = 0},   -- Left
-		{dx = 1, dz = -1},   -- Up-Right (diagonal)
-		{dx = 1, dz = 1},    -- Down-Right (diagonal)
-		{dx = -1, dz = -1},  -- Up-Left (diagonal)
+		{dx = fwdX, dz = fwdZ},                             -- Forward
+		{dx = -fwdX, dz = -fwdZ},                           -- Backward
+		{dx = fwdX + perpX, dz = fwdZ + perpZ},             -- Forward-Up diagonal
+		{dx = fwdX - perpX, dz = fwdZ - perpZ},             -- Forward-Down diagonal
+		{dx = -fwdX + perpX, dz = -fwdZ + perpZ},           -- Backward-Up diagonal
 	}
 	
 	for _, dir in directions do
+		-- Normalize direction
+		local mag = math.sqrt(dir.dx * dir.dx + dir.dz * dir.dz)
+		local normDx = if mag > 0 then dir.dx / mag else dir.dx
+		local normDz = if mag > 0 then dir.dz / mag else dir.dz
+		
 		local entityId = world:spawn(
 			PositionComponent({
-				X = startX + dir.dx * offsetX,
+				X = startX + normDx * offsetX,
 				Y = offsetY,
-				Z = z + dir.dz * offsetX
+				Z = z + normDz * offsetX
 			}),
 			ProjectileComponent({
 				Damage = damage,
@@ -221,8 +248,8 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 				SourceEntity = plantId,
 				Lane = lane,
 				SpawnX = startX,
-				DirectionX = dir.dx,
-				DirectionZ = dir.dz,
+				DirectionX = normDx,
+				DirectionZ = normDz,
 				MaxRange = ProjectileDefaults.MAX_RANGE,
 			})
 		)
@@ -230,7 +257,7 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 		Network.ProjectileSpawned.FireAll({
 			EntityId = entityId,
 			Lane = lane :: any,
-			StartX = startX + dir.dx * offsetX,
+			StartX = startX + normDx * offsetX,
 			TargetEntityId = nil,
 		})
 	end
@@ -393,8 +420,11 @@ local function ProjectileSystem(world)
 			continue
 		end
 		
-		-- Check out of bounds
-		if newX < GridConfig.GRID_ORIGIN_X - 10 or newX > GridConfig.GRID_ORIGIN_X + (GridConfig.GRID_COLUMNS + 2) * GridConfig.CELL_SIZE then
+		-- Check out of bounds (using MapConfig for dynamic grid bounds)
+		local config = MapConfig.GetConfig()
+		local minX = config.GridCornerA.X - 10
+		local maxX = config.GridCornerB.X + 10
+		if newX < minX or newX > maxX then
 			world:despawn(projId)
 			continue
 		end

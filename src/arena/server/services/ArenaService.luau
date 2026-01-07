@@ -13,6 +13,7 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local MapConfig = require(Shared.config.MapConfig)
 local StageData = require(Shared.data.StageData)
 local TeleportData = require(Shared.TeleportData)
 
@@ -29,6 +30,10 @@ end
 -- Start a battle for a player
 function ArenaService.StartBattle(player: Player, stageId: string, deck: {string}): boolean
     Logger.Info("ArenaService", `Starting battle for {player.Name}: stage={stageId}, deck={#deck}`)
+    
+    -- Force MapConfig reload to ensure visual config is loaded
+    -- (Rojo sync may not have completed during initial server startup)
+    MapConfig.Reload()
     
     -- Validate stage
     local stageConfig = StageData.GetStage(stageId)

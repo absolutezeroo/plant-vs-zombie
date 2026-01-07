@@ -278,6 +278,26 @@ event WaveCompleted = {
     }
 }
 
+-- Preparation phase countdown
+event PreparationTime = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        TimeRemaining: f32,
+    }
+}
+
+-- Intermission phase countdown
+event IntermissionTime = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        TimeRemaining: f32,
+    }
+}
+
 -- Game phase changed
 event GamePhaseChanged = {
     from: Server,

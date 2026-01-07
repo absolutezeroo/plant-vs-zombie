@@ -14,7 +14,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
-local GridUtils = require(Shared.utils.GridUtils)
+local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
 
 -- Configuration
@@ -52,42 +52,47 @@ local function createGrid()
 		_gridFolder:Destroy()
 	end
 	
-	_gridFolder = Instance.new("Folder")
-	_gridFolder.Name = "DebugGrid"
-	_gridFolder.Parent = Workspace
+	local folder = Instance.new("Folder")
+	folder.Name = "DebugGrid"
+	folder.Parent = Workspace
+	_gridFolder = folder
 	
-	local y = GridConfig.GRID_ORIGIN_Y + GRID_LINE_HEIGHT
+	-- Use MapConfig for dynamic grid bounds
+	local config = MapConfig.GetConfig()
+	local cellW, cellD = MapConfig.GetCellSize()
+	local y = config.GridY + GRID_LINE_HEIGHT
 	
 	-- Vertical lines (columns)
 	for col = 0, GridConfig.GRID_COLUMNS do
-		local x = GridConfig.GRID_ORIGIN_X + col * GridConfig.CELL_SIZE
-		local startZ = GridConfig.GRID_ORIGIN_Z
-		local endZ = GridConfig.GRID_ORIGIN_Z + GridConfig.GRID_HEIGHT
+		local x = config.GridCornerA.X + col * cellW
+		local startZ = config.GridCornerA.Z
+		local endZ = config.GridCornerB.Z
 		
 		createLine(
 			Vector3.new(x, y, startZ),
 			Vector3.new(x, y, endZ),
-			_gridFolder
+			folder
 		)
 	end
 	
 	-- Horizontal lines (lanes)
 	for lane = 0, GridConfig.GRID_LANES do
-		local z = GridConfig.GRID_ORIGIN_Z + lane * GridConfig.CELL_SIZE
-		local startX = GridConfig.GRID_ORIGIN_X
-		local endX = GridConfig.GRID_ORIGIN_X + GridConfig.GRID_WIDTH
+		local z = config.GridCornerA.Z + lane * cellD
+		local startX = config.GridCornerA.X
+		local endX = config.GridCornerB.X
 		
 		createLine(
 			Vector3.new(startX, y, z),
 			Vector3.new(endX, y, z),
-			_gridFolder
+			folder
 		)
 	end
 	
 	Logger.Info("GridVisualization", "Grid created", {
 		Columns = GridConfig.GRID_COLUMNS,
 		Lanes = GridConfig.GRID_LANES,
-		CellSize = GridConfig.CELL_SIZE,
+		CellSize = cellW,
+		UsingVisualConfig = config.UsingVisualConfig,
 	})
 end
 

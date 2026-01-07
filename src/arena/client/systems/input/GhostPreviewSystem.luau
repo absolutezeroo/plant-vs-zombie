@@ -269,6 +269,12 @@ local function checkPlacementValid(column: number, lane: number, plantType: stri
 end
 
 local function GhostPreviewSystem(world)
+	-- In shovel mode, hide ghost and show cursor differently
+	if SelectionState.IsShovelActive() then
+		hideGhost()
+		return
+	end
+	
 	local selectedPlant = Fusion.peek(SelectionState.SelectedPlant)
 	
 	-- No plant selected, hide ghost
@@ -296,6 +302,95 @@ local function GhostPreviewSystem(world)
 	
 	-- Update ghost visual with the real plant model
 	updateGhostPosition(column, lane, isValid, selectedPlant)
+end
+
+-- Handle shovel click - find plant at clicked position and send removal request
+local function handleShovel()
+	if not SelectionState.IsShovelActive() then
+		return
+	end
+	
+	-- Get mouse world position
+	local worldPos = getMouseWorldPosition()
+	if not worldPos then
+		return
+	end
+	
+	-- Convert to grid coordinates
+	local column, lane = GridUtils.WorldToGrid(worldPos)
+	if not column or not lane or not GridUtils.IsValidCell(column, lane) then
+		Logger.Debug("GhostPreview", "Shovel: clicked outside grid")
+		return
+	end
+	
+	-- Find plant model at this position via raycast
+	local camera = Workspace.CurrentCamera
+	if not camera then return end
+	
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
+	
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Include
+	-- Look for plants in workspace
+	local plantsFolder = Workspace:FindFirstChild("Plants")
+	if plantsFolder then
+		rayParams.FilterDescendantsInstances = {plantsFolder}
+	else
+		-- No plants folder, look at all parts
+		rayParams.FilterType = Enum.RaycastFilterType.Exclude
+		rayParams.FilterDescendantsInstances = {}
+	end
+	
+	local rayResult = Workspace:Raycast(ray.Origin, ray.Direction * 1000, rayParams)
+	
+	if rayResult and rayResult.Instance then
+		-- Find the plant model (parent with EntityId attribute)
+		local part = rayResult.Instance
+		local plantModel: Model? = nil
+		local current: Instance? = part
+		
+		while current and current ~= Workspace do
+			if current:IsA("Model") and current:GetAttribute("EntityId") then
+				plantModel = current :: Model
+				break
+			end
+			current = current.Parent
+		end
+		
+		if plantModel then
+			local entityId = plantModel:GetAttribute("EntityId")
+			if entityId and typeof(entityId) == "number" then
+				Logger.Info("GhostPreview", `Shovel: removing plant entity {entityId}`)
+				
+				-- Send shovel request to server
+				_requestId = (_requestId + 1) % 65535
+				Network.ShovelPlantRequest.Fire({
+					RequestId = _requestId,
+					PlantEntityId = entityId,
+				})
+				
+				-- Play shovel sound
+				local audio = getAudioService()
+				if audio and audio.PlayShovel then
+					audio.PlayShovel()
+				elseif audio and audio.PlayPlantPlaced then
+					audio.PlayPlantPlaced() -- Fallback
+				end
+				
+				-- Deactivate shovel mode after use
+				SelectionState.DeactivateShovel()
+				return
+			end
+		end
+	end
+	
+	-- No plant found at click location - play error sound
+	Logger.Debug("GhostPreview", `Shovel: no plant found at grid ({column}, {lane})`)
+	local audio = getAudioService()
+	if audio and audio.PlayError then
+		audio.PlayError()
+	end
 end
 
 -- Handle click/tap to place
@@ -358,15 +453,21 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	
 	if input.UserInputType == Enum.UserInputType.MouseButton1 
 		or input.UserInputType == Enum.UserInputType.Touch then
-		handlePlacement()
+		-- Check if shovel mode is active first
+		if SelectionState.IsShovelActive() then
+			handleShovel()
+		else
+			handlePlacement()
+		end
 	end
 end)
 
--- Right-click or ESC to cancel selection
+-- Right-click or ESC to cancel selection or shovel mode
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2
 		or input.KeyCode == Enum.KeyCode.Escape then
 		SelectionState.Select(nil)
+		SelectionState.DeactivateShovel()
 		destroyGhost() -- Fully destroy when canceling
 	end
 end)

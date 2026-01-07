@@ -21,6 +21,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
@@ -182,8 +183,10 @@ end
 
 -- Get grid column from world X position
 local function getColumnFromX(x: number): number
-	local localX = x - GridConfig.GRID_ORIGIN_X
-	return math.floor(localX / GridConfig.CELL_SIZE) + 1
+	local origin = MapConfig.GetGridOrigin()
+	local cellW, _ = MapConfig.GetCellSize()
+	local localX = x - origin.X
+	return math.floor(localX / cellW) + 1
 end
 
 local function CombatSystem(world: MatterWorld)
@@ -321,15 +324,16 @@ local function CombatSystem(world: MatterWorld)
 			-- Already eating - check if target still exists
 			if not world:contains(target.TargetEntity) then
 				-- Target destroyed, resume moving
+				local direction = MapConfig.GetZombieDirection()
 				world:remove(zombieId, TargetComponent)
 				world:insert(zombieId, MovementComponent({
-					VelocityX = -stats.Speed,
+					VelocityX = direction.X * stats.Speed,
 					VelocityY = 0,
-					VelocityZ = 0
+					VelocityZ = direction.Z * stats.Speed
 				}))
 				_zombieAttackTimes[zombieId] = nil
 				continue
-			end
+			 end
 			
 			-- Check attack timer
 			local lastAttack = _zombieAttackTimes[zombieId] or 0
@@ -341,11 +345,12 @@ local function CombatSystem(world: MatterWorld)
 				
 				if killed then
 					-- Plant destroyed, resume moving
+					local direction = MapConfig.GetZombieDirection()
 					world:remove(zombieId, TargetComponent)
 					world:insert(zombieId, MovementComponent({
-						VelocityX = -stats.Speed,
+						VelocityX = direction.X * stats.Speed,
 						VelocityY = 0,
-						VelocityZ = 0
+						VelocityZ = direction.Z * stats.Speed
 					}))
 					_zombieAttackTimes[zombieId] = nil
 					_frameStats.plantsDestroyed += 1

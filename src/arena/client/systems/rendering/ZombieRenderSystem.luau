@@ -15,6 +15,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 
@@ -87,7 +88,8 @@ local ZOMBIE_COLORS = {
 local INTERPOLATION_SPEED = 10 -- How fast to interpolate to target position
 
 local function getLaneZ(lane: number): number
-	return (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	return laneCenter.Z
 end
 
 local function createZombieVisual(entityId: number, zombieType: string, lane: number, positionX: number): ZombieVisual

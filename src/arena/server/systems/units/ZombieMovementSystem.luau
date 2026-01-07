@@ -17,6 +17,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
 
 -- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
@@ -72,8 +73,24 @@ local function ZombieMovementSystem(world)
 		local newY = pos.Y + movement.VelocityY * dt * slowMultiplier
 		local newZ = pos.Z + movement.VelocityZ * dt * slowMultiplier
 		
-		-- Check game over condition
-		if newX <= MovementConfig.HOUSE_X then
+		-- Check game over condition (zombie reached house)
+		-- Use MapConfig to get base position and zombie direction
+		local basePos = MapConfig.GetBasePosition()
+		local zombieDir = MapConfig.GetZombieDirection()
+		
+		-- Check if zombie passed the base (direction-aware)
+		-- If zombies go +X, check if newX >= basePos.X
+		-- If zombies go -X, check if newX <= basePos.X
+		local reachedBase = false
+		if zombieDir.X > 0 then
+			-- Zombies moving toward +X (right)
+			reachedBase = newX >= basePos.X
+		else
+			-- Zombies moving toward -X (left) - original behavior
+			reachedBase = newX <= basePos.X
+		end
+		
+		if reachedBase then
 			if not _reachedHouse[id] then
 				Logger.Warn("ZombieMovement", `Zombie {id} reached the house!`)
 				_reachedHouse[id] = true
@@ -90,7 +107,7 @@ local function ZombieMovementSystem(world)
 				})
 				continue
 			end
-			newX = MovementConfig.HOUSE_X
+			newX = basePos.X
 		end
 		
 		-- Update position

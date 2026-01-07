@@ -16,7 +16,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 
@@ -45,12 +45,8 @@ local _nextSpawnDelay = 5 -- First spawn after 5 seconds
 local _zombieTypes = {"Basic", "Basic", "Basic", "Cone"} -- Weighted spawn pool
 
 local function getSpawnPosition(lane: number): Vector3
-	-- Spawn at right edge of grid + offset
-	local x = GridConfig.GRID_WIDTH + SpawnConfig.SPAWN_X_OFFSET + GridConfig.GRID_ORIGIN_X
-	local y = 0
-	local z = (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
-	
-	return Vector3.new(x, y, z)
+	-- Use MapConfig for spawn position (reads from Workspace Attachments or defaults)
+	return MapConfig.GetZombieSpawn(lane)
 end
 
 local function spawnZombie(world: any, zombieType: string, lane: number): number
@@ -61,6 +57,9 @@ local function spawnZombie(world: any, zombieType: string, lane: number): number
 	end
 	
 	local spawnPos = getSpawnPosition(lane)
+	
+	-- Get zombie direction from MapConfig
+	local direction = MapConfig.GetZombieDirection()
 	
 	local entityId = world:spawn(
 		PositionComponent({
@@ -73,9 +72,9 @@ local function spawnZombie(world: any, zombieType: string, lane: number): number
 			Max = stats.Health
 		}),
 		MovementComponent({
-			VelocityX = -stats.Speed, -- Move left towards house
+			VelocityX = direction.X * stats.Speed,
 			VelocityY = 0,
-			VelocityZ = 0
+			VelocityZ = direction.Z * stats.Speed
 		}),
 		ZombieTypeComponent({
 			ZombieType = zombieType,

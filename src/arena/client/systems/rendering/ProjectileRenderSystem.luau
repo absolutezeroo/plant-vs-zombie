@@ -19,6 +19,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 local Logger = require(Shared.utils.Logger)
 
@@ -69,7 +70,8 @@ local PEA_COLOR = Color3.fromRGB(100, 200, 100) -- Green pea
 local PEA_SPEED = 15 -- Match server
 
 local function getLaneZ(lane: number): number
-	return (lane - 1) * GridConfig.CELL_SIZE + GridConfig.CELL_SIZE / 2 + GridConfig.GRID_ORIGIN_Z
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	return laneCenter.Z
 end
 
 --[[

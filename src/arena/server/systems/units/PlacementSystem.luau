@@ -317,6 +317,91 @@ Network.PlacePlantRequest.SetCallback(function(player: Player, data)
 	})
 end)
 
+--[[
+	Shovel (remove) a plant and refund partial sun
+	@param world any - Matter world
+	@param player Player - Player requesting removal
+	@param plantEntityId number - Entity ID of plant to remove
+	@return boolean, string? - Success and optional error reason
+]]
+function PlacementAPI.ShovelPlant(world: any, player: Player, plantEntityId: number): (boolean, string?)
+	-- Validate entity exists
+	if not world:contains(plantEntityId) then
+		return false, "Plant not found"
+	end
+	
+	-- Get plant info
+	local plantType = world:get(plantEntityId, PlantTypeComponent)
+	local owner = world:get(plantEntityId, OwnerComponent)
+	
+	if not plantType then
+		return false, "Not a plant"
+	end
+	
+	-- Check ownership
+	if not owner or owner.PlayerId ~= player.UserId then
+		return false, "Not your plant"
+	end
+	
+	-- Get plant stats for refund calculation
+	local stats = PlantData[plantType.PlantType]
+	if not stats then
+		return false, "Invalid plant type"
+	end
+	
+	-- Calculate refund (50% of cost)
+	local refundAmount = math.floor(stats.Cost * 0.5)
+	
+	-- Clear grid cell
+	GridService.ClearByEntity(plantEntityId)
+	
+	-- Despawn entity
+	world:despawn(plantEntityId)
+	
+	-- Refund sun to player
+	PlacementAPI.AddSun(player, refundAmount)
+	
+	Logger.Info("PlacementSystem", `{player.Name} shoveled {plantType.PlantType} - refunded {refundAmount} sun`)
+	
+	-- Broadcast removal to all clients (use EntityDied event)
+	Network.EntityDied.FireAll({
+		EntityId = plantEntityId,
+	})
+	
+	return true, nil
+end
+
+-- Set up network handler for shovel requests
+Network.ShovelPlantRequest.SetCallback(function(player: Player, data)
+	if not _world then
+		Logger.Warn("PlacementSystem", "World not initialized, rejecting shovel")
+		Network.RequestResponse.Fire(player, {
+			RequestId = data.RequestId,
+			Success = false,
+			ErrorCode = 4, -- 4 = World not ready
+		})
+		return
+	end
+	
+	local success, reason = PlacementAPI.ShovelPlant(_world, player, data.PlantEntityId)
+	
+	-- Map reason to error code
+	local errorCode = 0
+	if reason == "Plant not found" then
+		errorCode = 5
+	elseif reason == "Not your plant" then
+		errorCode = 6
+	elseif reason == "Not a plant" then
+		errorCode = 7
+	end
+	
+	Network.RequestResponse.Fire(player, {
+		RequestId = data.RequestId,
+		Success = success,
+		ErrorCode = if success then nil else errorCode,
+	})
+end)
+
 -- System that processes cooldowns each frame (optional, for syncing)
 local function PlacementSystem(world)
 	_world = world -- Store world reference for Zap handler
