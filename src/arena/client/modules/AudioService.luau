@@ -20,35 +20,35 @@ local Logger = require(Shared.utils.Logger)
 -- Sound asset IDs (using Roblox library sounds)
 local SOUNDS = {
 	-- Plant sounds
-	PeaShoot = "rbxassetid://9114386081", -- Pop/shoot sound
-	PeaImpact = "rbxassetid://9114368485", -- Splat
-	PlantPlaced = "rbxassetid://9114342410", -- Dirt/place
-	Explosion = "rbxassetid://9114333311", -- Boom
+	PeaShoot = "rbxassetid://116561468284287", -- Pop/shoot sound
+	PeaImpact = "rbxassetid://83662029103234", -- Splat
+	PlantPlaced = "rbxassetid://101826567553108", -- Dirt/place
+	Explosion = "rbxassetid://100749525232283", -- Boom
 	
 	-- Zombie sounds
-	ZombieGroan = "rbxassetid://9114384236", -- Groan
-	ZombieDeath = "rbxassetid://9114374245", -- Death groan
-	ZombieBite = "rbxassetid://9114367157", -- Chomp
+	ZombieGroan = "rbxassetid://122508006619291", -- Groan
+	ZombieDeath = "rbxassetid://", -- Death groan
+	ZombieBite = "rbxassetid://99729332638497", -- Chomp
 	
 	-- Collection sounds
-	SunCollect = "rbxassetid://9114298767", -- Sparkle/chime
-	CoinCollect = "rbxassetid://9114343710", -- Coin ding
+	SunCollect = "rbxassetid://73530939144429", -- Sparkle/chime
+	CoinCollect = "rbxassetid://98363900764760", -- Coin ding
 	
 	-- UI sounds
-	UIClick = "rbxassetid://9114369169", -- Click
-	UIError = "rbxassetid://9114341316", -- Error buzz
-	UISuccess = "rbxassetid://9114340977", -- Success chime
-	CardSelect = "rbxassetid://9114369169", -- Select card
+	UIClick = "rbxassetid://", -- Click
+	UIError = "rbxassetid://", -- Error buzz
+	UISuccess = "rbxassetid://", -- Success chime
+	CardSelect = "rbxassetid://", -- Select card
 	
 	-- Game events
-	WaveStart = "rbxassetid://9114275839", -- Alert/horn
-	Victory = "rbxassetid://9114275839", -- Fanfare
-	Defeat = "rbxassetid://9114333311", -- Doom
+	WaveStart = "rbxassetid://81385124977604", -- Alert/horn
+	Victory = "rbxassetid://", -- Fanfare
+	Defeat = "rbxassetid://", -- Doom
 	
 	-- Music
-	MusicCalm = "rbxassetid://1837617252", -- Peaceful background
-	MusicWave = "rbxassetid://1846453837", -- Tense wave music
-	MusicIntense = "rbxassetid://1846453837", -- Boss/intense
+	MusicCalm = "rbxassetid://", -- Peaceful background
+	MusicWave = "rbxassetid://", -- Tense wave music
+	MusicIntense = "rbxassetid://", -- Boss/intense
 }
 
 local _soundFolder: Folder = nil

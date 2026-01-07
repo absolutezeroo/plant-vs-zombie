@@ -48,6 +48,13 @@ local function VFXAudioSystem(world)
 			_isWaveActive = true
 			_currentWave = data.WaveNumber
 			
+			-- Wave 0 = preparation phase, don't play wave start sound
+			if _currentWave == 0 then
+				AudioService.SetMusic("calm")
+				Logger.Debug("VFXAudio", "Preparation phase started - music: calm")
+				return
+			end
+			
 			-- Intense music for later waves
 			if _currentWave >= 5 then
 				AudioService.SetMusic("intense")

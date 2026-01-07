@@ -228,6 +228,11 @@ Network.BaseHealthUpdated.On(function(data)
 	end
 end)
 
+-- Preparation time countdown from server
+Network.PreparationTime.On(function(data)
+	hud:SetPreparationTime(data.TimeRemaining)
+end)
+
 -- Game over event
 Network.GameOver.On(function(data)
 	-- Basic game over (used as fallback, GameEndRewards has full data)
