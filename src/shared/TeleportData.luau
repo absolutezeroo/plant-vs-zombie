@@ -12,13 +12,13 @@ local TeleportData = {}
 
 -- Place IDs (à configurer avec les vrais IDs après publication)
 TeleportData.PlaceIds = {
-    Lobby = 0,  -- TODO: Set after publishing Lobby place
-    Arena = 0,  -- TODO: Set after publishing Arena place (current game)
+    Lobby = 74774650768633,
+    Arena = 89747004814506,
 }
 
 -- Structure des données de téléportation Lobby → Arena
 export type ArenaJoinData = {
-    StageId: string,           -- Ex: "world1_stage1"
+    StageId: string,           -- Ex: "1-1"
     Deck: { string },          -- Liste des PlantTypes sélectionnés (max 6)
     Timestamp: number,         -- os.time() pour validation timeout
 }

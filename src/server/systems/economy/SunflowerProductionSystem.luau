@@ -23,6 +23,16 @@ local Logger = require(Shared.utils.Logger)
 local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 
+-- Lazy-load WaveManager to check game state
+local _waveManager: any = nil
+local function getWaveManager()
+	if not _waveManager then
+		local WaveManagerSystemModule = require(Server.systems.wave.WaveManagerSystem)
+		_waveManager = WaveManagerSystemModule.WaveManager
+	end
+	return _waveManager
+end
+
 -- Components (via index module)
 local PositionComponent = Components.PositionComponent
 local PlantTypeComponent = Components.PlantTypeComponent
@@ -42,6 +52,15 @@ local _productionTimers: {[number]: number} = {}
 
 local function SunflowerProductionSystem(world)
 	local currentTime = os.clock()
+	
+	-- Only produce sun during "Playing" or "Preparation" states
+	-- (Sunflowers can produce during prep since player planted them)
+	local WaveManager = getWaveManager()
+	local gameState = WaveManager.GetGameState()
+	
+	if gameState ~= "Playing" and gameState ~= "Preparation" then
+		return
+	end
 	
 	-- Find all plants with ProducesSun flag and manage their production
 	for id, plant, pos in world:query(PlantTypeComponent, PositionComponent) do

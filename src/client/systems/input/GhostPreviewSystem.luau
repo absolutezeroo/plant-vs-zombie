@@ -31,9 +31,14 @@ local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)
 
--- Assets
-local Assets = ReplicatedStorage:WaitForChild("Assets", 5)
+-- Assets (optional - game works without visual previews)
+local Assets = ReplicatedStorage:FindFirstChild("Assets")
 local PlantAssets = Assets and Assets:FindFirstChild("Plants")
+
+-- Warn once if assets missing
+if not PlantAssets then
+	Logger.Warn("GhostPreview", "Plant assets not found - ghost previews disabled")
+end
 
 -- VFX/Audio services (lazy loaded)
 local _vfxService: any = nil
@@ -75,6 +80,7 @@ local _ghostModel: Model? = nil
 local _ghostPlantType: string? = nil  -- Track which plant type is currently shown
 local _currentCell: {Column: number, Lane: number}? = nil
 local _isValid = false
+local _warnedPlantTypes: {[string]: boolean} = {} -- Track warned plant types to avoid spam
 
 -- Colors
 local VALID_COLOR = Color3.fromRGB(100, 255, 100)   -- Green
@@ -150,11 +156,20 @@ local function ensureGhostModel(plantType: string): Model?
 	
 	-- Create if needed
 	if not _ghostModel then
+		-- Skip if assets not available
+		if not PlantAssets then
+			return nil
+		end
+		
 		_ghostModel = createGhostModel(plantType)
 		_ghostPlantType = plantType
 		
 		if not _ghostModel then
-			Logger.Warn("GhostPreview", `Could not create ghost for {plantType}`)
+			-- Only warn once per plant type
+			if not _warnedPlantTypes[plantType] then
+				Logger.Warn("GhostPreview", `Could not create ghost for {plantType}`)
+				_warnedPlantTypes[plantType] = true
+			end
 		end
 	end
 	

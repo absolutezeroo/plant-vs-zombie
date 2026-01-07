@@ -449,7 +449,7 @@ return function(props: LobbyScreenProps)
                         table.unpack((function()
                             local buttons = {}
                             for i = 1, 5 do
-                                local stageId = `world1_stage{i}`
+                                local stageId = `1-{i}`
                                 local isSelected = Computed(scope, function(use)
                                     return use(selectedStage) == stageId
                                 end)

@@ -25,6 +25,16 @@ local Logger = require(Shared.utils.Logger)
 local Server = script.Parent.Parent.Parent
 local Network = require(Server.network.generated)
 
+-- Lazy-load WaveManager to check game state
+local _waveManager: any = nil
+local function getWaveManager()
+	if not _waveManager then
+		local WaveManagerSystemModule = require(Server.systems.wave.WaveManagerSystem)
+		_waveManager = WaveManagerSystemModule.WaveManager
+	end
+	return _waveManager
+end
+
 -- Components (via index module)
 local PositionComponent = Components.PositionComponent
 local SunComponent = Components.SunComponent
@@ -97,6 +107,15 @@ end
 
 local function SunSpawnSystem(world)
 	local currentTime = os.clock()
+	
+	-- Only spawn sun during "Playing" state (not Waiting, Preparation, Victory, or Defeat)
+	local WaveManager = getWaveManager()
+	local gameState = WaveManager.GetGameState()
+	
+	if gameState ~= "Playing" then
+		-- Don't spawn sun during preparation or other non-playing states
+		return
+	end
 	
 	-- Check if it's time to spawn new sun
 	if currentTime - _lastSpawnTime >= _nextSpawnDelay then

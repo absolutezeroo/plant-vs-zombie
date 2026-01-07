@@ -38,6 +38,7 @@ local HealthComponent = Components.HealthComponent
 local Server = script
 local PlayerDataService = require(Server.services.PlayerDataService)
 local ProgressionHandler = require(Server.handlers.ProgressionHandler)
+local ArenaService = require(Server.services.ArenaService)
 
 -- Import server systems folder
 -- Note: init.server.luau IS the Server script, so children are direct
@@ -158,8 +159,26 @@ local function onPlayerAdded(player: Player)
 				deckSize = #teleportData.Deck,
 			})
 			
-			-- TODO: Initialize match with this stage/deck
-			-- MatchService.StartMatch(player, teleportData.StageId, teleportData.Deck)
+			-- Wait for profile to load, then start battle
+			task.spawn(function()
+				-- Wait up to 10 seconds for profile
+				local attempts = 0
+				while attempts < 100 do
+					local profileData = PlayerDataService.GetProfile(player)
+					if profileData then
+						-- Start battle with teleported stage/deck
+						ArenaService.StartBattle(player, teleportData.StageId, teleportData.Deck)
+						break
+					end
+					task.wait(0.1)
+					attempts += 1
+				end
+				
+				if attempts >= 100 then
+					Logger.Error("Server", `Profile load timeout for {player.Name}`)
+					-- Could teleport back to Lobby here
+				end
+			end)
 		else
 			Logger.Warn("Server", `Invalid teleport data for {player.Name}: {err}`)
 			-- Teleport back to lobby with error
@@ -168,12 +187,29 @@ local function onPlayerAdded(player: Player)
 	else
 		Logger.Info("Server", `{player.Name} joined directly (no teleport data)`)
 		-- Player joined without going through Lobby
-		-- For testing, allow direct join. In production, teleport to Lobby.
+		-- For testing in Studio, start with default stage
+		task.spawn(function()
+			local attempts = 0
+			while attempts < 100 do
+				local profileData = PlayerDataService.GetProfile(player)
+				if profileData then
+					-- Start with first stage for testing
+					local defaultStage = profileData.CurrentStage or "1-1"
+					local defaultDeck = {"Sunflower", "Peashooter", "WallNut"}
+					Logger.Info("Server", `Starting test battle with stage {defaultStage}`)
+					ArenaService.StartBattle(player, defaultStage, defaultDeck)
+					break
+				end
+				task.wait(0.1)
+				attempts += 1
+			end
+		end)
 	end
 end
 
 local function onPlayerRemoving(player: Player)
 	playerTeleportData[player] = nil
+	ArenaService.OnPlayerRemoving(player)
 end
 
 -- Get player's current match data
@@ -210,6 +246,34 @@ Players.PlayerRemoving:Connect(onPlayerRemoving)
 for _, player in Players:GetPlayers() do
 	task.spawn(onPlayerAdded, player)
 end
+
+-- ============================================
+-- NETWORK HANDLERS
+-- ============================================
+
+-- Import Zap network
+local ServerScriptService = game:GetService("ServerScriptService")
+local Network = require(ServerScriptService.Server.network.generated)
+
+-- Handle "Ready" button - start waves immediately
+Network.StartWaveRequest.SetCallback(function(player: Player, data: {RequestId: number}): {Success: boolean, ErrorCode: number}
+	Logger.Info("Server", `{player.Name} pressed Ready button`)
+	
+	-- Get WaveManager
+	local WaveManagerSystemModule = require(Server.systems.wave.WaveManagerSystem)
+	local WaveManager = WaveManagerSystemModule.WaveManager
+	
+	-- Try to start waves
+	local success = WaveManager.StartWaves()
+	
+	if success then
+		return {Success = true, ErrorCode = 0}
+	else
+		return {Success = false, ErrorCode = 1} -- Not in preparation phase
+	end
+end)
+
+Logger.Info("Server", "Network handlers registered")
 
 -- Export functions for other modules
 -- Note: In a real implementation, these would be in a separate ArenaService

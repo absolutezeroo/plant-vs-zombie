@@ -91,7 +91,7 @@ event TeleportToArenaRequest = {
     call: SingleAsync,
     data: struct {
         StageId: string.utf8(..50),
-        Deck: PlantType[6],  -- Max 6 plants in deck
+        Deck: PlantType[1..6],  -- Max 6 plants in deck
     }
 }
 
@@ -585,6 +585,16 @@ event StageComplete = {
         IsFirstClear: boolean,
         IsNewBest: boolean,
         PreviousStars: u8,
+    }
+}
+
+-- Server notifies teleport countdown
+event TeleportCountdown = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        TimeRemaining: u8,  -- Seconds until teleport
     }
 }
 

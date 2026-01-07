@@ -144,7 +144,58 @@ end)
 -- Wave started event
 Network.WaveStarted.On(function(data)
 	hud:SetWaveNumber(data.WaveNumber)
-	Logger.Info("Client", `Wave {data.WaveNumber} started`)
+	
+	if data.WaveNumber == 0 then
+		-- Preparation phase started
+		Logger.Info("Client", "Preparation phase started")
+		hud:StartPreparation()
+	else
+		Logger.Info("Client", `Wave {data.WaveNumber} started`)
+	end
+end)
+
+-- Countdown timer for preparation phase and intermission
+local preparationStartTime = 0
+local preparationDuration = 20
+local intermissionStartTime = 0
+local intermissionDuration = 30 -- WaveConfig.WAVE_DELAY from server
+
+RunService.RenderStepped:Connect(function()
+	local currentWave = hud._waveNumber and Fusion.peek(hud._waveNumber) or 0
+	local inPreparation = hud._preparationPhase and Fusion.peek(hud._preparationPhase) or false
+	local intermissionTime = hud._intermissionTime and Fusion.peek(hud._intermissionTime) or 0
+	
+	-- Preparation phase countdown
+	if currentWave == 0 and inPreparation then
+		if preparationStartTime == 0 then
+			preparationStartTime = tick()
+		end
+		
+		local elapsed = tick() - preparationStartTime
+		local remaining = preparationDuration - elapsed
+		
+		if remaining > 0 then
+			hud:SetPreparationTime(remaining)
+		else
+			-- Time's up, auto-start
+			hud:SetPreparationTime(0)
+		end
+	else
+		preparationStartTime = 0
+	end
+	
+	-- Intermission countdown
+	if intermissionTime > 0 and intermissionStartTime > 0 then
+		local elapsed = tick() - intermissionStartTime
+		local remaining = intermissionDuration - elapsed
+		
+		if remaining > 0 then
+			hud:SetIntermissionTime(remaining)
+		else
+			hud:SetIntermissionTime(0)
+			intermissionStartTime = 0
+		end
+	end
 end)
 
 -- Base health updated event
@@ -169,9 +220,21 @@ Network.GameEndRewards.SetCallback(function(data)
 	Logger.Info("Client", `  Waves completed: {data.WavesCompleted}`)
 end)
 
--- Wave completed event
+-- Wave completed event (start intermission countdown)
 Network.WaveCompleted.On(function(data)
 	Logger.Info("Client", `Wave {data.WaveNumber} completed!`)
+	
+	-- Start intermission countdown
+	intermissionStartTime = tick()
+	hud:SetIntermissionTime(intermissionDuration)
+end)
+
+-- Teleport countdown event
+Network.TeleportCountdown.On(function(data)
+	Logger.Info("Client", `Teleporting in {data.TimeRemaining}s`)
+	if hud then
+		hud:SetTeleportCountdown(data.TimeRemaining)
+	end
 end)
 
 -- Request response (for placement/collection confirmations)

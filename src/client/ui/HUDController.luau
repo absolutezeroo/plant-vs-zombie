@@ -71,6 +71,10 @@ function HUDController.new()
 	self._shopVisible = Value(self._scope, false) -- Shop visibility state
 	self._deckBuilderVisible = Value(self._scope, false) -- DeckBuilder visibility state
 	self._stageSelectVisible = Value(self._scope, false) -- StageSelect visibility state
+	self._preparationPhase = Value(self._scope, true) -- Show Ready button during preparation
+	self._preparationTime = Value(self._scope, 20) -- Countdown timer
+	self._intermissionTime = Value(self._scope, 0) -- Intermission countdown
+	self._teleportCountdown = Value(self._scope, 0) -- Teleport countdown
 	self._mounted = false
 	self._gui = nil :: ScreenGui?
 	
@@ -311,16 +315,164 @@ function HUDController:Mount()
 			PvZTheme.Banner(self._scope, {
 				Name = "WaveBanner",
 				Position = UDim2.new(0.5, 0, 0, 15),
-				Size = UDim2.fromOffset(220, 45),
+				Size = Computed(self._scope, function(use)
+					local intermission = use(self._intermissionTime)
+					-- Wider banner during intermission to fit the text
+					return if intermission > 0 
+						then UDim2.fromOffset(350, 45)
+						else UDim2.fromOffset(220, 45)
+				end),
 				AnchorPoint = Vector2.new(0.5, 0),
 				Text = Computed(self._scope, function(use)
 					local wave = use(self._waveNumber)
-					if wave == 0 then
+					local intermission = use(self._intermissionTime)
+					
+					-- During intermission, show countdown
+					if intermission > 0 then
+						return `⏸️ Wave Complete! Next in {math.ceil(intermission)}s`
+					elseif wave == 0 then
 						return PvZTheme.Icons.Plant .. " GET READY!"
 					else
 						return PvZTheme.Icons.Wave .. " WAVE " .. tostring(wave)
 					end
 				end),
+			}),
+			
+			-- ============================================
+			-- READY BUTTON (Preparation Phase)
+			-- ============================================
+			New(self._scope, "TextButton") {
+				Name = "ReadyButton",
+				Position = UDim2.new(0.5, 0, 1, -180), -- Above CardDeck
+				Size = UDim2.fromOffset(300, 60),
+				AnchorPoint = Vector2.new(0.5, 0),
+				BackgroundColor3 = PvZTheme.Colors.GrassGreen,
+				Text = Computed(self._scope, function(use)
+					local timeLeft = use(self._preparationTime)
+					return `🌻 READY! ({timeLeft}s)`
+				end),
+				TextColor3 = PvZTheme.Colors.TextWhite,
+				TextSize = 24,
+				Font = Enum.Font.GothamBold,
+				AutoButtonColor = true,
+				Visible = self._preparationPhase,
+				
+				[OnEvent "Activated"] = function()
+					Logger.Info("HUD", "Ready button clicked")
+					self._preparationPhase:set(false)
+					
+					-- Send request to server
+					local Client = script.Parent.Parent
+					local Network = require(Client.network.generated)
+					Network.StartWaveRequest.Fire({
+						RequestId = math.random(1, 65535),
+					})
+				end,
+				
+				[Children] = {
+					New(self._scope, "UICorner") {
+						CornerRadius = UDim.new(0, 12),
+					},
+					New(self._scope, "UIStroke") {
+						Color = PvZTheme.Colors.WoodDark,
+						Thickness = 4,
+					},
+				},
+			},
+			
+			-- ============================================
+			-- INTERMISSION INDICATOR
+			-- ============================================
+			New(self._scope, "Frame") {
+				Name = "IntermissionIndicator",
+				Position = UDim2.new(0.5, 0, 0.3, 0),
+				Size = UDim2.fromOffset(400, 80),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = PvZTheme.Colors.WoodBrown,
+				Visible = Computed(self._scope, function(use)
+					return use(self._intermissionTime) > 0 and use(self._teleportCountdown) == 0
+				end),
+				
+				[Children] = {
+					New(self._scope, "UICorner") {
+						CornerRadius = UDim.new(0, 15),
+					},
+					New(self._scope, "UIStroke") {
+						Color = PvZTheme.Colors.WoodDark,
+						Thickness = 4,
+					},
+					PvZTheme.StrokedText(self._scope, {
+						Name = "IntermissionText",
+						Position = UDim2.new(0.5, 0, 0.5, -10),
+						Size = UDim2.new(1, -20, 0.5, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Text = "⏸️ Wave Complete!",
+						TextColor3 = PvZTheme.Colors.CoinGold,
+						TextSize = 26,
+					}),
+					PvZTheme.StrokedText(self._scope, {
+						Name = "NextWaveText",
+						Position = UDim2.new(0.5, 0, 0.5, 15),
+						Size = UDim2.new(1, -20, 0.4, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Text = Computed(self._scope, function(use)
+							local timeLeft = use(self._intermissionTime)
+							return `Next wave in {math.ceil(timeLeft)}s`
+						end),
+						TextColor3 = PvZTheme.Colors.TextWhite,
+						TextSize = 18,
+					}),
+				},
+			},
+			
+			-- ============================================
+			-- CENTER: Teleport Countdown
+			-- ============================================
+			New(self._scope, "Frame")({
+				Name = "TeleportCountdown",
+				Position = UDim2.new(0.5, 0, 0.5, 0),
+				Size = UDim2.fromOffset(500, 120),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+				BorderSizePixel = 0,
+				Visible = Computed(self._scope, function(use)
+					return use(self._teleportCountdown) > 0
+				end),
+				
+				[Children] = {
+					New(self._scope, "UICorner")({
+						CornerRadius = UDim.new(0, 16),
+					}),
+					New(self._scope, "UIStroke")({
+						Color = Color3.fromRGB(255, 215, 0),
+						Thickness = 4,
+					}),
+					
+					PvZTheme.StrokedText(self._scope, {
+						Name = "Title",
+						Position = UDim2.new(0.5, 0, 0.3, 0),
+						Size = UDim2.new(0.9, 0, 0.3, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Text = "🏠 Returning to Lobby...",
+						TextSize = 24,
+						Font = Enum.Font.GothamBold,
+						TextColor3 = Color3.fromRGB(255, 215, 0),
+					}),
+					
+					PvZTheme.StrokedText(self._scope, {
+						Name = "Countdown",
+						Position = UDim2.new(0.5, 0, 0.7, 0),
+						Size = UDim2.new(0.9, 0, 0.3, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Text = Computed(self._scope, function(use)
+							local time = use(self._teleportCountdown)
+							return `Teleporting in {time}...`
+						end),
+						TextSize = 28,
+						Font = Enum.Font.GothamBold,
+						TextColor3 = Color3.fromRGB(255, 255, 255),
+					}),
+				},
 			}),
 			
 			-- ============================================
@@ -529,6 +681,28 @@ end
 
 function HUDController:SetWaveNumber(wave: number)
 	self._waveNumber:set(wave)
+	
+	-- Hide preparation phase when first wave starts
+	if wave > 0 then
+		self._preparationPhase:set(false)
+	end
+end
+
+function HUDController:SetPreparationTime(seconds: number)
+	self._preparationTime:set(math.max(0, math.ceil(seconds)))
+end
+
+function HUDController:StartPreparation()
+	self._preparationPhase:set(true)
+	self._preparationTime:set(20)
+end
+
+function HUDController:SetIntermissionTime(seconds: number)
+	self._intermissionTime:set(math.max(0, seconds))
+end
+
+function HUDController:SetTeleportCountdown(seconds: number)
+	self._teleportCountdown:set(math.max(0, seconds))
 end
 
 function HUDController:SetBaseHealth(current: number, max: number)

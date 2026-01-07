@@ -69,6 +69,15 @@ local function getPlantFoodSystem()
 	return _plantFoodSystem
 end
 
+-- Lazy-load ArenaService for battle end handling
+local _arenaService: any = nil
+local function getArenaService()
+	if not _arenaService then
+		_arenaService = require(Server.services.ArenaService)
+	end
+	return _arenaService
+end
+
 -- Wave configuration (defaults, overridden by StageData)
 local WaveConfig = {
 	TOTAL_WAVES = 10,         -- Total waves to complete for victory
@@ -150,7 +159,7 @@ end
 local SpawnPools = buildSpawnPools()
 
 -- Game state
-export type GameState = "Waiting" | "Playing" | "Intermission" | "Victory" | "Defeat"
+export type GameState = "Waiting" | "Preparation" | "Playing" | "Intermission" | "Victory" | "Defeat"
 
 local _gameState: GameState = "Waiting"
 local _currentWave = 0
@@ -164,8 +173,17 @@ local _zombiesKilledThisWave = 0
 local _zombiesSpawnedThisWave = 0
 local _spawnQueue: {{type: string, lane: number}} = {}
 
+-- Flag to disable auto-start (for multi-place architecture)
+local _autoStartEnabled = false
+
 -- Module API for other systems to query state
 local WaveManager = {}
+
+-- Enable/disable auto-start
+function WaveManager.SetAutoStart(enabled: boolean)
+	_autoStartEnabled = enabled
+	Logger.Info("WaveManager", `Auto-start {if enabled then "enabled" else "disabled"}`)
+end
 
 function WaveManager.GetGameState(): GameState
 	return _gameState
@@ -286,6 +304,25 @@ function WaveManager.SetGameState(state: GameState)
 			Logger.Info("WaveManager", `{player.Name}: +{xpEarned} XP, +{gemsEarned} gems, {levelsGained} level(s) gained`)
 		end
 		
+		-- Wait 5 seconds before teleporting, send countdown
+		task.spawn(function()
+			for countdown = 5, 1, -1 do
+				for _, player in Players:GetPlayers() do
+					Network.TeleportCountdown.Fire(player, {
+						TimeRemaining = countdown,
+					})
+				end
+				task.wait(1)
+			end
+			
+			-- Now teleport all players
+			local ArenaServiceInstance = getArenaService()
+			for _, player in Players:GetPlayers() do
+				ArenaServiceInstance.EndBattle(player, isVictory, starRating, totalCoins, xpEarned)
+			end
+		end)
+	end
+		
 		-- Reset session stats for next game
 		EntityDeathSystem.API.ResetAllSessionStats()
 		
@@ -328,7 +365,7 @@ end
 -- Start a specific stage
 function WaveManager.StartStage(stageId: string): boolean
 	if _gameState ~= "Waiting" then
-		Logger.Warn("WaveManager", `Cannot start stage - game already in progress`)
+		Logger.Warn("WaveManager", `Cannot start stage - game already in progress (state={_gameState})`)
 		return false
 	end
 	
@@ -344,7 +381,7 @@ function WaveManager.StartStage(stageId: string): boolean
 	
 	-- Update wave config from stage
 	WaveConfig.TOTAL_WAVES = stageConfig.WaveCount
-	WaveConfig.FIRST_WAVE_DELAY = 15 -- Slightly faster start for stages
+	WaveConfig.FIRST_WAVE_DELAY = 20 -- Preparation time
 	
 	-- Adjust spawn intervals based on stage
 	local spawnInterval = stageConfig.SpawnInterval or 2.5
@@ -355,21 +392,42 @@ function WaveManager.StartStage(stageId: string): boolean
 	-- Rebuild spawn pools with stage zombie types
 	SpawnPools = buildSpawnPools()
 	
-	-- Start the game
+	-- Start in preparation phase
 	_currentWave = 0
-	_gameState = "Playing"
+	_gameState = "Preparation"
 	_waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
 	
 	Logger.Info("WaveManager", `=== STAGE {stageId}: {stageConfig.Name} ===`)
+	Logger.Info("WaveManager", `Preparation phase: {WaveConfig.FIRST_WAVE_DELAY}s before first wave`)
 	Logger.Info("WaveManager", `Waves: {stageConfig.WaveCount}, Budget: {stageConfig.BaseBudget}+{stageConfig.BudgetPerWave}/wave`)
 	Logger.Info("WaveManager", `Zombies: {table.concat(stageConfig.ZombiePool, ", ")}`)
 	
-	-- Broadcast stage started
+	-- Broadcast stage started (preparation phase)
 	Network.StageStarted.FireAll({
 		StageId = stageId,
 		StageName = stageConfig.Name,
 		WaveCount = stageConfig.WaveCount,
 	})
+	
+	-- Broadcast preparation phase
+	Network.WaveStarted.FireAll({
+		WaveNumber = 0,
+		ZombieCount = 0,
+	})
+	
+	return true
+end
+
+-- Skip preparation and start waves immediately
+function WaveManager.StartWaves()
+	if _gameState ~= "Preparation" then
+		Logger.Warn("WaveManager", `Cannot start waves - not in preparation phase (state={_gameState})`)
+		return false
+	end
+	
+	_gameState = "Playing"
+	_waveStartTime = os.clock() -- Start first wave immediately
+	Logger.Info("WaveManager", "Preparation phase skipped - starting waves now!")
 	
 	return true
 end
@@ -381,6 +439,22 @@ end
 -- Get current stage ID
 function WaveManager.GetCurrentStageId(): string
 	return _currentStageId
+end
+
+-- Reset game state (for new battle)
+function WaveManager.ResetGameState()
+	_gameState = "Waiting"
+	_currentWave = 0
+	_waveStartTime = 0
+	_lastSpawnTime = 0
+	_currentPhase = "Trickle"
+	_phaseSpent = 0
+	_phaseBudget = 0
+	_totalBudget = 0
+	_zombiesKilledThisWave = 0
+	_zombiesSpawnedThisWave = 0
+	_spawnQueue = {}
+	Logger.Info("WaveManager", "Game state reset to Waiting")
 end
 
 -- Calculate wave budget (uses stage config if available)
@@ -537,8 +611,8 @@ end
 local function WaveManagerSystem(world)
 	local currentTime = os.clock()
 	
-	-- Auto-start game when first player joins (for testing)
-	if _gameState == "Waiting" then
+	-- Auto-start game when first player joins (only if enabled for testing)
+	if _gameState == "Waiting" and _autoStartEnabled then
 		if #Players:GetPlayers() > 0 then
 			WaveManager.StartGame()
 		end

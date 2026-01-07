@@ -46,6 +46,9 @@ local PROFILE_TEMPLATE = {
 		-- [PlantType] = { Damage = 0, Health = 0, Cooldown = 0 }
 	},
 	
+	-- Plant mastery system (cosmetic XP tracking)
+	PlantMastery = {} :: {[string]: { Rank: number, XP: number }},
+	
 	-- Statistics
 	Stats = {
 		GamesPlayed = 0,

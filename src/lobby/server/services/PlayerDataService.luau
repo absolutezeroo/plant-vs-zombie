@@ -6,7 +6,7 @@
     but not the full Arena game logic.
 ]]
 
-local Server = game:GetService("ServerScriptService"):WaitForChild("LobbyServer")
+local _Server = game:GetService("ServerScriptService"):WaitForChild("LobbyServer") -- Reserved for future use
 
 -- PlayerDataService is the same across both places
 -- In production, this would be in a shared location
@@ -14,7 +14,7 @@ local Server = game:GetService("ServerScriptService"):WaitForChild("LobbyServer"
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService") -- Reserved for future use
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local ProfileStore = require(Packages:WaitForChild("ProfileStore"))
@@ -30,7 +30,7 @@ local PROFILE_TEMPLATE = {
     TotalGemsEarned = 0,
     XP = 0,
     Level = 1,
-    CurrentStage = "world1_stage1",
+    CurrentStage = "1-1",
     CompletedStages = {} :: {[string]: number},
     UnlockedPlants = {
         Sunflower = true,
@@ -39,6 +39,7 @@ local PROFILE_TEMPLATE = {
     },
     PlantUpgrades = {},
     PlantMastery = {} :: {[string]: { Rank: number, XP: number }},
+    Deck = {"Sunflower", "Peashooter", "WallNut"} :: {string}, -- Default starter deck
     Stats = {
         GamesPlayed = 0,
         GamesWon = 0,
@@ -119,6 +120,23 @@ end
 function PlayerDataService.GetData(player: Player)
     local profile = Profiles[player]
     return if profile then profile.Data else nil
+end
+
+-- Set player's current deck (saved for reuse)
+function PlayerDataService.SetDeck(player: Player, deck: {string}): boolean
+    local profile = Profiles[player]
+    if not profile then return false end
+    
+    profile.Data.Deck = deck
+    Logger.Info("LobbyPlayerData", `Deck updated for {player.Name}`, {deckSize = #deck})
+    return true
+end
+
+-- Get player's current deck
+function PlayerDataService.GetDeck(player: Player): {string}?
+    local profile = Profiles[player]
+    if not profile then return nil end
+    return profile.Data.Deck
 end
 
 return PlayerDataService

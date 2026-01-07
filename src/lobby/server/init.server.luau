@@ -25,10 +25,18 @@ local PlantData = require(Shared.data.PlantData)
 
 -- Import services from this folder
 local PlayerDataService = require(script.services.PlayerDataService)
+local LobbyService = require(script.services.LobbyService)
+
+-- Import Zap generated network module
+local ZapServer = require(script.network.generated)
 
 -- Initialize services
 PlayerDataService.Initialize()
 Logger.Info("Lobby", "PlayerDataService initialized")
+
+-- Initialize LobbyService (teleport pads)
+LobbyService.Initialize(ZapServer)
+Logger.Info("Lobby", "LobbyService initialized")
 
 -- Track players in lobby
 local playersInLobby: { [Player]: boolean } = {}
@@ -37,45 +45,48 @@ local playersInLobby: { [Player]: boolean } = {}
     Handle teleport request from client
     Validates deck and stage before teleporting
 ]]
-local function handleTeleportToArena(player: Player, stageId: string, deck: { string })
+local function handleTeleportToArena(player: Player, stageId: string, deck: { string }): (boolean, number, string)
     Logger.Info("Lobby", `{player.Name} requesting teleport to {stageId}`)
     
     -- Validate stage exists
     local stage = StageData.GetStage(stageId)
     if not stage then
         Logger.Warn("Lobby", `Invalid stage: {stageId}`)
-        -- TODO: Send error response to client via Zap
-        return
+        return false, 1, "Invalid stage"
     end
     
     -- Validate deck
     if #deck < 1 or #deck > 6 then
         Logger.Warn("Lobby", `Invalid deck size: {#deck}`)
-        return
+        return false, 2, "Deck must have 1-6 plants"
     end
     
     -- Validate player owns all plants in deck
     local profile = PlayerDataService.GetProfile(player)
     if not profile then
         Logger.Warn("Lobby", `No profile for {player.Name}`)
-        return
+        return false, 2, "Profile not loaded"
     end
     
-    local unlockedPlants = profile.Data.PlantMastery
+    local unlockedPlants = profile.Data.UnlockedPlants or {}
     for _, plantType in deck do
         if not PlantData[plantType] then
             Logger.Warn("Lobby", `Invalid plant type: {plantType}`)
-            return
+            return false, 2, `Invalid plant: {plantType}`
         end
         
-        -- Check if plant is unlocked (starter plants always available)
-        local plantInfo = PlantData[plantType]
-        if plantInfo.Tier > 0 then -- Non-starter
-            if not unlockedPlants[plantType] then
-                Logger.Warn("Lobby", `{player.Name} doesn't own {plantType}`)
-                return
-            end
+        -- Check if plant is unlocked
+        if not unlockedPlants[plantType] then
+            Logger.Warn("Lobby", `{player.Name} doesn't own {plantType}`)
+            return false, 3, `Plant not unlocked: {plantType}`
         end
+    end
+    
+    -- Check if PlaceIds are configured
+    if TeleportData.PlaceIds.Arena == 0 then
+        Logger.Warn("Lobby", "Arena PlaceId not configured - skipping teleport in Studio")
+        -- In Studio without configured PlaceIds, just log success
+        return true, 0, "Teleport simulated (Studio mode)"
     end
     
     -- Create teleport data
@@ -94,8 +105,10 @@ local function handleTeleportToArena(player: Player, stageId: string, deck: { st
     
     if not success then
         Logger.Error("Lobby", `Teleport failed: {err}`)
-        -- TODO: Send error response to client
+        return false, 4, `Teleport failed: {err}`
     end
+    
+    return true, 0, "Teleporting..."
 end
 
 --[[
@@ -111,22 +124,59 @@ local function onPlayerAdded(player: Player)
     if teleportData then
         local isValid, err = TeleportData.ValidateLobbyReturnData(teleportData)
         if isValid then
-            Logger.Info("Lobby", `{player.Name} returned from Arena`, {
-                stageId = teleportData.StageId,
-                victory = teleportData.Victory,
-                stars = teleportData.Stars,
-            })
-            -- Results already saved by Arena server before teleport
-            -- Client will show results UI based on this data
-        else
-            Logger.Warn("Lobby", `Invalid return data: {err}`)
-        end
-    end
+			local returnData = teleportData :: TeleportData.LobbyReturnData
+			Logger.Info("Lobby", `{player.Name} returned from Arena`, {
+				stageId = returnData.StageId,
+				victory = returnData.Victory,
+				stars = returnData.Stars,
+			})
+			
+			-- Process rewards on server side
+			task.spawn(function()
+				-- Wait for profile to load (up to 10 seconds)
+				local attempts = 0
+				while attempts < 100 do
+					local profile = PlayerDataService.GetProfile(player)
+					if profile then
+						-- Update profile with rewards
+						if returnData.Victory then
+							PlayerDataService.CompleteStage(player, returnData.StageId, returnData.Stars)
+							Logger.Info("Lobby", `Stage {returnData.StageId} completed with {returnData.Stars} stars`)
+						end
+						
+						PlayerDataService.AddCoins(player, returnData.CoinsEarned)
+						PlayerDataService.AddXP(player, returnData.XPEarned)
+						
+						Logger.Info("Lobby", `Rewards applied: +{returnData.CoinsEarned} coins, +{returnData.XPEarned} XP`)
+						
+						-- Send results to client for display
+						ZapServer.ShowResults.Fire(player, {
+							StageId = returnData.StageId,
+							Victory = returnData.Victory,
+							Stars = returnData.Stars,
+							CoinsEarned = returnData.CoinsEarned,
+							XPEarned = returnData.XPEarned,
+						})
+						
+						break
+					end
+					task.wait(0.1)
+					attempts += 1
+				end
+				
+				if attempts >= 100 then
+					Logger.Error("Lobby", `Profile load timeout for {player.Name} - rewards not applied!`)
+				end
+			end)
+		else
+			Logger.Warn("Lobby", `Invalid return data: {err}`)
+		end
+	end
 end
 
 local function onPlayerRemoving(player: Player)
-    Logger.Info("Lobby", `{player.Name} leaving lobby`)
-    playersInLobby[player] = nil
+	Logger.Info("Lobby", `{player.Name} leaving lobby`)
+	playersInLobby[player] = nil
 end
 
 -- Connect player events
@@ -139,9 +189,46 @@ for _, player in Players:GetPlayers() do
 end
 
 -- Setup network event handlers (Zap generated)
--- TODO: Connect Zap events after adding TeleportToArena to packets.zap
--- ZapServer.TeleportToArenaRequest:SetCallback(function(player, data)
---     handleTeleportToArena(player, data.StageId, data.Deck)
--- end)
+ZapServer.TeleportToArenaRequest.SetCallback(function(player, data)
+    -- Convert Zap enum array to string array
+    local deckStrings: { string } = {}
+    for i, plantType in data.Deck do
+        deckStrings[i] = plantType
+    end
+    
+    local success, errorCode, message = handleTeleportToArena(player, data.StageId, deckStrings)
+    
+    -- Send response to client
+    ZapServer.TeleportToArenaResponse.Fire(player, {
+        Success = success,
+        ErrorCode = if success then nil else errorCode,
+        ErrorMessage = if success then nil else message,
+    })
+    
+    if success then
+        Logger.Info("Lobby", `{player.Name} teleport initiated: {message}`)
+    end
+end)
 
-Logger.Info("Lobby", "Lobby server initialized")
+-- Handle SaveDeck request
+ZapServer.SaveDeck.SetCallback(function(player, data)
+	-- Convert Zap enum array to string array
+	local deckStrings: { string } = {}
+	for i, plantType in data.Deck do
+		deckStrings[i] = plantType
+	end
+	
+	-- Save to profile
+	local success = PlayerDataService.SetDeck(player, deckStrings)
+	
+	if success then
+		-- Confirm to client
+		ZapServer.DeckChanged.Fire(player, {
+			Deck = data.Deck,
+		})
+		Logger.Info("Lobby", `{player.Name} deck saved`, {deckSize = #deckStrings})
+	else
+		Logger.Warn("Lobby", `Failed to save deck for {player.Name}`)
+	end
+end)
+

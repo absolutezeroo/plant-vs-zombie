@@ -25,9 +25,13 @@ local Client = script.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local Network = require(Client.network.generated)
 
--- Assets folder
-local Assets = ReplicatedStorage:WaitForChild("Assets", 5)
+-- Assets folder (optional - fallback to cubes if missing)
+local Assets = ReplicatedStorage:FindFirstChild("Assets")
 local PlantAssets = Assets and Assets:FindFirstChild("Plants")
+
+if not PlantAssets then
+	Logger.Warn("PlantRender", "Plant assets not found - using fallback cubes")
+end
 
 -- Services (lazy loaded)
 local _vfxService: any = nil

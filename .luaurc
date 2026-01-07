@@ -1,0 +1,24 @@
+{
+    "languageMode": "strict",
+    "lint": {
+        "*": true
+    },
+    "globals": [
+        "game",
+        "workspace",
+        "script",
+        "plugin",
+        "shared",
+        "task",
+        "os",
+        "utf8",
+        "bit32",
+        "buffer"
+    ],
+    "aliases": {
+        "Packages": "Packages",
+        "Shared": "src/shared",
+        "Server": "src/server",
+        "Client": "src/client"
+    }
+}
