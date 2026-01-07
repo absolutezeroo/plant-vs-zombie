@@ -19,7 +19,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local ErrorHandler = require(Shared.utils.ErrorHandler)
-local TeleportData = require(Shared.TeleportData)
+local TeleportData = require(Shared.data.TeleportData)
 local StageData = require(Shared.data.StageData)
 local PlantData = require(Shared.data.PlantData)
 

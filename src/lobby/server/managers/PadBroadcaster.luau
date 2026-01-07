@@ -20,18 +20,18 @@ local CountdownManager = require(script.Parent.CountdownManager)
 
 export type PadStatePayload = {
     PadId: string,
-    StageId: number,
+    StageId: string,
     PlayersCount: number,
     MaxPlayers: number,
     CountdownRemaining: number?,
     IsLocked: boolean,
-    PlayerNames: {string}?,
+    PlayerNames: string?,
 }
 
 export type PadBroadcaster = {
     BroadcastPadState: (self: PadBroadcaster, padId: string, config: PadManager.PadConfig) -> (),
-    NotifyPlayerJoined: (self: PadBroadcaster, player: Player, padId: string) -> (),
-    NotifyPlayerLeft: (self: PadBroadcaster, player: Player, padId: string) -> (),
+    NotifyPlayerJoined: (self: PadBroadcaster, player: Player, padId: string, stageId: string, position: Vector3) -> (),
+    NotifyPlayerLeft: (self: PadBroadcaster, player: Player) -> (),
 }
 
 local PadBroadcaster = {}
@@ -42,13 +42,16 @@ function PadBroadcaster.new(): PadBroadcaster
     return self
 end
 
--- Get player names from player list
-local function getPlayerNames(players: {Player}): {string}
+-- Get player names from player list as comma-separated string
+local function getPlayerNames(players: {Player}): string?
+    if #players == 0 then
+        return nil
+    end
     local names = {}
     for _, player in ipairs(players) do
         table.insert(names, player.Name)
     end
-    return names
+    return table.concat(names, ", ")
 end
 
 -- Broadcast full pad state to all clients
@@ -67,28 +70,26 @@ function PadBroadcaster:BroadcastPadState(padId: string, config: PadManager.PadC
         MaxPlayers = config.MaxPlayers,
         CountdownRemaining = if countdownRemaining > 0 then math.ceil(countdownRemaining) else nil,
         IsLocked = false,
-        PlayerNames = if playerCount > 0 then getPlayerNames(players) else nil,
+        PlayerNames = getPlayerNames(players),
     }
     
     ZapServer.PadStateUpdate.FireAll(payload)
 end
 
--- Notify all clients that a player joined a pad
-function PadBroadcaster:NotifyPlayerJoined(player: Player, padId: string)
-    ZapServer.JoinedPad.FireAll({
-        PlayerName = player.Name,
+-- Notify a specific player that they joined a pad
+function PadBroadcaster:NotifyPlayerJoined(player: Player, padId: string, stageId: string, position: Vector3)
+    ZapServer.JoinedPad.Fire(player, {
         PadId = padId,
+        StageId = stageId,
+        Position = position,
     })
     Logger.Debug("PadBroadcaster", `Notified: {player.Name} joined pad {padId}`)
 end
 
--- Notify all clients that a player left a pad
-function PadBroadcaster:NotifyPlayerLeft(player: Player, padId: string)
-    ZapServer.LeftPad.FireAll({
-        PlayerName = player.Name,
-        PadId = padId,
-    })
-    Logger.Debug("PadBroadcaster", `Notified: {player.Name} left pad {padId}`)
+-- Notify a specific player that they left a pad
+function PadBroadcaster:NotifyPlayerLeft(player: Player)
+    ZapServer.LeftPad.Fire(player, {})
+    Logger.Debug("PadBroadcaster", `Notified: {player.Name} left pad`)
 end
 
 -- Singleton instance

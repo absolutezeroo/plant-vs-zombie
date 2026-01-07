@@ -46,10 +46,20 @@ local SunConfig = {
 	SPAWN_INTERVAL_VARIANCE = 3, -- +/- variance (so 4-10 seconds)
 	SUN_VALUE = 25,           -- Sun value when collected
 	LIFE_TIME = 12,           -- Seconds until despawn
-	SPAWN_HEIGHT = 30,        -- Y height to spawn at
+	SPAWN_HEIGHT_OFFSET = 25, -- Y offset above grid for spawn
 	FALL_SPEED = 4,           -- Studs per second
-	MIN_GROUND_Y = 2,         -- Y position to stop falling
+	GROUND_OFFSET = 1.5,      -- Y offset above GridY for landing
 }
+
+-- Get ground Y from MapConfig (dynamic per map)
+local function getGroundY(): number
+	return MapConfig.GetConfig().GridY
+end
+
+-- Get spawn height for sky suns
+local function getSpawnHeight(): number
+	return getGroundY() + SunConfig.SPAWN_HEIGHT_OFFSET
+end
 
 -- State
 local _lastSpawnTime = 0
@@ -68,12 +78,12 @@ local function getRandomGridPosition(): (number, number, number)
 	local offsetX = (math.random() - 0.5) * cellW * 0.6
 	local offsetZ = (math.random() - 0.5) * cellD * 0.6
 	
-	return cellCenter.X + offsetX, SunConfig.SPAWN_HEIGHT, cellCenter.Z + offsetZ
+	return cellCenter.X + offsetX, getSpawnHeight(), cellCenter.Z + offsetZ
 end
 
 local function spawnSkySun(world: any): number
 	local x, y, z = getRandomGridPosition()
-	local targetY = SunConfig.MIN_GROUND_Y + math.random() * 2
+	local targetY = getGroundY() + SunConfig.GROUND_OFFSET + math.random() * 2
 	
 	local entityId = world:spawn(
 		PositionComponent({
@@ -145,7 +155,7 @@ local function SunSpawnSystem(world)
 		-- Falling physics
 		if sun.IsFalling then
 			local newY = pos.Y - SunConfig.FALL_SPEED * (1/60) -- Assume 60 FPS
-			local targetY = sun.TargetY or SunConfig.MIN_GROUND_Y
+			local targetY = sun.TargetY or (getGroundY() + SunConfig.GROUND_OFFSET)
 			
 			if newY <= targetY then
 				-- Landed

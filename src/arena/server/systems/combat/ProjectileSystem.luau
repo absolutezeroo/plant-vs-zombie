@@ -61,13 +61,27 @@ local _plantFireTimes: {[number]: number} = {}
 local _pendingMultiShots: {[number]: {shotsRemaining: number, nextShotTime: number, lane: number, startX: number, plantType: string, direction: number}} = {}
 
 -- Check if there are zombies in the lane (optionally behind plant for SplitPea)
-local function hasZombiesInLane(world: any, lane: number, plantX: number, checkBehind: boolean?): boolean
+-- Uses MapConfig.GetZombieDirection() to determine "in front" vs "behind"
+local function hasZombiesInLane(world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?): boolean
+	local zombieDir = MapConfig.GetZombieDirection()
+	
 	for id, pos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
 		if zombie.Lane == lane then
+			-- Calculate if zombie is in front or behind the plant
+			-- Zombie direction points from spawn to base (e.g., -1,0,0 means zombies come from +X)
+			-- "In front" = in the direction zombies come FROM (opposite of zombieDir)
+			local dx = pos.X - plantX
+			local dz = pos.Z - plantZ
+			
+			-- Dot product with zombie direction: negative = zombie is in direction zombies come from
+			local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
+			
 			if checkBehind then
-				if pos.X < plantX then return true end
+				-- Behind = same direction as zombie movement (positive dot product)
+				if dotProduct > 0 then return true end
 			else
-				if pos.X > plantX then return true end
+				-- In front = opposite of zombie direction (negative dot product)
+				if dotProduct < 0 then return true end
 			end
 		end
 	end
@@ -322,17 +336,17 @@ local function ProjectileSystem(world)
 		elseif stats.IsThreeLane then
 			-- Threepeater checks 3 lanes
 			for checkLane = math.max(1, plant.Lane - 1), math.min(GridConfig.GRID_LANES, plant.Lane + 1) do
-				if hasZombiesInLane(world, checkLane, pos.X, false) then
+				if hasZombiesInLane(world, checkLane, pos.X, pos.Z, false) then
 					hasTargets = true
 					break
 				end
 			end
 		else
 			-- Normal: check forward
-			hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, false)
+			hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, pos.Z, false)
 			-- SplitPea: also check behind
 			if stats.ShootsBehind and not hasTargets then
-				hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, true)
+				hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, pos.Z, true)
 			end
 		end
 		
@@ -343,9 +357,17 @@ local function ProjectileSystem(world)
 		-- Range check for short-range mushrooms (PuffShroom, SeaShroom, etc.)
 		if stats.Range and stats.Range > 0 then
 			local hasInRange = false
+			local zombieDir = MapConfig.GetZombieDirection()
+			
 			for _, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
 				if zombie.Lane == plant.Lane then
-					local distance = zombiePos.X - pos.X
+					-- Calculate distance in the direction zombies come from
+					local dx = zombiePos.X - pos.X
+					local dz = zombiePos.Z - pos.Z
+					-- Dot product with zombie direction (negative = in front of plant)
+					local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
+					local distance = -dotProduct -- Distance in the "forward" direction
+					
 					if distance > 0 and distance <= stats.Range then
 						hasInRange = true
 						break

@@ -76,7 +76,8 @@ function MapConfig.Initialize()
 	end
 	
 	-- Use WaitForChild with timeout to handle streaming/load order
-	local arenaMap = Workspace:WaitForChild("ArenaMap", 10)
+	-- Increased timeout for dynamic map loading via MapLoader
+	local arenaMap = Workspace:WaitForChild("ArenaMap", 30)
 	
 	if not arenaMap then
 		Logger.Info("MapConfig", "ArenaMap not found after WaitForChild, using GridConfig defaults")
@@ -117,8 +118,8 @@ end
 
 -- Read grid bounds from CornerA and CornerB attachments
 function MapConfig._ReadGridBounds(arenaMap: Instance): boolean
-	-- Use WaitForChild with timeout to handle streaming
-	local gridBounds = arenaMap:WaitForChild("GridBounds", 5)
+	-- Use WaitForChild with timeout to handle streaming (30s for dynamic maps)
+	local gridBounds = arenaMap:WaitForChild("GridBounds", 30)
 	
 	-- DEBUG: Log what we find
 	if gridBounds then
@@ -251,7 +252,8 @@ function MapConfig._ReadBasePosition(arenaMap: Instance)
 	if basePart then
 		if basePart:IsA("Attachment") then
 			-- Direct Attachment - check if parent is a BasePart for proper WorldPosition
-			if basePart.Parent:IsA("BasePart") then
+			local parent: Instance? = basePart.Parent
+			if parent and parent:IsA("BasePart") then
 				_config.BasePosition = basePart.WorldPosition
 				Logger.Info("MapConfig", `BasePosition from Attachment: {_config.BasePosition}`)
 			else
@@ -455,6 +457,126 @@ end
 function MapConfig.Reload()
 	_isInitialized = false
 	MapConfig.Initialize()
+end
+
+--[[
+	Load configuration from a specific map model
+	Used by MapLoader when dynamically loading maps
+	@param mapModel - The ArenaMap model to read configuration from
+]]
+function MapConfig.LoadFromMap(mapModel: Instance)
+	if not mapModel then
+		Logger.Warn("MapConfig", "LoadFromMap called with nil model")
+		return
+	end
+	
+	Logger.Info("MapConfig", `Loading config from map: {mapModel.Name}`)
+	
+	-- Read grid bounds
+	local success = MapConfig._ReadGridBounds(mapModel)
+	if not success then
+		Logger.Warn("MapConfig", "Failed to read grid bounds from map, using defaults")
+		MapConfig._UseDefaults()
+	end
+	
+	-- Read zombie spawns
+	MapConfig._ReadZombieSpawns(mapModel)
+	
+	-- Read base position
+	MapConfig._ReadBasePosition(mapModel)
+	
+	-- Calculate zombie direction
+	MapConfig._CalculateZombieDirection()
+	
+	_config.UsingVisualConfig = true
+	_isInitialized = true
+	
+	Logger.Info("MapConfig", `Map config loaded:`)
+	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)
+	Logger.Info("MapConfig", `  Cell size: {_config.CellWidth}x{_config.CellDepth}`)
+	Logger.Info("MapConfig", `  Zombie lanes: {#_config.ZombieSpawns}`)
+end
+
+--[[
+	Apply configuration received from server (client-side only)
+	This is the authoritative way for clients to get map config,
+	avoiding race conditions with streaming/replication
+]]
+export type ServerMapConfig = {
+	MapId: string,
+	GridCornerAX: number, GridCornerAY: number, GridCornerAZ: number,
+	GridCornerBX: number, GridCornerBY: number, GridCornerBZ: number,
+	GridY: number,
+	CellWidth: number,
+	CellDepth: number,
+	BasePositionX: number, BasePositionY: number, BasePositionZ: number,
+	ZombieDirectionX: number, ZombieDirectionZ: number,
+}
+
+function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
+	Logger.Info("MapConfig", `Applying config from server for map: {serverConfig.MapId}`)
+	
+	_config.GridCornerA = Vector3.new(serverConfig.GridCornerAX, serverConfig.GridCornerAY, serverConfig.GridCornerAZ)
+	_config.GridCornerB = Vector3.new(serverConfig.GridCornerBX, serverConfig.GridCornerBY, serverConfig.GridCornerBZ)
+	_config.GridOrigin = _config.GridCornerA
+	_config.GridY = serverConfig.GridY
+	_config.CellWidth = serverConfig.CellWidth
+	_config.CellDepth = serverConfig.CellDepth
+	_config.GridWidth = _config.GridCornerB.X - _config.GridCornerA.X
+	_config.GridDepth = _config.GridCornerB.Z - _config.GridCornerA.Z
+	_config.BasePosition = Vector3.new(serverConfig.BasePositionX, serverConfig.BasePositionY, serverConfig.BasePositionZ)
+	_config.ZombieDirection = Vector3.new(serverConfig.ZombieDirectionX, 0, serverConfig.ZombieDirectionZ).Unit
+	_config.UsingVisualConfig = true
+	
+	-- Generate zombie spawns from grid (client doesn't need exact positions)
+	MapConfig._GenerateDefaultSpawns()
+	
+	_isInitialized = true
+	
+	Logger.Info("MapConfig", `Config applied from server:`)
+	Logger.Info("MapConfig", `  GridY: {_config.GridY}`)
+	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)
+	Logger.Info("MapConfig", `  Cell size: {_config.CellWidth}x{_config.CellDepth}`)
+end
+
+--[[
+	Check if config has been initialized
+]]
+function MapConfig.IsInitialized(): boolean
+	return _isInitialized
+end
+
+--[[
+	Get serializable config for network sync (server-side)
+]]
+function MapConfig.GetServerSyncData(mapId: string): ServerMapConfig
+	return {
+		MapId = mapId,
+		GridCornerAX = _config.GridCornerA.X,
+		GridCornerAY = _config.GridCornerA.Y,
+		GridCornerAZ = _config.GridCornerA.Z,
+		GridCornerBX = _config.GridCornerB.X,
+		GridCornerBY = _config.GridCornerB.Y,
+		GridCornerBZ = _config.GridCornerB.Z,
+		GridY = _config.GridY,
+		CellWidth = _config.CellWidth,
+		CellDepth = _config.CellDepth,
+		BasePositionX = _config.BasePosition.X,
+		BasePositionY = _config.BasePosition.Y,
+		BasePositionZ = _config.BasePosition.Z,
+		ZombieDirectionX = _config.ZombieDirection.X,
+		ZombieDirectionZ = _config.ZombieDirection.Z,
+	}
+end
+
+--[[
+	Reset configuration to defaults (for map unload)
+]]
+function MapConfig.Reset()
+	_isInitialized = false
+	MapConfig._UseDefaults()
+	_isInitialized = true
+	Logger.Info("MapConfig", "Reset to defaults")
 end
 
 return MapConfig

@@ -32,6 +32,7 @@ local Logger = require(Shared.utils.Logger)
 local ErrorHandler = require(Shared.utils.ErrorHandler)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
+local MapConfig = require(Shared.config.MapConfig)
 
 loader:SetStage(2, "Loading packages...")
 
@@ -107,6 +108,7 @@ Logger.Info("Client", `Client ECS loop started at {NetworkConfig.TICK_RATE} Hz`)
 local UI = script:WaitForChild("ui")
 local HUDController = require(UI.HUDController)
 local FloatingTextUI = require(UI.FloatingTextUI)
+local VictoryDefeatScreen = require(UI.VictoryDefeatScreen)
 
 -- Initialize floating text system
 FloatingTextUI.Initialize()
@@ -116,7 +118,11 @@ Logger.Info("Client", "FloatingTextUI initialized")
 local hud = HUDController.new()
 hud:Mount()
 
-Logger.Info("Client", "HUD mounted")
+-- Create and mount Victory/Defeat screen
+local victoryScreen = VictoryDefeatScreen.new()
+victoryScreen:Mount()
+
+Logger.Info("Client", "HUD and VictoryScreen mounted")
 
 loader:SetStage(6, "Syncing with server...")
 
@@ -224,16 +230,39 @@ end)
 
 -- Game over event
 Network.GameOver.On(function(data)
+	-- Basic game over (used as fallback, GameEndRewards has full data)
+	Logger.Info("Client", `Game over received: {if data.Victory then "Victory" else "Defeat"} at wave {data.WaveReached}`)
+	-- HUD gets basic update for overlay
 	hud:SetGameOver(data.Victory, data.WaveReached)
 end)
 
--- Game end rewards event (detailed summary)
+-- Game end rewards event (detailed summary with animations)
 Network.GameEndRewards.SetCallback(function(data)
-	hud:ShowEndGameRewards(data)
-	Logger.Info("Client", `Game ended: {if data.Victory then "Victory" else "Defeat"}`)
-	Logger.Info("Client", `  Coins earned: {data.CoinsEarned} (bonus: {data.BonusCoins})`)
-	Logger.Info("Client", `  Zombies killed: {data.ZombiesKilled}`)
-	Logger.Info("Client", `  Waves completed: {data.WavesCompleted}`)
+	Logger.Info("Client", `GameEndRewards received: {if data.Victory then "Victory" else "Defeat"}`)
+	Logger.Info("Client", `  Coins: {data.CoinsEarned}, XP: {data.XPEarned}, Gems: {data.GemsEarned}`)
+	Logger.Info("Client", `  Zombies: {data.ZombiesKilled}, Waves: {data.WavesCompleted}, Stars: {data.StarRating}`)
+	
+	-- Show the animated victory/defeat screen
+	victoryScreen:Show({
+		Victory = data.Victory,
+		WaveReached = data.WavesCompleted,
+		StarRating = data.StarRating,
+		CoinsEarned = data.CoinsEarned,
+		XPEarned = data.XPEarned,
+		GemsEarned = data.GemsEarned,
+		ZombiesKilled = data.ZombiesKilled,
+		BonusCoins = data.BonusCoins,
+		NewLevel = data.NewLevel,
+		LevelsGained = data.LevelsGained,
+	})
+	
+	-- Also update HUD (which has the old overlay - now hidden behind VictoryScreen)
+	hud:SetGameOver(data.Victory, data.WavesCompleted, {
+		StarRating = data.StarRating,
+		CoinsEarned = data.CoinsEarned,
+		XPEarned = data.XPEarned,
+		GemsEarned = data.GemsEarned,
+	})
 end)
 
 -- Wave completed event (start intermission countdown)
@@ -251,6 +280,10 @@ Network.TeleportCountdown.On(function(data)
 	if hud then
 		hud:SetTeleportCountdown(data.TimeRemaining)
 	end
+	-- Also update VictoryDefeatScreen
+	if victoryScreen then
+		victoryScreen:SetTeleportCountdown(data.TimeRemaining)
+	end
 end)
 
 -- Request response (for placement/collection confirmations)
@@ -261,10 +294,84 @@ Network.RequestResponse.On(function(data)
 end)
 
 -- ============================================
+-- MAP ASSET LOADING
+-- ============================================
+
+-- Track if we're waiting for map assets
+local mapLoadingComplete = false
+local mapConfigReceived = false
+local mapLoadingStage = 7  -- "Loading map assets..." stage index
+
+-- Map config received from server (authoritative data)
+-- This MUST be received before GridVisualization can work correctly
+Network.MapConfigSync.On(function(data)
+	Logger.Info("Client", `Map config received from server for: {data.MapId}`)
+	Logger.Info("Client", `  GridY: {data.GridY}`)
+	
+	-- Apply the config (this is the authoritative source)
+	MapConfig.ApplyFromServer(data)
+	mapConfigReceived = true
+	
+	Logger.Info("Client", "MapConfig applied from server - systems can now use correct coordinates")
+end)
+
+-- Map loading started - switch loader to asset loading stage
+Network.MapLoadingStarted.On(function(data)
+	Logger.Info("Client", `Map loading started: {data.MapId} ({data.TotalAssets} assets)`)
+	loader:SetStage(mapLoadingStage, `Loading {data.MapId}...`)
+	loader:SetProgress(0)
+end)
+
+-- Map loading progress - update loader progress
+Network.MapLoadingProgress.On(function(data)
+	local progress = data.LoadedAssets / math.max(data.TotalAssets, 1)
+	loader:SetProgress(progress)
+	loader:SetStatus(`Loading assets... ({data.LoadedAssets}/{data.TotalAssets})`)
+end)
+
+-- Map loading complete - mark as done
+Network.MapLoadingComplete.On(function(data)
+	Logger.Info("Client", `Map loading complete: {data.MapId} (success={data.Success})`)
+	mapLoadingComplete = true
+	loader:SetProgress(1)
+	loader:SetStatus("Map loaded!")
+	
+	-- Move to final "Ready!" stage
+	task.delay(0.2, function()
+		loader:CompleteStage()
+	end)
+end)
+
+-- ============================================
 -- LOADING COMPLETE
 -- ============================================
-loader:Complete(function()
-	Logger.Info("Client", "Loading complete - UI visible")
+
+-- Wait a moment for any map loading events, then complete
+task.delay(1, function()
+	-- If no map loading events received, skip to ready
+	if not mapLoadingComplete then
+		loader:SetStage(mapLoadingStage, "Loading map...")
+		loader:SetProgress(1)
+		task.wait(0.1)
+		loader:CompleteStage()
+	end
+end)
+
+-- Complete after map is loaded or timeout
+task.spawn(function()
+	-- Wait for map loading or 5 second timeout
+	local timeout = 5
+	local elapsed = 0
+	while not mapLoadingComplete and elapsed < timeout do
+		task.wait(0.1)
+		elapsed += 0.1
+	end
+	
+	-- Ensure we're at the Ready stage
+	task.wait(0.3)
+	loader:Complete(function()
+		Logger.Info("Client", "Loading complete - UI visible")
+	end)
 end)
 
 Logger.Info("Client", "Client bootstrap complete")

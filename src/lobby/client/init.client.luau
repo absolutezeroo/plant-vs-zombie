@@ -23,7 +23,7 @@ local Children = Fusion.Children
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local TeleportData = require(Shared.TeleportData)
+local TeleportData = require(Shared.data.TeleportData)
 
 -- Import Zap generated network module
 local ZapClient = require(script:WaitForChild("network"):WaitForChild("generated"))

@@ -243,6 +243,21 @@ function AudioService.PlayDefeat()
 	AudioService.PlaySound("Defeat", { Volume = 0.8 })
 end
 
+function AudioService.PlayStarEarned()
+	AudioService.PlaySound("UISuccess", { 
+		Volume = 0.8,
+		PlaybackSpeed = 1.2,
+	})
+end
+
+function AudioService.PlayCoinCount()
+	-- Rapid coin counting sound (lighter version)
+	AudioService.PlaySound("CoinCollect", { 
+		Volume = 0.4,
+		PlaybackSpeed = 1.3,
+	})
+end
+
 --[[
 	🎶 MUSIC SYSTEM
 ]]

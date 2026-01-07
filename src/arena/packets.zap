@@ -631,3 +631,69 @@ event StageProgressSync = {
         CompletedStageStars: u8[],
     }
 }
+
+-- ===================
+-- MAP LOADING EVENTS
+-- ===================
+
+-- Server sends map configuration to client (authoritative data)
+-- This avoids client-side race conditions with streaming/replication
+event MapConfigSync = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
+        -- Grid bounds
+        GridCornerAX: f32,
+        GridCornerAY: f32,
+        GridCornerAZ: f32,
+        GridCornerBX: f32,
+        GridCornerBY: f32,
+        GridCornerBZ: f32,
+        GridY: f32,
+        CellWidth: f32,
+        CellDepth: f32,
+        -- Base position
+        BasePositionX: f32,
+        BasePositionY: f32,
+        BasePositionZ: f32,
+        -- Zombie direction
+        ZombieDirectionX: f32,
+        ZombieDirectionZ: f32,
+    }
+}
+
+-- Server notifies client that map loading has started
+event MapLoadingStarted = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
+        TotalAssets: u16,
+    }
+}
+
+-- Server sends loading progress updates
+event MapLoadingProgress = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        LoadedAssets: u16,
+        TotalAssets: u16,
+        AssetName: string.utf8(..64),
+    }
+}
+
+-- Server notifies client that map is fully loaded and ready
+event MapLoadingComplete = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
+        Success: boolean,
+    }
+}

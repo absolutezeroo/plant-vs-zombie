@@ -1,34 +1,53 @@
 --!strict
 --[[
-	StageData.luau - Stage/Level configuration
+	StageData.luau - Stage/Level configuration (Legacy + Bridge)
 	
-	Defines all stages organized by world:
-	- World 1: Day (basic zombies)
-	- World 2: Night (cones, buckets, newspaper)
-	- World 3: Pool (poles, footballs)
-	- World 4: Fog (balloons, imps)
-	- World 5: Roof (gargantuars, bosses)
+	This module now serves as a bridge between:
+	- Legacy stages defined here (budget-based)
+	- New StageRegistry system (precise wave definitions)
 	
-	Each stage has:
-	- Wave count and zombie budget per wave
-	- Available zombie types
-	- Difficulty modifiers
-	- Star thresholds and rewards
+	GetStage() will first check StageRegistry for new-style stages,
+	then fall back to legacy definitions here.
+	
+	NEW STAGES should be added to: data/stages/W{World}_{Level}.luau
 ]]
+
+-- Try to load new StageRegistry
+local StageRegistry: any = nil
+local _registryLoaded = false
+
+local function tryLoadRegistry()
+	if _registryLoaded then
+		return
+	end
+	_registryLoaded = true
+	
+	local success, registry = pcall(function()
+		return require(script.Parent.stages.StageRegistry)
+	end)
+	if success then
+		StageRegistry = registry
+	end
+end
 
 export type StageConfig = {
 	Name: string,
 	World: number,
 	Level: number,
 	
-	-- Wave configuration
-	WaveCount: number,
-	BaseBudget: number,           -- Starting zombie budget per wave
-	BudgetPerWave: number,        -- Additional budget added each wave
-	SpawnInterval: number,        -- Seconds between zombie spawns
+	-- Wave configuration (legacy)
+	WaveCount: number?,
+	BaseBudget: number?,          -- Starting zombie budget per wave
+	BudgetPerWave: number?,       -- Additional budget added each wave
+	SpawnInterval: number?,       -- Seconds between zombie spawns
+	
+	-- New wave system
+	Waves: any?,                  -- Array of WaveDefinition (from StageRegistry)
+	MapId: string?,               -- Map to load (from StageRegistry)
 	
 	-- Zombie pool for this stage
-	ZombiePool: {string},         -- Available zombie types
+	ZombiePool: {string}?,        -- Available zombie types
+	DefaultZombiePool: {string}?, -- Fallback pool (new system)
 	BossWave: number?,            -- Wave number that spawns boss (nil = no boss)
 	BossType: string?,            -- Boss zombie type
 	
@@ -38,39 +57,40 @@ export type StageConfig = {
 	SunStarting: number?,         -- Starting sun (default 50)
 	
 	-- Grid Origin (world position of grid center)
-	-- Allows different map layouts per world
-	GridOriginX: number?,         -- World X offset (default 0)
-	GridOriginZ: number?,         -- World Z offset (default 0)
-	GridOriginY: number?,         -- Ground level (default 0)
+	GridOriginX: number?,
+	GridOriginZ: number?,
+	GridOriginY: number?,
 	
 	-- Star rating thresholds
-	Star1Health: number,          -- Minimum base health % for 1 star
-	Star2Health: number,          -- Minimum base health % for 2 stars
-	Star3Health: number,          -- Minimum base health % for 3 stars
+	Star1Health: number,
+	Star2Health: number,
+	Star3Health: number,
 	
 	-- Rewards
-	CoinReward: number,           -- Base coins for completing
-	XPReward: number,             -- XP for completing
-	FirstClearBonus: number?,     -- Extra coins on first clear
+	CoinReward: number,
+	XPReward: number,
+	FirstClearBonus: number?,
 	
 	-- Unlock requirements
-	RequiredStage: string?,       -- Stage that must be completed to unlock (e.g. "1-4")
-	RequiredLevel: number?,       -- Player level required
+	RequiredStage: string?,
+	RequiredLevel: number?,
 }
 
--- Helper to create stage ID
-local function stageId(world: number, level: number): string
+-- Helper to create stage ID (prefixed with _ for now as only used in comments)
+local function _stageId(world: number, level: number): string
 	return `{world}-{level}`
 end
 
 -- ============================================
--- STAGE DEFINITIONS
+-- LEGACY STAGE DEFINITIONS
 -- ============================================
 
 local Stages: {[string]: StageConfig} = {}
 
 -- ============================================
 -- WORLD 1: DAY (Tutorial / Easy)
+-- Legacy definitions kept for backwards compatibility
+-- New stages use StageRegistry
 -- ============================================
 
 Stages["1-1"] = {
@@ -751,12 +771,33 @@ Stages["5-5"] = {
 local StageData = {}
 
 -- Get stage config by ID (e.g. "1-1", "2-3")
+-- First checks new StageRegistry, then falls back to legacy Stages
 function StageData.GetStage(stageId: string): StageConfig?
+	-- Try new system first
+	tryLoadRegistry()
+	if StageRegistry then
+		local newConfig = StageRegistry.GetStage(stageId)
+		if newConfig then
+			return newConfig :: any
+		end
+	end
+	
+	-- Fallback to legacy
 	return Stages[stageId]
 end
 
 -- Get all stages for a world
 function StageData.GetWorldStages(world: number): {StageConfig}
+	-- Try new system first
+	tryLoadRegistry()
+	if StageRegistry then
+		local newStages = StageRegistry.GetWorldStages(world)
+		if #newStages > 0 then
+			return newStages :: any
+		end
+	end
+	
+	-- Fallback to legacy
 	local worldStages = {}
 	for id, config in Stages do
 		if config.World == world then

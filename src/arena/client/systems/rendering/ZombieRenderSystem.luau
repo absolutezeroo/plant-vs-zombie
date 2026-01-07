@@ -13,7 +13,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+-- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+assert(Shared, "ZombieRenderSystem: Shared folder not found")
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
@@ -21,8 +23,10 @@ local Logger = require(Shared.utils.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:WaitForChild("modules")
-local UI = Client:WaitForChild("ui")
+local Modules = Client:FindFirstChild("modules")
+assert(Modules, "ZombieRenderSystem: modules folder not found")
+local UI = Client:FindFirstChild("ui")
+assert(UI, "ZombieRenderSystem: ui folder not found")
 local Network = require(Client.network.generated)
 
 -- VFX/Audio services (lazy loaded)
@@ -88,6 +92,10 @@ local ZOMBIE_COLORS = {
 local INTERPOLATION_SPEED = 10 -- How fast to interpolate to target position
 
 local function getLaneZ(lane: number): number
+	-- Return default if not initialized (will be corrected when initialized)
+	if not MapConfig.IsInitialized() then
+		return lane * 4 -- Rough estimate
+	end
 	local laneCenter = MapConfig.GridToWorld(1, lane)
 	return laneCenter.Z
 end
@@ -105,7 +113,9 @@ local function createZombieVisual(entityId: number, zombieType: string, lane: nu
 	part.CastShadow = true
 	
 	local z = getLaneZ(lane)
-	part.Position = Vector3.new(positionX, ZOMBIE_SIZE.Y / 2, z)
+	-- Use default Y if MapConfig not ready
+	local groundY = if MapConfig.IsInitialized() then MapConfig.GetConfig().GridY else 0
+	part.Position = Vector3.new(positionX, groundY + ZOMBIE_SIZE.Y / 2, z)
 	
 	-- Add attribute for entity tracking
 	part:SetAttribute("EntityId", entityId)
@@ -224,7 +234,13 @@ Network.EntityDamaged.On(function(data)
 end)
 
 local function ZombieRenderSystem(world)
+	-- Skip if MapConfig not initialized yet (Studio mode)
+	if not MapConfig.IsInitialized() then
+		return
+	end
+	
 	local dt = 1/60
+	local groundY = MapConfig.GetConfig().GridY
 	
 	-- Interpolate zombie positions
 	for entityId, visual in _zombieVisuals do
@@ -235,7 +251,7 @@ local function ZombieRenderSystem(world)
 		local newX = currentX + (targetX - currentX) * math.min(1, INTERPOLATION_SPEED * dt)
 		
 		local z = getLaneZ(visual.Lane)
-		visual.Part.Position = Vector3.new(newX, ZOMBIE_SIZE.Y / 2, z)
+		visual.Part.Position = Vector3.new(newX, groundY + ZOMBIE_SIZE.Y / 2, z)
 	end
 end
 

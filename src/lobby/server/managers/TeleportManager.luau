@@ -12,7 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local TeleportData = require(Shared.TeleportData)
+local TeleportData = require(Shared.data.TeleportData)
 
 -- Dependencies
 local PlayerDataService = nil -- Lazy loaded
@@ -61,9 +61,10 @@ local function getPlayerDeck(player: Player): {string}?
     local dataService = getPlayerDataService()
     if not dataService then return nil end
     
-    local profileData = dataService.GetProfileData(player)
-    if profileData and profileData.Deck and #profileData.Deck > 0 then
-        return profileData.Deck
+    -- Use GetDeck directly
+    local deck = dataService.GetDeck(player)
+    if deck and #deck > 0 then
+        return deck
     end
     
     return nil

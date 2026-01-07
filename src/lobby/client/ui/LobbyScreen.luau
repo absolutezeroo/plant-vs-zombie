@@ -17,7 +17,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local StageData = require(Shared.data.StageData)
-local TeleportData = require(Shared.TeleportData)
+local TeleportData = require(Shared.data.TeleportData)
 local Logger = require(Shared.utils.Logger)
 
 -- Note: PvZTheme lives in client/ui, we need to require it from there

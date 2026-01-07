@@ -26,13 +26,13 @@ local ErrorHandler = require(Shared.utils.ErrorHandler)
 local EntityPool = require(Shared.utils.EntityPool)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
-local TeleportData = require(Shared.TeleportData)
+local TeleportData = require(Shared.data.TeleportData)
 
 -- Import components via index module
 local Components = require(Shared.components)
 local Tags = Components.Tags
-local GridPositionComponent = Components.GridPositionComponent
-local HealthComponent = Components.HealthComponent
+local _GridPositionComponent = Components.GridPositionComponent -- Reserved for future use
+local _HealthComponent = Components.HealthComponent -- Reserved for future use
 
 -- Import server services
 local Server = script
@@ -114,24 +114,27 @@ RunService.Heartbeat:Connect(function(deltaTime)
 		local poolStats = EntityPool.GetStats()
 		local avgFPS = frameCount / (now - lastMonitorTime)
 		
+		-- gcinfo() returns memory in KB, convert to MB
+		local memoryKB = gcinfo()
+		local memoryMB = memoryKB / 1024
+		
 		Logger.Performance("Server", "Performance stats", {
 			FPS = math.floor(avgFPS),
 			EntitiesInUse = poolStats.InUse,
 			EntitiesAvailable = poolStats.Available,
-			MemoryMB = math.floor(collectgarbage("count") / 1024),
+			MemoryMB = math.floor(memoryMB),
 		})
 		
 		frameCount = 0
 		lastMonitorTime = now
 		
 		-- Memory warning check
-		local memoryMB = collectgarbage("count") / 1024
 		if memoryMB > PerformanceConfig.MEMORY_WARNING then
 			Logger.Warn("Server", "Memory usage high", { MemoryMB = math.floor(memoryMB) })
 		end
 		if memoryMB > PerformanceConfig.MEMORY_EMERGENCY then
-			Logger.Warn("Server", "EMERGENCY: Forcing garbage collection")
-			collectgarbage("collect")
+			Logger.Warn("Server", "EMERGENCY: Memory critical - consider ending match")
+			-- Note: Roblox doesn't support forced GC, memory is managed automatically
 		end
 	end
 end)
@@ -153,10 +156,12 @@ local function onPlayerAdded(player: Player)
 	if teleportData then
 		local isValid, err = TeleportData.ValidateArenaJoinData(teleportData)
 		if isValid then
-			playerTeleportData[player] = teleportData :: TeleportData.ArenaJoinData
+			-- Cast after validation to get proper typing
+			local validData = teleportData :: TeleportData.ArenaJoinData
+			playerTeleportData[player] = validData
 			Logger.Info("Server", `{player.Name} teleported from Lobby`, {
-				stageId = teleportData.StageId,
-				deckSize = #teleportData.Deck,
+				stageId = validData.StageId,
+				deckSize = #validData.Deck,
 			})
 			
 			-- Wait for profile to load, then start battle
@@ -167,7 +172,7 @@ local function onPlayerAdded(player: Player)
 					local profileData = PlayerDataService.GetProfile(player)
 					if profileData then
 						-- Start battle with teleported stage/deck
-						ArenaService.StartBattle(player, teleportData.StageId, teleportData.Deck)
+						ArenaService.StartBattle(player, validData.StageId, validData.Deck)
 						break
 					end
 					task.wait(0.1)

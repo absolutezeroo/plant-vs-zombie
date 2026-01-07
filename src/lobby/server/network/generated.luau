@@ -605,7 +605,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Success"]: (boolean),
 			["ErrorCode"]: ((number)?),
 			["ErrorMessage"]: ((string)?),
@@ -767,7 +767,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Coins"]: (number),
 			["Gems"]: (number),
 			["Level"]: (number),
@@ -930,7 +930,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["StageId"]: (string),
 			["Victory"]: (boolean),
 			["Stars"]: (number),
@@ -1193,7 +1193,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["PadId"]: (string),
 			["StageId"]: (string),
 			["PlayersCount"]: (number),
@@ -1352,7 +1352,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 		}))
 			load_empty()
 			alloc(1)
@@ -1497,7 +1497,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["PadId"]: (string),
 			["StageId"]: (string),
 			["Position"]: (Vector3),
@@ -2078,7 +2078,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			load_empty()

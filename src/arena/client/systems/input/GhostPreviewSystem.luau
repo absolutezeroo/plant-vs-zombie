@@ -12,15 +12,18 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
+local _Players = game:GetService("Players") -- Reserved for future use
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Fusion = require(Packages:WaitForChild("Fusion"))
+-- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(Packages, "GhostPreviewSystem: Packages folder not found")
+local Fusion = require(Packages.Fusion)
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
-local GridConfig = require(Shared.config.GridConfig)
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+assert(Shared, "GhostPreviewSystem: Shared folder not found")
+local _GridConfig = require(Shared.config.GridConfig) -- Reserved for future use
 local MapConfig = require(Shared.config.MapConfig)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
@@ -28,7 +31,8 @@ local Logger = require(Shared.utils.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/input/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:WaitForChild("modules")
+local Modules = Client:FindFirstChild("modules")
+assert(Modules, "GhostPreviewSystem: modules folder not found")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)
 
@@ -41,11 +45,11 @@ if not PlantAssets then
 	Logger.Warn("GhostPreview", "Plant assets not found - ghost previews disabled")
 end
 
--- VFX/Audio services (lazy loaded)
+-- VFX/Audio services (lazy loaded, reserved for future use)
 local _vfxService: any = nil
 local _audioService: any = nil
 
-local function getVFXService()
+local function _getVFXService()
 	if not _vfxService then
 		local success, result = pcall(function()
 			return require(Modules.VFXService)
@@ -189,11 +193,9 @@ local function updateGhostPosition(column: number, lane: number, valid: boolean,
 	
 	local worldPos = GridUtils.GridToWorld(column, lane)
 	
-	-- Position using PrimaryPart with 180° rotation (same as PlantRenderSystem)
-	if ghost.PrimaryPart then
-		local facingRotation = CFrame.Angles(0, math.rad(180), 0)
-		ghost:SetPrimaryPartCFrame(CFrame.new(worldPos) * facingRotation)
-	end
+	-- Position using PivotTo with 180° rotation (same as PlantRenderSystem)
+	local facingRotation = CFrame.Angles(0, math.rad(180), 0)
+	ghost:PivotTo(CFrame.new(worldPos) * facingRotation)
 	
 	-- Update color based on validity
 	updateGhostColor(valid)
@@ -205,9 +207,7 @@ end
 local function hideGhost()
 	if _ghostModel then
 		-- Move off-screen instead of destroying (for reuse)
-		if _ghostModel.PrimaryPart then
-			_ghostModel:SetPrimaryPartCFrame(CFrame.new(0, -1000, 0))
-		end
+		_ghostModel:PivotTo(CFrame.new(0, -1000, 0))
 	end
 	_currentCell = nil
 	_isValid = false

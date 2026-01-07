@@ -12,7 +12,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+-- Use FindFirstChild to avoid yielding (Shared should already exist from init.client.luau)
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+assert(Shared, "GridVisualizationSystem: Shared folder not found - ensure init.client.luau loads first")
+
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
@@ -57,10 +60,39 @@ local function createGrid()
 	folder.Parent = Workspace
 	_gridFolder = folder
 	
+	-- Wait for MapConfig to be initialized (either from server sync or local read)
+	-- The server sends authoritative config via MapConfigSync event
+	local timeout = 10
+	local elapsed = 0
+	while not MapConfig.IsInitialized() and elapsed < timeout do
+		task.wait(0.1)
+		elapsed += 0.1
+	end
+	
+	if not MapConfig.IsInitialized() then
+		-- Fallback: try to read from ArenaMap directly (legacy behavior)
+		Logger.Warn("GridVisualization", "MapConfig not initialized after 10s, trying local read")
+		local arenaMap = Workspace:FindFirstChild("ArenaMap")
+		if arenaMap then
+			MapConfig.LoadFromMap(arenaMap)
+		else
+			Logger.Warn("GridVisualization", "ArenaMap not found, using defaults")
+		end
+	end
+	
 	-- Use MapConfig for dynamic grid bounds
 	local config = MapConfig.GetConfig()
 	local cellW, cellD = MapConfig.GetCellSize()
 	local y = config.GridY + GRID_LINE_HEIGHT
+	
+	-- Log detailed config for debugging
+	Logger.Info("GridVisualization", `=== GRID CONFIG ===`)
+	Logger.Info("GridVisualization", `  UsingVisualConfig: {config.UsingVisualConfig}`)
+	Logger.Info("GridVisualization", `  GridY: {config.GridY}`)
+	Logger.Info("GridVisualization", `  GridCornerA: {config.GridCornerA}`)
+	Logger.Info("GridVisualization", `  GridCornerB: {config.GridCornerB}`)
+	Logger.Info("GridVisualization", `  Creating lines at Y={y}`)
+	Logger.Info("GridVisualization", `===================`)
 	
 	-- Vertical lines (columns)
 	for col = 0, GridConfig.GRID_COLUMNS do
@@ -92,6 +124,7 @@ local function createGrid()
 		Columns = GridConfig.GRID_COLUMNS,
 		Lanes = GridConfig.GRID_LANES,
 		CellSize = cellW,
+		GridY = y,
 		UsingVisualConfig = config.UsingVisualConfig,
 	})
 end
@@ -103,7 +136,7 @@ local function destroyGrid()
 	end
 end
 
-local function GridVisualizationSystem(world)
+local function GridVisualizationSystem(_world)
 	-- Only initialize once
 	if _initialized then
 		return
@@ -112,7 +145,9 @@ local function GridVisualizationSystem(world)
 	_initialized = true
 	
 	if DEBUG_GRID_VISIBLE then
-		createGrid()
+		-- Use task.spawn to avoid yielding inside the system
+		-- MapConfig.GetConfig() uses WaitForChild internally
+		task.spawn(createGrid)
 	end
 end
 

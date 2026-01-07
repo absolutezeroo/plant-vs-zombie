@@ -28,12 +28,13 @@ export type LoadingStage = {
 
 -- Default loading stages
 local DEFAULT_STAGES: {LoadingStage} = {
-	{ Name = "Initializing...", Weight = 0.1 },
-	{ Name = "Loading packages...", Weight = 0.15 },
-	{ Name = "Setting up ECS...", Weight = 0.2 },
-	{ Name = "Loading systems...", Weight = 0.25 },
-	{ Name = "Preparing UI...", Weight = 0.15 },
-	{ Name = "Syncing with server...", Weight = 0.1 },
+	{ Name = "Initializing...", Weight = 0.05 },
+	{ Name = "Loading packages...", Weight = 0.10 },
+	{ Name = "Setting up ECS...", Weight = 0.10 },
+	{ Name = "Loading systems...", Weight = 0.15 },
+	{ Name = "Preparing UI...", Weight = 0.10 },
+	{ Name = "Syncing with server...", Weight = 0.05 },
+	{ Name = "Loading map assets...", Weight = 0.40 },  -- New stage for ContentProvider preload
 	{ Name = "Ready!", Weight = 0.05 },
 }
 

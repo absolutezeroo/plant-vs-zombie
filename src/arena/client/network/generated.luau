@@ -225,6 +225,18 @@ if not RunService:IsRunning() then
 		PlacePlantRequest = table.freeze({
 			Fire = noop
 		}),
+		MapLoadingStarted = table.freeze({
+			On = noop
+		}),
+		MapLoadingProgress = table.freeze({
+			On = noop
+		}),
+		MapLoadingComplete = table.freeze({
+			On = noop
+		}),
+		MapConfigSync = table.freeze({
+			On = noop
+		}),
 		LevelUp = table.freeze({
 			SetCallback = noop
 		}),
@@ -277,21 +289,22 @@ local remotes = ReplicatedStorage:WaitForChild("ZAP")
 local reliable = remotes:WaitForChild("ZAP_RELIABLE")
 assert(reliable:IsA("RemoteEvent"), "Expected ZAP_RELIABLE to be a RemoteEvent")
 
-local unreliable = { remotes:WaitForChild("ZAP_UNRELIABLE_0"), remotes:WaitForChild("ZAP_UNRELIABLE_1"), remotes:WaitForChild("ZAP_UNRELIABLE_2"), remotes:WaitForChild("ZAP_UNRELIABLE_3"), remotes:WaitForChild("ZAP_UNRELIABLE_4"), remotes:WaitForChild("ZAP_UNRELIABLE_5") }
+local unreliable = { remotes:WaitForChild("ZAP_UNRELIABLE_0"), remotes:WaitForChild("ZAP_UNRELIABLE_1"), remotes:WaitForChild("ZAP_UNRELIABLE_2"), remotes:WaitForChild("ZAP_UNRELIABLE_3"), remotes:WaitForChild("ZAP_UNRELIABLE_4"), remotes:WaitForChild("ZAP_UNRELIABLE_5"), remotes:WaitForChild("ZAP_UNRELIABLE_6") }
 assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_0 to be an UnreliableRemoteEvent")
 assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to be an UnreliableRemoteEvent")
 assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
 assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
 assert(unreliable[5]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_4 to be an UnreliableRemoteEvent")
 assert(unreliable[6]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_5 to be an UnreliableRemoteEvent")
-export type Lane = (number)
+assert(unreliable[7]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_6 to be an UnreliableRemoteEvent")
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
+export type EntityId = (number)
+export type RequestId = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
 export type UpgradeType = ("Damage" | "Health" | "Cooldown")
-export type EntityId = (number)
-export type Column = (number)
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
 export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
-export type RequestId = (number)
+export type Column = (number)
+export type Lane = (number)
 
 local function SendEvents()
 	if outgoing_used ~= 0 then
@@ -309,10 +322,10 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(30)
-local reliable_event_queue: { [number]: { any } } = table.create(30)
-local unreliable_events = table.create(6)
-local unreliable_event_queue: { [number]: { any } } = table.create(6)
+local reliable_events = table.create(33)
+local reliable_event_queue: { [number]: { any } } = table.create(33)
+local unreliable_events = table.create(7)
+local unreliable_event_queue: { [number]: { any } } = table.create(7)
 reliable_events[3] = {}
 reliable_event_queue[3] = {}
 unreliable_events[5] = {}
@@ -352,6 +365,14 @@ reliable_event_queue[18] = {}
 reliable_event_queue[20] = {}
 reliable_events[19] = {}
 reliable_event_queue[19] = {}
+reliable_events[31] = {}
+reliable_event_queue[31] = {}
+unreliable_events[6] = {}
+unreliable_event_queue[6] = {}
+reliable_events[32] = {}
+reliable_event_queue[32] = {}
+reliable_events[30] = {}
+reliable_event_queue[30] = {}
 reliable_event_queue[22] = {}
 unreliable_events[4] = {}
 unreliable_event_queue[4] = {}
@@ -1151,22 +1172,87 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 					warn(`[ZAP] {#reliable_event_queue[19]} events in queue for PlantFoodActivated. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 22 then -- LevelUp
+		elseif id == 31 then -- MapLoadingStarted
+			local value
+			value = {  }
+			local len_13 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_13), len_13)
+			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
+			value["TotalAssets"] = buffer.readu16(incoming_buff, read(2))
+			if reliable_events[31][1] then
+				for _, cb in reliable_events[31] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[31], value)
+				if #reliable_event_queue[31] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[31]} events in queue for MapLoadingStarted. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 32 then -- MapLoadingComplete
 			local value
 			local bool_6 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
+			local len_14 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_14), len_14)
+			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
+			value["Success"] = bit32.btest(bool_6, 0b0000000000000001)
+			if reliable_events[32][1] then
+				for _, cb in reliable_events[32] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[32], value)
+				if #reliable_event_queue[32] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[32]} events in queue for MapLoadingComplete. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 30 then -- MapConfigSync
+			local value
+			value = {  }
+			local len_15 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_15), len_15)
+			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
+			value["GridCornerAX"] = buffer.readf32(incoming_buff, read(4))
+			value["GridCornerAY"] = buffer.readf32(incoming_buff, read(4))
+			value["GridCornerAZ"] = buffer.readf32(incoming_buff, read(4))
+			value["GridCornerBX"] = buffer.readf32(incoming_buff, read(4))
+			value["GridCornerBY"] = buffer.readf32(incoming_buff, read(4))
+			value["GridCornerBZ"] = buffer.readf32(incoming_buff, read(4))
+			value["GridY"] = buffer.readf32(incoming_buff, read(4))
+			value["CellWidth"] = buffer.readf32(incoming_buff, read(4))
+			value["CellDepth"] = buffer.readf32(incoming_buff, read(4))
+			value["BasePositionX"] = buffer.readf32(incoming_buff, read(4))
+			value["BasePositionY"] = buffer.readf32(incoming_buff, read(4))
+			value["BasePositionZ"] = buffer.readf32(incoming_buff, read(4))
+			value["ZombieDirectionX"] = buffer.readf32(incoming_buff, read(4))
+			value["ZombieDirectionZ"] = buffer.readf32(incoming_buff, read(4))
+			if reliable_events[30][1] then
+				for _, cb in reliable_events[30] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[30], value)
+				if #reliable_event_queue[30] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[30]} events in queue for MapConfigSync. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 22 then -- LevelUp
+			local value
+			local bool_7 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
 			value["NewLevel"] = buffer.readu8(incoming_buff, read(1))
-			if bit32.btest(bool_6, 0b0000000000000001) then
+			if bit32.btest(bool_7, 0b0000000000000001) then
 				value["RewardCoins"] = buffer.readu16(incoming_buff, read(2))
 			else
 				value["RewardCoins"] = nil
 			end
-			if bit32.btest(bool_6, 0b0000000000000010) then
+			if bit32.btest(bool_7, 0b0000000000000010) then
 				value["RewardGems"] = buffer.readu8(incoming_buff, read(1))
 			else
 				value["RewardGems"] = nil
 			end
-			if bit32.btest(bool_6, 0b0000000000000100) then
+			if bit32.btest(bool_7, 0b0000000000000100) then
 				local variant_5 = buffer.readu8(incoming_buff, read(1))
 				if variant_5 == 0 then
 					value["UnlockedPlant"] = "Sunflower"
@@ -1292,15 +1378,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 12 then -- GamePhaseChanged
 			local value
-			local bool_7 = buffer.readu8(incoming_buff, read(1))
+			local bool_8 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			if bit32.btest(bool_7, 0b0000000000000001) then
+			if bit32.btest(bool_8, 0b0000000000000001) then
 				value["Phase"] = "Pregame"
-			elseif bit32.btest(bool_7, 0b0000000000000010) then
+			elseif bit32.btest(bool_8, 0b0000000000000010) then
 				value["Phase"] = "Wave"
-			elseif bit32.btest(bool_7, 0b0000000000000100) then
+			elseif bit32.btest(bool_8, 0b0000000000000100) then
 				value["Phase"] = "Intermission"
-			elseif bit32.btest(bool_7, 0b0000000000001000) then
+			elseif bit32.btest(bool_8, 0b0000000000001000) then
 				value["Phase"] = "GameOver"
 			end
 			if reliable_events[12][1] then
@@ -1315,9 +1401,9 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 8 then -- GameOver
 			local value
-			local bool_8 = buffer.readu8(incoming_buff, read(1))
+			local bool_9 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Victory"] = bit32.btest(bool_8, 0b0000000000000001)
+			value["Victory"] = bit32.btest(bool_9, 0b0000000000000001)
 			value["WaveReached"] = buffer.readu8(incoming_buff, read(1))
 			if reliable_events[8][1] then
 				for _, cb in reliable_events[8] do
@@ -1331,9 +1417,9 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 16 then -- GameEndRewards
 			local value
-			local bool_9 = buffer.readu8(incoming_buff, read(1))
+			local bool_10 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Victory"] = bit32.btest(bool_9, 0b0000000000000001)
+			value["Victory"] = bit32.btest(bool_10, 0b0000000000000001)
 			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
 			value["ZombiesKilled"] = buffer.readu16(incoming_buff, read(2))
 			value["WavesCompleted"] = buffer.readu8(incoming_buff, read(1))
@@ -1353,17 +1439,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 13 then -- FullStateSync
 			local value
-			local bool_10 = buffer.readu8(incoming_buff, read(1))
+			local bool_11 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["SunCount"] = buffer.readu16(incoming_buff, read(2))
 			value["WaveNumber"] = buffer.readu8(incoming_buff, read(1))
-			if bit32.btest(bool_10, 0b0000000000000001) then
+			if bit32.btest(bool_11, 0b0000000000000001) then
 				value["Phase"] = "Pregame"
-			elseif bit32.btest(bool_10, 0b0000000000000010) then
+			elseif bit32.btest(bool_11, 0b0000000000000010) then
 				value["Phase"] = "Wave"
-			elseif bit32.btest(bool_10, 0b0000000000000100) then
+			elseif bit32.btest(bool_11, 0b0000000000000100) then
 				value["Phase"] = "Intermission"
-			elseif bit32.btest(bool_10, 0b0000000000001000) then
+			elseif bit32.btest(bool_11, 0b0000000000001000) then
 				value["Phase"] = "GameOver"
 			end
 			if reliable_events[13] then
@@ -1407,9 +1493,9 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 25 then -- DeckSync
 			local value
-			local bool_11 = buffer.readu8(incoming_buff, read(1))
+			local bool_12 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			if bit32.btest(bool_11, 0b0000000000000001) then
+			if bit32.btest(bool_12, 0b0000000000000001) then
 				local variant_6 = buffer.readu8(incoming_buff, read(1))
 				if variant_6 == 0 then
 					value["Slot1"] = "Sunflower"
@@ -1511,7 +1597,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot1"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000000010) then
+			if bit32.btest(bool_12, 0b0000000000000010) then
 				local variant_7 = buffer.readu8(incoming_buff, read(1))
 				if variant_7 == 0 then
 					value["Slot2"] = "Sunflower"
@@ -1613,7 +1699,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot2"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000000100) then
+			if bit32.btest(bool_12, 0b0000000000000100) then
 				local variant_8 = buffer.readu8(incoming_buff, read(1))
 				if variant_8 == 0 then
 					value["Slot3"] = "Sunflower"
@@ -1715,7 +1801,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot3"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000001000) then
+			if bit32.btest(bool_12, 0b0000000000001000) then
 				local variant_9 = buffer.readu8(incoming_buff, read(1))
 				if variant_9 == 0 then
 					value["Slot4"] = "Sunflower"
@@ -1817,7 +1903,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot4"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000010000) then
+			if bit32.btest(bool_12, 0b0000000000010000) then
 				local variant_10 = buffer.readu8(incoming_buff, read(1))
 				if variant_10 == 0 then
 					value["Slot5"] = "Sunflower"
@@ -1919,7 +2005,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot5"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000100000) then
+			if bit32.btest(bool_12, 0b0000000000100000) then
 				local variant_11 = buffer.readu8(incoming_buff, read(1))
 				if variant_11 == 0 then
 					value["Slot6"] = "Sunflower"
@@ -2031,12 +2117,12 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 24 then -- DeckSaved
 			local value
-			local bool_12 = buffer.readu8(incoming_buff, read(1))
+			local bool_13 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Success"] = bit32.btest(bool_12, 0b0000000000000001)
-			if bit32.btest(bool_12, 0b0000000000000010) then
-				local len_13 = buffer.readu16(incoming_buff, read(2))
-				value["Error"] = buffer.readstring(incoming_buff, read(len_13), len_13)
+			value["Success"] = bit32.btest(bool_13, 0b0000000000000001)
+			if bit32.btest(bool_13, 0b0000000000000010) then
+				local len_16 = buffer.readu16(incoming_buff, read(2))
+				value["Error"] = buffer.readstring(incoming_buff, read(len_16), len_16)
 				assert(utf8.len(value["Error"]) ~= nil, "value is not valid utf-8")
 			else
 				value["Error"] = nil
@@ -2051,16 +2137,16 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 15 then -- CoinGained
 			local value
-			local bool_13 = buffer.readu8(incoming_buff, read(1))
+			local bool_14 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["Amount"] = buffer.readu16(incoming_buff, read(2))
 			value["TotalCoins"] = buffer.readu32(incoming_buff, read(4))
-			if bit32.btest(bool_13, 0b0000000000000001) then
+			if bit32.btest(bool_14, 0b0000000000000001) then
 				value["SourceX"] = buffer.readf32(incoming_buff, read(4))
 			else
 				value["SourceX"] = nil
 			end
-			if bit32.btest(bool_13, 0b0000000000000010) then
+			if bit32.btest(bool_14, 0b0000000000000010) then
 				value["SourceZ"] = buffer.readf32(incoming_buff, read(4))
 			else
 				value["SourceZ"] = nil
@@ -2103,18 +2189,18 @@ unreliable[6].OnClientEvent:Connect(function(buff, inst) -- ZombiePositionBatch
 	incoming_ipos = 0
 	local value
 	value = {  }
-	local len_14 = buffer.readu8(incoming_buff, read(1))
-	assert(len_14 <= 100, "value is more than 100!")
-	value["EntityIds"] = table.create(len_14)
-	for i_8 = 1, len_14 do
+	local len_17 = buffer.readu8(incoming_buff, read(1))
+	assert(len_17 <= 100, "value is more than 100!")
+	value["EntityIds"] = table.create(len_17)
+	for i_8 = 1, len_17 do
 		local val_8
 		val_8 = buffer.readu32(incoming_buff, read(4))
 		value["EntityIds"][i_8] = val_8
 	end
-	local len_15 = buffer.readu8(incoming_buff, read(1))
-	assert(len_15 <= 100, "value is more than 100!")
-	value["PositionsX"] = table.create(len_15)
-	for i_9 = 1, len_15 do
+	local len_18 = buffer.readu8(incoming_buff, read(1))
+	assert(len_18 <= 100, "value is more than 100!")
+	value["PositionsX"] = table.create(len_18)
+	for i_9 = 1, len_18 do
 		local val_9
 		val_9 = buffer.readf32(incoming_buff, read(4))
 		value["PositionsX"][i_9] = val_9
@@ -2136,11 +2222,11 @@ unreliable[3].OnClientEvent:Connect(function(buff, inst) -- SunPositionUpdate
 	incoming_read = 0
 	incoming_ipos = 0
 	local value
-	local bool_14 = buffer.readu8(incoming_buff, read(1))
+	local bool_15 = buffer.readu8(incoming_buff, read(1))
 	value = {  }
 	value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 	value["PositionY"] = buffer.readf32(incoming_buff, read(4))
-	value["Falling"] = bit32.btest(bool_14, 0b0000000000000001)
+	value["Falling"] = bit32.btest(bool_15, 0b0000000000000001)
 	if unreliable_events[2][1] then
 		for _, cb in unreliable_events[2] do
 			task.spawn(cb, value)
@@ -2158,14 +2244,14 @@ unreliable[2].OnClientEvent:Connect(function(buff, inst) -- ProjectileSpawned
 	incoming_read = 0
 	incoming_ipos = 0
 	local value
-	local bool_15 = buffer.readu8(incoming_buff, read(1))
+	local bool_16 = buffer.readu8(incoming_buff, read(1))
 	value = {  }
 	value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 	value["Lane"] = buffer.readu8(incoming_buff, read(1))
 	assert(value["Lane"] >= 1, "value is less than 1!")
 	assert(value["Lane"] <= 5, "value is more than 5!")
 	value["StartX"] = buffer.readf32(incoming_buff, read(4))
-	if bit32.btest(bool_15, 0b0000000000000001) then
+	if bit32.btest(bool_16, 0b0000000000000001) then
 		value["TargetEntityId"] = buffer.readu32(incoming_buff, read(4))
 	else
 		value["TargetEntityId"] = nil
@@ -2197,6 +2283,30 @@ unreliable[4].OnClientEvent:Connect(function(buff, inst) -- PreparationTime
 		table.insert(unreliable_event_queue[3], value)
 		if #unreliable_event_queue[3] > 64 then
 			warn(`[ZAP] {#unreliable_event_queue[3]} events in queue for PreparationTime. Did you forget to attach a listener?`)
+		end
+	end
+end)
+unreliable[7].OnClientEvent:Connect(function(buff, inst) -- MapLoadingProgress
+	incoming_buff = buff
+	incoming_inst = inst
+	incoming_read = 0
+	incoming_ipos = 0
+	local value
+	value = {  }
+	value["LoadedAssets"] = buffer.readu16(incoming_buff, read(2))
+	value["TotalAssets"] = buffer.readu16(incoming_buff, read(2))
+	local len_19 = buffer.readu16(incoming_buff, read(2))
+	assert(len_19 <= 256, "value is more than 256!")
+	value["AssetName"] = buffer.readstring(incoming_buff, read(len_19), len_19)
+	assert(utf8.len(value["AssetName"]) ~= nil, "value is not valid utf-8")
+	if unreliable_events[6][1] then
+		for _, cb in unreliable_events[6] do
+			task.spawn(cb, value)
+		end
+	else
+		table.insert(unreliable_event_queue[6], value)
+		if #unreliable_event_queue[6] > 64 then
+			warn(`[ZAP] {#unreliable_event_queue[6]} events in queue for MapLoadingProgress. Did you forget to attach a listener?`)
 		end
 	end
 end)
@@ -2504,19 +2614,19 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_16 = #Value["StageId"]
-			assert(len_16 <= 200, "value is more than 200!")
+			local len_20 = #Value["StageId"]
+			assert(len_20 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_16)
-			alloc(len_16)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_16)
-			local len_17 = #Value["Deck"]
-			assert(len_17 >= 1, "value is less than 1!")
-			assert(len_17 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_20)
+			alloc(len_20)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_20)
+			local len_21 = #Value["Deck"]
+			assert(len_21 >= 1, "value is less than 1!")
+			assert(len_21 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_17 - 1)
-			for i_10 = 1, len_17 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_21 - 1)
+			for i_10 = 1, len_21 do
 				local val_10 = Value["Deck"][i_10]
 				if val_10 == "Sunflower" then
 					alloc(1)
@@ -2763,12 +2873,12 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 9)
-			local len_18 = #Value["StageId"]
+			local len_22 = #Value["StageId"]
 			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_18)
-			alloc(len_18)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_18)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_22)
+			alloc(len_22)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_22)
 		end,
 	},
 	StageStarted = {
@@ -2849,10 +2959,10 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local bool_16 = 0
-			local bool_16_pos_1 = alloc(1)
+			local bool_17 = 0
+			local bool_17_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_16 = bit32.bor(bool_16, 0b0000000000000001)
+				bool_17 = bit32.bor(bool_17, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -3002,7 +3112,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_16 = bit32.bor(bool_16, 0b0000000000000010)
+				bool_17 = bit32.bor(bool_17, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -3152,7 +3262,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_16 = bit32.bor(bool_16, 0b0000000000000100)
+				bool_17 = bit32.bor(bool_17, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -3302,7 +3412,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_16 = bit32.bor(bool_16, 0b0000000000001000)
+				bool_17 = bit32.bor(bool_17, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -3452,7 +3562,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_16 = bit32.bor(bool_16, 0b0000000000010000)
+				bool_17 = bit32.bor(bool_17, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -3602,7 +3712,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_16 = bit32.bor(bool_16, 0b0000000000100000)
+				bool_17 = bit32.bor(bool_17, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -3751,7 +3861,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_16_pos_1, bool_16)
+			buffer.writeu8(outgoing_buff, bool_17_pos_1, bool_17)
 		end,
 	},
 	RequestResponse = {
@@ -3778,8 +3888,8 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local bool_17 = 0
-			local bool_17_pos_1 = alloc(1)
+			local bool_18 = 0
+			local bool_18_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["RequestId"])
 			if Value["PlantType"] == "Sunflower" then
@@ -3930,15 +4040,15 @@ local returns = {
 				error("Invalid enumerator")
 			end
 			if Value["UpgradeType"] == "Damage" then
-				bool_17 = bit32.bor(bool_17, 0b0000000000000001)
+				bool_18 = bit32.bor(bool_18, 0b0000000000000001)
 			elseif Value["UpgradeType"] == "Health" then
-				bool_17 = bit32.bor(bool_17, 0b0000000000000010)
+				bool_18 = bit32.bor(bool_18, 0b0000000000000010)
 			elseif Value["UpgradeType"] == "Cooldown" then
-				bool_17 = bit32.bor(bool_17, 0b0000000000000100)
+				bool_18 = bit32.bor(bool_18, 0b0000000000000100)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_17_pos_1, bool_17)
+			buffer.writeu8(outgoing_buff, bool_18_pos_1, bool_18)
 		end,
 	},
 	ProjectileSpawned = {
@@ -4235,6 +4345,80 @@ local returns = {
 			assert(Value["Column"] <= 9, "value is more than 9!")
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Column"])
+		end,
+	},
+	MapLoadingStarted = {
+		On = function(Callback: (Value: ({
+			["MapId"]: (string),
+			["TotalAssets"]: (number),
+		})) -> ())
+			table.insert(reliable_events[31], Callback)
+			for _, value in reliable_event_queue[31] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[31] = {}
+			return function()
+				table.remove(reliable_events[31], table.find(reliable_events[31], Callback))
+			end
+		end,
+	},
+	MapLoadingProgress = {
+		On = function(Callback: (Value: ({
+			["LoadedAssets"]: (number),
+			["TotalAssets"]: (number),
+			["AssetName"]: (string),
+		})) -> ())
+			table.insert(unreliable_events[6], Callback)
+			for _, value in unreliable_event_queue[6] do
+				task.spawn(Callback, value)
+			end
+			unreliable_event_queue[6] = {}
+			return function()
+				table.remove(unreliable_events[6], table.find(unreliable_events[6], Callback))
+			end
+		end,
+	},
+	MapLoadingComplete = {
+		On = function(Callback: (Value: ({
+			["MapId"]: (string),
+			["Success"]: (boolean),
+		})) -> ())
+			table.insert(reliable_events[32], Callback)
+			for _, value in reliable_event_queue[32] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[32] = {}
+			return function()
+				table.remove(reliable_events[32], table.find(reliable_events[32], Callback))
+			end
+		end,
+	},
+	MapConfigSync = {
+		On = function(Callback: (Value: ({
+			["MapId"]: (string),
+			["GridCornerAX"]: (number),
+			["GridCornerAY"]: (number),
+			["GridCornerAZ"]: (number),
+			["GridCornerBX"]: (number),
+			["GridCornerBY"]: (number),
+			["GridCornerBZ"]: (number),
+			["GridY"]: (number),
+			["CellWidth"]: (number),
+			["CellDepth"]: (number),
+			["BasePositionX"]: (number),
+			["BasePositionY"]: (number),
+			["BasePositionZ"]: (number),
+			["ZombieDirectionX"]: (number),
+			["ZombieDirectionZ"]: (number),
+		})) -> ())
+			table.insert(reliable_events[30], Callback)
+			for _, value in reliable_event_queue[30] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[30] = {}
+			return function()
+				table.remove(reliable_events[30], table.find(reliable_events[30], Callback))
+			end
 		end,
 	},
 	LevelUp = {

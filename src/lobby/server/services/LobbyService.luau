@@ -15,13 +15,13 @@
 ]]
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService") -- Reserved for future use
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local LobbyConfig = require(Shared.config.LobbyConfig)
+local _LobbyConfig = require(Shared.config.LobbyConfig) -- Reserved for future use
 
 -- Managers
 local PadManager = require(script.Parent.Parent.modules.PadManager)
@@ -53,6 +53,9 @@ local _countdownManager: CountdownManager.CountdownManager
 local _teleportManager: TeleportManager.TeleportManager
 local _broadcaster: PadBroadcaster.PadBroadcaster
 local _touchHandler: PadTouchHandler.PadTouchHandler
+
+-- Forward declarations
+local handlePlayerLeave: (player: Player) -> ()
 
 --[[ ============================================
     PRIVATE: Core pad operations
@@ -107,7 +110,7 @@ local function handlePlayerJoin(player: Player, padModel: Model)
 end
 
 -- Handle player leaving a pad
-local function handlePlayerLeave(player: Player)
+function handlePlayerLeave(player: Player)
     local padId = _queueManager:LeavePad(player)
     if not padId then
         return

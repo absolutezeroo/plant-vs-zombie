@@ -21,13 +21,41 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local _Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
-local StageData = require(Shared.data.StageData)
 local Logger = require(Shared.utils.Logger)
+
+-- Stage loading: Try new StageRegistry first, fallback to old StageData
+local StageRegistry: any = nil
+local StageData: any = nil
+
+local function getStageConfig(stageId: string): any
+    -- Try new system first
+    if not StageRegistry then
+        local success, registry = pcall(function()
+            return require(Shared.data.stages.StageRegistry)
+        end)
+        if success then
+            StageRegistry = registry
+        end
+    end
+    
+    if StageRegistry then
+        local config = StageRegistry.GetStage(stageId)
+        if config then
+            return config
+        end
+    end
+    
+    -- Fallback to old StageData
+    if not StageData then
+        StageData = require(Shared.data.StageData)
+    end
+    return StageData.GetStage(stageId)
+end
 
 -- Managers
 local Server = script.Parent.Parent.Parent
@@ -43,6 +71,26 @@ local ZombieTypeComponent = Components.ZombieTypeComponent
 -- Types
 type GameState = GameStateManager.GameState
 type SpawnPhase = WaveSpawner.SpawnPhase
+
+-- Stage config type (mirrors StageData.StageConfig for local use)
+type StageConfig = {
+    Id: string,
+    Name: string,
+    Description: string?,
+    World: number,
+    Level: number,
+    MapId: string?,
+    Waves: any?,
+    TotalWaves: number,
+    BaseBudget: number,
+    BudgetScale: number,
+    DefaultZombiePool: {string}?,
+    SunGeneration: number?,
+    StartingSun: number?,
+    Rewards: any?,
+    Stars: any?,
+    UnlockRequirement: any?,
+}
 
 -- Wave timing configuration
 local WaveConfig = {
@@ -64,7 +112,7 @@ local _phaseBudget = 0
 local _totalBudget = 0
 local _zombiesSpawnedThisWave = 0
 local _currentStageId = "1-1"
-local _currentStageConfig: StageData.StageConfig? = nil
+local _currentStageConfig: StageConfig? = nil
 local _autoStartEnabled = false
 
 -- Manager instances
@@ -143,13 +191,12 @@ local function advancePhase(world: any)
     end
 end
 
+-- Track if current wave uses defined spawns
+local _usingDefinedWave = false
+
 -- Start a new wave
-local function startWave(waveNumber: number)
+local function startWave(waveNumber: number, world: any?)
     _currentWave = waveNumber
-    _totalBudget = _spawner:CalculateBudget(waveNumber)
-    _currentPhase = "Trickle"
-    _phaseSpent = 0
-    _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Trickle")
     _zombiesSpawnedThisWave = 0
     _lastSpawnTime = os.clock()
     _waveStartTime = os.clock()
@@ -158,7 +205,34 @@ local function startWave(waveNumber: number)
     local PlantFoodSystemAPI = getPlantFoodSystem().API
     PlantFoodSystemAPI.ResetWaveTracking()
     
-    Logger.Info("WaveManager", `=== WAVE {waveNumber} START === Budget: {math.floor(_totalBudget)}`)
+    -- Check if this wave has precise spawn definitions
+    if _spawner:HasDefinedWave(waveNumber) then
+        _usingDefinedWave = true
+        local waveDef = _spawner:GetWaveDefinition(waveNumber)
+        
+        -- Apply pre-delay if specified
+        local preDelay = waveDef and waveDef.PreDelay or 0
+        if preDelay > 0 then
+            task.delay(preDelay, function()
+                if world then
+                    _spawner:SpawnDefinedWave(world, waveNumber)
+                end
+            end)
+        elseif world then
+            _spawner:SpawnDefinedWave(world, waveNumber)
+        end
+        
+        Logger.Info("WaveManager", `=== WAVE {waveNumber} START === (Defined spawns)`)
+    else
+        -- Fallback to budget-based system
+        _usingDefinedWave = false
+        _totalBudget = _spawner:CalculateBudget(waveNumber)
+        _currentPhase = "Trickle"
+        _phaseSpent = 0
+        _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Trickle")
+        
+        Logger.Info("WaveManager", `=== WAVE {waveNumber} START === Budget: {math.floor(_totalBudget)}`)
+    end
     
     _broadcaster:BroadcastWaveStarted(waveNumber, 0)
 end
@@ -192,7 +266,7 @@ local function handleGameEnd(isVictory: boolean)
                 CoinsEarned = sessionStats.CoinsEarned,
                 PlantsPlaced = sessionStats.PlantsPlaced or 0,
             },
-            StageConfig = _currentStageConfig,
+            StageConfig = _currentStageConfig :: any,
             StarRating = starRating,
             IsFirstClear = isFirstClear,
             IsNewBest = isNewBest,
@@ -313,7 +387,8 @@ function WaveManager.StartStage(stageId: string): boolean
         return false
     end
     
-    local stageConfig = StageData.GetStage(stageId)
+    -- Use new stage loading system
+    local stageConfig = getStageConfig(stageId)
     if not stageConfig then
         Logger.Error("WaveManager", `Invalid stage ID: {stageId}`)
         return false
@@ -322,7 +397,14 @@ function WaveManager.StartStage(stageId: string): boolean
     -- Configure stage
     _currentStageId = stageId
     _currentStageConfig = stageConfig
-    _totalWaves = stageConfig.WaveCount
+    
+    -- Determine wave count: from Waves array or WaveCount property
+    if stageConfig.Waves and #stageConfig.Waves > 0 then
+        _totalWaves = #stageConfig.Waves
+    else
+        _totalWaves = stageConfig.TotalWaves or stageConfig.WaveCount or 5
+    end
+    
     _spawner:SetStageConfig(stageConfig)
     
     -- Update timing from stage
@@ -338,7 +420,8 @@ function WaveManager.StartStage(stageId: string): boolean
     
     Logger.Info("WaveManager", `=== STAGE {stageId}: {stageConfig.Name} ===`)
     
-    _broadcaster:BroadcastStageStarted(stageId, stageConfig.Name, stageConfig.WaveCount)
+    local waveCount = stageConfig.TotalWaves or stageConfig.WaveCount or _totalWaves
+    _broadcaster:BroadcastStageStarted(stageId, stageConfig.Name, waveCount)
     _broadcaster:BroadcastWaveStarted(0, 0)
     
     return true
@@ -390,7 +473,7 @@ local function WaveManagerSystem(world)
     end
     
     local currentTime = os.clock()
-    local state = _stateManager:GetState()
+    local state: string = _stateManager:GetState()
     
     -- Auto-start when players join (testing only)
     if state == "Waiting" and _autoStartEnabled then
@@ -413,7 +496,7 @@ local function WaveManagerSystem(world)
     end
     
     -- Preparation phase countdown
-    if state == "Preparation" then
+    if state :: string == "Preparation" then
         local remaining = math.ceil(_waveStartTime - currentTime)
         if remaining > 0 then
             -- Broadcast preparation time periodically
@@ -423,16 +506,16 @@ local function WaveManagerSystem(world)
         else
             -- Start first wave
             _stateManager:SetState("Playing")
-            startWave(1)
+            startWave(1, world)
         end
         return
     end
     
     -- Intermission between waves
-    if state == "Intermission" then
+    if state :: string == "Intermission" then
         if currentTime - _waveStartTime >= WaveConfig.WAVE_DELAY then
             _stateManager:SetState("Playing")
-            startWave(_currentWave + 1)
+            startWave(_currentWave + 1, world)
         end
         return
     end
@@ -440,19 +523,39 @@ local function WaveManagerSystem(world)
     -- Wait for first wave
     if _currentWave == 0 then
         if currentTime >= _waveStartTime then
-            startWave(1)
+            startWave(1, world)
         end
         return
     end
     
     -- Check wave completion
-    local allSpawned = _phaseSpent >= _phaseBudget and _currentPhase == "Flag"
+    -- For defined waves: just check if all zombies are dead
+    -- For budget waves: check if all phases are spent
+    local waveComplete = false
     local activeZombies = 0
-    for _ in world:query(ZombieTypeComponent) do
-        activeZombies += 1
+    local queryResult: any = world:query(ZombieTypeComponent)
+    if queryResult then
+        for _ in queryResult do
+            activeZombies += 1
+        end
     end
     
-    if allSpawned and activeZombies == 0 then
+    if _usingDefinedWave then
+        -- For defined waves, wave is complete when spawning is done and all zombies dead
+        -- We consider spawning "done" after 15 seconds max or when all zombies spawned are dead
+        local timeSinceWaveStart = currentTime - _waveStartTime
+        if activeZombies == 0 and timeSinceWaveStart > 3 then
+            waveComplete = true
+        end
+    else
+        -- For budget waves, check phase completion
+        local allSpawned = _phaseSpent >= _phaseBudget and _currentPhase == "Flag"
+        if allSpawned and activeZombies == 0 then
+            waveComplete = true
+        end
+    end
+    
+    if waveComplete then
         Logger.Info("WaveManager", `=== WAVE {_currentWave} COMPLETE ===`)
         
         _broadcaster:BroadcastWaveCompleted(_currentWave, true)
@@ -471,26 +574,28 @@ local function WaveManagerSystem(world)
         return
     end
     
-    -- Spawn zombies
-    if currentTime - _lastSpawnTime >= getSpawnInterval() then
-        if _phaseSpent >= _phaseBudget then
-            if _currentPhase ~= "Flag" then
-                advancePhase(world)
+    -- Budget-based spawning (only for non-defined waves)
+    if not _usingDefinedWave then
+        if currentTime - _lastSpawnTime >= getSpawnInterval() then
+            if _phaseSpent >= _phaseBudget then
+                if _currentPhase ~= "Flag" then
+                    advancePhase(world)
+                end
+                return
             end
-            return
-        end
-        
-        local remainingBudget = _phaseBudget - _phaseSpent
-        local zombieType = _spawner:PickZombie(_currentPhase, remainingBudget)
-        
-        if zombieType then
-            local lane = math.random(1, GridConfig.GRID_LANES)
-            _spawner:SpawnZombie(world, zombieType, lane, _currentWave)
-            _phaseSpent += _spawner:GetZombieCost(zombieType)
-            _lastSpawnTime = currentTime
-            _zombiesSpawnedThisWave += 1
-        else
-            _phaseSpent = _phaseBudget
+            
+            local remainingBudget = _phaseBudget - _phaseSpent
+            local zombieType = _spawner:PickZombie(_currentPhase, remainingBudget)
+            
+            if zombieType then
+                local lane = math.random(1, GridConfig.GRID_LANES)
+                _spawner:SpawnZombie(world, zombieType, lane, _currentWave)
+                _phaseSpent += _spawner:GetZombieCost(zombieType)
+                _lastSpawnTime = currentTime
+                _zombiesSpawnedThisWave += 1
+            else
+                _phaseSpent = _phaseBudget
+            end
         end
     end
 end

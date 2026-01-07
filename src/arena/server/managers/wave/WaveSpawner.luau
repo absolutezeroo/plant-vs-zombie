@@ -2,18 +2,22 @@
 --[[
     WaveSpawner.luau - Handles zombie spawning logic
     
-    Single Responsibility: Spawn zombies with budget-based system
-    - Spawn pools per phase (Trickle, Assault, Flag)
-    - Budget calculation per wave
-    - Zombie stat multipliers from stage config
+    Single Responsibility: Spawn zombies with both:
+    - Precise wave definitions (from StageRegistry)
+    - Budget-based fallback system
+    
+    Supports:
+    - Exact spawns: { ZombieType = "Cone", Lane = 3, Delay = 2 }
+    - Count spawns: { ZombieType = "Basic", Count = 5 } (random lanes)
+    - Budget-based: uses ZombiePool + budget calculation
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MapConfig = require(Shared.config.MapConfig)
+local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
-local StageData = require(Shared.data.StageData)
 local Logger = require(Shared.utils.Logger)
 local Components = require(Shared.components)
 
@@ -27,6 +31,21 @@ local PlantFoodComponent = Components.PlantFoodComponent
 -- Types
 export type SpawnPhase = "Trickle" | "Assault" | "Flag"
 
+export type SpawnEntry = {
+    ZombieType: string,
+    Lane: number?,
+    Delay: number?,
+    Count: number?,
+}
+
+export type WaveDefinition = {
+    Spawns: {SpawnEntry}?,
+    Budget: number?,
+    ZombiePool: {string}?,
+    SpawnInterval: number?,
+    PreDelay: number?,
+}
+
 export type SpawnConfig = {
     SpawnXOffset: number,
     TrickleRatio: number,
@@ -35,13 +54,19 @@ export type SpawnConfig = {
 }
 
 export type WaveSpawner = {
-    SetStageConfig: (self: WaveSpawner, stageConfig: StageData.StageConfig?) -> (),
+    SetStageConfig: (self: WaveSpawner, stageConfig: any?) -> (),
+    SetWaveDefinitions: (self: WaveSpawner, waves: {WaveDefinition}?) -> (),
+    HasDefinedWave: (self: WaveSpawner, waveNumber: number) -> boolean,
+    GetWaveDefinition: (self: WaveSpawner, waveNumber: number) -> WaveDefinition?,
+    SpawnDefinedWave: (self: WaveSpawner, world: any, waveNumber: number) -> (),
     CalculateBudget: (self: WaveSpawner, waveNumber: number) -> number,
     GetPhaseBudget: (self: WaveSpawner, totalBudget: number, phase: SpawnPhase) -> number,
-    SpawnZombie: (self: WaveSpawner, world: any, zombieType: string, lane: number) -> number,
+    SpawnZombie: (self: WaveSpawner, world: any, zombieType: string, lane: number, waveNumber: number?) -> number,
     PickZombie: (self: WaveSpawner, phase: SpawnPhase, remainingBudget: number) -> string?,
     GetZombieCost: (self: WaveSpawner, zombieType: string) -> number,
     GetSpawnPosition: (self: WaveSpawner, lane: number) -> Vector3,
+    GetZombieHealth: (self: WaveSpawner, zombieType: string) -> number,
+    GetZombieSpeed: (self: WaveSpawner, zombieType: string) -> number,
     RebuildSpawnPools: (self: WaveSpawner) -> (),
 }
 
@@ -50,10 +75,10 @@ WaveSpawner.__index = WaveSpawner
 
 -- Constants
 local DEFAULT_SPAWN_COST = 10
--- Note: SPAWN_X_OFFSET is now handled by MapConfig via ZombieSpawns Attachments
 
 -- State
-local _stageConfig: StageData.StageConfig? = nil
+local _stageConfig: any = nil  -- StageConfig from StageRegistry or StageData
+local _waveDefinitions: {WaveDefinition}? = nil  -- Precise wave definitions
 local _spawnPools: {Trickle: {string}, Assault: {string}, Flag: {string}} = {
     Trickle = {"Basic", "Basic", "Basic", "Cone", "Imp"},
     Assault = {"Basic", "Basic", "Cone", "Cone", "Bucket", "Imp", "Imp"},
@@ -86,16 +111,81 @@ function WaveSpawner.new(): WaveSpawner
     return self :: any
 end
 
--- Set stage configuration
-function WaveSpawner:SetStageConfig(stageConfig: StageData.StageConfig?)
+-- Set stage configuration (supports both old StageData and new StageRegistry configs)
+function WaveSpawner:SetStageConfig(stageConfig: any?)
     _stageConfig = stageConfig
+    
+    -- Extract wave definitions if present (new system)
+    if stageConfig and stageConfig.Waves then
+        _waveDefinitions = stageConfig.Waves
+        Logger.Info("WaveSpawner", `Loaded {#stageConfig.Waves} wave definitions`)
+    else
+        _waveDefinitions = nil
+    end
+    
     self:RebuildSpawnPools()
+end
+
+-- Set wave definitions directly
+function WaveSpawner:SetWaveDefinitions(waves: {WaveDefinition}?)
+    _waveDefinitions = waves
+    if waves then
+        Logger.Info("WaveSpawner", `Set {#waves} wave definitions`)
+    end
+end
+
+-- Check if a wave has precise spawn definitions
+function WaveSpawner:HasDefinedWave(waveNumber: number): boolean
+    if not _waveDefinitions then
+        return false
+    end
+    local wave = _waveDefinitions[waveNumber]
+    return wave ~= nil and wave.Spawns ~= nil and #wave.Spawns > 0
+end
+
+-- Get wave definition
+function WaveSpawner:GetWaveDefinition(waveNumber: number): WaveDefinition?
+    if not _waveDefinitions then
+        return nil
+    end
+    return _waveDefinitions[waveNumber]
+end
+
+-- Spawn all zombies for a defined wave (handles delays)
+function WaveSpawner:SpawnDefinedWave(world: any, waveNumber: number)
+    local wave = self:GetWaveDefinition(waveNumber)
+    if not wave or not wave.Spawns then
+        Logger.Warn("WaveSpawner", `No spawn definitions for wave {waveNumber}`)
+        return
+    end
+    
+    Logger.Info("WaveSpawner", `Spawning defined wave {waveNumber} with {#wave.Spawns} entries`)
+    
+    for _, spawnEntry in wave.Spawns do
+        local spawn = spawnEntry :: SpawnEntry
+        local delay = spawn.Delay or 0
+        local count = spawn.Count or 1
+        local lane = spawn.Lane
+        
+        task.delay(delay, function()
+            for i = 1, count do
+                -- If no lane specified, pick random
+                local spawnLane = lane or math.random(1, GridConfig.GRID_LANES)
+                self:SpawnZombie(world, spawn.ZombieType, spawnLane)
+                
+                -- Small delay between multiple spawns of same entry
+                if count > 1 and i < count then
+                    task.wait(0.3)
+                end
+            end
+        end)
+    end
 end
 
 -- Rebuild spawn pools based on stage config
 function WaveSpawner:RebuildSpawnPools()
-    if _stageConfig and _stageConfig.ZombiePool then
-        local pool = _stageConfig.ZombiePool
+    if _stageConfig and (_stageConfig.ZombiePool or _stageConfig.DefaultZombiePool) then
+        local pool = _stageConfig.ZombiePool or _stageConfig.DefaultZombiePool
         _spawnPools = {
             Trickle = pool,
             Assault = pool,

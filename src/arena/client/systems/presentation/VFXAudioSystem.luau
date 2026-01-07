@@ -12,15 +12,19 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+-- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+assert(Shared, "VFXAudioSystem: Shared folder not found")
 local Logger = require(Shared.utils.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/presentation/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:WaitForChild("modules")
+local Modules = Client:FindFirstChild("modules")
+assert(Modules, "VFXAudioSystem: modules folder not found")
 local VFXService = require(Modules.VFXService)
 local AudioService = require(Modules.AudioService)
-local ClientNetwork = Client:WaitForChild("network")
+local ClientNetwork = Client:FindFirstChild("network")
+assert(ClientNetwork, "VFXAudioSystem: network folder not found")
 local Network = require(ClientNetwork.generated)
 
 -- Game state for music

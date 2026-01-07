@@ -315,6 +315,34 @@ if not RunService:IsRunning() then
 		PlacePlantRequest = table.freeze({
 			SetCallback = noop
 		}),
+		MapLoadingStarted = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		MapLoadingProgress = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		MapLoadingComplete = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		MapConfigSync = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
 		LevelUp = table.freeze({
 			Fire = noop,
 			FireAll = noop,
@@ -445,13 +473,14 @@ local function getOrCreateUnreliableRemote(name: string): UnreliableRemoteEvent
 	return remote
 end
 
-local unreliable = { getOrCreateUnreliableRemote("ZAP_UNRELIABLE_0"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_1"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_2"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_3"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_4"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_5") }
+local unreliable = { getOrCreateUnreliableRemote("ZAP_UNRELIABLE_0"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_1"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_2"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_3"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_4"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_5"), getOrCreateUnreliableRemote("ZAP_UNRELIABLE_6") }
 assert(unreliable[1]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_0 to be an UnreliableRemoteEvent")
 assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to be an UnreliableRemoteEvent")
 assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
 assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
 assert(unreliable[5]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_4 to be an UnreliableRemoteEvent")
 assert(unreliable[6]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_5 to be an UnreliableRemoteEvent")
+assert(unreliable[7]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_6 to be an UnreliableRemoteEvent")
 local player_map = {}
 
 local function load_player(player: Player)
@@ -465,14 +494,14 @@ end
 Players.PlayerRemoving:Connect(function(player)
 	player_map[player] = nil
 end)
-export type Lane = (number)
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
+export type EntityId = (number)
+export type RequestId = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
 export type UpgradeType = ("Damage" | "Health" | "Cooldown")
-export type EntityId = (number)
-export type Column = (number)
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
 export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
-export type RequestId = (number)
+export type Column = (number)
+export type Lane = (number)
 
 local function SendEvents()
 	for player, outgoing in player_map do
@@ -1754,7 +1783,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 			["ZombieType"]: ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag"),
 			["Lane"]: (number),
@@ -1937,7 +1966,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityIds"]: ({ (number) }),
 			["PositionsX"]: ({ (number) }),
 		}))
@@ -2070,7 +2099,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Amount"]: (number),
 			["TotalXP"]: (number),
 			["CurrentLevel"]: (number),
@@ -2179,7 +2208,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["WaveNumber"]: (number),
 			["ZombieCount"]: (number),
 		}))
@@ -2288,7 +2317,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["WaveNumber"]: (number),
 			["Survived"]: (boolean),
 		}))
@@ -2425,7 +2454,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Success"]: (boolean),
 			["ErrorCode"]: ((number)?),
 		}))
@@ -2538,7 +2567,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["TimeRemaining"]: (number),
 		}))
 			load_empty()
@@ -2665,7 +2694,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 			["PositionX"]: (number),
 			["PositionY"]: (number),
@@ -2795,7 +2824,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 			["PositionY"]: (number),
 			["Falling"]: (boolean),
@@ -2887,7 +2916,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 		}))
 			load_empty()
@@ -2987,7 +3016,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["SunEntityId"]: (number),
 			["CollectorId"]: (number),
 			["NewTotal"]: (number),
@@ -3143,7 +3172,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["StageId"]: (string),
 			["StageName"]: (string),
 			["WaveCount"]: (number),
@@ -3340,7 +3369,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["CurrentStage"]: (string),
 			["TotalStars"]: (number),
 			["CompletedStageIds"]: ({ (string) }),
@@ -3573,7 +3602,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["StageId"]: (string),
 			["Victory"]: (boolean),
 			["Stars"]: (number),
@@ -3782,7 +3811,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["RequestId"]: (number),
 			["Success"]: (boolean),
 			["ErrorCode"]: ((number)?),
@@ -3941,7 +3970,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 			["Lane"]: (number),
 			["StartX"]: (number),
@@ -4035,7 +4064,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["TimeRemaining"]: (number),
 		}))
 			load_empty()
@@ -5163,7 +5192,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Coins"]: (number),
 			["Gems"]: (number),
 			["XP"]: (number),
@@ -6432,7 +6461,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
 			["Lane"]: (number),
@@ -6864,7 +6893,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["CollectorId"]: (number),
 			["NewChargeCount"]: (number),
 			["ZombieEntityId"]: (number),
@@ -6958,7 +6987,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["ChargeCount"]: (number),
 		}))
 			load_empty()
@@ -7493,7 +7522,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["PlantEntityId"]: (number),
 			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
 			["OwnerId"]: (number),
@@ -7843,6 +7872,687 @@ local returns = {
 			end
 		end,
 	},
+	MapLoadingStarted = {
+		Fire = function(Player: Player, Value: ({
+			["MapId"]: (string),
+			["TotalAssets"]: (number),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			local len_74 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_74)
+			alloc(len_74)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_74)
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["MapId"]: (string),
+			["TotalAssets"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			local len_75 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_75)
+			alloc(len_75)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_75)
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["MapId"]: (string),
+			["TotalAssets"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			local len_76 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_76)
+			alloc(len_76)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_76)
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [any]: Player }, Value: ({
+			["MapId"]: (string),
+			["TotalAssets"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			local len_77 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_77)
+			alloc(len_77)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_77)
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["MapId"]: (string),
+			["TotalAssets"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			local len_78 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_78)
+			alloc(len_78)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_78)
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	MapLoadingProgress = {
+		Fire = function(Player: Player, Value: ({
+			["LoadedAssets"]: (number),
+			["TotalAssets"]: (number),
+			["AssetName"]: (string),
+		}))
+			load_empty()
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["LoadedAssets"])
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local len_79 = #Value["AssetName"]
+			assert(len_79 <= 256, "value is more than 256!")
+			assert(utf8.len(Value["AssetName"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_79)
+			alloc(len_79)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["AssetName"], len_79)
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			unreliable[7]:FireClient(Player, buff, outgoing_inst)
+		end,
+		FireAll = function(Value: ({
+			["LoadedAssets"]: (number),
+			["TotalAssets"]: (number),
+			["AssetName"]: (string),
+		}))
+			load_empty()
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["LoadedAssets"])
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local len_80 = #Value["AssetName"]
+			assert(len_80 <= 256, "value is more than 256!")
+			assert(utf8.len(Value["AssetName"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_80)
+			alloc(len_80)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["AssetName"], len_80)
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			unreliable[7]:FireAllClients(buff, outgoing_inst)
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["LoadedAssets"]: (number),
+			["TotalAssets"]: (number),
+			["AssetName"]: (string),
+		}))
+			load_empty()
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["LoadedAssets"])
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local len_81 = #Value["AssetName"]
+			assert(len_81 <= 256, "value is more than 256!")
+			assert(utf8.len(Value["AssetName"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_81)
+			alloc(len_81)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["AssetName"], len_81)
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					unreliable[7]:FireClient(player, buff, outgoing_inst)
+				end
+			end
+		end,
+		FireList = function(List: { [any]: Player }, Value: ({
+			["LoadedAssets"]: (number),
+			["TotalAssets"]: (number),
+			["AssetName"]: (string),
+		}))
+			load_empty()
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["LoadedAssets"])
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local len_82 = #Value["AssetName"]
+			assert(len_82 <= 256, "value is more than 256!")
+			assert(utf8.len(Value["AssetName"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_82)
+			alloc(len_82)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["AssetName"], len_82)
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for _, player in List do
+				unreliable[7]:FireClient(player, buff, outgoing_inst)
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["LoadedAssets"]: (number),
+			["TotalAssets"]: (number),
+			["AssetName"]: (string),
+		}))
+			load_empty()
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["LoadedAssets"])
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, Value["TotalAssets"])
+			local len_83 = #Value["AssetName"]
+			assert(len_83 <= 256, "value is more than 256!")
+			assert(utf8.len(Value["AssetName"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_83)
+			alloc(len_83)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["AssetName"], len_83)
+			local buff = buffer.create(outgoing_used)
+			buffer.copy(buff, 0, outgoing_buff, 0, outgoing_used)
+			for player in Set do
+				unreliable[7]:FireClient(player, buff, outgoing_inst)
+			end
+		end,
+	},
+	MapLoadingComplete = {
+		Fire = function(Player: Player, Value: ({
+			["MapId"]: (string),
+			["Success"]: (boolean),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			local bool_38 = 0
+			local bool_38_pos_1 = alloc(1)
+			local len_84 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_84)
+			alloc(len_84)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_84)
+			if Value["Success"] then
+				bool_38 = bit32.bor(bool_38, 0b0000000000000001)
+			end
+			buffer.writeu8(outgoing_buff, bool_38_pos_1, bool_38)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["MapId"]: (string),
+			["Success"]: (boolean),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			local bool_39 = 0
+			local bool_39_pos_1 = alloc(1)
+			local len_85 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_85)
+			alloc(len_85)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_85)
+			if Value["Success"] then
+				bool_39 = bit32.bor(bool_39, 0b0000000000000001)
+			end
+			buffer.writeu8(outgoing_buff, bool_39_pos_1, bool_39)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["MapId"]: (string),
+			["Success"]: (boolean),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			local bool_40 = 0
+			local bool_40_pos_1 = alloc(1)
+			local len_86 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_86)
+			alloc(len_86)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_86)
+			if Value["Success"] then
+				bool_40 = bit32.bor(bool_40, 0b0000000000000001)
+			end
+			buffer.writeu8(outgoing_buff, bool_40_pos_1, bool_40)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [any]: Player }, Value: ({
+			["MapId"]: (string),
+			["Success"]: (boolean),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			local bool_41 = 0
+			local bool_41_pos_1 = alloc(1)
+			local len_87 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_87)
+			alloc(len_87)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_87)
+			if Value["Success"] then
+				bool_41 = bit32.bor(bool_41, 0b0000000000000001)
+			end
+			buffer.writeu8(outgoing_buff, bool_41_pos_1, bool_41)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["MapId"]: (string),
+			["Success"]: (boolean),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			local bool_42 = 0
+			local bool_42_pos_1 = alloc(1)
+			local len_88 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_88)
+			alloc(len_88)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_88)
+			if Value["Success"] then
+				bool_42 = bit32.bor(bool_42, 0b0000000000000001)
+			end
+			buffer.writeu8(outgoing_buff, bool_42_pos_1, bool_42)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	MapConfigSync = {
+		Fire = function(Player: Player, Value: ({
+			["MapId"]: (string),
+			["GridCornerAX"]: (number),
+			["GridCornerAY"]: (number),
+			["GridCornerAZ"]: (number),
+			["GridCornerBX"]: (number),
+			["GridCornerBY"]: (number),
+			["GridCornerBZ"]: (number),
+			["GridY"]: (number),
+			["CellWidth"]: (number),
+			["CellDepth"]: (number),
+			["BasePositionX"]: (number),
+			["BasePositionY"]: (number),
+			["BasePositionZ"]: (number),
+			["ZombieDirectionX"]: (number),
+			["ZombieDirectionZ"]: (number),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			local len_89 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_89)
+			alloc(len_89)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_89)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellWidth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellDepth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionZ"])
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["MapId"]: (string),
+			["GridCornerAX"]: (number),
+			["GridCornerAY"]: (number),
+			["GridCornerAZ"]: (number),
+			["GridCornerBX"]: (number),
+			["GridCornerBY"]: (number),
+			["GridCornerBZ"]: (number),
+			["GridY"]: (number),
+			["CellWidth"]: (number),
+			["CellDepth"]: (number),
+			["BasePositionX"]: (number),
+			["BasePositionY"]: (number),
+			["BasePositionZ"]: (number),
+			["ZombieDirectionX"]: (number),
+			["ZombieDirectionZ"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			local len_90 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_90)
+			alloc(len_90)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_90)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellWidth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellDepth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionZ"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["MapId"]: (string),
+			["GridCornerAX"]: (number),
+			["GridCornerAY"]: (number),
+			["GridCornerAZ"]: (number),
+			["GridCornerBX"]: (number),
+			["GridCornerBY"]: (number),
+			["GridCornerBZ"]: (number),
+			["GridY"]: (number),
+			["CellWidth"]: (number),
+			["CellDepth"]: (number),
+			["BasePositionX"]: (number),
+			["BasePositionY"]: (number),
+			["BasePositionZ"]: (number),
+			["ZombieDirectionX"]: (number),
+			["ZombieDirectionZ"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			local len_91 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_91)
+			alloc(len_91)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_91)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellWidth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellDepth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionZ"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [any]: Player }, Value: ({
+			["MapId"]: (string),
+			["GridCornerAX"]: (number),
+			["GridCornerAY"]: (number),
+			["GridCornerAZ"]: (number),
+			["GridCornerBX"]: (number),
+			["GridCornerBY"]: (number),
+			["GridCornerBZ"]: (number),
+			["GridY"]: (number),
+			["CellWidth"]: (number),
+			["CellDepth"]: (number),
+			["BasePositionX"]: (number),
+			["BasePositionY"]: (number),
+			["BasePositionZ"]: (number),
+			["ZombieDirectionX"]: (number),
+			["ZombieDirectionZ"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			local len_92 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_92)
+			alloc(len_92)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_92)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellWidth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellDepth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionZ"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["MapId"]: (string),
+			["GridCornerAX"]: (number),
+			["GridCornerAY"]: (number),
+			["GridCornerAZ"]: (number),
+			["GridCornerBX"]: (number),
+			["GridCornerBY"]: (number),
+			["GridCornerBZ"]: (number),
+			["GridY"]: (number),
+			["CellWidth"]: (number),
+			["CellDepth"]: (number),
+			["BasePositionX"]: (number),
+			["BasePositionY"]: (number),
+			["BasePositionZ"]: (number),
+			["ZombieDirectionX"]: (number),
+			["ZombieDirectionZ"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			local len_93 = #Value["MapId"]
+			assert(utf8.len(Value["MapId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_93)
+			alloc(len_93)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["MapId"], len_93)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerAZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridCornerBZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["GridY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellWidth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["CellDepth"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionY"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["BasePositionZ"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionX"])
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["ZombieDirectionZ"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
 	LevelUp = {
 		Fire = function(Player: Player, Value: ({
 			["NewLevel"]: (number),
@@ -7853,22 +8563,22 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-			local bool_38 = 0
-			local bool_38_pos_1 = alloc(1)
+			local bool_43 = 0
+			local bool_43_pos_1 = alloc(1)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			if Value["RewardCoins"] ~= nil then
-				bool_38 = bit32.bor(bool_38, 0b0000000000000001)
+				bool_43 = bit32.bor(bool_43, 0b0000000000000001)
 				alloc(2)
 				buffer.writeu16(outgoing_buff, outgoing_apos, Value["RewardCoins"])
 			end
 			if Value["RewardGems"] ~= nil then
-				bool_38 = bit32.bor(bool_38, 0b0000000000000010)
+				bool_43 = bit32.bor(bool_43, 0b0000000000000010)
 				alloc(1)
 				buffer.writeu8(outgoing_buff, outgoing_apos, Value["RewardGems"])
 			end
 			if Value["UnlockedPlant"] ~= nil then
-				bool_38 = bit32.bor(bool_38, 0b0000000000000100)
+				bool_43 = bit32.bor(bool_43, 0b0000000000000100)
 				if Value["UnlockedPlant"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -8017,7 +8727,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_38_pos_1, bool_38)
+			buffer.writeu8(outgoing_buff, bool_43_pos_1, bool_43)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -8029,22 +8739,22 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-			local bool_39 = 0
-			local bool_39_pos_1 = alloc(1)
+			local bool_44 = 0
+			local bool_44_pos_1 = alloc(1)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			if Value["RewardCoins"] ~= nil then
-				bool_39 = bit32.bor(bool_39, 0b0000000000000001)
+				bool_44 = bit32.bor(bool_44, 0b0000000000000001)
 				alloc(2)
 				buffer.writeu16(outgoing_buff, outgoing_apos, Value["RewardCoins"])
 			end
 			if Value["RewardGems"] ~= nil then
-				bool_39 = bit32.bor(bool_39, 0b0000000000000010)
+				bool_44 = bit32.bor(bool_44, 0b0000000000000010)
 				alloc(1)
 				buffer.writeu8(outgoing_buff, outgoing_apos, Value["RewardGems"])
 			end
 			if Value["UnlockedPlant"] ~= nil then
-				bool_39 = bit32.bor(bool_39, 0b0000000000000100)
+				bool_44 = bit32.bor(bool_44, 0b0000000000000100)
 				if Value["UnlockedPlant"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -8193,7 +8903,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_39_pos_1, bool_39)
+			buffer.writeu8(outgoing_buff, bool_44_pos_1, bool_44)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -8212,22 +8922,22 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-			local bool_40 = 0
-			local bool_40_pos_1 = alloc(1)
+			local bool_45 = 0
+			local bool_45_pos_1 = alloc(1)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			if Value["RewardCoins"] ~= nil then
-				bool_40 = bit32.bor(bool_40, 0b0000000000000001)
+				bool_45 = bit32.bor(bool_45, 0b0000000000000001)
 				alloc(2)
 				buffer.writeu16(outgoing_buff, outgoing_apos, Value["RewardCoins"])
 			end
 			if Value["RewardGems"] ~= nil then
-				bool_40 = bit32.bor(bool_40, 0b0000000000000010)
+				bool_45 = bit32.bor(bool_45, 0b0000000000000010)
 				alloc(1)
 				buffer.writeu8(outgoing_buff, outgoing_apos, Value["RewardGems"])
 			end
 			if Value["UnlockedPlant"] ~= nil then
-				bool_40 = bit32.bor(bool_40, 0b0000000000000100)
+				bool_45 = bit32.bor(bool_45, 0b0000000000000100)
 				if Value["UnlockedPlant"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -8376,7 +9086,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_40_pos_1, bool_40)
+			buffer.writeu8(outgoing_buff, bool_45_pos_1, bool_45)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -8388,7 +9098,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["NewLevel"]: (number),
 			["RewardCoins"]: ((number)?),
 			["RewardGems"]: ((number)?),
@@ -8397,22 +9107,22 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-			local bool_41 = 0
-			local bool_41_pos_1 = alloc(1)
+			local bool_46 = 0
+			local bool_46_pos_1 = alloc(1)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			if Value["RewardCoins"] ~= nil then
-				bool_41 = bit32.bor(bool_41, 0b0000000000000001)
+				bool_46 = bit32.bor(bool_46, 0b0000000000000001)
 				alloc(2)
 				buffer.writeu16(outgoing_buff, outgoing_apos, Value["RewardCoins"])
 			end
 			if Value["RewardGems"] ~= nil then
-				bool_41 = bit32.bor(bool_41, 0b0000000000000010)
+				bool_46 = bit32.bor(bool_46, 0b0000000000000010)
 				alloc(1)
 				buffer.writeu8(outgoing_buff, outgoing_apos, Value["RewardGems"])
 			end
 			if Value["UnlockedPlant"] ~= nil then
-				bool_41 = bit32.bor(bool_41, 0b0000000000000100)
+				bool_46 = bit32.bor(bool_46, 0b0000000000000100)
 				if Value["UnlockedPlant"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -8561,7 +9271,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_41_pos_1, bool_41)
+			buffer.writeu8(outgoing_buff, bool_46_pos_1, bool_46)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -8580,22 +9290,22 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-			local bool_42 = 0
-			local bool_42_pos_1 = alloc(1)
+			local bool_47 = 0
+			local bool_47_pos_1 = alloc(1)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			if Value["RewardCoins"] ~= nil then
-				bool_42 = bit32.bor(bool_42, 0b0000000000000001)
+				bool_47 = bit32.bor(bool_47, 0b0000000000000001)
 				alloc(2)
 				buffer.writeu16(outgoing_buff, outgoing_apos, Value["RewardCoins"])
 			end
 			if Value["RewardGems"] ~= nil then
-				bool_42 = bit32.bor(bool_42, 0b0000000000000010)
+				bool_47 = bit32.bor(bool_47, 0b0000000000000010)
 				alloc(1)
 				buffer.writeu8(outgoing_buff, outgoing_apos, Value["RewardGems"])
 			end
 			if Value["UnlockedPlant"] ~= nil then
-				bool_42 = bit32.bor(bool_42, 0b0000000000000100)
+				bool_47 = bit32.bor(bool_47, 0b0000000000000100)
 				if Value["UnlockedPlant"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -8744,7 +9454,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_42_pos_1, bool_42)
+			buffer.writeu8(outgoing_buff, bool_47_pos_1, bool_47)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -8790,7 +9500,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["TimeRemaining"]: (number),
 		}))
 			load_empty()
@@ -8880,7 +9590,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Amount"]: (number),
 			["TotalGems"]: (number),
 			["Reason"]: (number),
@@ -8934,20 +9644,20 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-			local bool_43 = 0
-			local bool_43_pos_1 = alloc(1)
+			local bool_48 = 0
+			local bool_48_pos_1 = alloc(1)
 			if Value["Phase"] == "Pregame" then
-				bool_43 = bit32.bor(bool_43, 0b0000000000000001)
+				bool_48 = bit32.bor(bool_48, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_43 = bit32.bor(bool_43, 0b0000000000000010)
+				bool_48 = bit32.bor(bool_48, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_43 = bit32.bor(bool_43, 0b0000000000000100)
+				bool_48 = bit32.bor(bool_48, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_43 = bit32.bor(bool_43, 0b0000000000001000)
+				bool_48 = bit32.bor(bool_48, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_43_pos_1, bool_43)
+			buffer.writeu8(outgoing_buff, bool_48_pos_1, bool_48)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -8956,20 +9666,20 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-			local bool_44 = 0
-			local bool_44_pos_1 = alloc(1)
+			local bool_49 = 0
+			local bool_49_pos_1 = alloc(1)
 			if Value["Phase"] == "Pregame" then
-				bool_44 = bit32.bor(bool_44, 0b0000000000000001)
+				bool_49 = bit32.bor(bool_49, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_44 = bit32.bor(bool_44, 0b0000000000000010)
+				bool_49 = bit32.bor(bool_49, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_44 = bit32.bor(bool_44, 0b0000000000000100)
+				bool_49 = bit32.bor(bool_49, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_44 = bit32.bor(bool_44, 0b0000000000001000)
+				bool_49 = bit32.bor(bool_49, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_44_pos_1, bool_44)
+			buffer.writeu8(outgoing_buff, bool_49_pos_1, bool_49)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -8985,20 +9695,20 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-			local bool_45 = 0
-			local bool_45_pos_1 = alloc(1)
+			local bool_50 = 0
+			local bool_50_pos_1 = alloc(1)
 			if Value["Phase"] == "Pregame" then
-				bool_45 = bit32.bor(bool_45, 0b0000000000000001)
+				bool_50 = bit32.bor(bool_50, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_45 = bit32.bor(bool_45, 0b0000000000000010)
+				bool_50 = bit32.bor(bool_50, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_45 = bit32.bor(bool_45, 0b0000000000000100)
+				bool_50 = bit32.bor(bool_50, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_45 = bit32.bor(bool_45, 0b0000000000001000)
+				bool_50 = bit32.bor(bool_50, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_45_pos_1, bool_45)
+			buffer.writeu8(outgoing_buff, bool_50_pos_1, bool_50)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -9010,26 +9720,26 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Phase"]: ("Pregame" | "Wave" | "Intermission" | "GameOver"),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-			local bool_46 = 0
-			local bool_46_pos_1 = alloc(1)
+			local bool_51 = 0
+			local bool_51_pos_1 = alloc(1)
 			if Value["Phase"] == "Pregame" then
-				bool_46 = bit32.bor(bool_46, 0b0000000000000001)
+				bool_51 = bit32.bor(bool_51, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_46 = bit32.bor(bool_46, 0b0000000000000010)
+				bool_51 = bit32.bor(bool_51, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_46 = bit32.bor(bool_46, 0b0000000000000100)
+				bool_51 = bit32.bor(bool_51, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_46 = bit32.bor(bool_46, 0b0000000000001000)
+				bool_51 = bit32.bor(bool_51, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_46_pos_1, bool_46)
+			buffer.writeu8(outgoing_buff, bool_51_pos_1, bool_51)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -9045,20 +9755,20 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-			local bool_47 = 0
-			local bool_47_pos_1 = alloc(1)
+			local bool_52 = 0
+			local bool_52_pos_1 = alloc(1)
 			if Value["Phase"] == "Pregame" then
-				bool_47 = bit32.bor(bool_47, 0b0000000000000001)
+				bool_52 = bit32.bor(bool_52, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_47 = bit32.bor(bool_47, 0b0000000000000010)
+				bool_52 = bit32.bor(bool_52, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_47 = bit32.bor(bool_47, 0b0000000000000100)
+				bool_52 = bit32.bor(bool_52, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_47 = bit32.bor(bool_47, 0b0000000000001000)
+				bool_52 = bit32.bor(bool_52, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_47_pos_1, bool_47)
+			buffer.writeu8(outgoing_buff, bool_52_pos_1, bool_52)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -9077,14 +9787,14 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local bool_48 = 0
-			local bool_48_pos_1 = alloc(1)
+			local bool_53 = 0
+			local bool_53_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_48 = bit32.bor(bool_48, 0b0000000000000001)
+				bool_53 = bit32.bor(bool_53, 0b0000000000000001)
 			end
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveReached"])
-			buffer.writeu8(outgoing_buff, bool_48_pos_1, bool_48)
+			buffer.writeu8(outgoing_buff, bool_53_pos_1, bool_53)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -9094,14 +9804,14 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local bool_49 = 0
-			local bool_49_pos_1 = alloc(1)
+			local bool_54 = 0
+			local bool_54_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_49 = bit32.bor(bool_49, 0b0000000000000001)
+				bool_54 = bit32.bor(bool_54, 0b0000000000000001)
 			end
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveReached"])
-			buffer.writeu8(outgoing_buff, bool_49_pos_1, bool_49)
+			buffer.writeu8(outgoing_buff, bool_54_pos_1, bool_54)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -9118,14 +9828,14 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local bool_50 = 0
-			local bool_50_pos_1 = alloc(1)
+			local bool_55 = 0
+			local bool_55_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_50 = bit32.bor(bool_50, 0b0000000000000001)
+				bool_55 = bit32.bor(bool_55, 0b0000000000000001)
 			end
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveReached"])
-			buffer.writeu8(outgoing_buff, bool_50_pos_1, bool_50)
+			buffer.writeu8(outgoing_buff, bool_55_pos_1, bool_55)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -9137,21 +9847,21 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Victory"]: (boolean),
 			["WaveReached"]: (number),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local bool_51 = 0
-			local bool_51_pos_1 = alloc(1)
+			local bool_56 = 0
+			local bool_56_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_51 = bit32.bor(bool_51, 0b0000000000000001)
+				bool_56 = bit32.bor(bool_56, 0b0000000000000001)
 			end
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveReached"])
-			buffer.writeu8(outgoing_buff, bool_51_pos_1, bool_51)
+			buffer.writeu8(outgoing_buff, bool_56_pos_1, bool_56)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -9168,14 +9878,14 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local bool_52 = 0
-			local bool_52_pos_1 = alloc(1)
+			local bool_57 = 0
+			local bool_57_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_52 = bit32.bor(bool_52, 0b0000000000000001)
+				bool_57 = bit32.bor(bool_57, 0b0000000000000001)
 			end
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveReached"])
-			buffer.writeu8(outgoing_buff, bool_52_pos_1, bool_52)
+			buffer.writeu8(outgoing_buff, bool_57_pos_1, bool_57)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -9202,10 +9912,10 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-			local bool_53 = 0
-			local bool_53_pos_1 = alloc(1)
+			local bool_58 = 0
+			local bool_58_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_53 = bit32.bor(bool_53, 0b0000000000000001)
+				bool_58 = bit32.bor(bool_58, 0b0000000000000001)
 			end
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
@@ -9225,7 +9935,7 @@ local returns = {
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["LevelsGained"])
-			buffer.writeu8(outgoing_buff, bool_53_pos_1, bool_53)
+			buffer.writeu8(outgoing_buff, bool_58_pos_1, bool_58)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -9243,10 +9953,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-			local bool_54 = 0
-			local bool_54_pos_1 = alloc(1)
+			local bool_59 = 0
+			local bool_59_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_54 = bit32.bor(bool_54, 0b0000000000000001)
+				bool_59 = bit32.bor(bool_59, 0b0000000000000001)
 			end
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
@@ -9266,7 +9976,7 @@ local returns = {
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["LevelsGained"])
-			buffer.writeu8(outgoing_buff, bool_54_pos_1, bool_54)
+			buffer.writeu8(outgoing_buff, bool_59_pos_1, bool_59)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -9291,10 +10001,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-			local bool_55 = 0
-			local bool_55_pos_1 = alloc(1)
+			local bool_60 = 0
+			local bool_60_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_55 = bit32.bor(bool_55, 0b0000000000000001)
+				bool_60 = bit32.bor(bool_60, 0b0000000000000001)
 			end
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
@@ -9314,7 +10024,7 @@ local returns = {
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["LevelsGained"])
-			buffer.writeu8(outgoing_buff, bool_55_pos_1, bool_55)
+			buffer.writeu8(outgoing_buff, bool_60_pos_1, bool_60)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -9326,7 +10036,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Victory"]: (boolean),
 			["CoinsEarned"]: (number),
 			["ZombiesKilled"]: (number),
@@ -9341,10 +10051,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-			local bool_56 = 0
-			local bool_56_pos_1 = alloc(1)
+			local bool_61 = 0
+			local bool_61_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_56 = bit32.bor(bool_56, 0b0000000000000001)
+				bool_61 = bit32.bor(bool_61, 0b0000000000000001)
 			end
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
@@ -9364,7 +10074,7 @@ local returns = {
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["LevelsGained"])
-			buffer.writeu8(outgoing_buff, bool_56_pos_1, bool_56)
+			buffer.writeu8(outgoing_buff, bool_61_pos_1, bool_61)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -9389,10 +10099,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-			local bool_57 = 0
-			local bool_57_pos_1 = alloc(1)
+			local bool_62 = 0
+			local bool_62_pos_1 = alloc(1)
 			if Value["Victory"] then
-				bool_57 = bit32.bor(bool_57, 0b0000000000000001)
+				bool_62 = bit32.bor(bool_62, 0b0000000000000001)
 			end
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
@@ -9412,7 +10122,7 @@ local returns = {
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["NewLevel"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["LevelsGained"])
-			buffer.writeu8(outgoing_buff, bool_57_pos_1, bool_57)
+			buffer.writeu8(outgoing_buff, bool_62_pos_1, bool_62)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -9432,24 +10142,24 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-			local bool_58 = 0
-			local bool_58_pos_1 = alloc(1)
+			local bool_63 = 0
+			local bool_63_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["SunCount"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveNumber"])
 			if Value["Phase"] == "Pregame" then
-				bool_58 = bit32.bor(bool_58, 0b0000000000000001)
+				bool_63 = bit32.bor(bool_63, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_58 = bit32.bor(bool_58, 0b0000000000000010)
+				bool_63 = bit32.bor(bool_63, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_58 = bit32.bor(bool_58, 0b0000000000000100)
+				bool_63 = bit32.bor(bool_63, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_58 = bit32.bor(bool_58, 0b0000000000001000)
+				bool_63 = bit32.bor(bool_63, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_58_pos_1, bool_58)
+			buffer.writeu8(outgoing_buff, bool_63_pos_1, bool_63)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -9460,24 +10170,24 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-			local bool_59 = 0
-			local bool_59_pos_1 = alloc(1)
+			local bool_64 = 0
+			local bool_64_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["SunCount"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveNumber"])
 			if Value["Phase"] == "Pregame" then
-				bool_59 = bit32.bor(bool_59, 0b0000000000000001)
+				bool_64 = bit32.bor(bool_64, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_59 = bit32.bor(bool_59, 0b0000000000000010)
+				bool_64 = bit32.bor(bool_64, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_59 = bit32.bor(bool_59, 0b0000000000000100)
+				bool_64 = bit32.bor(bool_64, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_59 = bit32.bor(bool_59, 0b0000000000001000)
+				bool_64 = bit32.bor(bool_64, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_59_pos_1, bool_59)
+			buffer.writeu8(outgoing_buff, bool_64_pos_1, bool_64)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -9495,24 +10205,24 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-			local bool_60 = 0
-			local bool_60_pos_1 = alloc(1)
+			local bool_65 = 0
+			local bool_65_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["SunCount"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveNumber"])
 			if Value["Phase"] == "Pregame" then
-				bool_60 = bit32.bor(bool_60, 0b0000000000000001)
+				bool_65 = bit32.bor(bool_65, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_60 = bit32.bor(bool_60, 0b0000000000000010)
+				bool_65 = bit32.bor(bool_65, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_60 = bit32.bor(bool_60, 0b0000000000000100)
+				bool_65 = bit32.bor(bool_65, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_60 = bit32.bor(bool_60, 0b0000000000001000)
+				bool_65 = bit32.bor(bool_65, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_60_pos_1, bool_60)
+			buffer.writeu8(outgoing_buff, bool_65_pos_1, bool_65)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -9524,7 +10234,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["SunCount"]: (number),
 			["WaveNumber"]: (number),
 			["Phase"]: ("Pregame" | "Wave" | "Intermission" | "GameOver"),
@@ -9532,24 +10242,24 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-			local bool_61 = 0
-			local bool_61_pos_1 = alloc(1)
+			local bool_66 = 0
+			local bool_66_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["SunCount"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveNumber"])
 			if Value["Phase"] == "Pregame" then
-				bool_61 = bit32.bor(bool_61, 0b0000000000000001)
+				bool_66 = bit32.bor(bool_66, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_61 = bit32.bor(bool_61, 0b0000000000000010)
+				bool_66 = bit32.bor(bool_66, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_61 = bit32.bor(bool_61, 0b0000000000000100)
+				bool_66 = bit32.bor(bool_66, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_61 = bit32.bor(bool_61, 0b0000000000001000)
+				bool_66 = bit32.bor(bool_66, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_61_pos_1, bool_61)
+			buffer.writeu8(outgoing_buff, bool_66_pos_1, bool_66)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -9567,24 +10277,24 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-			local bool_62 = 0
-			local bool_62_pos_1 = alloc(1)
+			local bool_67 = 0
+			local bool_67_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["SunCount"])
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, Value["WaveNumber"])
 			if Value["Phase"] == "Pregame" then
-				bool_62 = bit32.bor(bool_62, 0b0000000000000001)
+				bool_67 = bit32.bor(bool_67, 0b0000000000000001)
 			elseif Value["Phase"] == "Wave" then
-				bool_62 = bit32.bor(bool_62, 0b0000000000000010)
+				bool_67 = bit32.bor(bool_67, 0b0000000000000010)
 			elseif Value["Phase"] == "Intermission" then
-				bool_62 = bit32.bor(bool_62, 0b0000000000000100)
+				bool_67 = bit32.bor(bool_67, 0b0000000000000100)
 			elseif Value["Phase"] == "GameOver" then
-				bool_62 = bit32.bor(bool_62, 0b0000000000001000)
+				bool_67 = bit32.bor(bool_67, 0b0000000000001000)
 			else
 				error("Invalid enumerator")
 			end
-			buffer.writeu8(outgoing_buff, bool_62_pos_1, bool_62)
+			buffer.writeu8(outgoing_buff, bool_67_pos_1, bool_67)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -9669,7 +10379,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["PositionX"]: (number),
 			["PositionY"]: (number),
 			["PositionZ"]: (number),
@@ -9769,7 +10479,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 		}))
 			load_empty()
@@ -9857,7 +10567,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["EntityId"]: (number),
 			["NewHealth"]: (number),
 			["DamageAmount"]: (number),
@@ -9906,10 +10616,10 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-			local bool_63 = 0
-			local bool_63_pos_1 = alloc(1)
+			local bool_68 = 0
+			local bool_68_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_63 = bit32.bor(bool_63, 0b0000000000000001)
+				bool_68 = bit32.bor(bool_68, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10059,7 +10769,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_63 = bit32.bor(bool_63, 0b0000000000000010)
+				bool_68 = bit32.bor(bool_68, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10209,7 +10919,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_63 = bit32.bor(bool_63, 0b0000000000000100)
+				bool_68 = bit32.bor(bool_68, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10359,7 +11069,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_63 = bit32.bor(bool_63, 0b0000000000001000)
+				bool_68 = bit32.bor(bool_68, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10509,7 +11219,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_63 = bit32.bor(bool_63, 0b0000000000010000)
+				bool_68 = bit32.bor(bool_68, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10659,7 +11369,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_63 = bit32.bor(bool_63, 0b0000000000100000)
+				bool_68 = bit32.bor(bool_68, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10808,7 +11518,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_63_pos_1, bool_63)
+			buffer.writeu8(outgoing_buff, bool_68_pos_1, bool_68)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -10822,10 +11532,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-			local bool_64 = 0
-			local bool_64_pos_1 = alloc(1)
+			local bool_69 = 0
+			local bool_69_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_64 = bit32.bor(bool_64, 0b0000000000000001)
+				bool_69 = bit32.bor(bool_69, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -10975,7 +11685,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_64 = bit32.bor(bool_64, 0b0000000000000010)
+				bool_69 = bit32.bor(bool_69, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -11125,7 +11835,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_64 = bit32.bor(bool_64, 0b0000000000000100)
+				bool_69 = bit32.bor(bool_69, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -11275,7 +11985,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_64 = bit32.bor(bool_64, 0b0000000000001000)
+				bool_69 = bit32.bor(bool_69, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -11425,7 +12135,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_64 = bit32.bor(bool_64, 0b0000000000010000)
+				bool_69 = bit32.bor(bool_69, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -11575,7 +12285,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_64 = bit32.bor(bool_64, 0b0000000000100000)
+				bool_69 = bit32.bor(bool_69, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -11724,7 +12434,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_64_pos_1, bool_64)
+			buffer.writeu8(outgoing_buff, bool_69_pos_1, bool_69)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -11745,10 +12455,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-			local bool_65 = 0
-			local bool_65_pos_1 = alloc(1)
+			local bool_70 = 0
+			local bool_70_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_65 = bit32.bor(bool_65, 0b0000000000000001)
+				bool_70 = bit32.bor(bool_70, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -11898,7 +12608,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_65 = bit32.bor(bool_65, 0b0000000000000010)
+				bool_70 = bit32.bor(bool_70, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12048,7 +12758,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_65 = bit32.bor(bool_65, 0b0000000000000100)
+				bool_70 = bit32.bor(bool_70, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12198,7 +12908,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_65 = bit32.bor(bool_65, 0b0000000000001000)
+				bool_70 = bit32.bor(bool_70, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12348,7 +13058,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_65 = bit32.bor(bool_65, 0b0000000000010000)
+				bool_70 = bit32.bor(bool_70, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12498,7 +13208,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_65 = bit32.bor(bool_65, 0b0000000000100000)
+				bool_70 = bit32.bor(bool_70, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12647,7 +13357,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_65_pos_1, bool_65)
+			buffer.writeu8(outgoing_buff, bool_70_pos_1, bool_70)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -12659,7 +13369,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Slot1"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
 			["Slot2"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
 			["Slot3"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
@@ -12670,10 +13380,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-			local bool_66 = 0
-			local bool_66_pos_1 = alloc(1)
+			local bool_71 = 0
+			local bool_71_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_66 = bit32.bor(bool_66, 0b0000000000000001)
+				bool_71 = bit32.bor(bool_71, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12823,7 +13533,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_66 = bit32.bor(bool_66, 0b0000000000000010)
+				bool_71 = bit32.bor(bool_71, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -12973,7 +13683,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_66 = bit32.bor(bool_66, 0b0000000000000100)
+				bool_71 = bit32.bor(bool_71, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -13123,7 +13833,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_66 = bit32.bor(bool_66, 0b0000000000001000)
+				bool_71 = bit32.bor(bool_71, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -13273,7 +13983,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_66 = bit32.bor(bool_66, 0b0000000000010000)
+				bool_71 = bit32.bor(bool_71, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -13423,7 +14133,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_66 = bit32.bor(bool_66, 0b0000000000100000)
+				bool_71 = bit32.bor(bool_71, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -13572,7 +14282,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_66_pos_1, bool_66)
+			buffer.writeu8(outgoing_buff, bool_71_pos_1, bool_71)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -13593,10 +14303,10 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-			local bool_67 = 0
-			local bool_67_pos_1 = alloc(1)
+			local bool_72 = 0
+			local bool_72_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_67 = bit32.bor(bool_67, 0b0000000000000001)
+				bool_72 = bit32.bor(bool_72, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -13746,7 +14456,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_67 = bit32.bor(bool_67, 0b0000000000000010)
+				bool_72 = bit32.bor(bool_72, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -13896,7 +14606,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_67 = bit32.bor(bool_67, 0b0000000000000100)
+				bool_72 = bit32.bor(bool_72, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -14046,7 +14756,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_67 = bit32.bor(bool_67, 0b0000000000001000)
+				bool_72 = bit32.bor(bool_72, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -14196,7 +14906,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_67 = bit32.bor(bool_67, 0b0000000000010000)
+				bool_72 = bit32.bor(bool_72, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -14346,7 +15056,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_67 = bit32.bor(bool_67, 0b0000000000100000)
+				bool_72 = bit32.bor(bool_72, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -14495,7 +15205,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_67_pos_1, bool_67)
+			buffer.writeu8(outgoing_buff, bool_72_pos_1, bool_72)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -14514,21 +15224,21 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-			local bool_68 = 0
-			local bool_68_pos_1 = alloc(1)
+			local bool_73 = 0
+			local bool_73_pos_1 = alloc(1)
 			if Value["Success"] then
-				bool_68 = bit32.bor(bool_68, 0b0000000000000001)
+				bool_73 = bit32.bor(bool_73, 0b0000000000000001)
 			end
 			if Value["Error"] ~= nil then
-				bool_68 = bit32.bor(bool_68, 0b0000000000000010)
-				local len_74 = #Value["Error"]
+				bool_73 = bit32.bor(bool_73, 0b0000000000000010)
+				local len_94 = #Value["Error"]
 				assert(utf8.len(Value["Error"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_74)
-				alloc(len_74)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_74)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_94)
+				alloc(len_94)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_94)
 			end
-			buffer.writeu8(outgoing_buff, bool_68_pos_1, bool_68)
+			buffer.writeu8(outgoing_buff, bool_73_pos_1, bool_73)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -14538,21 +15248,21 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-			local bool_69 = 0
-			local bool_69_pos_1 = alloc(1)
+			local bool_74 = 0
+			local bool_74_pos_1 = alloc(1)
 			if Value["Success"] then
-				bool_69 = bit32.bor(bool_69, 0b0000000000000001)
+				bool_74 = bit32.bor(bool_74, 0b0000000000000001)
 			end
 			if Value["Error"] ~= nil then
-				bool_69 = bit32.bor(bool_69, 0b0000000000000010)
-				local len_75 = #Value["Error"]
+				bool_74 = bit32.bor(bool_74, 0b0000000000000010)
+				local len_95 = #Value["Error"]
 				assert(utf8.len(Value["Error"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_75)
-				alloc(len_75)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_75)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_95)
+				alloc(len_95)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_95)
 			end
-			buffer.writeu8(outgoing_buff, bool_69_pos_1, bool_69)
+			buffer.writeu8(outgoing_buff, bool_74_pos_1, bool_74)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -14569,21 +15279,21 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-			local bool_70 = 0
-			local bool_70_pos_1 = alloc(1)
+			local bool_75 = 0
+			local bool_75_pos_1 = alloc(1)
 			if Value["Success"] then
-				bool_70 = bit32.bor(bool_70, 0b0000000000000001)
+				bool_75 = bit32.bor(bool_75, 0b0000000000000001)
 			end
 			if Value["Error"] ~= nil then
-				bool_70 = bit32.bor(bool_70, 0b0000000000000010)
-				local len_76 = #Value["Error"]
+				bool_75 = bit32.bor(bool_75, 0b0000000000000010)
+				local len_96 = #Value["Error"]
 				assert(utf8.len(Value["Error"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_76)
-				alloc(len_76)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_76)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_96)
+				alloc(len_96)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_96)
 			end
-			buffer.writeu8(outgoing_buff, bool_70_pos_1, bool_70)
+			buffer.writeu8(outgoing_buff, bool_75_pos_1, bool_75)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -14595,28 +15305,28 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Success"]: (boolean),
 			["Error"]: ((string)?),
 		}))
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-			local bool_71 = 0
-			local bool_71_pos_1 = alloc(1)
+			local bool_76 = 0
+			local bool_76_pos_1 = alloc(1)
 			if Value["Success"] then
-				bool_71 = bit32.bor(bool_71, 0b0000000000000001)
+				bool_76 = bit32.bor(bool_76, 0b0000000000000001)
 			end
 			if Value["Error"] ~= nil then
-				bool_71 = bit32.bor(bool_71, 0b0000000000000010)
-				local len_77 = #Value["Error"]
+				bool_76 = bit32.bor(bool_76, 0b0000000000000010)
+				local len_97 = #Value["Error"]
 				assert(utf8.len(Value["Error"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_77)
-				alloc(len_77)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_77)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_97)
+				alloc(len_97)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_97)
 			end
-			buffer.writeu8(outgoing_buff, bool_71_pos_1, bool_71)
+			buffer.writeu8(outgoing_buff, bool_76_pos_1, bool_76)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -14633,21 +15343,21 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-			local bool_72 = 0
-			local bool_72_pos_1 = alloc(1)
+			local bool_77 = 0
+			local bool_77_pos_1 = alloc(1)
 			if Value["Success"] then
-				bool_72 = bit32.bor(bool_72, 0b0000000000000001)
+				bool_77 = bit32.bor(bool_77, 0b0000000000000001)
 			end
 			if Value["Error"] ~= nil then
-				bool_72 = bit32.bor(bool_72, 0b0000000000000010)
-				local len_78 = #Value["Error"]
+				bool_77 = bit32.bor(bool_77, 0b0000000000000010)
+				local len_98 = #Value["Error"]
 				assert(utf8.len(Value["Error"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_78)
-				alloc(len_78)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_78)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_98)
+				alloc(len_98)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["Error"], len_98)
 			end
-			buffer.writeu8(outgoing_buff, bool_72_pos_1, bool_72)
+			buffer.writeu8(outgoing_buff, bool_77_pos_1, bool_77)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -14679,23 +15389,23 @@ local returns = {
 			load_player(Player)
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-			local bool_73 = 0
-			local bool_73_pos_1 = alloc(1)
+			local bool_78 = 0
+			local bool_78_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["Amount"])
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalCoins"])
 			if Value["SourceX"] ~= nil then
-				bool_73 = bit32.bor(bool_73, 0b0000000000000001)
+				bool_78 = bit32.bor(bool_78, 0b0000000000000001)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceX"])
 			end
 			if Value["SourceZ"] ~= nil then
-				bool_73 = bit32.bor(bool_73, 0b0000000000000010)
+				bool_78 = bit32.bor(bool_78, 0b0000000000000010)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceZ"])
 			end
-			buffer.writeu8(outgoing_buff, bool_73_pos_1, bool_73)
+			buffer.writeu8(outgoing_buff, bool_78_pos_1, bool_78)
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
@@ -14707,23 +15417,23 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-			local bool_74 = 0
-			local bool_74_pos_1 = alloc(1)
+			local bool_79 = 0
+			local bool_79_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["Amount"])
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalCoins"])
 			if Value["SourceX"] ~= nil then
-				bool_74 = bit32.bor(bool_74, 0b0000000000000001)
+				bool_79 = bit32.bor(bool_79, 0b0000000000000001)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceX"])
 			end
 			if Value["SourceZ"] ~= nil then
-				bool_74 = bit32.bor(bool_74, 0b0000000000000010)
+				bool_79 = bit32.bor(bool_79, 0b0000000000000010)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceZ"])
 			end
-			buffer.writeu8(outgoing_buff, bool_74_pos_1, bool_74)
+			buffer.writeu8(outgoing_buff, bool_79_pos_1, bool_79)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				load_player(player)
@@ -14742,23 +15452,23 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-			local bool_75 = 0
-			local bool_75_pos_1 = alloc(1)
+			local bool_80 = 0
+			local bool_80_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["Amount"])
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalCoins"])
 			if Value["SourceX"] ~= nil then
-				bool_75 = bit32.bor(bool_75, 0b0000000000000001)
+				bool_80 = bit32.bor(bool_80, 0b0000000000000001)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceX"])
 			end
 			if Value["SourceZ"] ~= nil then
-				bool_75 = bit32.bor(bool_75, 0b0000000000000010)
+				bool_80 = bit32.bor(bool_80, 0b0000000000000010)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceZ"])
 			end
-			buffer.writeu8(outgoing_buff, bool_75_pos_1, bool_75)
+			buffer.writeu8(outgoing_buff, bool_80_pos_1, bool_80)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in Players:GetPlayers() do
 				if player ~= Except then
@@ -14770,7 +15480,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["Amount"]: (number),
 			["TotalCoins"]: (number),
 			["SourceX"]: ((number)?),
@@ -14779,23 +15489,23 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-			local bool_76 = 0
-			local bool_76_pos_1 = alloc(1)
+			local bool_81 = 0
+			local bool_81_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["Amount"])
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalCoins"])
 			if Value["SourceX"] ~= nil then
-				bool_76 = bit32.bor(bool_76, 0b0000000000000001)
+				bool_81 = bit32.bor(bool_81, 0b0000000000000001)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceX"])
 			end
 			if Value["SourceZ"] ~= nil then
-				bool_76 = bit32.bor(bool_76, 0b0000000000000010)
+				bool_81 = bit32.bor(bool_81, 0b0000000000000010)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceZ"])
 			end
-			buffer.writeu8(outgoing_buff, bool_76_pos_1, bool_76)
+			buffer.writeu8(outgoing_buff, bool_81_pos_1, bool_81)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for _, player in List do
 				load_player(player)
@@ -14814,23 +15524,23 @@ local returns = {
 			load_empty()
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-			local bool_77 = 0
-			local bool_77_pos_1 = alloc(1)
+			local bool_82 = 0
+			local bool_82_pos_1 = alloc(1)
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, Value["Amount"])
 			alloc(4)
 			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalCoins"])
 			if Value["SourceX"] ~= nil then
-				bool_77 = bit32.bor(bool_77, 0b0000000000000001)
+				bool_82 = bit32.bor(bool_82, 0b0000000000000001)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceX"])
 			end
 			if Value["SourceZ"] ~= nil then
-				bool_77 = bit32.bor(bool_77, 0b0000000000000010)
+				bool_82 = bit32.bor(bool_82, 0b0000000000000010)
 				alloc(4)
 				buffer.writef32(outgoing_buff, outgoing_apos, Value["SourceZ"])
 			end
-			buffer.writeu8(outgoing_buff, bool_77_pos_1, bool_77)
+			buffer.writeu8(outgoing_buff, bool_82_pos_1, bool_82)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
 			for player in Set do
 				load_player(player)
@@ -14906,7 +15616,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [unknown]: Player }, Value: ({
+		FireList = function(List: { [any]: Player }, Value: ({
 			["CurrentHealth"]: (number),
 			["MaxHealth"]: (number),
 			["DamageAmount"]: (number),

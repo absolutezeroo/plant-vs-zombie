@@ -8,7 +8,7 @@
 
 local _Server = game:GetService("ServerScriptService"):WaitForChild("LobbyServer") -- Reserved for future use
 
--- PlayerDataService is the same across both places
+-- FaiDataService is the same across both places
 -- In production, this would be in a shared location
 -- For now, we duplicate the essential functionality
 
@@ -55,7 +55,7 @@ local PROFILE_TEMPLATE = {
 local PlayerDataService = {}
 
 local Store = ProfileStore.New("PlayerData_v1", PROFILE_TEMPLATE)
-local Profiles: { [Player]: typeof(Store:StartSessionAsync(nil :: any)) } = {}
+local Profiles: { [Player]: any } = {}
 
 function PlayerDataService.Initialize()
     Logger.Info("LobbyPlayerData", "Initializing PlayerDataService for Lobby")
@@ -137,6 +137,106 @@ function PlayerDataService.GetDeck(player: Player): {string}?
     local profile = Profiles[player]
     if not profile then return nil end
     return profile.Data.Deck
+end
+
+-- ============================================
+-- STAGE COMPLETION (synced from Arena)
+-- ============================================
+
+-- Complete a stage with stars (only updates if better)
+function PlayerDataService.CompleteStage(player: Player, stageId: string, stars: number): (boolean, boolean)
+    local profile = Profiles[player]
+    if not profile then
+        return false, false
+    end
+    
+    if not profile.Data.CompletedStages then
+        profile.Data.CompletedStages = {}
+    end
+    
+    local currentStars = profile.Data.CompletedStages[stageId] or 0
+    local isFirstClear = currentStars == 0
+    local isNewBest = stars > currentStars
+    
+    if isNewBest then
+        profile.Data.CompletedStages[stageId] = stars
+        Logger.Info("LobbyPlayerData", `{player.Name} completed {stageId} with {stars} stars (previous: {currentStars})`)
+    end
+    
+    return isFirstClear, isNewBest
+end
+
+-- Get stars for a specific stage
+function PlayerDataService.GetStageStars(player: Player, stageId: string): number
+    local profile = Profiles[player]
+    if not profile or not profile.Data.CompletedStages then
+        return 0
+    end
+    return profile.Data.CompletedStages[stageId] or 0
+end
+
+-- ============================================
+-- COINS SYSTEM
+-- ============================================
+
+-- Get coins for a player
+function PlayerDataService.GetCoins(player: Player): number
+    local profile = Profiles[player]
+    return if profile then profile.Data.Coins else 0
+end
+
+-- Add coins to a player
+function PlayerDataService.AddCoins(player: Player, amount: number): boolean
+    local profile = Profiles[player]
+    if not profile then
+        return false
+    end
+    
+    profile.Data.Coins += amount
+    profile.Data.TotalCoinsEarned += amount
+    
+    Logger.Info("LobbyPlayerData", `{player.Name} +{amount} coins (Total: {profile.Data.Coins})`)
+    return true
+end
+
+-- ============================================
+-- XP / LEVEL SYSTEM
+-- ============================================
+
+-- Add XP to a player (simplified version - full progression is in Arena)
+function PlayerDataService.AddXP(player: Player, amount: number): number
+    local profile = Profiles[player]
+    if not profile then
+        return 0
+    end
+    
+    local oldLevel = profile.Data.Level
+    profile.Data.XP += amount
+    
+    -- Simple level up check (100 XP per level for now)
+    local XP_PER_LEVEL = 100
+    local newLevel = math.floor(profile.Data.XP / XP_PER_LEVEL) + 1
+    local levelsGained = newLevel - oldLevel
+    
+    if levelsGained > 0 then
+        profile.Data.Level = newLevel
+        Logger.Info("LobbyPlayerData", `🎉 {player.Name} leveled up! {oldLevel} -> {newLevel}`)
+    end
+    
+    Logger.Info("LobbyPlayerData", `{player.Name} +{amount} XP (Level {profile.Data.Level}, Total: {profile.Data.XP})`)
+    return levelsGained
+end
+
+-- Get current level
+function PlayerDataService.GetLevel(player: Player): number
+    local profile = Profiles[player]
+    return if profile then profile.Data.Level else 1
+end
+
+-- Get current XP
+function PlayerDataService.GetXP(player: Player): number
+    local profile = Profiles[player]
+    return if profile then profile.Data.XP else 0
 end
 
 return PlayerDataService

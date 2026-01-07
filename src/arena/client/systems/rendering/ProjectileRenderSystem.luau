@@ -17,7 +17,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+-- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+assert(Shared, "ProjectileRenderSystem: Shared folder not found")
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
@@ -25,7 +27,8 @@ local Logger = require(Shared.utils.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:WaitForChild("modules")
+local Modules = Client:FindFirstChild("modules")
+assert(Modules, "ProjectileRenderSystem: modules folder not found")
 local Network = require(Client.network.generated)
 
 -- VFX/Audio services (lazy loaded)

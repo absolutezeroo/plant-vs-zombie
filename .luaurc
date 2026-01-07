@@ -2,9 +2,9 @@
     "languageMode": "strict",
     "lint": {
         "*": true,
-        "LocalUnused": "disabled",
-        "FunctionUnused": "disabled",
-        "ImportUnused": "disabled"
+        "LocalUnused": false,
+        "FunctionUnused": false,
+        "ImportUnused": false
     },
     "lintErrors": false,
     "globals": [

@@ -16,14 +16,18 @@ local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
-local Packages = ReplicatedStorage:WaitForChild("Packages")
+-- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(Packages, "SunRenderSystem: Packages folder not found")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+assert(Shared, "SunRenderSystem: Shared folder not found")
 local Logger = require(Shared.utils.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:WaitForChild("modules")
+local Modules = Client:FindFirstChild("modules")
+assert(Modules, "SunRenderSystem: modules folder not found")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Client.network.generated)
 
