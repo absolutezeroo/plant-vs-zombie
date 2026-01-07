@@ -235,10 +235,8 @@ end)
 
 -- Game over event
 Network.GameOver.On(function(data)
-	-- Basic game over (used as fallback, GameEndRewards has full data)
+	-- Basic game over - only log, VictoryDefeatScreen handles display via GameEndRewards
 	Logger.Info("Client", `Game over received: {if data.Victory then "Victory" else "Defeat"} at wave {data.WaveReached}`)
-	-- HUD gets basic update for overlay
-	hud:SetGameOver(data.Victory, data.WaveReached)
 end)
 
 -- Game end rewards event (detailed summary with animations)
@@ -247,7 +245,7 @@ Network.GameEndRewards.SetCallback(function(data)
 	Logger.Info("Client", `  Coins: {data.CoinsEarned}, XP: {data.XPEarned}, Gems: {data.GemsEarned}`)
 	Logger.Info("Client", `  Zombies: {data.ZombiesKilled}, Waves: {data.WavesCompleted}, Stars: {data.StarRating}`)
 	
-	-- Show the animated victory/defeat screen
+	-- Show the animated victory/defeat screen (this is the ONLY game over UI now)
 	victoryScreen:Show({
 		Victory = data.Victory,
 		WaveReached = data.WavesCompleted,
@@ -261,13 +259,6 @@ Network.GameEndRewards.SetCallback(function(data)
 		LevelsGained = data.LevelsGained,
 	})
 	
-	-- Also update HUD (which has the old overlay - now hidden behind VictoryScreen)
-	hud:SetGameOver(data.Victory, data.WavesCompleted, {
-		StarRating = data.StarRating,
-		CoinsEarned = data.CoinsEarned,
-		XPEarned = data.XPEarned,
-		GemsEarned = data.GemsEarned,
-	})
 end)
 
 -- Wave completed event (start intermission countdown)

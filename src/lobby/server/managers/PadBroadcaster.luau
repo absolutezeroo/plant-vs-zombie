@@ -20,17 +20,17 @@ local CountdownManager = require(script.Parent.CountdownManager)
 
 export type PadStatePayload = {
     PadId: string,
-    StageId: string,
+    WorldId: string,
+    Difficulty: string,
     PlayersCount: number,
     MaxPlayers: number,
     CountdownRemaining: number?,
-    IsLocked: boolean,
     PlayerNames: string?,
 }
 
 export type PadBroadcaster = {
     BroadcastPadState: (self: PadBroadcaster, padId: string, config: PadManager.PadConfig) -> (),
-    NotifyPlayerJoined: (self: PadBroadcaster, player: Player, padId: string, stageId: string, position: Vector3) -> (),
+    NotifyPlayerJoined: (self: PadBroadcaster, player: Player, padId: string, worldId: string, difficulty: string, position: Vector3) -> (),
     NotifyPlayerLeft: (self: PadBroadcaster, player: Player) -> (),
 }
 
@@ -65,11 +65,11 @@ function PadBroadcaster:BroadcastPadState(padId: string, config: PadManager.PadC
     
     local payload: PadStatePayload = {
         PadId = padId,
-        StageId = config.StageId,
+        WorldId = config.WorldId,
+        Difficulty = config.Difficulty,
         PlayersCount = playerCount,
         MaxPlayers = config.MaxPlayers,
         CountdownRemaining = if countdownRemaining > 0 then math.ceil(countdownRemaining) else nil,
-        IsLocked = false,
         PlayerNames = getPlayerNames(players),
     }
     
@@ -77,10 +77,11 @@ function PadBroadcaster:BroadcastPadState(padId: string, config: PadManager.PadC
 end
 
 -- Notify a specific player that they joined a pad
-function PadBroadcaster:NotifyPlayerJoined(player: Player, padId: string, stageId: string, position: Vector3)
+function PadBroadcaster:NotifyPlayerJoined(player: Player, padId: string, worldId: string, difficulty: string, position: Vector3)
     ZapServer.JoinedPad.Fire(player, {
         PadId = padId,
-        StageId = stageId,
+        WorldId = worldId,
+        Difficulty = difficulty,
         Position = position,
     })
     Logger.Debug("PadBroadcaster", `Notified: {player.Name} joined pad {padId}`)

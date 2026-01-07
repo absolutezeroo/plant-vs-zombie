@@ -17,7 +17,8 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local StageData = require(Shared.data.StageData)
+local WorldData = require(Shared.data.WorldData)
+local DifficultyData = require(Shared.data.DifficultyData)
 
 -- Import Zap (navigate from controllers/ to client/ then to network/)
 local LobbyClient = script.Parent.Parent
@@ -33,11 +34,11 @@ local OnEvent = Fusion.OnEvent
 type PadUIState = {
     PadId: string,
     Scope: any, -- Store scope to prevent garbage collection
-    StageId: Fusion.Value<string>,
+    WorldId: Fusion.Value<string>,
+    Difficulty: Fusion.Value<string>,
     PlayersCount: Fusion.Value<number>,
     MaxPlayers: Fusion.Value<number>,
     CountdownRemaining: Fusion.Value<number?>,
-    IsLocked: Fusion.Value<boolean>,
     BillboardGui: BillboardGui?,
 }
 
@@ -47,7 +48,8 @@ local _scope = Fusion.scoped(Fusion)
 -- Track if player is currently on a pad
 local _isOnPad = Value(_scope, false)
 local _currentPadId = Value(_scope, "")
-local _currentPadStageId = Value(_scope, "")
+local _currentWorldId = Value(_scope, "")
+local _currentDifficulty = Value(_scope, "")
 local _currentCountdown = Value(_scope, nil :: number?)
 local _currentPlayerCount = Value(_scope, 0)
 local _currentMaxPlayers = Value(_scope, 1)
@@ -57,8 +59,11 @@ local PadUIController = {}
 
 -- Create BillboardGui for a pad
 local function createPadUI(scope, state: PadUIState): BillboardGui
-    local stageConfig = StageData.GetStage(Fusion.peek(state.StageId))
-    local stageName = if stageConfig then stageConfig.Name else state.StageId
+    local worldConfig = WorldData.GetWorld(Fusion.peek(state.WorldId))
+    local diffConfig = DifficultyData.GetDifficulty(Fusion.peek(state.Difficulty))
+    local displayName = if worldConfig and diffConfig 
+        then `{worldConfig.Name} ({diffConfig.Name})`
+        else `{Fusion.peek(state.WorldId)} - {Fusion.peek(state.Difficulty)}`
     
     return New(scope, "BillboardGui") {
         Name = "PadUI",
@@ -84,12 +89,12 @@ local function createPadUI(scope, state: PadUIState): BillboardGui
                         Thickness = 3,
                     },
                     
-                    -- Stage name
+                    -- World + Difficulty name
                     New(scope, "TextLabel") {
                         Size = UDim2.new(1, -16, 0, 32),
                         Position = UDim2.new(0, 8, 0, 8),
                         BackgroundTransparency = 1,
-                        Text = stageName,
+                        Text = displayName,
                         TextSize = 18,
                         TextScaled = false,
                         Font = Enum.Font.GothamBlack,
@@ -173,17 +178,17 @@ local function updatePadState(data: any)
         state = {
             PadId = padId,
             Scope = scope, -- Store scope to prevent GC
-            StageId = Value(scope, data.StageId),
+            WorldId = Value(scope, data.WorldId),
+            Difficulty = Value(scope, data.Difficulty),
             PlayersCount = Value(scope, data.PlayersCount),
             MaxPlayers = Value(scope, data.MaxPlayers),
             CountdownRemaining = Value(scope, data.CountdownRemaining),
-            IsLocked = Value(scope, data.IsLocked or false),
             BillboardGui = nil,
         }
         _padStates[padId] = state
         
         -- Find pad model in workspace
-        -- PadId format: "Workspace.TeleportPads.Stage_1-1"
+        -- PadId format: "Workspace.TeleportPads.Day_Normal"
         local workspace = game:GetService("Workspace")
         local teleportPadsFolder = workspace:FindFirstChild("TeleportPads")
         
@@ -226,11 +231,11 @@ local function updatePadState(data: any)
     else
         -- Update existing state
         print(`[PadUI] Update received: {data.PlayersCount}/{data.MaxPlayers} players`) -- Debug visible
-        state.StageId:set(data.StageId)
+        state.WorldId:set(data.WorldId)
+        state.Difficulty:set(data.Difficulty)
         state.PlayersCount:set(data.PlayersCount)
         state.MaxPlayers:set(data.MaxPlayers)
         state.CountdownRemaining:set(data.CountdownRemaining)
-        state.IsLocked:set(data.IsLocked or false)
         
         -- Also update current pad info if this is the pad we're on
         if Fusion.peek(_isOnPad) and data.PadId == Fusion.peek(_currentPadId) then
@@ -243,9 +248,14 @@ end
 
 -- Create Leave Button UI (shown when player is on a pad)
 local function createLeaveButtonUI(): ScreenGui
-    local stageConfig = Computed(_scope, function(use)
-        local stageId = use(_currentPadStageId)
-        return StageData.GetStage(stageId)
+    local worldConfig = Computed(_scope, function(use)
+        local worldId = use(_currentWorldId)
+        return WorldData.GetWorld(worldId)
+    end)
+    
+    local difficultyConfig = Computed(_scope, function(use)
+        local difficulty = use(_currentDifficulty)
+        return DifficultyData.GetDifficulty(difficulty)
     end)
     
     return New(_scope, "ScreenGui") {
@@ -275,14 +285,18 @@ local function createLeaveButtonUI(): ScreenGui
                         Thickness = 4,
                     },
                     
-                    -- Stage name
+                    -- World + Difficulty name
                     New(_scope, "TextLabel") {
                         Size = UDim2.new(1, -20, 0, 40),
                         Position = UDim2.new(0, 10, 0, 10),
                         BackgroundTransparency = 1,
                         Text = Computed(_scope, function(use)
-                            local config = use(stageConfig)
-                            return if config then `🌿 {config.Name}` else "Loading..."
+                            local world = use(worldConfig)
+                            local diff = use(difficultyConfig)
+                            if world and diff then
+                                return `🌿 {world.Name} ({diff.Name})`
+                            end
+                            return "Loading..."
                         end),
                         TextSize = 22,
                         TextScaled = false,
@@ -354,9 +368,10 @@ end
 
 -- Handle JoinedPad event
 local function onJoinedPad(data: any)
-    Logger.Info("PadUI", `Joined pad {data.PadId} (stage: {data.StageId})`)
+    Logger.Info("PadUI", `Joined pad {data.PadId} (World: {data.WorldId}, Difficulty: {data.Difficulty})`)
     _currentPadId:set(data.PadId)
-    _currentPadStageId:set(data.StageId)
+    _currentWorldId:set(data.WorldId)
+    _currentDifficulty:set(data.Difficulty)
     _isOnPad:set(true)
 end
 
@@ -365,7 +380,8 @@ local function onLeftPad(_data: any)
     Logger.Info("PadUI", "Left pad")
     _isOnPad:set(false)
     _currentPadId:set("")
-    _currentPadStageId:set("")
+    _currentWorldId:set("")
+    _currentDifficulty:set("")
     _currentCountdown:set(nil)
     _currentPlayerCount:set(0)
     _currentMaxPlayers:set(1)

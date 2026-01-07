@@ -27,8 +27,8 @@ export type TeleportResult = {
 }
 
 export type TeleportManager = {
-    TeleportPlayer: (self: TeleportManager, player: Player, stageId: number, onComplete: ((player: Player) -> ())?) -> TeleportResult,
-    TeleportGroup: (self: TeleportManager, players: {Player}, stageId: number, onComplete: ((player: Player) -> ())?) -> {[Player]: TeleportResult},
+    TeleportPlayer: (self: TeleportManager, player: Player, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?) -> TeleportResult,
+    TeleportGroup: (self: TeleportManager, players: {Player}, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?) -> {[Player]: TeleportResult},
     IsStudioMode: (self: TeleportManager) -> boolean,
 }
 
@@ -93,12 +93,12 @@ function TeleportManager:IsStudioMode(): boolean
 end
 
 -- Teleport a single player to arena
-function TeleportManager:TeleportPlayer(player: Player, stageId: number, onComplete: ((player: Player) -> ())?): TeleportResult
+function TeleportManager:TeleportPlayer(player: Player, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?): TeleportResult
     local deck = getPlayerDeck(player) or DEFAULT_DECK
     
     if _isStudio then
         -- In Studio, simulate teleport
-        Logger.Info("TeleportManager", `[STUDIO] Would teleport {player.Name} to Arena (stage {stageId})`)
+        Logger.Info("TeleportManager", `[STUDIO] Would teleport {player.Name} to Arena (World={worldId}, Difficulty={difficulty})`)
         movePlayerToSpawn(player)
         
         -- Unlock player
@@ -116,7 +116,7 @@ function TeleportManager:TeleportPlayer(player: Player, stageId: number, onCompl
     
     -- Real teleport
     local teleportOptions = Instance.new("TeleportOptions")
-    local arenaData = TeleportData.CreateArenaJoinData(tostring(stageId), deck)
+    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck)
     teleportOptions:SetTeleportData(arenaData)
     
     local success, err = pcall(function()
@@ -142,7 +142,7 @@ function TeleportManager:TeleportPlayer(player: Player, stageId: number, onCompl
         }
     end
     
-    Logger.Info("TeleportManager", `{player.Name} teleported to Arena (stage {stageId})`)
+    Logger.Info("TeleportManager", `{player.Name} teleported to Arena (World={worldId}, Difficulty={difficulty})`)
     
     if onComplete then
         onComplete(player)
@@ -155,11 +155,11 @@ function TeleportManager:TeleportPlayer(player: Player, stageId: number, onCompl
 end
 
 -- Teleport a group of players
-function TeleportManager:TeleportGroup(players: {Player}, stageId: number, onComplete: ((player: Player) -> ())?): {[Player]: TeleportResult}
+function TeleportManager:TeleportGroup(players: {Player}, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?): {[Player]: TeleportResult}
     local results: {[Player]: TeleportResult} = {}
     
     for _, player in ipairs(players) do
-        results[player] = self:TeleportPlayer(player, stageId, onComplete)
+        results[player] = self:TeleportPlayer(player, worldId, difficulty, onComplete)
     end
     
     return results

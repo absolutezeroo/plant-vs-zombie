@@ -20,7 +20,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local ErrorHandler = require(Shared.utils.ErrorHandler)
 local TeleportData = require(Shared.data.TeleportData)
-local StageData = require(Shared.data.StageData)
+local WorldData = require(Shared.data.WorldData)
+local DifficultyData = require(Shared.data.DifficultyData)
 local PlantData = require(Shared.data.PlantData)
 
 -- Import services from this folder
@@ -43,16 +44,23 @@ local playersInLobby: { [Player]: boolean } = {}
 
 --[[
     Handle teleport request from client
-    Validates deck and stage before teleporting
+    Validates deck and world/difficulty before teleporting
 ]]
-local function handleTeleportToArena(player: Player, stageId: string, deck: { string }): (boolean, number, string)
-    Logger.Info("Lobby", `{player.Name} requesting teleport to {stageId}`)
+local function handleTeleportToArena(player: Player, worldId: string, difficulty: string, deck: { string }): (boolean, number, string)
+    Logger.Info("Lobby", `{player.Name} requesting teleport to World={worldId}, Difficulty={difficulty}`)
     
-    -- Validate stage exists
-    local stage = StageData.GetStage(stageId)
-    if not stage then
-        Logger.Warn("Lobby", `Invalid stage: {stageId}`)
-        return false, 1, "Invalid stage"
+    -- Validate world exists (data-driven via WorldData)
+    local world = WorldData.GetWorld(worldId)
+    if not world then
+        Logger.Warn("Lobby", `Invalid world: {worldId}`)
+        return false, 1, "Invalid world"
+    end
+    
+    -- Validate difficulty exists (data-driven via DifficultyData)
+    local diffConfig = DifficultyData.GetDifficulty(difficulty)
+    if not diffConfig then
+        Logger.Warn("Lobby", `Invalid difficulty: {difficulty}`)
+        return false, 1, "Invalid difficulty"
     end
     
     -- Validate deck
@@ -91,7 +99,7 @@ local function handleTeleportToArena(player: Player, stageId: string, deck: { st
     
     -- Create teleport data
     local teleportOptions = Instance.new("TeleportOptions")
-    local arenaData = TeleportData.CreateArenaJoinData(stageId, deck)
+    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck)
     teleportOptions:SetTeleportData(arenaData)
     
     -- Teleport to Arena
@@ -126,7 +134,8 @@ local function onPlayerAdded(player: Player)
         if isValid then
 			local returnData = teleportData :: TeleportData.LobbyReturnData
 			Logger.Info("Lobby", `{player.Name} returned from Arena`, {
-				stageId = returnData.StageId,
+				worldId = returnData.WorldId,
+				difficulty = returnData.Difficulty,
 				victory = returnData.Victory,
 				stars = returnData.Stars,
 			})
@@ -138,12 +147,7 @@ local function onPlayerAdded(player: Player)
 				while attempts < 100 do
 					local profile = PlayerDataService.GetProfile(player)
 					if profile then
-						-- Update profile with rewards
-						if returnData.Victory then
-							PlayerDataService.CompleteStage(player, returnData.StageId, returnData.Stars)
-							Logger.Info("Lobby", `Stage {returnData.StageId} completed with {returnData.Stars} stars`)
-						end
-						
+						-- Apply rewards (no stage completion tracking in new system)
 						PlayerDataService.AddCoins(player, returnData.CoinsEarned)
 						PlayerDataService.AddXP(player, returnData.XPEarned)
 						
@@ -151,7 +155,8 @@ local function onPlayerAdded(player: Player)
 						
 						-- Send results to client for display
 						ZapServer.ShowResults.Fire(player, {
-							StageId = returnData.StageId,
+							WorldId = returnData.WorldId,
+							Difficulty = returnData.Difficulty,
 							Victory = returnData.Victory,
 							Stars = returnData.Stars,
 							CoinsEarned = returnData.CoinsEarned,
@@ -196,7 +201,7 @@ ZapServer.TeleportToArenaRequest.SetCallback(function(player, data)
         deckStrings[i] = plantType
     end
     
-    local success, errorCode, message = handleTeleportToArena(player, data.StageId, deckStrings)
+    local success, errorCode, message = handleTeleportToArena(player, data.WorldId, data.Difficulty, deckStrings)
     
     -- Send response to client
     ZapServer.TeleportToArenaResponse.Fire(player, {

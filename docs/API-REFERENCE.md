@@ -149,15 +149,17 @@ This document lists all public functions for each service module to prevent call
 ### Types
 ```lua
 type ArenaJoinData = {
-    StageId: string,
+    WorldId: string,       -- "day", "night", "pool", "fog", "roof", "boss"
+    Difficulty: string,    -- "easy", "normal", "hard", "nightmare", "endless"
     Deck: {string},
     Timestamp: number,
 }
 
 type LobbyReturnData = {
-    StageId: string,
+    WorldId: string,
+    Difficulty: string,
     Victory: boolean,
-    Stars: number,
+    WavesSurvived: number,
     CoinsEarned: number,
     XPEarned: number,
     Timestamp: number,
@@ -169,21 +171,92 @@ type LobbyReturnData = {
 |----------|------------|---------|-------------|
 | `ValidateArenaJoinData(data)` | `any` | `boolean, string?` | Validate teleport data to Arena |
 | `ValidateLobbyReturnData(data)` | `any` | `boolean, string?` | Validate return data to Lobby |
-| `CreateArenaJoinData(stageId, deck)` | `string, {string}` | `ArenaJoinData` | Create teleport data |
-| `CreateLobbyReturnData(stageId, victory, stars, coins, xp)` | `...` | `LobbyReturnData` | Create return data |
+| `CreateArenaJoinData(worldId, difficulty, deck)` | `string, string, {string}` | `ArenaJoinData` | Create teleport data |
+| `CreateLobbyReturnData(worldId, difficulty, victory, waves, coins, xp)` | `...` | `LobbyReturnData` | Create return data |
 
 ---
 
-## StageRegistry
+## WorldData (NEW)
 
-**Location:** `src/shared/data/StageRegistry.luau`
+**Location:** `src/shared/data/WorldData.luau`
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `GetStage(stageId)` | `string` | `StageConfig?` | Get stage configuration |
-| `GetWorldStages(worldNumber)` | `number` | `{StageConfig}` | Get all stages in a world |
-| `IsUnlocked(stageId, completedStages)` | `string, {[string]: number}` | `boolean` | Check if stage is unlocked |
-| `GetNextStage(stageId)` | `string` | `string?` | Get next stage in sequence |
+| `GetAllWorlds()` | - | `{WorldConfig}` | Get all worlds sorted by order |
+| `GetWorld(worldId)` | `string` | `WorldConfig?` | Get a specific world |
+| `IsUnlocked(worldId, playerLevel)` | `string, number` | `boolean` | Check if world is unlocked for player level |
+| `GetUnlockedWorlds(playerLevel)` | `number` | `{WorldConfig}` | Get all unlocked worlds |
+
+### WorldConfig Type
+```lua
+{
+    Id: string,            -- "day", "night", "pool", etc.
+    Name: string,
+    Description: string,
+    MapId: string,
+    IsNight: boolean,
+    HasWater: boolean,
+    HasFog: boolean,
+    IsRoof: boolean,
+    ZombiePool: {string},
+    SunStarting: number,
+    RequiredLevel: number?, -- nil = unlocked from start
+}
+```
+
+---
+
+## DifficultyData (NEW)
+
+**Location:** `src/shared/data/DifficultyData.luau`
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetAll()` | - | `{DifficultyConfig}` | Get all difficulties sorted |
+| `GetDifficulty(difficultyId)` | `string` | `DifficultyConfig?` | Get a specific difficulty |
+| `CalculateEndlessRewards(wavesSurvived)` | `number` | `number, number` | Calculate coins & XP for endless mode |
+| `GetEndlessMultipliers(waveNumber)` | `number` | `number, number, number` | Get health/speed/damage multipliers |
+
+### DifficultyConfig Type
+```lua
+{
+    Id: string,            -- "easy", "normal", "hard", "nightmare", "endless"
+    Name: string,
+    WaveCount: number,
+    BaseBudget: number,
+    BudgetPerWave: number,
+    ZombieHealthMult: number,
+    ZombieSpeedMult: number,
+    CoinReward: number,
+    XPReward: number,
+    HasBoss: boolean,
+}
+```
+
+---
+
+## CosmeticData (NEW)
+
+**Location:** `src/shared/data/CosmeticData.luau`
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetSkinsForPlant(plantType)` | `string` | `{PlantSkin}` | Get all skins for a plant |
+| `GetSkin(skinId)` | `string` | `PlantSkin?` | Get a specific skin |
+| `GetAllSkins()` | - | `{PlantSkin}` | Get all skins |
+| `GetAllTrails()` | - | `{TrailEffect}` | Get all projectile trails |
+| `GetTrail(trailId)` | `string` | `TrailEffect?` | Get a specific trail |
+| `GetRarityColor(rarity)` | `SkinRarity` | `Color3` | Get color for rarity tier |
+| `CanPurchase(skinId, playerLevel)` | `string, number` | `boolean` | Check level requirement |
+
+---
+
+## ⚠️ DEPRECATED: StageRegistry
+
+**Location:** `src/shared/data/stages/StageRegistry.luau`
+
+> **This module is deprecated.** Use `WorldData` + `DifficultyData` instead.
+> The old stage system (1-1, 1-2, etc.) has been replaced with World + Difficulty selection.
 
 ---
 

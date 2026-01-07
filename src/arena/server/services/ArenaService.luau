@@ -4,9 +4,14 @@
     
     Handles:
     - Starting battles from TeleportData (Lobby → Arena)
-    - Loading the correct map for each stage
-    - Setting up stage and deck
+    - Loading the correct map for each world
+    - Setting up world + difficulty and deck
     - Returning to Lobby with results
+    
+    NEW SYSTEM (v2):
+    - Uses WorldData + DifficultyData instead of StageData
+    - World determines map, mechanics, zombie pool
+    - Difficulty determines wave count, budget, multipliers
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,66 +23,56 @@ local Logger = require(Shared.utils.Logger)
 local MapConfig = require(Shared.config.MapConfig)
 local _TeleportData = require(Shared.data.TeleportData)
 
+-- NEW: Data-driven world and difficulty
+local WorldData = require(Shared.data.WorldData)
+local DifficultyData = require(Shared.data.DifficultyData)
+
 -- Check if running in Studio (skip preload to avoid yield issues)
 local IS_STUDIO = RunService:IsStudio()
 
 -- Services
 local MapLoader = require(script.Parent.MapLoader)
 
--- Stage loading: Try new StageRegistry first, fallback to old StageData
-local StageRegistry: any = nil
-local StageData: any = nil
-
-local function getStageConfig(stageId: string): any
-    -- Try new system first
-    if not StageRegistry then
-        local success, registry = pcall(function()
-            return require(Shared.data.stages.StageRegistry)
-        end)
-        if success then
-            StageRegistry = registry
-        end
-    end
-    
-    if StageRegistry then
-        local config = StageRegistry.GetStage(stageId)
-        if config then
-            return config
-        end
-    end
-    
-    -- Fallback to old StageData
-    if not StageData then
-        StageData = require(Shared.data.StageData)
-    end
-    return StageData.GetStage(stageId)
-end
-
 local ArenaService = {}
 
 -- Track which players have started battles
-local _activeBattles: { [Player]: {StageId: string, Deck: {string}} } = {}
+export type BattleData = {
+    WorldId: string,
+    Difficulty: string,
+    Deck: {string},
+}
+
+local _activeBattles: { [Player]: BattleData } = {}
 
 -- Get battle data for a player
-function ArenaService.GetBattleData(player: Player): {StageId: string, Deck: {string}}?
+function ArenaService.GetBattleData(player: Player): BattleData?
     return _activeBattles[player]
 end
 
--- Start a battle for a player
-function ArenaService.StartBattle(player: Player, stageId: string, deck: {string}): boolean
-    Logger.Info("ArenaService", `Starting battle for {player.Name}: stage={stageId}, deck={#deck}`)
+-- Start a battle for a player (NEW API: WorldId + Difficulty)
+function ArenaService.StartBattle(player: Player, worldId: string, difficulty: string, deck: {string}): boolean
+    Logger.Info("ArenaService", `Starting battle for {player.Name}: world={worldId}, difficulty={difficulty}, deck={#deck}`)
     
-    -- Validate stage
-    local stageConfig = getStageConfig(stageId)
-    if not stageConfig then
-        Logger.Error("ArenaService", `Invalid stage: {stageId}`)
+    -- Validate world (data-driven)
+    local worldConfig = WorldData.GetWorld(worldId)
+    if not worldConfig then
+        Logger.Error("ArenaService", `Invalid world: {worldId}`)
         return false
     end
     
-    -- Load the map for this stage
-    -- In Studio: use LoadMap (no preload) to avoid yield issues
-    -- In Production: use LoadMapWithPreload for smooth loading
-    local mapId = stageConfig.MapId
+    -- Validate difficulty (data-driven)
+    local difficultyConfig = DifficultyData.GetDifficulty(difficulty)
+    if not difficultyConfig then
+        Logger.Error("ArenaService", `Invalid difficulty: {difficulty}`)
+        return false
+    end
+    
+    -- Check world unlock requirement
+    -- TODO: Get player level from PlayerDataService if needed
+    -- For now, all worlds are accessible
+    
+    -- Load the map for this world
+    local mapId = worldConfig.MapId
     if mapId then
         local mapLoaded: boolean
         if IS_STUDIO then
@@ -101,7 +96,8 @@ function ArenaService.StartBattle(player: Player, stageId: string, deck: {string
     
     -- Track active battle
     _activeBattles[player] = {
-        StageId = stageId,
+        WorldId = worldId,
+        Difficulty = difficulty,
         Deck = deck,
     }
     
@@ -112,33 +108,33 @@ function ArenaService.StartBattle(player: Player, stageId: string, deck: {string
     -- Reset game state before starting new battle
     WaveManager.ResetGameState()
     
-    -- Start the stage
-    local success = WaveManager.StartStage(stageId)
+    -- Start the game with world + difficulty (NEW API)
+    local success = WaveManager.StartGame(worldId, difficulty)
     
     if not success then
-        Logger.Error("ArenaService", `Failed to start stage {stageId}`)
+        Logger.Error("ArenaService", `Failed to start game: {worldId}/{difficulty}`)
         _activeBattles[player] = nil
         return false
     end
     
-    Logger.Info("ArenaService", `Battle started: {stageConfig.Name}`)
+    Logger.Info("ArenaService", `Battle started: {worldConfig.Name} ({difficultyConfig.Name})`)
     return true
 end
 
--- End battle and prepare return data
-function ArenaService.EndBattle(player: Player, victory: boolean, stars: number, coins: number, xp: number)
+-- End battle and prepare return data (updated for new system)
+function ArenaService.EndBattle(player: Player, victory: boolean, wavesSurvived: number, coins: number, xp: number)
     local battleData = _activeBattles[player]
     if not battleData then
         Logger.Warn("ArenaService", `No active battle for {player.Name}`)
         return
     end
     
-    Logger.Info("ArenaService", `Battle ended for {player.Name}: victory={victory}, stars={stars}`)
+    Logger.Info("ArenaService", `Battle ended for {player.Name}: victory={victory}, waves={wavesSurvived}`)
     
     -- Use the global function set by init.server.luau
     local sendToLobby = _G.ArenaSendPlayerToLobby
     if sendToLobby then
-        sendToLobby(player, victory, stars, coins, xp)
+        sendToLobby(player, victory, wavesSurvived, coins, xp)
     else
         Logger.Error("ArenaService", "ArenaSendPlayerToLobby not available")
     end
@@ -149,6 +145,24 @@ end
 -- Clean up when player leaves
 function ArenaService.OnPlayerRemoving(player: Player)
     _activeBattles[player] = nil
+end
+
+-- Get current world config for a player's active battle
+function ArenaService.GetWorldConfig(player: Player): WorldData.WorldConfig?
+    local battleData = _activeBattles[player]
+    if not battleData then
+        return nil
+    end
+    return WorldData.GetWorld(battleData.WorldId)
+end
+
+-- Get current difficulty config for a player's active battle
+function ArenaService.GetDifficultyConfig(player: Player): DifficultyData.DifficultyConfig?
+    local battleData = _activeBattles[player]
+    if not battleData then
+        return nil
+    end
+    return DifficultyData.GetDifficulty(battleData.Difficulty)
 end
 
 return ArenaService

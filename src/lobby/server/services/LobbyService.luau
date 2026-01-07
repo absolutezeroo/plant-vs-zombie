@@ -95,7 +95,8 @@ local function handlePlayerJoin(player: Player, padModel: Model)
     if ZapServer then
         ZapServer.JoinedPad.Fire(player, {
             PadId = padId,
-            StageId = config.StageId,
+            WorldId = config.WorldId,
+            Difficulty = config.Difficulty,
             Position = centerPos,
         })
     end
@@ -175,7 +176,7 @@ function teleportPadGroup(padId: string, config: PadConfig)
     -- Set cooldowns and teleport each player
     for _, player in ipairs(players) do
         _touchHandler:SetCooldown(player)
-        _teleportManager:TeleportPlayer(player, config.StageId)
+        _teleportManager:TeleportPlayer(player, config.WorldId, config.Difficulty)
     end
     
     -- Clear the queue

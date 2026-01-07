@@ -91,8 +91,9 @@ event TeleportToArenaRequest = {
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        StageId: string.utf8(..50),
-        Deck: PlantType[1..6],  -- Max 6 plants in deck
+        WorldId: string.utf8(..20),       -- "day", "night", "pool", etc.
+        Difficulty: string.utf8(..20),    -- "easy", "normal", "hard", "nightmare", "endless"
+        Deck: PlantType[1..6],            -- Max 6 plants in deck
     }
 }
 
@@ -103,7 +104,7 @@ event TeleportToArenaResponse = {
     call: ManyAsync,
     data: struct {
         Success: boolean,
-        ErrorCode: u8?,  -- 0=None, 1=InvalidStage, 2=InvalidDeck, 3=NotUnlocked
+        ErrorCode: u8?,  -- 0=None, 1=InvalidWorld, 2=InvalidDeck, 3=InvalidDifficulty
     }
 }
 
@@ -547,45 +548,44 @@ event DeckSync = {
 }
 
 -- ===================
--- STAGE SYSTEM
+-- GAME SYSTEM (World + Difficulty)
 -- ===================
 
--- Client requests to start a specific stage
-event StartStageRequest = {
+-- Client requests to start a game (Arena)
+event StartGameRequest = {
     from: Client,
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        StageId: string.utf8,
+        WorldId: string.utf8,
+        Difficulty: string.utf8,
     }
 }
 
--- Server confirms stage started (sent to all players in game)
-event StageStarted = {
+-- Server confirms game started (sent to all players in game)
+event GameStarted = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
     data: struct {
-        StageId: string.utf8,
-        StageName: string.utf8,
+        WorldId: string.utf8,
+        Difficulty: string.utf8,
         WaveCount: u8,
     }
 }
 
--- Server notifies stage completion with rewards
-event StageComplete = {
+-- Server notifies game completion with rewards
+event GameComplete = {
     from: Server,
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        StageId: string.utf8,
+        WorldId: string.utf8,
+        Difficulty: string.utf8,
         Victory: boolean,
-        Stars: u8,
+        WavesSurvived: u8,
         CoinsEarned: u32,
         XPEarned: u32,
-        IsFirstClear: boolean,
-        IsNewBest: boolean,
-        PreviousStars: u8,
     }
 }
 
@@ -599,16 +599,17 @@ event TeleportCountdown = {
     }
 }
 
--- Server syncs stage progression data (on join)
-event StageProgressSync = {
+-- Server syncs progression data (on join)
+event ProgressionSync = {
     from: Server,
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        CurrentStage: string.utf8,
-        TotalStars: u16,
-        -- Completed stages as parallel arrays
-        CompletedStageIds: string.utf8[],
-        CompletedStageStars: u8[],
+        Level: u16,
+        TotalXP: u32,
+        Coins: u32,
+        Gems: u32,
+        UnlockedPlants: string.utf8[],
+        OwnedSkins: string.utf8[],
     }
 }

@@ -15,6 +15,11 @@
     - Trickle phase (20% budget): Slow spawns
     - Assault phase (50% budget): Main wave
     - Flag phase (30% budget): Final push
+    
+    NEW SYSTEM (v2):
+    - Uses WorldData + DifficultyData instead of StageData
+    - World = map, mechanics, zombie pool
+    - Difficulty = wave count, budget, multipliers
 ]]
 
 local Players = game:GetService("Players")
@@ -28,34 +33,9 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local Logger = require(Shared.utils.Logger)
 
--- Stage loading: Try new StageRegistry first, fallback to old StageData
-local StageRegistry: any = nil
-local StageData: any = nil
-
-local function getStageConfig(stageId: string): any
-    -- Try new system first
-    if not StageRegistry then
-        local success, registry = pcall(function()
-            return require(Shared.data.stages.StageRegistry)
-        end)
-        if success then
-            StageRegistry = registry
-        end
-    end
-    
-    if StageRegistry then
-        local config = StageRegistry.GetStage(stageId)
-        if config then
-            return config
-        end
-    end
-    
-    -- Fallback to old StageData
-    if not StageData then
-        StageData = require(Shared.data.StageData)
-    end
-    return StageData.GetStage(stageId)
-end
+-- NEW: Data-driven world and difficulty
+local WorldData = require(Shared.data.WorldData)
+local DifficultyData = require(Shared.data.DifficultyData)
 
 -- Managers
 local Server = script.Parent.Parent.Parent
@@ -111,8 +91,12 @@ local _phaseSpent = 0
 local _phaseBudget = 0
 local _totalBudget = 0
 local _zombiesSpawnedThisWave = 0
-local _currentStageId = "1-1"
-local _currentStageConfig: StageConfig? = nil
+
+-- NEW: World + Difficulty instead of StageId
+local _currentWorldId = "day"
+local _currentDifficulty = "normal"
+local _currentWorldConfig: WorldData.WorldConfig? = nil
+local _currentDifficultyConfig: DifficultyData.DifficultyConfig? = nil
 local _autoStartEnabled = false
 
 -- Manager instances
@@ -244,18 +228,16 @@ local function handleGameEnd(isVictory: boolean)
     local ArenaService = getArenaService()
     
     local starRating = if isVictory then BaseHealth.GetStarRating() else 0
+    local difficultyConfig = _currentDifficultyConfig
     
     -- Process rewards for each player
     for _, player in Players:GetPlayers() do
         local sessionStats = EntityDeathSystem.API.GetSessionStats(player)
         
-        -- Check first clear
-        local previousStars = PlayerDataService.GetStageStars(player, _currentStageId)
-        local isFirstClear, isNewBest = false, false
-        
-        if isVictory then
-            isFirstClear, isNewBest = PlayerDataService.CompleteStage(player, _currentStageId, starRating)
-        end
+        -- Calculate base rewards from difficulty config
+        local baseCoins = if difficultyConfig then difficultyConfig.CoinReward else 100
+        local baseXP = if difficultyConfig then difficultyConfig.XPReward else 50
+        local waveMultiplier = _currentWave / (if _totalWaves > 0 then _totalWaves else 1)
         
         -- Calculate rewards
         local rewards = _rewardCalc:CalculateRewards({
@@ -266,21 +248,25 @@ local function handleGameEnd(isVictory: boolean)
                 CoinsEarned = sessionStats.CoinsEarned,
                 PlantsPlaced = sessionStats.PlantsPlaced or 0,
             },
-            StageConfig = _currentStageConfig :: any,
+            DifficultyConfig = difficultyConfig,
+            WorldConfig = _currentWorldConfig,
             StarRating = starRating,
-            IsFirstClear = isFirstClear,
-            IsNewBest = isNewBest,
+            BaseCoins = baseCoins,
+            BaseXP = baseXP,
+            WaveMultiplier = waveMultiplier,
+            IsFirstClear = false,  -- No longer tracking per-stage completion
+            IsNewBest = false,
         })
         
         -- Award rewards
         if isVictory then
-            PlayerDataService.AddCoins(player, rewards.StageCoins + rewards.FirstClearBonus + rewards.BonusCoins)
+            PlayerDataService.AddCoins(player, rewards.TotalCoins or (baseCoins * waveMultiplier))
         end
         
-        local levelsGained = PlayerDataService.AddXP(player, rewards.XPEarned)
+        local levelsGained = PlayerDataService.AddXP(player, rewards.XPEarned or baseXP)
         local newLevel = PlayerDataService.GetLevel(player)
         
-        if rewards.GemsEarned > 0 then
+        if rewards.GemsEarned and rewards.GemsEarned > 0 then
             PlayerDataService.AddGems(player, rewards.GemsEarned)
         end
         
@@ -290,32 +276,24 @@ local function handleGameEnd(isVictory: boolean)
             PlayerDataService.IncrementStat(player, "GamesWon", 1)
         end
         
-        -- Broadcast to client
-        _broadcaster:BroadcastStageComplete(player, {
-            StageId = _currentStageId,
+        -- Broadcast to client (World + Difficulty based)
+        _broadcaster:BroadcastGameEndRewards(player, {
+            WorldId = _currentWorldId,
+            Difficulty = _currentDifficulty,
             Victory = isVictory,
             Stars = starRating,
-            CoinsEarned = rewards.TotalCoins,
-            XPEarned = rewards.XPEarned,
-            IsFirstClear = isFirstClear,
-            IsNewBest = isNewBest,
-            PreviousStars = previousStars,
-        })
-        
-        _broadcaster:BroadcastGameEndRewards(player, {
-            Victory = isVictory,
-            CoinsEarned = rewards.TotalCoins,
+            CoinsEarned = rewards.TotalCoins or baseCoins,
+            XPEarned = rewards.XPEarned or baseXP,
             ZombiesKilled = sessionStats.ZombiesKilled,
             WavesCompleted = _currentWave,
-            BonusCoins = rewards.BonusCoins,
+            TotalWaves = _totalWaves,
+            BonusCoins = rewards.BonusCoins or 0,
             StarRating = starRating,
-            XPEarned = rewards.XPEarned,
-            GemsEarned = rewards.GemsEarned,
             NewLevel = newLevel,
             LevelsGained = levelsGained,
         })
         
-        Logger.Info("WaveManager", `{player.Name}: +{rewards.XPEarned} XP, +{rewards.GemsEarned} gems`)
+        Logger.Info("WaveManager", `{player.Name}: +{rewards.XPEarned or baseXP} XP, World={_currentWorldId}, Difficulty={_currentDifficulty}`)
     end
     
     -- Teleport countdown
@@ -368,63 +346,91 @@ function WaveManager.SetGameState(state: GameState)
     end
 end
 
-function WaveManager.StartGame()
+function WaveManager.StartGame(worldId: string?, difficulty: string?): boolean
+    -- If no worldId/difficulty provided, use defaults (for testing)
+    if not worldId or not difficulty then
+        if not _stateManager:CanStartGame() then
+            return false
+        end
+        _currentWave = 0
+        _stateManager:SetState("Playing")
+        _waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
+        Logger.Info("WaveManager", `Game started (default)! First wave in {WaveConfig.FIRST_WAVE_DELAY}s`)
+        return true
+    end
+    
     if not _stateManager:CanStartGame() then
+        Logger.Warn("WaveManager", `Cannot start game - already in progress`)
         return false
     end
     
-    _currentWave = 0
-    _stateManager:SetState("Playing")
-    _waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
-    
-    Logger.Info("WaveManager", `Game started! First wave in {WaveConfig.FIRST_WAVE_DELAY}s`)
-    return true
-end
-
-function WaveManager.StartStage(stageId: string): boolean
-    if not _stateManager:CanStartGame() then
-        Logger.Warn("WaveManager", `Cannot start stage - game in progress`)
+    -- Load World config
+    local worldConfig = WorldData.GetWorld(worldId)
+    if not worldConfig then
+        Logger.Error("WaveManager", `Invalid world ID: {worldId}`)
         return false
     end
     
-    -- Use new stage loading system
-    local stageConfig = getStageConfig(stageId)
-    if not stageConfig then
-        Logger.Error("WaveManager", `Invalid stage ID: {stageId}`)
+    -- Load Difficulty config
+    local difficultyConfig = DifficultyData.GetDifficulty(difficulty)
+    if not difficultyConfig then
+        Logger.Error("WaveManager", `Invalid difficulty: {difficulty}`)
         return false
     end
     
-    -- Configure stage
-    _currentStageId = stageId
-    _currentStageConfig = stageConfig
+    -- Configure game session
+    _currentWorldId = worldId
+    _currentDifficulty = difficulty
+    _currentWorldConfig = worldConfig
+    _currentDifficultyConfig = difficultyConfig
     
-    -- Determine wave count: from Waves array or WaveCount property
-    if stageConfig.Waves and #stageConfig.Waves > 0 then
-        _totalWaves = #stageConfig.Waves
-    else
-        _totalWaves = stageConfig.TotalWaves or stageConfig.WaveCount or 5
-    end
+    -- Determine wave count from difficulty
+    _totalWaves = difficultyConfig.WaveCount or 10
     
-    _spawner:SetStageConfig(stageConfig)
+    -- Build merged config for spawner (combine world + difficulty)
+    local spawnerConfig = {
+        -- From World
+        Name = worldConfig.Name,
+        MapId = worldConfig.MapId,
+        ZombiePool = worldConfig.ZombiePool,
+        Mechanics = worldConfig.Mechanics,
+        -- From Difficulty (use existing field names)
+        BaseZombieHP = difficultyConfig.ZombieHealthMult or 1.0,
+        BaseBudgetMultiplier = difficultyConfig.ZombieDamageMult or 1.0, -- Use damage as budget proxy
+        SpawnInterval = difficultyConfig.SpawnInterval or 2.5,
+        TotalWaves = _totalWaves,
+    }
     
-    -- Update timing from stage
-    local spawnInterval = stageConfig.SpawnInterval or 2.5
+    _spawner:SetWorldConfig(spawnerConfig)
+    
+    -- Update timing from difficulty
+    local spawnInterval = spawnerConfig.SpawnInterval
     WaveConfig.TRICKLE_INTERVAL = spawnInterval + 1.5
     WaveConfig.ASSAULT_INTERVAL = spawnInterval
-    WaveConfig.FLAG_INTERVAL = spawnInterval - 0.5
+    WaveConfig.FLAG_INTERVAL = math.max(0.5, spawnInterval - 0.5)
     
-    -- Start preparation
+    -- Start preparation phase
     _currentWave = 0
     _stateManager:SetState("Preparation")
     _waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
     
-    Logger.Info("WaveManager", `=== STAGE {stageId}: {stageConfig.Name} ===`)
+    Logger.Info("WaveManager", `=== {worldConfig.Name} | {difficultyConfig.Name} ({_totalWaves} waves) ===`)
     
-    local waveCount = stageConfig.TotalWaves or stageConfig.WaveCount or _totalWaves
-    _broadcaster:BroadcastStageStarted(stageId, stageConfig.Name, waveCount)
+    _broadcaster:BroadcastGameStarted(worldId, difficulty, worldConfig.Name, difficultyConfig.Name, _totalWaves)
     _broadcaster:BroadcastWaveStarted(0, 0)
     
     return true
+end
+
+-- Legacy function for compatibility
+function WaveManager.StartStage(stageId: string): boolean
+    -- Parse legacy format "world-difficulty" if needed
+    local worldId, difficulty = stageId:match("^(%w+)%-(%w+)$")
+    if worldId and difficulty then
+        return WaveManager.StartGame(worldId, difficulty)
+    end
+    -- Default fallback
+    return WaveManager.StartGame("day", "normal")
 end
 
 function WaveManager.StartWaves(): boolean
@@ -442,8 +448,30 @@ function WaveManager.OnZombieDied()
     -- Called by EntityDeathSystem
 end
 
+-- Legacy getter (deprecated)
 function WaveManager.GetCurrentStageId(): string
-    return _currentStageId
+    return `{_currentWorldId}-{_currentDifficulty}`
+end
+
+-- New getters for World + Difficulty system
+function WaveManager.GetCurrentWorldId(): string
+    return _currentWorldId
+end
+
+function WaveManager.GetCurrentDifficulty(): string
+    return _currentDifficulty
+end
+
+function WaveManager.GetCurrentWorldConfig(): WorldData.WorldConfig?
+    return _currentWorldConfig
+end
+
+function WaveManager.GetCurrentDifficultyConfig(): DifficultyData.DifficultyConfig?
+    return _currentDifficultyConfig
+end
+
+function WaveManager.GetTotalWaves(): number
+    return _totalWaves
 end
 
 function WaveManager.ResetGameState()
@@ -456,6 +484,11 @@ function WaveManager.ResetGameState()
     _phaseBudget = 0
     _totalBudget = 0
     _zombiesSpawnedThisWave = 0
+    _totalWaves = 0
+    _currentWorldId = ""
+    _currentDifficulty = ""
+    _currentWorldConfig = nil
+    _currentDifficultyConfig = nil
     Logger.Info("WaveManager", "Game state reset")
 end
 

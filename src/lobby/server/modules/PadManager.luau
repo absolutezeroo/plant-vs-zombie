@@ -6,11 +6,12 @@
     Structure attendue:
     Workspace/
     └── TeleportPads/
-        └── Stage_1-1/              -- Model (any name)
+        └── Day_Normal/             -- Model (any name)
             ├── Platform (Part)     -- Touch detection part
             ├── Billboard (Part?)   -- Attachment point for UI
             └── Configuration/
-                ├── StageId (StringValue)
+                ├── WorldId (StringValue)        -- Required: "day", "night", "pool", etc.
+                ├── Difficulty (StringValue)     -- Required: "easy", "normal", "hard", etc.
                 ├── MinPlayers (IntValue, optional)
                 └── MaxPlayers (IntValue, optional)
 ]]
@@ -19,7 +20,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local StageData = require(Shared.data.StageData)
+local WorldData = require(Shared.data.WorldData)
+local DifficultyData = require(Shared.data.DifficultyData)
 
 -- Import lobby config (now in Shared.config)
 local LobbyConfig = require(Shared.config.LobbyConfig)
@@ -28,7 +30,10 @@ export type PadConfig = {
     Model: Model,
     Platform: BasePart,
     BillboardAttachment: Attachment?,
-    StageId: string,
+    WorldId: string,
+    Difficulty: string,
+    WorldConfig: WorldData.WorldConfig?,
+    DifficultyConfig: DifficultyData.DifficultyConfig?,
     MinPlayers: number,
     MaxPlayers: number,
     CountdownDuration: number,
@@ -43,7 +48,10 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
         Model = padModel,
         Platform = nil :: any,
         BillboardAttachment = nil,
-        StageId = "",
+        WorldId = "",
+        Difficulty = "normal",
+        WorldConfig = nil,
+        DifficultyConfig = nil,
         MinPlayers = LobbyConfig.DEFAULT_MIN_PLAYERS,
         MaxPlayers = LobbyConfig.DEFAULT_MAX_PLAYERS,
         CountdownDuration = LobbyConfig.COUNTDOWN_DURATION,
@@ -85,20 +93,37 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
         return nil
     end
     
-    -- Read StageId (required)
-    local stageIdValue = configFolder:FindFirstChild("StageId")
-    if not stageIdValue or not stageIdValue:IsA("StringValue") then
-        Logger.Warn("PadManager", `Pad {padModel.Name} missing StageId StringValue`)
+    -- Read WorldId (required)
+    local worldIdValue = configFolder:FindFirstChild("WorldId")
+    if not worldIdValue or not worldIdValue:IsA("StringValue") then
+        Logger.Warn("PadManager", `Pad {padModel.Name} missing WorldId StringValue`)
         return nil
     end
-    config.StageId = stageIdValue.Value
+    config.WorldId = worldIdValue.Value
     
-    -- Validate stage exists
-    local stageConfig = StageData.GetStage(config.StageId)
-    if not stageConfig then
-        Logger.Warn("PadManager", `Pad {padModel.Name} has invalid StageId: {config.StageId}`)
+    -- Read Difficulty (required)
+    local difficultyValue = configFolder:FindFirstChild("Difficulty")
+    if not difficultyValue or not difficultyValue:IsA("StringValue") then
+        Logger.Warn("PadManager", `Pad {padModel.Name} missing Difficulty StringValue`)
         return nil
     end
+    config.Difficulty = difficultyValue.Value
+    
+    -- Validate world exists using WorldData (data-driven)
+    local worldConfig = WorldData.GetWorld(config.WorldId)
+    if not worldConfig then
+        Logger.Warn("PadManager", `Pad {padModel.Name} has invalid WorldId: {config.WorldId}`)
+        return nil
+    end
+    config.WorldConfig = worldConfig
+    
+    -- Validate difficulty exists using DifficultyData (data-driven)
+    local difficultyConfig = DifficultyData.GetDifficulty(config.Difficulty)
+    if not difficultyConfig then
+        Logger.Warn("PadManager", `Pad {padModel.Name} has invalid Difficulty: {config.Difficulty}`)
+        return nil
+    end
+    config.DifficultyConfig = difficultyConfig
     
     -- Read MinPlayers (optional)
     local minPlayersValue = configFolder:FindFirstChild("MinPlayers")
@@ -121,7 +146,8 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
     config.IsValid = true
     
     Logger.Info("PadManager", `Loaded pad: {padModel.Name}`, {
-        stageId = config.StageId,
+        worldId = config.WorldId,
+        difficulty = config.Difficulty,
         minPlayers = config.MinPlayers,
         maxPlayers = config.MaxPlayers,
         countdownDuration = config.CountdownDuration,

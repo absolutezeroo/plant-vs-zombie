@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ProgressionData = require(Shared.data.ProgressionData)
-local StageData = require(Shared.data.StageData)
+local DifficultyData = require(Shared.data.DifficultyData)
 local Logger = require(Shared.utils.Logger)
 
 -- Types
@@ -41,10 +41,16 @@ export type RewardParams = {
     IsVictory: boolean,
     WaveReached: number,
     SessionStats: SessionStats,
-    StageConfig: StageData.StageConfig?,
     StarRating: number,
-    IsFirstClear: boolean,
-    IsNewBest: boolean,
+    -- New World + Difficulty system
+    DifficultyConfig: DifficultyData.DifficultyConfig?,
+    WorldConfig: any?,
+    BaseCoins: number?,
+    BaseXP: number?,
+    WaveMultiplier: number?,
+    -- Legacy fields (optional for backwards compatibility)
+    IsFirstClear: boolean?,
+    IsNewBest: boolean?,
 }
 
 local RewardCalculator = {}
@@ -78,12 +84,12 @@ function RewardCalculator:CalculateRewards(params: RewardParams): RewardResult
         GemsEarned = 0,
         StarRating = params.StarRating,
         LevelsGained = 0,
-        IsFirstClear = params.IsFirstClear,
-        IsNewBest = params.IsNewBest,
+        IsFirstClear = params.IsFirstClear or false,
+        IsNewBest = params.IsNewBest or false,
     }
     
     local stats = params.SessionStats
-    local stageConfig = params.StageConfig
+    local difficultyConfig = params.DifficultyConfig
     
     -- Base coins from zombies killed during game
     result.TotalCoins = stats.CoinsEarned
@@ -94,18 +100,16 @@ function RewardCalculator:CalculateRewards(params: RewardParams): RewardResult
         result.TotalCoins += result.BonusCoins
     end
     
-    -- Stage completion rewards
-    if stageConfig then
+    -- Difficulty-based completion rewards (new system)
+    if difficultyConfig then
         if params.IsVictory then
-            result.StageCoins = stageConfig.CoinReward or 0
+            result.StageCoins = params.BaseCoins or difficultyConfig.CoinReward or 0
             result.TotalCoins += result.StageCoins
-            
-            -- First clear bonus
-            if params.IsFirstClear and stageConfig.FirstClearBonus then
-                result.FirstClearBonus = stageConfig.FirstClearBonus
-                result.TotalCoins += result.FirstClearBonus
-            end
         end
+    elseif params.BaseCoins then
+        -- Use BaseCoins directly if provided (e.g., endless mode)
+        result.StageCoins = params.BaseCoins
+        result.TotalCoins += result.StageCoins
     end
     
     -- XP calculation
@@ -114,14 +118,16 @@ function RewardCalculator:CalculateRewards(params: RewardParams): RewardResult
     result.XPEarned += params.WaveReached * ProgressionData.XP_PER_WAVE
     
     if params.IsVictory then
-        if stageConfig then
-            result.XPEarned += stageConfig.XPReward or 0
+        if difficultyConfig then
+            result.XPEarned += params.BaseXP or difficultyConfig.XPReward or 0
+        elseif params.BaseXP then
+            result.XPEarned += params.BaseXP
         end
         result.XPEarned += ProgressionData.XP_VICTORY_BONUS
         result.XPEarned += params.StarRating * ProgressionData.XP_PER_STAR
     end
     
-    -- Gems for 3-star victory
+    -- Gems for 3-star victory (cosmetics only)
     if params.IsVictory and params.StarRating == 3 then
         result.GemsEarned = ProgressionData.GEMS_VICTORY_3_STAR
     end

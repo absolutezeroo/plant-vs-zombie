@@ -35,7 +35,8 @@ event TeleportToArenaRequest = {
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        StageId: string.utf8(..50),
+        WorldId: string.utf8(..50),     -- World ID from WorldData
+        Difficulty: string.utf8(..20),  -- Difficulty from DifficultyData
         Deck: PlantType[1..6],  -- Max 6 plants in deck
     }
 }
@@ -75,7 +76,8 @@ event ShowResults = {
     type: Reliable,
     call: ManyAsync,
     data: struct {
-        StageId: string.utf8(..50),
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
         Victory: boolean,
         Stars: u8,  -- 0-3
         CoinsEarned: u32,
@@ -94,11 +96,11 @@ event PadStateUpdate = {
     call: ManyAsync,
     data: struct {
         PadId: string.utf8(..100),  -- Unique pad identifier
-        StageId: string.utf8(..50),
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
         PlayersCount: u8,
         MaxPlayers: u8,
         CountdownRemaining: u8?,    -- nil = no countdown
-        IsLocked: boolean,           -- Stage not unlocked for this player
         PlayerNames: string.utf8(..200)?, -- Comma-separated player names
     }
 }
@@ -110,7 +112,8 @@ event JoinedPad = {
     call: ManyAsync,
     data: struct {
         PadId: string.utf8(..100),
-        StageId: string.utf8(..50),
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
         Position: Vector3,  -- Center of pad to teleport to
     }
 }

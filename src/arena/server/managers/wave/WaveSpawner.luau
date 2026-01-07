@@ -3,7 +3,7 @@
     WaveSpawner.luau - Handles zombie spawning logic
     
     Single Responsibility: Spawn zombies with both:
-    - Precise wave definitions (from StageRegistry)
+    - Precise wave definitions (from WorldData + DifficultyData)
     - Budget-based fallback system
     
     Supports:
@@ -54,7 +54,8 @@ export type SpawnConfig = {
 }
 
 export type WaveSpawner = {
-    SetStageConfig: (self: WaveSpawner, stageConfig: any?) -> (),
+    SetWorldConfig: (self: WaveSpawner, config: any?) -> (),
+    SetStageConfig: (self: WaveSpawner, stageConfig: any?) -> (),  -- Legacy
     SetWaveDefinitions: (self: WaveSpawner, waves: {WaveDefinition}?) -> (),
     HasDefinedWave: (self: WaveSpawner, waveNumber: number) -> boolean,
     GetWaveDefinition: (self: WaveSpawner, waveNumber: number) -> WaveDefinition?,
@@ -77,8 +78,10 @@ WaveSpawner.__index = WaveSpawner
 local DEFAULT_SPAWN_COST = 10
 
 -- State
-local _stageConfig: any = nil  -- StageConfig from StageRegistry or StageData
+local _worldConfig: any = nil  -- Merged config from WorldData + DifficultyData
 local _waveDefinitions: {WaveDefinition}? = nil  -- Precise wave definitions
+local _budgetMultiplier: number = 1.0  -- From difficulty
+local _zombieHPMultiplier: number = 1.0  -- From difficulty
 local _spawnPools: {Trickle: {string}, Assault: {string}, Flag: {string}} = {
     Trickle = {"Basic", "Basic", "Basic", "Cone", "Imp"},
     Assault = {"Basic", "Basic", "Cone", "Cone", "Bucket", "Imp", "Imp"},
@@ -111,11 +114,30 @@ function WaveSpawner.new(): WaveSpawner
     return self :: any
 end
 
--- Set stage configuration (supports both old StageData and new StageRegistry configs)
-function WaveSpawner:SetStageConfig(stageConfig: any?)
-    _stageConfig = stageConfig
+-- Set world configuration (merged WorldData + DifficultyData)
+function WaveSpawner:SetWorldConfig(config: any?)
+    _worldConfig = config
     
-    -- Extract wave definitions if present (new system)
+    if config then
+        _budgetMultiplier = config.BaseBudgetMultiplier or 1.0
+        _zombieHPMultiplier = config.BaseZombieHP or 1.0
+        Logger.Info("WaveSpawner", `Config loaded: Budget x{_budgetMultiplier}, HP x{_zombieHPMultiplier}`)
+    else
+        _budgetMultiplier = 1.0
+        _zombieHPMultiplier = 1.0
+    end
+    
+    -- Clear wave definitions (use budget-based for new system)
+    _waveDefinitions = nil
+    
+    self:RebuildSpawnPools()
+end
+
+-- Set stage configuration (legacy support)
+function WaveSpawner:SetStageConfig(stageConfig: any?)
+    _worldConfig = stageConfig
+    
+    -- Extract wave definitions if present (old system)
     if stageConfig and stageConfig.Waves then
         _waveDefinitions = stageConfig.Waves
         Logger.Info("WaveSpawner", `Loaded {#stageConfig.Waves} wave definitions`)
@@ -182,10 +204,10 @@ function WaveSpawner:SpawnDefinedWave(world: any, waveNumber: number)
     end
 end
 
--- Rebuild spawn pools based on stage config
+-- Rebuild spawn pools based on world config
 function WaveSpawner:RebuildSpawnPools()
-    if _stageConfig and (_stageConfig.ZombiePool or _stageConfig.DefaultZombiePool) then
-        local pool = _stageConfig.ZombiePool or _stageConfig.DefaultZombiePool
+    if _worldConfig and _worldConfig.ZombiePool then
+        local pool = _worldConfig.ZombiePool
         _spawnPools = {
             Trickle = pool,
             Assault = pool,
@@ -209,33 +231,27 @@ function WaveSpawner:GetZombieCost(zombieType: string): number
     return DEFAULT_SPAWN_COST
 end
 
--- Get zombie health with stage multiplier
+-- Get zombie health with difficulty multiplier
 function WaveSpawner:GetZombieHealth(zombieType: string): number
     local stats = ZombieData[zombieType]
     if not stats then return 100 end
     
     local baseHealth = stats.Health
-    local mult = if _stageConfig then (_stageConfig.ZombieHealthMult or 1) else 1
-    return math.floor(baseHealth * mult)
+    return math.floor(baseHealth * _zombieHPMultiplier)
 end
 
--- Get zombie speed with stage multiplier
+-- Get zombie speed (no multiplier currently)
 function WaveSpawner:GetZombieSpeed(zombieType: string): number
     local stats = ZombieData[zombieType]
     if not stats then return 1.5 end
-    
-    local baseSpeed = stats.Speed
-    local mult = if _stageConfig then (_stageConfig.ZombieSpeedMult or 1) else 1
-    return baseSpeed * mult
+    return stats.Speed
 end
 
--- Calculate wave budget
+-- Calculate wave budget with difficulty multiplier
 function WaveSpawner:CalculateBudget(waveNumber: number): number
-    if _stageConfig then
-        return _stageConfig.BaseBudget + (waveNumber - 1) * _stageConfig.BudgetPerWave
-    end
-    -- Default fallback
-    return 50 * math.pow(1.6, waveNumber)
+    -- Base formula: 50 * 1.6^wave, scaled by difficulty budget multiplier
+    local baseBudget = 50 * math.pow(1.6, waveNumber)
+    return baseBudget * _budgetMultiplier
 end
 
 -- Get budget for a specific phase

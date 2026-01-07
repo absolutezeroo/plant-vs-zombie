@@ -16,6 +16,7 @@ local RewardCalculator = require(script.Parent.RewardCalculator)
 export type RewardResult = RewardCalculator.RewardResult
 
 export type WaveBroadcaster = {
+    BroadcastGameStarted: (self: WaveBroadcaster, worldId: string, difficulty: string, worldName: string, difficultyName: string, waveCount: number) -> (),
     BroadcastStageStarted: (self: WaveBroadcaster, stageId: string, stageName: string, waveCount: number) -> (),
     BroadcastWaveStarted: (self: WaveBroadcaster, waveNumber: number, zombieCount: number) -> (),
     BroadcastWaveCompleted: (self: WaveBroadcaster, waveNumber: number, survived: boolean) -> (),
@@ -39,16 +40,20 @@ export type StageCompleteData = {
 }
 
 export type GameEndRewardsData = {
+    WorldId: string?,
+    Difficulty: string?,
     Victory: boolean,
     CoinsEarned: number,
     ZombiesKilled: number,
     WavesCompleted: number,
+    TotalWaves: number?,
     BonusCoins: number,
     StarRating: number,
     XPEarned: number,
-    GemsEarned: number,
+    GemsEarned: number?,
     NewLevel: number,
     LevelsGained: number,
+    IsEndless: boolean?,
 }
 
 local WaveBroadcaster = {}
@@ -69,7 +74,24 @@ function WaveBroadcaster.new(): WaveBroadcaster
     return self :: any
 end
 
--- Broadcast stage started
+-- Broadcast game started (new World + Difficulty system)
+function WaveBroadcaster:BroadcastGameStarted(worldId: string, difficulty: string, worldName: string, difficultyName: string, waveCount: number)
+    local Network = getNetwork()
+    -- Use StageStarted event for compatibility, or add GameStarted to packets.zap
+    Network.StageStarted.FireAll({
+        StageId = `{worldId}-{difficulty}`,
+        StageName = `{worldName} ({difficultyName})`,
+        WaveCount = waveCount,
+        -- New fields (will be ignored by old clients)
+        WorldId = worldId,
+        Difficulty = difficulty,
+        WorldName = worldName,
+        DifficultyName = difficultyName,
+    })
+    Logger.Debug("WaveBroadcaster", `Game started: {worldName} | {difficultyName}`)
+end
+
+-- Broadcast stage started (legacy)
 function WaveBroadcaster:BroadcastStageStarted(stageId: string, stageName: string, waveCount: number)
     local Network = getNetwork()
     Network.StageStarted.FireAll({

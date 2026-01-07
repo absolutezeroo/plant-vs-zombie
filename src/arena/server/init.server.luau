@@ -192,17 +192,18 @@ local function onPlayerAdded(player: Player)
 	else
 		Logger.Info("Server", `{player.Name} joined directly (no teleport data)`)
 		-- Player joined without going through Lobby
-		-- For testing in Studio, start with default stage
+		-- For testing in Studio, start with default world + difficulty
 		task.spawn(function()
 			local attempts = 0
 			while attempts < 100 do
 				local profileData = PlayerDataService.GetProfile(player)
 				if profileData then
-					-- Start with first stage for testing
-					local defaultStage = profileData.CurrentStage or "1-1"
+					-- Start with day world, normal difficulty for testing
+					local defaultWorldId = "day"
+					local defaultDifficulty = "normal"
 					local defaultDeck = {"Sunflower", "Peashooter", "WallNut"}
-					Logger.Info("Server", `Starting test battle with stage {defaultStage}`)
-					ArenaService.StartBattle(player, defaultStage, defaultDeck)
+					Logger.Info("Server", `Starting test battle: World={defaultWorldId}, Difficulty={defaultDifficulty}`)
+					ArenaService.StartBattle(player, defaultWorldId, defaultDifficulty, defaultDeck)
 					break
 				end
 				task.wait(0.1)
