@@ -13,6 +13,11 @@
 	- Catapult plants (lobbing projectiles)
 	- Projectile movement
 	- Short-range mushrooms (PuffShroom, SeaShroom, FumeShroom)
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - manages projectiles
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -467,7 +472,19 @@ local function ProjectileSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_plantFireTimes)
+	table.clear(_pendingMultiShots)
+end
+
 return {
-	system = ProjectileSystem,
+	_name = "ProjectileSystem",
 	priority = 160,
+	system = ProjectileSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

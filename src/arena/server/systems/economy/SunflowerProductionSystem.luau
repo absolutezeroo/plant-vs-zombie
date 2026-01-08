@@ -7,6 +7,11 @@
 	Sunflowers produce sun orbs every 24 seconds.
 	Sun spawns at plant position and can be collected.
 	Uses SunComponent for consistency with sky sun.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - manages sun production
+	- Dispose(): Clear production timers
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -127,7 +132,18 @@ local function SunflowerProductionSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_productionTimers)
+end
+
 return {
-	system = SunflowerProductionSystem,
+	_name = "SunflowerProductionSystem",
 	priority = 305,
+	system = SunflowerProductionSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

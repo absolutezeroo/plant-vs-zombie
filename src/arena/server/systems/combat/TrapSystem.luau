@@ -8,6 +8,11 @@
 	- Spikeweed/Spikerock damaging zombies walking over (IsTrap, DamagesOnWalk)
 	- Garlic diverting zombies to adjacent lanes (DivertsZombies)
 	- Vehicle tire popping (PopsTires) - for Zomboni etc.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes traps
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -206,8 +211,20 @@ function TrapAPI.OnGarlicEaten(world: any, garlicId: number, zombieId: number)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_trapDamageTimes)
+	table.clear(_garlicBites)
+end
+
 return {
-	system = TrapSystem,
+	_name = "TrapSystem",
 	priority = 165,
+	system = TrapSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = TrapAPI,
 }

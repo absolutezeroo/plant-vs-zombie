@@ -11,6 +11,11 @@
 	- Shield piercing (Fume-shroom)
 	- Zombie eating plants
 	- Damage application
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes combat
+	- Dispose(): Clear attack tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -406,7 +411,19 @@ local function CombatSystem(world: MatterWorld)
 	logFrameStats()
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_zombieAttackTimes)
+	resetFrameStats()
+end
+
 return {
-	system = CombatSystem,
+	_name = "CombatSystem",
 	priority = 170,
+	system = CombatSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

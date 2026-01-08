@@ -9,6 +9,11 @@
 	Despawns after lifetime expires if not collected.
 	
 	Broadcasts sun events to all clients via Zap.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - manages sun spawning
+	- Dispose(): Reset spawn timing state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -195,7 +200,19 @@ local function SunSpawnSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	_lastSpawnTime = 0
+	_nextSpawnDelay = 0
+end
+
 return {
-	system = SunSpawnSystem,
+	_name = "SunSpawnSystem",
 	priority = 300, -- Resource phase
+	system = SunSpawnSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

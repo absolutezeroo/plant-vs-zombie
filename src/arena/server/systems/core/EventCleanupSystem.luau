@@ -1,12 +1,17 @@
 --!strict
 --[[
-	Event Cleanup System - Cleans up ephemeral event entities
+	EventCleanupSystem.luau - Cleans up ephemeral event entities
 	
 	Priority: 400 (Cleanup phase)
 	
 	Events in Matter ECS are entities with event components.
 	This system removes all event entities at the end of each frame.
 	"Events exist for exactly one frame"
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - despawns event entities
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,7 +42,18 @@ local function EventCleanupSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No cleanup needed
+end
+
 return {
-	system = EventCleanupSystem,
+	_name = "EventCleanupSystem",
 	priority = 400,  -- Cleanup phase
+	system = EventCleanupSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

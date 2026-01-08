@@ -11,6 +11,11 @@
 	- Current wave number
 	- Base health
 	- Game state
+	
+	LIFECYCLE:
+	- Init(): Setup player connection listeners (CAN yield)
+	- system(): Main loop (CANNOT yield) - processes pending syncs
+	- Dispose(): Cleanup player connections
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,6 +41,9 @@ local PlantTypeComponent = Components.PlantTypeComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local SunComponent = Components.SunComponent
 local HealthComponent = Components.HealthComponent
+
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
 
 -- Track players pending sync
 local _pendingSync: {[Player]: boolean} = {}
@@ -108,8 +116,10 @@ local function onPlayerRemoving(player: Player)
 	_pendingSync[player] = nil
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoving)
+local function setupListeners()
+	table.insert(_connections, Players.PlayerAdded:Connect(onPlayerAdded))
+	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+end
 
 -- System runs each frame to process pending syncs
 local function FullStateSyncSystem(world)
@@ -130,7 +140,24 @@ local function FullStateSyncSystem(world)
 	end
 end
 
+local function Init(_world)
+	setupListeners()
+	Logger.Debug("FullStateSyncSystem", "Initialized")
+end
+
+local function Dispose()
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	table.clear(_pendingSync)
+	Logger.Debug("FullStateSyncSystem", "Disposed")
+end
+
 return {
-	system = FullStateSyncSystem,
+	_name = "FullStateSyncSystem",
 	priority = 50,
+	system = FullStateSyncSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

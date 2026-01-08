@@ -6,6 +6,11 @@
 	
 	Spawns poison clouds when plants with PoisonCloud die.
 	Damages zombies inside poison clouds over time.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes poison clouds
+	- Dispose(): Clear active clouds
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -121,8 +126,19 @@ function API.Reset()
 	activeClouds = {}
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	activeClouds = {}
+end
+
 return {
-	system = PoisonCloudSystem,
+	_name = "PoisonCloudSystem",
 	priority = 365,
+	system = PoisonCloudSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

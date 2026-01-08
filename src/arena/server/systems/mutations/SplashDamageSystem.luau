@@ -5,6 +5,11 @@
 	Priority: 345 (Before individual damage processing)
 	
 	Plants with SplashDamageComponent deal damage in an area on hit.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): No per-frame logic, API-driven
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -86,8 +91,19 @@ local function SplashDamageSystem(world)
 	-- No per-frame processing needed
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No state to clean up
+end
+
 return {
-	system = SplashDamageSystem,
+	_name = "SplashDamageSystem",
 	priority = 345,
+	system = SplashDamageSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

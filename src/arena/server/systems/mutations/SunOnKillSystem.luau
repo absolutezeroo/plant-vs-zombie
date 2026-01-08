@@ -6,6 +6,11 @@
 	
 	Plants with SunOnKillComponent spawn sun when they kill a zombie.
 	Works with projectile kills and direct damage kills.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): No per-frame logic, API-driven
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -62,8 +67,19 @@ local function SunOnKillSystem(world)
 	-- No per-frame processing needed
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No state to clean up
+end
+
 return {
-	system = SunOnKillSystem,
+	_name = "SunOnKillSystem",
 	priority = 375,
+	system = SunOnKillSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

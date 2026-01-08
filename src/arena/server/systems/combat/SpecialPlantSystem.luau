@@ -12,6 +12,11 @@
 	- Chomper instant-kill + chewing
 	- Squash jump-and-squash
 	- Explode-o-nut death explosion
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes special plants
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -448,8 +453,20 @@ local function SpecialPlantSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_fusePlants)
+	table.clear(_squashJumps)
+end
+
 return {
-	system = SpecialPlantSystem,
+	_name = "SpecialPlantSystem",
 	priority = 175,
+	system = SpecialPlantSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = SpecialPlantAPI,
 }

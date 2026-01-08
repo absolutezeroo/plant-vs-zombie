@@ -6,6 +6,11 @@
 	
 	When a projectile with ChainLightning hits a zombie, damage chains
 	to nearby zombies within range.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): No per-frame logic, API-driven
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -132,8 +137,19 @@ function API.ApplyChainLightning(
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No state to clean up
+end
+
 return {
-	system = function(_world) end, -- No per-frame logic, API-driven
+	_name = "ChainLightningSystem",
 	priority = 360,
+	system = function(_world) end, -- No per-frame logic, API-driven
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

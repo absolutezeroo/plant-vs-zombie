@@ -10,6 +10,11 @@
 	- Cleaning up grid occupancy for plants
 	- Spawning coins for zombie kills
 	- Despawning dead entities
+	
+	LIFECYCLE:
+	- Init(): Setup player listener (CAN yield)
+	- system(): Main loop (CANNOT yield) - processes entity deaths
+	- Dispose(): Cleanup player connection and session stats
 ]]
 
 local Players = game:GetService("Players")
@@ -47,6 +52,9 @@ end
 
 -- Session zombie kill tracking (for end-game stats)
 local _sessionStats: {[Player]: {ZombiesKilled: number, CoinsEarned: number}} = {}
+
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
 
 local function getSessionStats(player: Player)
 	if not _sessionStats[player] then
@@ -130,12 +138,31 @@ local function EntityDeathSystem(world)
 end
 
 -- Clean up when players leave
-Players.PlayerRemoving:Connect(function(player)
+local function onPlayerRemoving(player)
 	_sessionStats[player] = nil
-end)
+end
+
+local function setupListeners()
+	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+end
+
+local function Init(_world)
+	setupListeners()
+end
+
+local function Dispose()
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	table.clear(_sessionStats)
+end
 
 return {
-	system = EntityDeathSystem,
+	_name = "EntityDeathSystem",
 	priority = 180,
+	system = EntityDeathSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

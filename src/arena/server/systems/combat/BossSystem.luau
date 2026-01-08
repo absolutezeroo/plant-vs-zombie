@@ -8,6 +8,11 @@
 	- Gargantuar spawning Imp at 50% health
 	- Boss-specific death effects
 	- Future boss mechanics
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes boss behavior
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -121,7 +126,18 @@ local function BossSystem(world: MatterWorld)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_hasSpawnedMinion)
+end
+
 return {
-	system = BossSystem,
+	_name = "BossSystem",
 	priority = 175, -- After combat (170), before death (180)
+	system = BossSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

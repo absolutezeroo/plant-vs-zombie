@@ -9,6 +9,11 @@
 	- Red tint = invalid placement (cell occupied, can't afford, out of bounds)
 	
 	Uses the actual plant model from Assets for better visual feedback.
+	
+	LIFECYCLE:
+	- Init(): Setup input handlers & network listeners (CAN yield)
+	- system(): Update ghost position each frame (CANNOT yield)
+	- Dispose(): Disconnect events, cleanup ghost visuals
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -64,6 +69,9 @@ local _requestId = 0
 -- Track pending placement requests for refund on failure
 -- { [requestId]: { plantType: string, cost: number } }
 local _pendingPlacements: {[number]: {plantType: string, cost: number}} = {}
+
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
 
 -- Ghost visual state
 local _ghostModel: Model? = nil
@@ -528,57 +536,91 @@ local function handlePlacement()
 	hideGhost()
 end
 
--- Connect input
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then
-		return
-	end
-	
-	if input.UserInputType == Enum.UserInputType.MouseButton1 
-		or input.UserInputType == Enum.UserInputType.Touch then
-		-- Check if shovel mode is active first
-		if SelectionState.IsShovelActive() then
-			handleShovel()
-		else
-			handlePlacement()
+--[[
+	Setup input handlers and network listeners (called during Init phase)
+]]
+local function setupListeners()
+	-- Left-click / touch to place or shovel
+	table.insert(_connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then
+			return
 		end
-	end
-end)
-
--- Right-click or ESC to cancel selection or shovel mode
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if input.UserInputType == Enum.UserInputType.MouseButton2
-		or input.KeyCode == Enum.KeyCode.Escape then
-		SelectionState.Select(nil)
-		SelectionState.DeactivateShovel()
-		destroyGhost() -- Fully destroy when canceling
-		restoreHighlightedPlant() -- Restore any highlighted plant
-	end
-end)
-
--- Handle placement response from server - refund on failure
-Network.RequestResponse.On(function(data)
-	local pending = _pendingPlacements[data.RequestId]
-	if not pending then
-		return -- Not a placement request we're tracking
-	end
-	
-	-- Remove from pending
-	_pendingPlacements[data.RequestId] = nil
-	
-	if not data.Success then
-		-- Refund the sun!
-		SelectionState.AddSun(pending.cost)
-		-- Cancel the cooldown
-		SelectionState.CancelCooldown(pending.plantType)
 		
-		Logger.Warn("GhostPreview", `Placement failed (error {data.ErrorCode}), refunded {pending.cost} sun`)
-	else
-		Logger.Debug("GhostPreview", `Placement confirmed for {pending.plantType}`)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 
+			or input.UserInputType == Enum.UserInputType.Touch then
+			-- Check if shovel mode is active first
+			if SelectionState.IsShovelActive() then
+				handleShovel()
+			else
+				handlePlacement()
+			end
+		end
+	end))
+	
+	-- Right-click or ESC to cancel selection or shovel mode
+	table.insert(_connections, UserInputService.InputBegan:Connect(function(input, _gameProcessed)
+		if input.UserInputType == Enum.UserInputType.MouseButton2
+			or input.KeyCode == Enum.KeyCode.Escape then
+			SelectionState.Select(nil)
+			SelectionState.DeactivateShovel()
+			destroyGhost() -- Fully destroy when canceling
+			restoreHighlightedPlant() -- Restore any highlighted plant
+		end
+	end))
+	
+	-- Handle placement response from server - refund on failure
+	table.insert(_connections, Network.RequestResponse.On(function(data)
+		local pending = _pendingPlacements[data.RequestId]
+		if not pending then
+			return -- Not a placement request we're tracking
+		end
+		
+		-- Remove from pending
+		_pendingPlacements[data.RequestId] = nil
+		
+		if not data.Success then
+			-- Refund the sun!
+			SelectionState.AddSun(pending.cost)
+			-- Cancel the cooldown
+			SelectionState.CancelCooldown(pending.plantType)
+			
+			Logger.Warn("GhostPreview", `Placement failed (error {data.ErrorCode}), refunded {pending.cost} sun`)
+		else
+			Logger.Debug("GhostPreview", `Placement confirmed for {pending.plantType}`)
+		end
+	end))
+end
+
+--[[
+	Init - Setup input handlers and network listeners (CAN yield)
+]]
+local function Init(_world)
+	setupListeners()
+	Logger.Debug("GhostPreview", "Initialized")
+end
+
+--[[
+	Dispose - Cleanup ghost visuals and connections
+]]
+local function Dispose()
+	-- Disconnect all events
+	for _, conn in _connections do
+		conn:Disconnect()
 	end
-end)
+	table.clear(_connections)
+	
+	-- Cleanup ghost visuals
+	destroyGhost()
+	restoreHighlightedPlant()
+	table.clear(_pendingPlacements)
+	
+	Logger.Debug("GhostPreview", "Disposed")
+end
 
 return {
+	_name = "GhostPreviewSystem",
+	priority = 50,
 	system = GhostPreviewSystem,
-	priority = 50, -- Input phase
+	Init = Init,
+	Dispose = Dispose,
 }

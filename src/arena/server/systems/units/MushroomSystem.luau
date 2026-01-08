@@ -9,6 +9,11 @@
 	- Coffee Bean waking mushrooms (WakesMushrooms)
 	- Scaredy-shroom hiding when zombies near (HidesWhenNear)
 	- Sun-shroom growing over time (GrowsOverTime)
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes mushroom behavior
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -167,8 +172,19 @@ local function MushroomSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_sunShroomPlanted)
+end
+
 return {
-	system = MushroomSystem,
+	_name = "MushroomSystem",
 	priority = 155,
+	system = MushroomSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = MushroomAPI,
 }

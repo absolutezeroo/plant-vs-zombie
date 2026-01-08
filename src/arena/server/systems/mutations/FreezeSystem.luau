@@ -9,6 +9,11 @@
 	- Removing freeze when duration expires
 	
 	FreezeEffect on plants/projectiles is processed when hitting zombies.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes frozen entities
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -104,8 +109,19 @@ function API.ApplyFreeze(world, zombieEntityId: number, duration: number)
 	Logger.Debug("FreezeSystem", `Applied freeze to entity {zombieEntityId} for {duration}s`)
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No state to clean up
+end
+
 return {
-	system = FreezeSystem,
+	_name = "FreezeSystem",
 	priority = 355,
+	system = FreezeSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

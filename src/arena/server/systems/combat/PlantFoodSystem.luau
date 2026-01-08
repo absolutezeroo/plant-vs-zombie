@@ -9,6 +9,11 @@
 	- Collecting Plant Food charges when glowing zombies die
 	- Activating Plant Food abilities on plants
 	- Managing player charge counts (max 3)
+	
+	LIFECYCLE:
+	- Init(): Setup player listeners and network handlers (CAN yield)
+	- system(): Main loop (CANNOT yield) - processes Plant Food requests
+	- Dispose(): Cleanup player connections and state
 ]]
 
 local Players = game:GetService("Players")
@@ -55,8 +60,12 @@ local _playerCharges: {[number]: number} = {}  -- UserId -> charge count
 -- Track glowing zombies spawned this wave (for guaranteed spawns)
 local _glowingSpawnedThisWave = 0
 
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
+
 -- Module API for external access
 local PlantFoodSystem = {}
+PlantFoodSystem._name = "PlantFoodSystem"
 PlantFoodSystem.priority = 185
 PlantFoodSystem.API = {}
 
@@ -325,17 +334,41 @@ function PlantFoodSystem.system(world: MatterWorld)
 end
 
 -- Initialize charges for new players
-Players.PlayerAdded:Connect(function(player)
+local function onPlayerAdded(player: Player)
 	_playerCharges[player.UserId] = 0
 	
 	Network.PlantFoodChargeUpdate.Fire(player, {
 		ChargeCount = 0,
 	})
-end)
+end
 
 -- Cleanup on player leave
-Players.PlayerRemoving:Connect(function(player)
+local function onPlayerRemoving(player: Player)
 	_playerCharges[player.UserId] = nil
-end)
+end
+
+local function setupListeners()
+	table.insert(_connections, Players.PlayerAdded:Connect(onPlayerAdded))
+	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+end
+
+local function Init(_world)
+	setupListeners()
+	Logger.Debug("PlantFoodSystem", "Initialized")
+end
+
+local function Dispose()
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	table.clear(_playerCharges)
+	table.clear(_pendingRequests)
+	_glowingSpawnedThisWave = 0
+	Logger.Debug("PlantFoodSystem", "Disposed")
+end
+
+PlantFoodSystem.Init = Init
+PlantFoodSystem.Dispose = Dispose
 
 return PlantFoodSystem

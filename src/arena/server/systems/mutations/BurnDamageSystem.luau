@@ -9,6 +9,11 @@
 	- Removes component when duration expires
 	
 	Also handles projectiles with BurnEffect hitting zombies.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes burning entities
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -101,8 +106,19 @@ function API.ApplyBurn(world, zombieEntityId: number, damagePerSecond: number, d
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No state to clean up
+end
+
 return {
-	system = BurnDamageSystem,
+	_name = "BurnDamageSystem",
 	priority = 350,
+	system = BurnDamageSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

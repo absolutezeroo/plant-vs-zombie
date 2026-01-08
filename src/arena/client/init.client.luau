@@ -9,6 +9,7 @@
     - Network event handling
     
     Uses ServiceLoader for structured initialization.
+    Uses SystemManager for proper system lifecycle (Init/System/Dispose).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +35,7 @@ local ErrorHandler = require(Shared.utils.ErrorHandler)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ServiceLoader = require(Shared.utils.ServiceLoader)
+local SystemManager = require(Shared.utils.SystemManager)
 
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
@@ -279,8 +281,6 @@ loader:AddStep("ECS", function()
     Logger.Info("ArenaClient", "Matter World created")
     
     -- Load all client systems recursively
-    local systemModules: {any} = {}
-    
     for _, descendant in Systems:GetDescendants() do
         if descendant:IsA("ModuleScript") then
             local success, system = ErrorHandler.Try(function()
@@ -288,16 +288,20 @@ loader:AddStep("ECS", function()
             end, `LoadSystem.{descendant.Name}`)
             
             if success and system then
-                table.insert(systemModules, system)
-                Logger.Debug("ArenaClient", `Loaded system: {descendant.Name}`)
+                SystemManager.Register(system)
+                Logger.Debug("ArenaClient", `Registered system: {descendant.Name}`)
             end
         end
     end
     
-    Logger.Info("ArenaClient", `Loaded {#systemModules} client systems`)
+    Logger.Info("ArenaClient", `Registered {#SystemManager.GetMatterSystems()} client systems`)
     
-    -- Schedule and start the loop
-    loop:scheduleSystems(systemModules)
+    -- Initialize ALL systems BEFORE Matter loop starts (CAN yield here)
+    SystemManager.InitializeAll(world)
+    Logger.Info("ArenaClient", "All systems initialized")
+    
+    -- Schedule and start the loop (systems CANNOT yield after this)
+    loop:scheduleSystems(SystemManager.GetMatterSystems())
     loop:begin({
         default = RunService.RenderStepped,
     })

@@ -9,6 +9,11 @@
 	
 	This system runs once per plant spawn and adds the appropriate
 	mutation effect components (BurnEffect, ChainLightning, etc.)
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - applies mutations to new plants
+	- Dispose(): Clear player mutation cache
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -190,8 +195,19 @@ local function MutationApplySystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(playerMutationsCache)
+end
+
 return {
-	system = MutationApplySystem,
+	_name = "MutationApplySystem",
 	priority = 205, -- Right after PlacementSystem (200)
+	system = MutationApplySystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

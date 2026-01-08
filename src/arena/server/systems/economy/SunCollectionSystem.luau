@@ -7,6 +7,11 @@
 	Handles sun collection requests from clients via Zap.
 	Validates the sun entity exists and is collectible.
 	Awards sun to player and despawns entity.
+	
+	LIFECYCLE:
+	- Init(): Setup network listener (CAN yield)
+	- system(): Main loop (CANNOT yield) - processes collection queue
+	- Dispose(): Clear collection queue
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -125,8 +130,23 @@ local function SunCollectionSystem(world)
 	table.clear(_collectionQueue)
 end
 
+local function Init(_world)
+	-- Network handler is already set up at module load
+	Logger.Debug("SunCollectionSystem", "Initialized")
+end
+
+local function Dispose()
+	table.clear(_collectionQueue)
+	_world = nil
+	_placementAPI = nil
+	Logger.Debug("SunCollectionSystem", "Disposed")
+end
+
 return {
-	system = SunCollectionSystem,
+	_name = "SunCollectionSystem",
 	priority = 310, -- After sun spawning
+	system = SunCollectionSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = SunCollectionAPI,
 }

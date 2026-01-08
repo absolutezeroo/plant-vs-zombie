@@ -11,6 +11,11 @@
 	- If a source plant visual exists, spawns projectile at "Muzzle" Attachment
 	- This respects the "spatial contract" between Artists and Code
 	- Fallback to server-provided StartX if no model/attachment found
+	
+	LIFECYCLE:
+	- Init(): Setup network listeners (CAN yield)
+	- system(): Move projectiles each frame (CANNOT yield)
+	- Dispose(): Disconnect events, cleanup visuals
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -66,6 +71,9 @@ type ProjectileVisual = {
 	Speed: number,
 }
 local _projectileVisuals: {[number]: ProjectileVisual} = {}
+
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
 
 -- Visual config
 local PEA_SIZE = Vector3.new(1, 1, 1)
@@ -145,23 +153,61 @@ local function destroyProjectileVisual(entityId: number)
 	end
 end
 
--- Network event handlers
-Network.ProjectileSpawned.On(function(data)
-	local entityId = data.EntityId
-	local lane = data.Lane
-	local startX = data.StartX
+--[[
+	Setup network event listeners (called during Init phase)
+]]
+local function setupNetworkListeners()
+	table.insert(_connections, Network.ProjectileSpawned.On(function(data)
+		local entityId = data.EntityId
+		local lane = data.Lane
+		local startX = data.StartX
+		
+		if not _projectileVisuals[entityId] then
+			_projectileVisuals[entityId] = createProjectileVisual(entityId, lane, startX)
+			Logger.Debug("ProjectileRender", `Pea {entityId} spawned in lane {lane}`)
+		end
+	end))
 	
-	if not _projectileVisuals[entityId] then
-		_projectileVisuals[entityId] = createProjectileVisual(entityId, lane, startX)
-		Logger.Debug("ProjectileRender", `Pea {entityId} spawned in lane {lane}`)
-	end
-end)
+	-- Clean up on EntityDied (for any entity)
+	table.insert(_connections, Network.EntityDied.On(function(data)
+		-- Check if this was a projectile we're tracking
+		if _projectileVisuals[data.EntityId] then
+			local visual = _projectileVisuals[data.EntityId]
+			local pos = visual.Part.Position
+			
+			-- Play impact VFX and audio
+			local vfx = getVFXService()
+			local audio = getAudioService()
+			if vfx then vfx.PlayPeaImpact(pos, false) end
+			if audio then audio.PlayPeaImpact(pos) end
+			
+			-- Hit animation (quick scale down)
+			local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
+			local tween = TweenService:Create(visual.Part, tweenInfo, {
+				Size = Vector3.new(0.1, 0.1, 0.1),
+				Transparency = 1
+			})
+			tween:Play()
+			tween.Completed:Connect(function()
+				destroyProjectileVisual(data.EntityId)
+			end)
+			_projectileVisuals[data.EntityId] = nil
+		end
+	end))
+end
 
--- Also handle projectile despawn via EntityDied (reuse the event)
--- Projectiles don't have health so they won't trigger EntityDied normally
--- We'll clean up when they go off-screen
+--[[
+	Init - Setup network listeners (CAN yield)
+]]
+local function Init(_world)
+	setupNetworkListeners()
+	Logger.Debug("ProjectileRender", "Initialized")
+end
 
-local function ProjectileRenderSystem(world)
+--[[
+	System - Move projectiles each frame (CANNOT yield)
+]]
+local function ProjectileRenderSystem(_world)
 	local dt = 1/60
 	
 	-- Move projectiles
@@ -179,34 +225,28 @@ local function ProjectileRenderSystem(world)
 	end
 end
 
--- Clean up on EntityDied (for any entity)
-Network.EntityDied.On(function(data)
-	-- Check if this was a projectile we're tracking
-	if _projectileVisuals[data.EntityId] then
-		local visual = _projectileVisuals[data.EntityId]
-		local pos = visual.Part.Position
-		
-		-- Play impact VFX and audio
-		local vfx = getVFXService()
-		local audio = getAudioService()
-		if vfx then vfx.PlayPeaImpact(pos, false) end
-		if audio then audio.PlayPeaImpact(pos) end
-		
-		-- Hit animation (quick scale down)
-		local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
-		local tween = TweenService:Create(visual.Part, tweenInfo, {
-			Size = Vector3.new(0.1, 0.1, 0.1),
-			Transparency = 1
-		})
-		tween:Play()
-		tween.Completed:Connect(function()
-			destroyProjectileVisual(data.EntityId)
-		end)
-		_projectileVisuals[data.EntityId] = nil
+--[[
+	Dispose - Cleanup all visuals and connections
+]]
+local function Dispose()
+	-- Disconnect all events
+	for _, conn in _connections do
+		conn:Disconnect()
 	end
-end)
+	table.clear(_connections)
+	
+	-- Destroy all projectile visuals
+	for entityId in _projectileVisuals do
+		destroyProjectileVisual(entityId)
+	end
+	
+	Logger.Debug("ProjectileRender", "Disposed")
+end
 
 return {
-	system = ProjectileRenderSystem,
+	_name = "ProjectileRenderSystem",
 	priority = 420,
+	system = ProjectileRenderSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

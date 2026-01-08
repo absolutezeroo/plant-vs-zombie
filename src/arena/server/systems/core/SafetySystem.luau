@@ -1,12 +1,17 @@
 --!strict
 --[[
-	Safety System - Enforces entity cap and critical invariants
+	SafetySystem.luau - Enforces entity cap and critical invariants
 	
 	Priority: 1 (runs very early)
 	
 	CRITICAL SYSTEM - This prevents crashes from entity overflow.
 	Enforces ENTITY_CAP of 200 entities maximum.
 	Logs warnings when approaching limits.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - enforces entity cap
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -75,7 +80,18 @@ local function SafetySystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	lastWarningTime = 0
+end
+
 return {
-	system = SafetySystem,
+	_name = "SafetySystem",
 	priority = 1,  -- Runs very early
+	system = SafetySystem,
+	Init = Init,
+	Dispose = Dispose,
 }

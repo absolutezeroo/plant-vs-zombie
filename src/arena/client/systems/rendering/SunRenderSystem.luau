@@ -7,6 +7,11 @@
 	Receives sun spawn/despawn events from server via Zap.
 	Creates visual sun orbs with falling animation.
 	Handles collection input (click/tap on sun).
+	
+	LIFECYCLE:
+	- Init(): Setup network listeners & input handlers (CAN yield)
+	- system(): Animate falling suns (CANNOT yield)
+	- Dispose(): Disconnect events, cleanup visuals
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -67,6 +72,9 @@ type SunData = {
 	Value: number,
 }
 local _sunData: {[number]: SunData} = {}
+
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
 
 -- Sun visual config
 local SUN_SIZE = Vector3.new(2.5, 2.5, 2.5)
@@ -167,9 +175,9 @@ local function handleInput(input: InputObject, gameProcessed: boolean)
 	rayParams.FilterType = Enum.RaycastFilterType.Include
 	
 	-- Build filter list of sun visuals
-	local sunParts = {}
+	local sunParts: {Instance} = {}
 	for _, data in _sunData do
-		table.insert(sunParts, data.Part)
+		table.insert(sunParts, data.Part :: Instance)
 	end
 	rayParams.FilterDescendantsInstances = sunParts
 	
@@ -183,65 +191,90 @@ local function handleInput(input: InputObject, gameProcessed: boolean)
 	end
 end
 
-UserInputService.InputBegan:Connect(handleInput)
-
--- Network event handlers
-Network.SunSpawned.On(function(data)
-	local entityId = data.EntityId
-	local position = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+--[[
+	Setup network event listeners & input handlers (called during Init phase)
+]]
+local function setupListeners()
+	table.insert(_connections, UserInputService.InputBegan:Connect(handleInput))
 	
-	if _sunData[entityId] then
-		-- Already exists, update position
-		_sunData[entityId].Part.Position = position
-	else
-		-- Create new sun visual
-		_sunData[entityId] = createSunVisual(entityId, position, data.TargetY, data.Value)
-		Logger.Debug("SunRender", `Sun {entityId} spawned at ({math.floor(data.PositionX)}, {math.floor(data.PositionY)}, {math.floor(data.PositionZ)})`)
-	end
-end)
+	table.insert(_connections, Network.SunSpawned.On(function(data)
+		local entityId = data.EntityId
+		local position = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		
+		if _sunData[entityId] then
+			-- Already exists, update position
+			_sunData[entityId].Part.Position = position
+		else
+			-- Create new sun visual
+			_sunData[entityId] = createSunVisual(entityId, position, data.TargetY, data.Value)
+			Logger.Debug("SunRender", `Sun {entityId} spawned at ({math.floor(data.PositionX)}, {math.floor(data.PositionY)}, {math.floor(data.PositionZ)})`)
+		end
+	end))
+	
+	table.insert(_connections, Network.SunDespawned.On(function(data)
+		local entityId = data.EntityId
+		local sunData = _sunData[entityId]
+		
+		if sunData then
+			sunData.Part:Destroy()
+			_sunData[entityId] = nil
+			Logger.Debug("SunRender", `Sun {entityId} despawned`)
+		end
+	end))
+	
+	table.insert(_connections, Network.SunPositionUpdate.On(function(data)
+		local sunData = _sunData[data.EntityId]
+		if sunData then
+			sunData.Falling = data.Falling
+			if not data.Falling then
+				sunData.Part.Position = Vector3.new(
+					sunData.Part.Position.X,
+					data.PositionY,
+					sunData.Part.Position.Z
+				)
+			end
+		end
+	end))
+	
+	table.insert(_connections, Network.SunCollected.On(function(data)
+		-- Another player collected the sun, remove visual
+		local sunData = _sunData[data.SunEntityId]
+		if sunData then
+			sunData.Part:Destroy()
+			_sunData[data.SunEntityId] = nil
+		end
+		
+		-- Update our sun count if we were the collector
+		local localPlayer = Players.LocalPlayer
+		if localPlayer and data.CollectorId == localPlayer.UserId then
+			SelectionState.SetSun(data.NewTotal)
+		end
+	end))
+end
 
-Network.SunDespawned.On(function(data)
-	local entityId = data.EntityId
+--[[
+	Destroy sun visual
+]]
+local function destroySunVisual(entityId: number)
 	local sunData = _sunData[entityId]
-	
 	if sunData then
 		sunData.Part:Destroy()
 		_sunData[entityId] = nil
-		Logger.Debug("SunRender", `Sun {entityId} despawned`)
 	end
-end)
+end
 
-Network.SunPositionUpdate.On(function(data)
-	local sunData = _sunData[data.EntityId]
-	if sunData then
-		sunData.Falling = data.Falling
-		if not data.Falling then
-			sunData.Part.Position = Vector3.new(
-				sunData.Part.Position.X,
-				data.PositionY,
-				sunData.Part.Position.Z
-			)
-		end
-	end
-end)
+--[[
+	Init - Setup listeners (CAN yield)
+]]
+local function Init(_world)
+	setupListeners()
+	Logger.Debug("SunRender", "Initialized")
+end
 
-Network.SunCollected.On(function(data)
-	-- Another player collected the sun, remove visual
-	local sunData = _sunData[data.SunEntityId]
-	if sunData then
-		sunData.Part:Destroy()
-		_sunData[data.SunEntityId] = nil
-	end
-	
-	-- Update our sun count if we were the collector
-	local localPlayer = Players.LocalPlayer
-	if localPlayer and data.CollectorId == localPlayer.UserId then
-		SelectionState.SetSun(data.NewTotal)
-	end
-end)
-
-local function SunRenderSystem(world)
-	-- Client-side falling animation (interpolation)
+--[[
+	System - Animate falling suns (CANNOT yield)
+]]
+local function SunRenderSystem(_world)
 	local dt = 1/60 -- Approximate delta time
 	
 	for entityId, sunData in _sunData do
@@ -263,7 +296,28 @@ local function SunRenderSystem(world)
 	end
 end
 
+--[[
+	Dispose - Cleanup all visuals and connections
+]]
+local function Dispose()
+	-- Disconnect all events
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	
+	-- Destroy all sun visuals
+	for entityId in _sunData do
+		destroySunVisual(entityId)
+	end
+	
+	Logger.Debug("SunRender", "Disposed")
+end
+
 return {
+	_name = "SunRenderSystem",
+	priority = 400,
 	system = SunRenderSystem,
-	priority = 400, -- Render phase
+	Init = Init,
+	Dispose = Dispose,
 }

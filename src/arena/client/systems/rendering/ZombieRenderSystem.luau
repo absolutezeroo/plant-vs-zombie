@@ -7,6 +7,11 @@
 	Receives zombie spawn/position events from server via Zap.
 	Creates and updates visual zombie representations.
 	Uses simple Part-based visuals for MVP (no Humanoid).
+	
+	LIFECYCLE:
+	- Init(): Setup network listeners (CAN yield)
+	- system(): Interpolate zombie positions (CANNOT yield)
+	- Dispose(): Disconnect events, cleanup visuals
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -79,6 +84,9 @@ type ZombieVisual = {
 }
 local _zombieVisuals: {[number]: ZombieVisual} = {}
 
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
+
 -- Visual config
 local ZOMBIE_SIZE = Vector3.new(3, 5, 3)
 local ZOMBIE_COLORS = {
@@ -147,93 +155,108 @@ local function destroyZombieVisual(entityId: number)
 	end
 end
 
--- Network event handlers
-Network.ZombieSpawned.On(function(data)
-	local entityId = data.EntityId
-	local zombieType = tostring(data.ZombieType) -- Convert enum to string
-	local lane = data.Lane
-	local positionX = data.PositionX
-	
-	if _zombieVisuals[entityId] then
-		Logger.Warn("ZombieRender", `Zombie {entityId} already exists, updating`)
-		_zombieVisuals[entityId].TargetX = positionX
-	else
-		_zombieVisuals[entityId] = createZombieVisual(entityId, zombieType, lane, positionX)
-		Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned in lane {lane}`)
-	end
-end)
-
-Network.ZombiePositionBatch.On(function(data)
-	local entityIds = data.EntityIds
-	local positionsX = data.PositionsX
-	
-	for i, entityId in entityIds do
-		local visual = _zombieVisuals[entityId]
-		if visual then
-			visual.TargetX = positionsX[i]
+--[[
+	Setup network event listeners (called during Init phase)
+]]
+local function setupNetworkListeners()
+	table.insert(_connections, Network.ZombieSpawned.On(function(data)
+		local entityId = data.EntityId
+		local zombieType = tostring(data.ZombieType) -- Convert enum to string
+		local lane = data.Lane
+		local positionX = data.PositionX
+		
+		if _zombieVisuals[entityId] then
+			Logger.Warn("ZombieRender", `Zombie {entityId} already exists, updating`)
+			_zombieVisuals[entityId].TargetX = positionX
+		else
+			_zombieVisuals[entityId] = createZombieVisual(entityId, zombieType, lane, positionX)
+			Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned in lane {lane}`)
 		end
-	end
-end)
-
-Network.EntityDied.On(function(data)
-	local entityId = data.EntityId
-	local visual = _zombieVisuals[entityId]
+	end))
 	
-	if visual then
-		-- Play death VFX and audio
-		local pos = visual.Part.Position
-		local vfx = getVFXService()
-		local audio = getAudioService()
-		if vfx then vfx.PlayZombieDeath(pos) end
-		if audio then audio.PlayZombieDeath(pos) end
+	table.insert(_connections, Network.ZombiePositionBatch.On(function(data)
+		local entityIds = data.EntityIds
+		local positionsX = data.PositionsX
 		
-		-- Death animation
-		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		local tween = TweenService:Create(visual.Part, tweenInfo, {
-			Size = Vector3.new(ZOMBIE_SIZE.X, 0.5, ZOMBIE_SIZE.Z),
-			Position = visual.Part.Position - Vector3.new(0, ZOMBIE_SIZE.Y / 2 - 0.25, 0),
-			Transparency = 1
-		})
-		
-		tween:Play()
-		tween.Completed:Connect(function()
-			destroyZombieVisual(entityId)
-		end)
-		
-		-- Remove from active tracking immediately
-		_zombieVisuals[entityId] = nil
-		
-		Logger.Debug("ZombieRender", `Zombie {entityId} died`)
-	end
-end)
-
--- Show floating damage numbers
-Network.EntityDamaged.On(function(data)
-	local visual = _zombieVisuals[data.EntityId]
-	if visual then
-		-- Flash red
-		local originalColor = visual.Part.Color
-		visual.Part.Color = Color3.fromRGB(255, 100, 100)
-		task.delay(0.1, function()
-			if visual.Part and visual.Part.Parent then
-				visual.Part.Color = originalColor
+		for i, entityId in entityIds do
+			local visual = _zombieVisuals[entityId]
+			if visual then
+				visual.TargetX = positionsX[i]
 			end
-		end)
-		
-		-- Show floating damage number
-		local floatingText = getFloatingTextUI()
-		if floatingText and data.DamageAmount > 0 then
-			local pos = visual.Part.Position + Vector3.new(
-				(math.random() - 0.5) * 2, -- Random X offset
-				1, -- Above zombie
-				0
-			)
-			floatingText.ShowDamage(pos, data.DamageAmount)
 		end
-	end
-end)
+	end))
+	
+	table.insert(_connections, Network.EntityDied.On(function(data)
+		local entityId = data.EntityId
+		local visual = _zombieVisuals[entityId]
+		
+		if visual then
+			-- Play death VFX and audio
+			local pos = visual.Part.Position
+			local vfx = getVFXService()
+			local audio = getAudioService()
+			if vfx then vfx.PlayZombieDeath(pos) end
+			if audio then audio.PlayZombieDeath(pos) end
+			
+			-- Death animation
+			local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			local tween = TweenService:Create(visual.Part, tweenInfo, {
+				Size = Vector3.new(ZOMBIE_SIZE.X, 0.5, ZOMBIE_SIZE.Z),
+				Position = visual.Part.Position - Vector3.new(0, ZOMBIE_SIZE.Y / 2 - 0.25, 0),
+				Transparency = 1
+			})
+			
+			tween:Play()
+			tween.Completed:Connect(function()
+				destroyZombieVisual(entityId)
+			end)
+			
+			-- Remove from active tracking immediately
+			_zombieVisuals[entityId] = nil
+			
+			Logger.Debug("ZombieRender", `Zombie {entityId} died`)
+		end
+	end))
+	
+	-- Show floating damage numbers
+	table.insert(_connections, Network.EntityDamaged.On(function(data)
+		local visual = _zombieVisuals[data.EntityId]
+		if visual then
+			-- Flash red
+			local originalColor = visual.Part.Color
+			visual.Part.Color = Color3.fromRGB(255, 100, 100)
+			task.delay(0.1, function()
+				if visual.Part and visual.Part.Parent then
+					visual.Part.Color = originalColor
+				end
+			end)
+			
+			-- Show floating damage number
+			local floatingText = getFloatingTextUI()
+			if floatingText and data.DamageAmount > 0 then
+				local pos = visual.Part.Position + Vector3.new(
+					(math.random() - 0.5) * 2, -- Random X offset
+					1, -- Above zombie
+					0
+				)
+				floatingText.ShowDamage(pos, data.DamageAmount)
+			end
+		end
+	end))
+end
 
-local function ZombieRenderSystem(world)
+--[[
+	Init - Setup network listeners (CAN yield)
+]]
+local function Init(_world)
+	setupNetworkListeners()
+	Logger.Debug("ZombieRender", "Initialized")
+end
+
+--[[
+	System - Interpolate zombie positions (CANNOT yield)
+]]
+local function ZombieRenderSystem(_world)
 	-- Skip if MapConfig not initialized yet (Studio mode)
 	if not MapConfig.IsInitialized() then
 		return
@@ -255,7 +278,28 @@ local function ZombieRenderSystem(world)
 	end
 end
 
+--[[
+	Dispose - Cleanup all visuals and connections
+]]
+local function Dispose()
+	-- Disconnect all events
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	
+	-- Destroy all zombie visuals
+	for entityId in _zombieVisuals do
+		destroyZombieVisual(entityId)
+	end
+	
+	Logger.Debug("ZombieRender", "Disposed")
+end
+
 return {
+	_name = "ZombieRenderSystem",
+	priority = 410,
 	system = ZombieRenderSystem,
-	priority = 410, -- Render phase, after sun
+	Init = Init,
+	Dispose = Dispose,
 }

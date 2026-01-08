@@ -8,6 +8,11 @@
 	- Torchwood converting peas to fire peas (EnhancesPeas)
 	- Fire pea damage multiplier (FireDamageMultiplier)
 	- Future: Other enhancement plants
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes enhancements
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -129,7 +134,18 @@ local function EnhancementSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	table.clear(_enhancedProjectiles)
+end
+
 return {
-	system = EnhancementSystem,
+	_name = "EnhancementSystem",
 	priority = 158,
+	system = EnhancementSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

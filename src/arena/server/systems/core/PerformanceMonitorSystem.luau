@@ -1,6 +1,6 @@
 --!strict
 --[[
-	Performance Monitor System - Tracks frame time budget
+	PerformanceMonitorSystem.luau - Tracks frame time budget
 	
 	Priority: 500 (runs after cleanup)
 	
@@ -8,6 +8,11 @@
 	Logs warnings when frames take too long.
 	
 	CRITICAL FOR MOBILE-FIRST: Frame budget is non-negotiable.
+	
+	LIFECYCLE:
+	- Init(): Setup RunService heartbeat connection (CAN yield)
+	- system(): Main loop (CANNOT yield) - monitors performance
+	- Dispose(): Cleanup heartbeat connection
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,10 +30,15 @@ local SPIKE_THRESHOLD = PerformanceConfig.FRAME_BUDGET_TOTAL * 1.5 -- 22.5ms is 
 local LOG_INTERVAL = 60 -- Log summary every 60 seconds
 local lastLogTime = 0
 
--- Hook into frame start to measure time
-RunService.Heartbeat:Connect(function()
-	frameStartTime = tick()
-end)
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
+
+local function setupListeners()
+	-- Hook into frame start to measure time
+	table.insert(_connections, RunService.Heartbeat:Connect(function()
+		frameStartTime = tick()
+	end))
+end
 
 local function PerformanceMonitorSystem(world)
 	if frameStartTime == 0 then
@@ -70,7 +80,28 @@ local function PerformanceMonitorSystem(world)
 	end
 end
 
+local function Init(_world)
+	setupListeners()
+	Logger.Debug("PerformanceMonitorSystem", "Initialized")
+end
+
+local function Dispose()
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	frameStartTime = 0
+	spikeCount = 0
+	frameCount = 0
+	totalFrameTime = 0
+	lastLogTime = 0
+	Logger.Debug("PerformanceMonitorSystem", "Disposed")
+end
+
 return {
-	system = PerformanceMonitorSystem,
+	_name = "PerformanceMonitorSystem",
 	priority = 500,  -- After cleanup
+	system = PerformanceMonitorSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

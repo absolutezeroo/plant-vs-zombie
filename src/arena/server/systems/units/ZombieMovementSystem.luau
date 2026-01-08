@@ -7,6 +7,11 @@
 	Moves zombies towards the house (left).
 	Stops zombie when eating a plant.
 	Checks for game over condition (zombie reaches house).
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): Main loop (CANNOT yield) - processes zombie movement
+	- Dispose(): Clear tracking state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -152,7 +157,20 @@ local function ZombieMovementSystem(world)
 	end
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	_lastBatchTime = 0
+	table.clear(_positionUpdates)
+	table.clear(_reachedHouse)
+end
+
 return {
-	system = ZombieMovementSystem,
+	_name = "ZombieMovementSystem",
 	priority = 150,
+	system = ZombieMovementSystem,
+	Init = Init,
+	Dispose = Dispose,
 }

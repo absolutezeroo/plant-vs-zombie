@@ -7,6 +7,11 @@
 	Creates cyan debug lines showing the 9×5 grid.
 	Only runs once on initialization, then cleans up.
 	Toggle with DEBUG_GRID_VISIBLE constant.
+	
+	LIFECYCLE:
+	- Init(): Wait for MapConfig, create grid lines (CAN yield)
+	- system(): No per-frame updates
+	- Dispose(): Destroy grid folder
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,7 +32,6 @@ local GRID_LINE_THICKNESS = 0.1
 local GRID_LINE_HEIGHT = 0.05 -- Slightly above ground
 
 -- State
-local _initialized = false
 local _gridFolder: Folder? = nil
 
 local function createLine(from: Vector3, to: Vector3, parent: Instance): Part
@@ -136,29 +140,44 @@ local function destroyGrid()
 	end
 end
 
-local function GridVisualizationSystem(_world)
-	-- Only initialize once
-	if _initialized then
+--------------------------------------------------------------------------------
+-- INIT: Called once before Matter loop (CAN yield)
+--------------------------------------------------------------------------------
+local function Init(_world: any)
+	if DEBUG_GRID_VISIBLE then
+		createGrid()
+	end
+end
+
+--------------------------------------------------------------------------------
+-- SYSTEM: Called every frame by Matter (CANNOT yield)
+--------------------------------------------------------------------------------
+local function GridVisualizationSystem(_world: any)
+	-- No per-frame updates needed
+	-- Grid is static, created in Init
+end
+
+--------------------------------------------------------------------------------
+-- DISPOSE: Called on cleanup (player leave, game end)
+--------------------------------------------------------------------------------
+local function Dispose(_player: Player?)
+	if _player then
+		-- Player-specific cleanup (none for this system)
 		return
 	end
 	
-	_initialized = true
-	
-	if DEBUG_GRID_VISIBLE then
-		-- Use task.spawn to avoid yielding inside the system
-		-- MapConfig.GetConfig() uses WaitForChild internally
-		task.spawn(createGrid)
-	end
-end
-
--- Cleanup function for hot-reloading
-local function cleanup()
+	-- Full cleanup
 	destroyGrid()
-	_initialized = false
+	Logger.Debug("GridVisualizationSystem", "Disposed")
 end
 
+--------------------------------------------------------------------------------
+-- MODULE EXPORT
+--------------------------------------------------------------------------------
 return {
+	_name = "GridVisualizationSystem",
+	priority = 350,
 	system = GridVisualizationSystem,
-	priority = 350, -- Presentation phase
-	cleanup = cleanup,
+	Init = Init,
+	Dispose = Dispose,
 }

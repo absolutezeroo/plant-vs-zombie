@@ -5,6 +5,11 @@
 	Priority: 370 (After damage processing)
 	
 	Plants with LifestealComponent heal for a percentage of damage dealt.
+	
+	LIFECYCLE:
+	- Init(): No init needed
+	- system(): No per-frame logic, API-driven
+	- Dispose(): No cleanup needed
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -59,8 +64,19 @@ local function LifestealSystem(_world)
 	-- No per-frame processing needed
 end
 
+local function Init(_world)
+	-- No initialization needed
+end
+
+local function Dispose()
+	-- No state to clean up
+end
+
 return {
-	system = LifestealSystem,
+	_name = "LifestealSystem",
 	priority = 370,
+	system = LifestealSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = API,
 }

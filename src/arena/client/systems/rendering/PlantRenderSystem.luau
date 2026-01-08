@@ -8,6 +8,11 @@
 	Creates visual plant representations using real models from Assets.
 	Uses AnimationService for idle/spawn/death animations (no Humanoid).
 	Falls back to colored cube if model not found.
+	
+	LIFECYCLE:
+	- Init(): Setup network listeners (CAN yield)
+	- system(): Static plants, no per-frame updates (CANNOT yield)
+	- Dispose(): Disconnect events, cleanup visuals
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,6 +75,9 @@ type PlantVisual = {
 	Lane: number,
 }
 local _plantVisuals: {[number]: PlantVisual} = {}
+
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
 
 -- Fallback visual config (when model not found)
 local FALLBACK_SIZE = Vector3.new(4, 4, 4)
@@ -189,132 +197,136 @@ local function destroyPlantVisual(entityId: number)
 	end
 end
 
--- Network event handlers
-Network.PlantSpawned.On(function(data)
-	local entityId = data.EntityId
-	local plantType = tostring(data.PlantType)
-	local column = data.Column
-	local lane = data.Lane
-	
-	if _plantVisuals[entityId] then
-		Logger.Warn("PlantRender", `Plant {entityId} already exists`)
-		return
-	end
-	
-	_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
-	
-	-- Play placement VFX
-	-- Use Center Attachment if model available, otherwise fallback to grid position
-	local visual = _plantVisuals[entityId]
-	local vfx = getVFXService()
-	if vfx then
-		if visual.Model then
-			-- Model-aware: use Center Attachment (spatial contract)
-			local AttachmentUtils = require(Shared.utils.AttachmentUtils)
-			local vfxPos = AttachmentUtils.GetWorldPosition(visual.Model, AttachmentUtils.Names.Center, false)
-			vfx.PlayPlantPlaced(vfxPos)
-		else
-			-- Fallback for cube: use grid center
-			local worldPos = GridUtils.GridToWorld(column, lane)
-			vfx.PlayPlantPlaced(worldPos)
+--[[
+	Setup network event listeners (called during Init phase)
+]]
+local function setupNetworkListeners()
+	table.insert(_connections, Network.PlantSpawned.On(function(data)
+		local entityId = data.EntityId
+		local plantType = tostring(data.PlantType)
+		local column = data.Column
+		local lane = data.Lane
+		
+		if _plantVisuals[entityId] then
+			Logger.Warn("PlantRender", `Plant {entityId} already exists`)
+			return
 		end
-	end
-	
-	Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
-end)
+		
+		_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
+		
+		-- Play placement VFX
+		-- Use Center Attachment if model available, otherwise fallback to grid position
+		local visual = _plantVisuals[entityId]
+		local vfx = getVFXService()
+		if vfx then
+			if visual.Model then
+				-- Model-aware: use Center Attachment (spatial contract)
+				local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+				local vfxPos = AttachmentUtils.GetWorldPosition(visual.Model, AttachmentUtils.Names.Center, false)
+				vfx.PlayPlantPlaced(vfxPos)
+			else
+				-- Fallback for cube: use grid center
+				local worldPos = GridUtils.GridToWorld(column, lane)
+				vfx.PlayPlantPlaced(worldPos)
+			end
+		end
+		
+		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
+	end))
 
-Network.EntityDied.On(function(data)
-	local entityId = data.EntityId
-	local visual = _plantVisuals[entityId]
-	
-	if visual then
-		local animService = getAnimService()
+	table.insert(_connections, Network.EntityDied.On(function(data)
+		local entityId = data.EntityId
+		local visual = _plantVisuals[entityId]
+		
+		if visual then
+			local animService = getAnimService()
+			local vfx = getVFXService()
+			
+			if visual.Model then
+				-- Stop idle animation and VFX
+				if animService then animService.StopIdle(visual.Model) end
+				if vfx then vfx.DetachIdleVFX(visual.Model) end
+				
+				-- Get position for death VFX
+				local pos = visual.Model.PrimaryPart and visual.Model.PrimaryPart.Position 
+					or GridUtils.GridToWorld(visual.Column, visual.Lane)
+				
+				-- Play death VFX (model-aware)
+				if vfx then vfx.PlayPlantDeath(visual.Model, pos) end
+				
+				-- Play death animation then destroy
+				if animService then
+					task.spawn(function()
+						animService.PlayDeath(visual.Model)
+						destroyPlantVisual(entityId)
+					end)
+				else
+					destroyPlantVisual(entityId)
+				end
+			elseif visual.Part then
+				-- Fallback cube death animation
+				local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+				local tween = TweenService:Create(visual.Part, tweenInfo, {
+					Size = Vector3.new(0.1, 0.1, 0.1),
+					Transparency = 1
+				})
+				
+				tween:Play()
+				tween.Completed:Connect(function()
+					destroyPlantVisual(entityId)
+				end)
+			end
+			
+			-- Remove from tracking immediately
+			_plantVisuals[entityId] = nil
+			
+			Logger.Debug("PlantRender", `Plant {entityId} died`)
+		end
+	end))
+
+	-- Damage flash effect
+	table.insert(_connections, Network.EntityDamaged.On(function(data)
+		local visual = _plantVisuals[data.EntityId]
+		if not visual then return end
+		
 		local vfx = getVFXService()
 		
 		if visual.Model then
-			-- Stop idle animation and VFX
-			if animService then animService.StopIdle(visual.Model) end
-			if vfx then vfx.DetachIdleVFX(visual.Model) end
+			-- Flash all parts in the model
+			local partsToFlash: {BasePart} = {}
+			local originalColors: {Color3} = {}
 			
-			-- Get position for death VFX
-			local pos = visual.Model.PrimaryPart and visual.Model.PrimaryPart.Position 
-				or GridUtils.GridToWorld(visual.Column, visual.Lane)
-			
-			-- Play death VFX (model-aware)
-			if vfx then vfx.PlayPlantDeath(visual.Model, pos) end
-			
-			-- Play death animation then destroy
-			if animService then
-				task.spawn(function()
-					animService.PlayDeath(visual.Model)
-					destroyPlantVisual(entityId)
-				end)
-			else
-				destroyPlantVisual(entityId)
-			end
-		elseif visual.Part then
-			-- Fallback cube death animation
-			local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-			local tween = TweenService:Create(visual.Part, tweenInfo, {
-				Size = Vector3.new(0.1, 0.1, 0.1),
-				Transparency = 1
-			})
-			
-			tween:Play()
-			tween.Completed:Connect(function()
-				destroyPlantVisual(entityId)
-			end)
-		end
-		
-		-- Remove from tracking immediately
-		_plantVisuals[entityId] = nil
-		
-		Logger.Debug("PlantRender", `Plant {entityId} died`)
-	end
-end)
-
--- Damage flash effect
-Network.EntityDamaged.On(function(data)
-	local visual = _plantVisuals[data.EntityId]
-	if not visual then return end
-	
-	local vfx = getVFXService()
-	
-	if visual.Model then
-		-- Flash all parts in the model
-		local partsToFlash: {BasePart} = {}
-		local originalColors: {Color3} = {}
-		
-		for _, part in visual.Model:GetDescendants() do
-			if part:IsA("BasePart") and part.Transparency < 1 then
-				table.insert(partsToFlash, part)
-				table.insert(originalColors, part.Color)
-				part.Color = Color3.fromRGB(255, 100, 100)
-			end
-		end
-		
-		task.delay(0.1, function()
-			for i, part in partsToFlash do
-				if part and part.Parent then
-					part.Color = originalColors[i]
+			for _, part in visual.Model:GetDescendants() do
+				if part:IsA("BasePart") and part.Transparency < 1 then
+					table.insert(partsToFlash, part)
+					table.insert(originalColors, part.Color)
+					part.Color = Color3.fromRGB(255, 100, 100)
 				end
 			end
-		end)
-	elseif visual.Part then
-		-- Flash fallback cube
-		if vfx then
-			vfx.FlashDamage(visual.Part)
-		else
-			local originalColor = visual.Part.Color
-			visual.Part.Color = Color3.fromRGB(255, 100, 100)
+			
 			task.delay(0.1, function()
-				if visual.Part and visual.Part.Parent then
-					visual.Part.Color = originalColor
+				for i, part in partsToFlash do
+					if part and part.Parent then
+						part.Color = originalColors[i]
+					end
 				end
 			end)
+		elseif visual.Part then
+			-- Flash fallback cube
+			if vfx then
+				vfx.FlashDamage(visual.Part)
+			else
+				local originalColor = visual.Part.Color
+				visual.Part.Color = Color3.fromRGB(255, 100, 100)
+				task.delay(0.1, function()
+					if visual.Part and visual.Part.Parent then
+						visual.Part.Color = originalColor
+					end
+				end)
+			end
 		end
-	end
-end)
+	end))
+end
 
 --[[
 	Get the visual Model/Part for an entity (used by other systems for VFX)
@@ -327,13 +339,44 @@ local function getPlantVisual(entityId: number): (Model?, Part?)
 	return nil, nil
 end
 
-local function PlantRenderSystem(world)
-	-- Plants are static, no per-frame updates needed
+--[[
+	Init - Setup network listeners (CAN yield)
+]]
+local function Init(_world)
+	setupNetworkListeners()
+	Logger.Debug("PlantRender", "Initialized")
+end
+
+--[[
+	System - Static plants, no per-frame updates needed
+]]
+local function PlantRenderSystem(_world)
 	-- All updates come via network events
 end
 
+--[[
+	Dispose - Cleanup all visuals and connections
+]]
+local function Dispose()
+	-- Disconnect all events
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	
+	-- Destroy all plant visuals
+	for entityId in _plantVisuals do
+		destroyPlantVisual(entityId)
+	end
+	
+	Logger.Debug("PlantRender", "Disposed")
+end
+
 return {
-	system = PlantRenderSystem,
+	_name = "PlantRenderSystem",
 	priority = 405,
+	system = PlantRenderSystem,
+	Init = Init,
+	Dispose = Dispose,
 	getPlantVisual = getPlantVisual,
 }

@@ -7,6 +7,11 @@
 	The system loop is DISABLED (ENABLED = false).
 	
 	Priority: 100 (Simulation phase - early)
+	
+	LIFECYCLE:
+	- Init(): No init needed (@deprecated)
+	- system(): Main loop (CANNOT yield) - disabled
+	- Dispose(): Reset spawn timing state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -140,8 +145,20 @@ function ZombieSpawnAPI.SetEnabled(enabled: boolean)
 	SpawnConfig.ENABLED = enabled
 end
 
+local function Init(_world)
+	-- No initialization needed (@deprecated system)
+end
+
+local function Dispose()
+	_lastSpawnTime = 0
+	_nextSpawnDelay = 5
+end
+
 return {
-	system = ZombieSpawnSystem,
+	_name = "ZombieSpawnSystem",
 	priority = 100,
+	system = ZombieSpawnSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = ZombieSpawnAPI,
 }

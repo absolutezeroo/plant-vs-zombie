@@ -20,6 +20,11 @@
     - Uses WorldData + DifficultyData instead of StageData
     - World = map, mechanics, zombie pool
     - Difficulty = wave count, budget, multipliers
+    
+    LIFECYCLE:
+    - Init(): No init needed (managers lazy-loaded)
+    - system(): Main loop (CANNOT yield) - manages waves
+    - Dispose(): Reset game state
 ]]
 
 local Players = game:GetService("Players")
@@ -617,8 +622,25 @@ local function WaveManagerSystem(world)
     end
 end
 
+local function Init(_world)
+    -- Managers are lazy-loaded on first system run
+    Logger.Info("WaveManagerSystem", "Initialized")
+end
+
+local function Dispose()
+    WaveManager.ResetGameState()
+    _stateManager = nil :: any
+    _spawner = nil :: any
+    _rewardCalc = nil :: any
+    _broadcaster = nil :: any
+    Logger.Info("WaveManagerSystem", "Disposed")
+end
+
 return {
-    system = WaveManagerSystem,
+    _name = "WaveManagerSystem",
     priority = 100,
+    system = WaveManagerSystem,
+    Init = Init,
+    Dispose = Dispose,
     WaveManager = WaveManager,
 }

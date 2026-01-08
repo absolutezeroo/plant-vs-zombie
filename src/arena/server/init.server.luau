@@ -3,6 +3,8 @@
 	Server Bootstrap - Initializes Matter ECS World and system loop
 	
 	Runs at 60 Hz (TICK_RATE from NetworkConfig)
+	Uses SystemManager for proper system lifecycle (Init/System/Dispose).
+	
 	Systems execute in priority order within phases:
 	- Input Phase: Priority 0-99
 	- Simulation Phase: Priority 100-299
@@ -28,6 +30,7 @@ local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local TeleportData = require(Shared.data.TeleportData)
 local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
+local SystemManager = require(Shared.utils.SystemManager)
 
 -- Import components via index module
 local Components = require(Shared.components)
@@ -68,16 +71,14 @@ EntityPool.Initialize(world, Tags.InactiveTag)
 Logger.Info("Server", "Entity Pool initialized", EntityPool.GetStats())
 
 -- Load all systems from systems folder (RECURSIVELY scan subfolders)
-local systemModules: {any} = {}
-
 local function loadSystem(moduleScript: ModuleScript)
 	local success, system = ErrorHandler.Try(function()
 		return require(moduleScript)
 	end, `LoadSystem.{moduleScript.Name}`)
 	
 	if success and system then
-		table.insert(systemModules, system)
-		Logger.Debug("Server", `Loaded system: {moduleScript.Name}`, {
+		SystemManager.Register(system)
+		Logger.Debug("Server", `Registered system: {moduleScript.Name}`, {
 			priority = system.priority or 0
 		})
 	end
@@ -91,10 +92,14 @@ for _, descendant in Systems:GetDescendants() do
 	end
 end
 
-Logger.Info("Server", `Loaded {#systemModules} systems`)
+Logger.Info("Server", `Registered {#SystemManager.GetMatterSystems()} systems`)
+
+-- Initialize ALL systems BEFORE Matter loop starts (CAN yield here)
+SystemManager.InitializeAll(world)
+Logger.Info("Server", "All systems initialized")
 
 -- Schedule systems in the loop
-loop:scheduleSystems(systemModules)
+loop:scheduleSystems(SystemManager.GetMatterSystems())
 
 -- Start the loop at 60 Hz
 loop:begin({
@@ -185,6 +190,9 @@ end)
 
 -- Clean up when player leaves
 local function onPlayerRemoving(player: Player)
+	-- Dispose player-specific resources in all systems
+	SystemManager.DisposePlayer(player)
+	
 	MutationApplySystemModule.API.ClearPlayerMutations(player.UserId)
 	ArenaService.OnPlayerRemoving(player)
 end
@@ -259,5 +267,11 @@ Logger.Info("Server", "Network handlers registered")
 -- Export functions for other modules
 _G.ArenaGetPlayerMatchData = function(player: Player) return TeleportDataHandler.GetTeleportData(player) end
 _G.ArenaSendPlayerToLobby = sendPlayerToLobby
+
+-- Cleanup when server shuts down
+game:BindToClose(function()
+	Logger.Info("Server", "Server shutting down - disposing all systems")
+	SystemManager.DisposeAll()
+end)
 
 Logger.Info("Server", "Server bootstrap complete")

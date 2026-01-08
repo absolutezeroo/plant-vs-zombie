@@ -11,6 +11,11 @@
 	- Plant not on cooldown (server cooldown tracking)
 	
 	Spawns plant entity on success, rejects on failure.
+	
+	LIFECYCLE:
+	- Init(): Setup player listeners (CAN yield)
+	- system(): Main loop (CANNOT yield) - stores world reference
+	- Dispose(): Cleanup player connections and state
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,6 +53,9 @@ local playerCooldowns: {[Player]: {[string]: number}} = {}
 
 local STARTING_SUN = 50
 
+-- Connections for cleanup
+local _connections: {RBXScriptConnection} = {}
+
 -- Initialize new player
 local function onPlayerAdded(player: Player)
 	playerSun[player] = STARTING_SUN
@@ -60,12 +68,9 @@ local function onPlayerRemoving(player: Player)
 	playerCooldowns[player] = nil
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoving)
-
--- Initialize existing players
-for _, player in Players:GetPlayers() do
-	onPlayerAdded(player)
+local function setupListeners()
+	table.insert(_connections, Players.PlayerAdded:Connect(onPlayerAdded))
+	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
 end
 
 -- Validate placement request
@@ -421,8 +426,31 @@ local function PlacementSystem(world)
 	-- No per-frame work needed
 end
 
+local function Init(_world)
+	setupListeners()
+	-- Initialize existing players
+	for _, player in Players:GetPlayers() do
+		onPlayerAdded(player)
+	end
+	Logger.Debug("PlacementSystem", "Initialized")
+end
+
+local function Dispose()
+	for _, conn in _connections do
+		conn:Disconnect()
+	end
+	table.clear(_connections)
+	table.clear(playerSun)
+	table.clear(playerCooldowns)
+	_world = nil
+	Logger.Debug("PlacementSystem", "Disposed")
+end
+
 return {
-	system = PlacementSystem,
+	_name = "PlacementSystem",
 	priority = 200,
+	system = PlacementSystem,
+	Init = Init,
+	Dispose = Dispose,
 	API = PlacementAPI,
 }
