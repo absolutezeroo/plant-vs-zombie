@@ -208,33 +208,38 @@ function SystemManager.InitializeAll(world: any, timeout: number?): boolean
         
         if initFn then
             local startTime = os.clock()
+            local completed = false
+            local initError: string? = nil
             
-            -- Run init with timeout protection
-            local initThread = coroutine.create(function()
-                initFn(world)
+            -- Use task.spawn so yielding functions (task.wait, WaitForChild) work properly
+            task.spawn(function()
+                local success, err = pcall(function()
+                    initFn(world)
+                end)
+                
+                if not success then
+                    initError = tostring(err)
+                end
+                completed = true
             end)
             
-            local success, errorMsg = coroutine.resume(initThread)
+            -- Wait for completion with timeout
+            local elapsed = 0
+            while not completed and elapsed < maxTimeout do
+                task.wait(0.1)
+                elapsed += 0.1
+            end
             
-            if not success then
-                Logger.Error("SystemManager", `Init failed for '{entry.name}': {errorMsg}`)
+            if not completed then
+                Logger.Error("SystemManager", `Init timeout for '{entry.name}' ({maxTimeout}s)`)
+                table.insert(failedSystems, entry.name)
+            elseif initError then
+                Logger.Error("SystemManager", `Init failed for '{entry.name}': {initError}`)
                 table.insert(failedSystems, entry.name)
             else
-                -- Wait for completion if yielded
-                local elapsed = 0
-                while coroutine.status(initThread) ~= "dead" and elapsed < maxTimeout do
-                    task.wait(0.1)
-                    elapsed += 0.1
-                end
-                
-                if coroutine.status(initThread) ~= "dead" then
-                    Logger.Error("SystemManager", `Init timeout for '{entry.name}' ({maxTimeout}s)`)
-                    table.insert(failedSystems, entry.name)
-                else
-                    entry.initialized = true
-                    entry.initTime = os.clock() - startTime
-                    Logger.Debug("SystemManager", `Initialized '{entry.name}' in {string.format("%.2f", (entry.initTime or 0) * 1000)}ms`)
-                end
+                entry.initialized = true
+                entry.initTime = os.clock() - startTime
+                Logger.Debug("SystemManager", `Initialized '{entry.name}' in {string.format("%.2f", (entry.initTime or 0) * 1000)}ms`)
             end
         else
             -- No Init function = already initialized

@@ -5,13 +5,13 @@
 	Priority: 350 (Presentation phase)
 	
 	Creates cyan debug lines showing the 9×5 grid.
-	Only runs once on initialization, then cleans up.
+	Listens for MapConfigSync and creates grid when config is received.
 	Toggle with DEBUG_GRID_VISIBLE constant.
 	
 	LIFECYCLE:
-	- Init(): Wait for MapConfig, create grid lines (CAN yield)
+	- Init(): Setup MapConfigSync listener, create grid if already initialized
 	- system(): No per-frame updates
-	- Dispose(): Destroy grid folder
+	- Dispose(): Destroy grid folder, disconnect listeners
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +24,7 @@ assert(Shared, "GridVisualizationSystem: Shared folder not found - ensure init.c
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
+local Network = require(Shared.network.generated.client)
 
 -- Configuration
 local DEBUG_GRID_VISIBLE = true
@@ -33,6 +34,7 @@ local GRID_LINE_HEIGHT = 0.05 -- Slightly above ground
 
 -- State
 local _gridFolder: Folder? = nil
+local _connections: {any} = {}
 
 local function createLine(from: Vector3, to: Vector3, parent: Instance): Part
 	local distance = (to - from).Magnitude
@@ -55,6 +57,10 @@ local function createLine(from: Vector3, to: Vector3, parent: Instance): Part
 end
 
 local function createGrid()
+	if not DEBUG_GRID_VISIBLE then
+		return
+	end
+	
 	if _gridFolder then
 		_gridFolder:Destroy()
 	end
@@ -63,26 +69,6 @@ local function createGrid()
 	folder.Name = "DebugGrid"
 	folder.Parent = Workspace
 	_gridFolder = folder
-	
-	-- Wait for MapConfig to be initialized (either from server sync or local read)
-	-- The server sends authoritative config via MapConfigSync event
-	local timeout = 10
-	local elapsed = 0
-	while not MapConfig.IsInitialized() and elapsed < timeout do
-		task.wait(0.1)
-		elapsed += 0.1
-	end
-	
-	if not MapConfig.IsInitialized() then
-		-- Fallback: try to read from ArenaMap directly (legacy behavior)
-		Logger.Warn("GridVisualization", "MapConfig not initialized after 10s, trying local read")
-		local arenaMap = Workspace:FindFirstChild("ArenaMap")
-		if arenaMap then
-			MapConfig.LoadFromMap(arenaMap)
-		else
-			Logger.Warn("GridVisualization", "ArenaMap not found, using defaults")
-		end
-	end
 	
 	-- Use MapConfig for dynamic grid bounds
 	local config = MapConfig.GetConfig()
@@ -144,9 +130,23 @@ end
 -- INIT: Called once before Matter loop (CAN yield)
 --------------------------------------------------------------------------------
 local function Init(_world: any)
-	if DEBUG_GRID_VISIBLE then
+	-- Listen for MapConfigSync from server (event-driven, not polling!)
+	table.insert(_connections, Network.MapConfigSync.On(function(data)
+		Logger.Info("GridVisualization", `MapConfigSync received, creating grid`)
+		-- MapConfig.ApplyFromServer is called by init.client.luau
+		-- We just need to wait a frame for it to be applied
+		task.defer(function()
+			createGrid()
+		end)
+	end))
+	
+	-- If MapConfig already initialized (late system init), create immediately
+	if MapConfig.IsInitialized() then
+		Logger.Info("GridVisualization", "MapConfig already initialized, creating grid")
 		createGrid()
 	end
+	
+	Logger.Debug("GridVisualizationSystem", "Initialized with MapConfigSync listener")
 end
 
 --------------------------------------------------------------------------------
@@ -165,6 +165,17 @@ local function Dispose(_player: Player?)
 		-- Player-specific cleanup (none for this system)
 		return
 	end
+	
+	-- Disconnect all listeners
+	for _, conn in _connections do
+		if typeof(conn) == "function" then
+			-- Zap returns disconnect function
+			conn()
+		elseif typeof(conn) == "RBXScriptConnection" then
+			conn:Disconnect()
+		end
+	end
+	table.clear(_connections)
 	
 	-- Full cleanup
 	destroyGrid()

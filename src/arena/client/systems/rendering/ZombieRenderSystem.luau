@@ -191,8 +191,14 @@ local function setupNetworkListeners()
 		local visual = _zombieVisuals[entityId]
 		
 		if visual then
+			-- Remove from active tracking FIRST to prevent duplicate processing
+			_zombieVisuals[entityId] = nil
+			
+			-- Keep reference to part for animation
+			local part = visual.Part
+			
 			-- Play death VFX and audio
-			local pos = visual.Part.Position
+			local pos = part.Position
 			local vfx = getVFXService()
 			local audio = getAudioService()
 			if vfx then vfx.PlayZombieDeath(pos) end
@@ -200,19 +206,19 @@ local function setupNetworkListeners()
 			
 			-- Death animation
 			local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			local tween = TweenService:Create(visual.Part, tweenInfo, {
+			local tween = TweenService:Create(part, tweenInfo, {
 				Size = Vector3.new(ZOMBIE_SIZE.X, 0.5, ZOMBIE_SIZE.Z),
-				Position = visual.Part.Position - Vector3.new(0, ZOMBIE_SIZE.Y / 2 - 0.25, 0),
+				Position = part.Position - Vector3.new(0, ZOMBIE_SIZE.Y / 2 - 0.25, 0),
 				Transparency = 1
 			})
 			
 			tween:Play()
 			tween.Completed:Connect(function()
-				destroyZombieVisual(entityId)
+				-- Destroy the part directly since it's no longer in _zombieVisuals
+				if part and part.Parent then
+					part:Destroy()
+				end
 			end)
-			
-			-- Remove from active tracking immediately
-			_zombieVisuals[entityId] = nil
 			
 			Logger.Debug("ZombieRender", `Zombie {entityId} died`)
 		end
@@ -267,6 +273,12 @@ local function ZombieRenderSystem(_world)
 	
 	-- Interpolate zombie positions
 	for entityId, visual in _zombieVisuals do
+		-- Skip if part was destroyed
+		if not visual.Part or not visual.Part.Parent then
+			_zombieVisuals[entityId] = nil
+			continue
+		end
+		
 		local currentX = visual.Part.Position.X
 		local targetX = visual.TargetX
 		

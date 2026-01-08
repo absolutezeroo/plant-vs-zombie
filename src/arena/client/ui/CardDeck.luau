@@ -96,10 +96,11 @@ local function PlantCard(props: {
 	
 	-- Cooldown remaining
 	local cooldownRemaining = Value(scope, 0)
+	local isDestroyed = false
 	
-	-- Update cooldown every frame
+	-- Update cooldown - runs until component is destroyed
 	task.spawn(function()
-		while true do
+		while not isDestroyed do
 			local cooldowns = Fusion.peek(props.Cooldowns)
 			local endTime = cooldowns[plantType]
 			if endTime then
@@ -109,6 +110,11 @@ local function PlantCard(props: {
 			end
 			task.wait(0.1)
 		end
+	end)
+	
+	-- Register cleanup when scope is cleaned up
+	table.insert(scope, function()
+		isDestroyed = true
 	end)
 	
 	local isOnCooldown = Computed(scope, function(use)

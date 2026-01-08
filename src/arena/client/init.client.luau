@@ -63,9 +63,6 @@ local preparationDuration = 20
 local intermissionStartTime = 0
 local intermissionDuration = 30
 
--- Map loading state
-local mapLoadingComplete = false
-
 -- Create a scope for Fusion cleanup
 local scope = Fusion.scoped(Fusion)
 
@@ -88,6 +85,40 @@ local loader = ServiceLoader.new({
 -- NETWORK EVENT LISTENERS
 -- ============================================
 
+--[[
+    Setup early network listeners that must be ready BEFORE ECS systems init.
+    This includes MapConfigSync which GridVisualizationSystem waits for.
+]]
+local function setupEarlyNetworkListeners()
+    -- Map config sync (critical - must be ready before GridVisualization Init)
+    Network.MapConfigSync.On(function(data)
+        Logger.Info("ArenaClient", `Map config received: {data.MapId}, GridY={data.GridY}`)
+        MapConfig.ApplyFromServer(data)
+    end)
+
+    -- Map loading started
+    Network.MapLoadingStarted.On(function(data)
+        Logger.Info("ArenaClient", `Map loading: {data.MapId} ({data.TotalAssets} assets)`)
+    end)
+
+    -- Map loading progress
+    Network.MapLoadingProgress.On(function(data)
+        local progress = data.LoadedAssets / math.max(data.TotalAssets, 1)
+        Logger.Debug("ArenaClient", `Map progress: {math.floor(progress * 100)}%`)
+    end)
+
+    -- Map loading complete
+    Network.MapLoadingComplete.On(function(data)
+        Logger.Info("ArenaClient", `Map loaded: {data.MapId} (success={data.Success})`)
+    end)
+    
+    Logger.Debug("ArenaClient", "Early network listeners setup complete")
+end
+
+--[[
+    Setup network listeners that depend on HUD being ready.
+    Called after UI is mounted.
+]]
 local function setupNetworkListeners()
     -- Wave started event
     Network.WaveStarted.On(function(data)
@@ -97,6 +128,9 @@ local function setupNetworkListeners()
             Logger.Info("ArenaClient", "Preparation phase started")
             hud:StartPreparation()
         else
+            -- Reset intermission when new wave starts
+            intermissionStartTime = 0
+            hud:SetIntermissionTime(0)
             Logger.Info("ArenaClient", `Wave {data.WaveNumber} started`)
         end
     end)
@@ -157,29 +191,8 @@ local function setupNetworkListeners()
             Logger.Debug("ArenaClient", `Request {data.RequestId} failed: error {data.ErrorCode}`)
         end
     end)
-
-    -- Map config sync
-    Network.MapConfigSync.On(function(data)
-        Logger.Info("ArenaClient", `Map config received: {data.MapId}, GridY={data.GridY}`)
-        MapConfig.ApplyFromServer(data)
-    end)
-
-    -- Map loading started
-    Network.MapLoadingStarted.On(function(data)
-        Logger.Info("ArenaClient", `Map loading: {data.MapId} ({data.TotalAssets} assets)`)
-    end)
-
-    -- Map loading progress
-    Network.MapLoadingProgress.On(function(data)
-        local progress = data.LoadedAssets / math.max(data.TotalAssets, 1)
-        Logger.Debug("ArenaClient", `Map progress: {math.floor(progress * 100)}%`)
-    end)
-
-    -- Map loading complete
-    Network.MapLoadingComplete.On(function(data)
-        Logger.Info("ArenaClient", `Map loaded: {data.MapId} (success={data.Success})`)
-        mapLoadingComplete = true
-    end)
+    
+    -- Note: MapConfigSync and Map loading listeners are in setupEarlyNetworkListeners
 end
 
 -- ============================================
@@ -258,6 +271,9 @@ end
 -- Step 1: Load Modules
 loader:AddStep("Modules", function()
     Network = require(Shared.network.generated.client)
+    
+    -- Setup early network listeners BEFORE ECS init (for MapConfigSync)
+    setupEarlyNetworkListeners()
     
     local Modules = script:WaitForChild("modules")
     PlayerDataClient = require(Modules:WaitForChild("PlayerDataClient"))
@@ -347,18 +363,14 @@ loader:AddStep("UI", function()
     Logger.Info("ArenaClient", "HUD and VictoryScreen mounted")
 end, 1)
 
--- Step 5: Wait for Map Sync
+-- Step 5: Map Sync Ready
 loader:AddStep("MapSync", function()
-    -- Wait for map loading or timeout
-    local timeout = 3
-    local elapsed = 0
-    while not mapLoadingComplete and elapsed < timeout do
-        task.wait(0.1)
-        elapsed += 0.1
-    end
-    
-    Logger.Info("ArenaClient", `Map sync complete (loaded={mapLoadingComplete})`)
-end, 1)
+    -- Map sync is now event-driven via MapConfigSync listener
+    -- GridVisualizationSystem listens for MapConfigSync and creates grid when received
+    -- No polling needed - just mark step complete
+    local status = if MapConfig.IsInitialized() then "synced" else "waiting for server"
+    Logger.Info("ArenaClient", `Map sync ready ({status})`)
+end, 0.5)
 
 -- Step 6: Ready
 loader:AddStep("Ready", function()

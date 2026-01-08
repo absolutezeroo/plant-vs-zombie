@@ -208,6 +208,14 @@ function MapLoader._SyncConfigToClients(mapId: string)
     end
     
     Logger.Info("MapLoader", `Synced map config to {#Players:GetPlayers()} clients`)
+    
+    -- Also resync after a short delay to catch clients still initializing
+    task.delay(1, function()
+        for _, player in Players:GetPlayers() do
+            network.MapConfigSync.Fire(player, syncData)
+        end
+        Logger.Debug("MapLoader", "Resent map config after delay")
+    end)
 end
 
 --[[
