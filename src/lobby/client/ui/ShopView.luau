@@ -1,9 +1,9 @@
 --!strict
 --[[
-    ShopView.luau - Plant shop interface
+    ShopView.luau - Modern Plant Shop UI
     
-    Displays all plants with their unlock status and purchase price.
-    Players can buy plants with Coins.
+    Clean, card-based design inspired by modern Roblox games.
+    Dark theme with gold accents, smooth hover effects.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,8 +14,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ProgressionData = require(Shared.data.ProgressionData)
 local PlantData = require(Shared.data.PlantData)
 
-local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
-
 local New = Fusion.New
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
@@ -23,167 +21,262 @@ local Computed = Fusion.Computed
 local Value = Fusion.Value
 local peek = Fusion.peek
 
+-- Modern dark color palette
+local Colors = {
+    Background = Color3.fromRGB(22, 22, 30),
+    CardBg = Color3.fromRGB(38, 38, 50),
+    CardHover = Color3.fromRGB(50, 50, 65),
+    TopBar = Color3.fromRGB(30, 30, 42),
+    Gold = Color3.fromRGB(255, 193, 7),
+    GoldDark = Color3.fromRGB(200, 150, 0),
+    Green = Color3.fromRGB(76, 175, 80),
+    GreenLight = Color3.fromRGB(129, 199, 132),
+    TextWhite = Color3.new(1, 1, 1),
+    TextMuted = Color3.fromRGB(150, 150, 160),
+    Disabled = Color3.fromRGB(80, 80, 90),
+    Border = Color3.fromRGB(60, 60, 75),
+}
+
 export type ShopViewProps = {
-    PlayerData: any, -- Value<PlayerData?>
+    PlayerData: any,
     OnBack: () -> (),
     OnPurchase: (plantType: string) -> (),
 }
 
--- Get sorted plant list by Order
+-- Plant emoji mapping
+local PlantEmojis: {[string]: string} = {
+    Peashooter = "🌱", Sunflower = "🌻", WallNut = "🥜",
+    PotatoMine = "💣", SnowPea = "❄️", Repeater = "🌿",
+    CherryBomb = "🍒", Chomper = "🦷", Jalapeno = "🌶️",
+    TallNut = "🧱", Squash = "🎃", ThreePeater = "🌾",
+    TorchWood = "🔥", Spikeweed = "⚔️", Pumpkin = "🎃",
+    Starfruit = "⭐", MagnifyingGrass = "🔍", CattailPlant = "🐱",
+    CobCannon = "🌽", Bonkchoy = "🥬", Snapdragon = "🐉",
+    IceBerg = "🧊", SunShroom = "🍄",
+}
+
+local function getPlantEmoji(plantType: string): string
+    return PlantEmojis[plantType] or "🌱"
+end
+
 local function getSortedPlants(): {{PlantType: string, Info: ProgressionData.PlantUnlockInfo}}
     local plants = {}
     for plantType, info in pairs(ProgressionData.PlantUnlocks) do
         table.insert(plants, {PlantType = plantType, Info = info})
     end
-    table.sort(plants, function(a, b)
-        return a.Info.Order < b.Info.Order
-    end)
+    table.sort(plants, function(a, b) return a.Info.Order < b.Info.Order end)
     return plants
 end
 
--- Single plant card in shop
+-- Modern plant card
 local function PlantCard(scope: any, props: {
     PlantType: string,
     Cost: number,
-    IsUnlocked: any, -- Computed<boolean>
-    CanAfford: any,  -- Computed<boolean>
+    IsUnlocked: any,
+    CanAfford: any,
     OnPurchase: () -> (),
-}): any
+}): Frame
     local isHovered = Value(scope, false)
     local plantStats = PlantData[props.PlantType]
+    local emoji = getPlantEmoji(props.PlantType)
     
     return New(scope, "Frame") {
-        Size = UDim2.new(0, 140, 0, 180),
+        Name = props.PlantType,
+        Size = UDim2.fromOffset(180, 245),
         BackgroundColor3 = Computed(scope, function(use)
-            if use(props.IsUnlocked) then
-                return PvZTheme.Colors.LeafGreen
-            elseif use(isHovered) then
-                return PvZTheme.Colors.WoodLight
-            else
-                return PvZTheme.Colors.WoodBrown
-            end
+            return if use(isHovered) then Colors.CardHover else Colors.CardBg
         end),
         
         [Children] = {
-            New(scope, "UICorner") {
-                CornerRadius = UDim.new(0, 10),
-            },
+            New(scope, "UICorner") { CornerRadius = UDim.new(0, 14) },
             
             New(scope, "UIStroke") {
                 Color = Computed(scope, function(use)
-                    return if use(props.IsUnlocked) then PvZTheme.Colors.Success else PvZTheme.Colors.WoodDark
+                    if use(props.IsUnlocked) then return Colors.Green end
+                    if use(isHovered) then return Colors.Gold end
+                    return Colors.Border
                 end),
                 Thickness = 2,
             },
             
-            -- Plant icon placeholder
+            -- Owned badge
+            Computed(scope, function(use)
+                if not use(props.IsUnlocked) then return nil end
+                return New(scope, "Frame") {
+                    Size = UDim2.new(1, 0, 0, 26),
+                    BackgroundColor3 = Colors.Green,
+                    [Children] = {
+                        New(scope, "UICorner") { CornerRadius = UDim.new(0, 14) },
+                        New(scope, "Frame") {
+                            Size = UDim2.new(1, 0, 0.5, 0),
+                            Position = UDim2.new(0, 0, 0.5, 0),
+                            BackgroundColor3 = Colors.Green,
+                        },
+                        New(scope, "TextLabel") {
+                            Size = UDim2.new(1, 0, 1, 0),
+                            BackgroundTransparency = 1,
+                            Text = "✓ OWNED",
+                            TextColor3 = Colors.TextWhite,
+                            TextSize = 12,
+                            Font = Enum.Font.GothamBold,
+                        },
+                    },
+                }
+            end),
+            
+            -- Plant icon
             New(scope, "TextLabel") {
-                Size = UDim2.new(1, 0, 0, 60),
-                Position = UDim2.new(0, 0, 0, 10),
+                Size = UDim2.new(1, 0, 0, 75),
+                Position = UDim2.fromOffset(0, 35),
                 BackgroundTransparency = 1,
-                Text = "🌱",
-                TextSize = 40,
-                Font = Enum.Font.GothamBold,
+                Text = emoji,
+                TextSize = 55,
             },
             
             -- Plant name
             New(scope, "TextLabel") {
-                Size = UDim2.new(1, -10, 0, 30),
-                Position = UDim2.new(0, 5, 0, 70),
+                Size = UDim2.new(1, -16, 0, 26),
+                Position = UDim2.new(0, 8, 0, 112),
                 BackgroundTransparency = 1,
                 Text = props.PlantType,
-                TextSize = 14,
+                TextColor3 = Colors.TextWhite,
+                TextSize = 16,
                 Font = Enum.Font.GothamBold,
-                TextColor3 = PvZTheme.Colors.TextWhite,
-                TextWrapped = true,
                 TextTruncate = Enum.TextTruncate.AtEnd,
             },
             
             -- Category
             plantStats and New(scope, "TextLabel") {
-                Size = UDim2.new(1, 0, 0, 16),
-                Position = UDim2.new(0, 0, 0, 98),
+                Size = UDim2.new(1, 0, 0, 18),
+                Position = UDim2.fromOffset(0, 138),
                 BackgroundTransparency = 1,
                 Text = plantStats.Category or "",
-                TextSize = 11,
+                TextColor3 = Colors.TextMuted,
+                TextSize = 12,
                 Font = Enum.Font.Gotham,
-                TextColor3 = PvZTheme.Colors.TextWhite,
-                TextTransparency = 0.3,
             } or nil,
             
-            -- Purchase button / Owned status
+            -- Sun cost display
+            plantStats and New(scope, "Frame") {
+                Size = UDim2.fromOffset(65, 24),
+                Position = UDim2.new(0.5, 0, 0, 158),
+                AnchorPoint = Vector2.new(0.5, 0),
+                BackgroundColor3 = Color3.fromRGB(255, 180, 0),
+                
+                [Children] = {
+                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 6) },
+                    New(scope, "TextLabel") {
+                        Size = UDim2.new(1, 0, 1, 0),
+                        BackgroundTransparency = 1,
+                        Text = `☀️ {plantStats.Cost}`,
+                        TextColor3 = Color3.fromRGB(50, 50, 50),
+                        TextSize = 12,
+                        Font = Enum.Font.GothamBold,
+                    },
+                },
+            } or nil,
+            
+            -- Buy button OR owned info
             Computed(scope, function(use)
                 if use(props.IsUnlocked) then
-                    return New(scope, "TextLabel") {
-                        Size = UDim2.new(0.9, 0, 0, 35),
-                        Position = UDim2.new(0.05, 0, 1, -45),
-                        BackgroundColor3 = PvZTheme.Colors.Success,
-                        Text = `{PvZTheme.Icons.Check} Owned`,
-                        TextSize = 14,
-                        Font = Enum.Font.GothamBold,
-                        TextColor3 = PvZTheme.Colors.TextWhite,
+                    -- Show stats for owned plants instead of empty space
+                    return New(scope, "Frame") {
+                        Size = UDim2.new(1, -24, 0, 42),
+                        Position = UDim2.new(0, 12, 1, -52),
+                        BackgroundColor3 = Color3.fromRGB(45, 65, 45),
                         
                         [Children] = {
-                            New(scope, "UICorner") {
-                                CornerRadius = UDim.new(0, 6),
-                            },
-                        },
-                    }
-                else
-                    local canAfford = use(props.CanAfford)
-                    return New(scope, "TextButton") {
-                        Size = UDim2.new(0.9, 0, 0, 35),
-                        Position = UDim2.new(0.05, 0, 1, -45),
-                        BackgroundColor3 = if canAfford then PvZTheme.Colors.CoinGold else PvZTheme.Colors.Disabled,
-                        Text = `{PvZTheme.Icons.Coin} {props.Cost}`,
-                        TextSize = 14,
-                        Font = Enum.Font.GothamBold,
-                        TextColor3 = PvZTheme.Colors.TextDark,
-                        
-                        [OnEvent "Activated"] = function()
-                            if peek(props.CanAfford) then
-                                props.OnPurchase()
-                            end
-                        end,
-                        [OnEvent "MouseEnter"] = function() isHovered:set(true) end,
-                        [OnEvent "MouseLeave"] = function() isHovered:set(false) end,
-                        
-                        [Children] = {
-                            New(scope, "UICorner") {
-                                CornerRadius = UDim.new(0, 6),
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 10) },
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 1, 0),
+                                BackgroundTransparency = 1,
+                                Text = "✓ In Collection",
+                                TextColor3 = Colors.GreenLight,
+                                TextSize = 14,
+                                Font = Enum.Font.GothamBold,
                             },
                         },
                     }
                 end
+                
+                local canAfford = use(props.CanAfford)
+                
+                return New(scope, "TextButton") {
+                    Size = UDim2.new(1, -24, 0, 42),
+                    Position = UDim2.new(0, 12, 1, -52),
+                    BackgroundColor3 = if canAfford then Colors.Gold else Colors.Disabled,
+                    Text = "",
+                    AutoButtonColor = false,
+                    
+                    [OnEvent "Activated"] = function()
+                        if peek(props.CanAfford) then props.OnPurchase() end
+                    end,
+                    
+                    [Children] = {
+                        New(scope, "UICorner") { CornerRadius = UDim.new(0, 10) },
+                        New(scope, "TextLabel") {
+                            Size = UDim2.new(1, 0, 1, 0),
+                            BackgroundTransparency = 1,
+                            Text = `🪙 {props.Cost}`,
+                            TextColor3 = if canAfford then Color3.fromRGB(40, 40, 40) else Colors.TextMuted,
+                            TextSize = 15,
+                            Font = Enum.Font.GothamBold,
+                        },
+                    },
+                }
             end),
+            
+            -- Hover detector
+            New(scope, "TextButton") {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Text = "",
+                ZIndex = 10,
+                [OnEvent "MouseEnter"] = function() isHovered:set(true) end,
+                [OnEvent "MouseLeave"] = function() isHovered:set(false) end,
+            },
         },
     }
 end
 
-return function(scope: any, props: ShopViewProps)
+-- Filter pill
+local function FilterPill(scope: any, text: string, isActive: any, onClick: () -> ()): TextButton
+    return New(scope, "TextButton") {
+        Size = UDim2.fromOffset(85, 34),
+        BackgroundColor3 = Computed(scope, function(use)
+            return if use(isActive) then Colors.Gold else Colors.CardBg
+        end),
+        Text = text,
+        TextColor3 = Computed(scope, function(use)
+            return if use(isActive) then Color3.fromRGB(30, 30, 30) else Colors.TextWhite
+        end),
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false,
+        [OnEvent "Activated"] = onClick,
+        [Children] = { New(scope, "UICorner") { CornerRadius = UDim.new(0, 17) } },
+    }
+end
+
+return function(scope: any, props: ShopViewProps): Frame
     local sortedPlants = getSortedPlants()
-    local selectedFilter = Value(scope, "All") -- "All", "Owned", "Locked"
+    local selectedFilter = Value(scope, "All")
     
-    -- Filter plants based on selection
     local filteredPlants = Computed(scope, function(use)
         local filter = use(selectedFilter)
         local playerData = use(props.PlayerData)
         local unlockedSet: {[string]: boolean} = {}
         
         if playerData and playerData.UnlockedPlants then
-            for _, plantType in ipairs(playerData.UnlockedPlants) do
-                unlockedSet[plantType] = true
+            for _, pt in ipairs(playerData.UnlockedPlants) do
+                unlockedSet[pt] = true
             end
         end
         
         local result = {}
         for _, plant in ipairs(sortedPlants) do
-            local isUnlocked = unlockedSet[plant.PlantType] == true
-            if filter == "All" then
-                table.insert(result, plant)
-            elseif filter == "Owned" and isUnlocked then
-                table.insert(result, plant)
-            elseif filter == "Locked" and not isUnlocked then
+            local owned = unlockedSet[plant.PlantType] == true
+            if filter == "All" or (filter == "Owned" and owned) or (filter == "Locked" and not owned) then
                 table.insert(result, plant)
             end
         end
@@ -192,125 +285,105 @@ return function(scope: any, props: ShopViewProps)
     
     return New(scope, "Frame") {
         Size = UDim2.new(1, 0, 1, 0),
-        BackgroundColor3 = PvZTheme.Colors.SkyBlue,
+        BackgroundColor3 = Colors.Background,
         
         [Children] = {
-            New(scope, "UIGradient") {
-                Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 150)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 150, 80)),
-                }),
-                Rotation = 90,
-            },
-            
-            -- Back button
-            PvZTheme.BackButton(scope, props.OnBack),
-            
-            -- Header
-            PvZTheme.Header(scope, "🛒 Plant Shop"),
-            
-            -- Currency display
+            -- Top bar
             New(scope, "Frame") {
-                Size = UDim2.new(0, 200, 0, 40),
-                Position = UDim2.new(1, -20, 0, 20),
-                AnchorPoint = Vector2.new(1, 0),
-                BackgroundColor3 = PvZTheme.Colors.WoodBrown,
+                Size = UDim2.new(1, 0, 0, 90),
+                BackgroundColor3 = Colors.TopBar,
                 
                 [Children] = {
-                    New(scope, "UICorner") {
-                        CornerRadius = UDim.new(0, 8),
-                    },
-                    New(scope, "TextLabel") {
-                        Size = UDim2.new(1, 0, 1, 0),
-                        BackgroundTransparency = 1,
-                        Text = Computed(scope, function(use)
-                            local data = use(props.PlayerData)
-                            return if data then `💰 {data.Coins}` else "💰 ---"
-                        end),
-                        TextSize = 22,
+                    -- Close button (RIGHT side to avoid Roblox UI)
+                    New(scope, "TextButton") {
+                        Size = UDim2.fromOffset(44, 44),
+                        Position = UDim2.new(1, -15, 0, 32),
+                        AnchorPoint = Vector2.new(1, 0),
+                        BackgroundColor3 = Colors.CardBg,
+                        Text = "✕",
+                        TextColor3 = Colors.TextWhite,
+                        TextSize = 20,
                         Font = Enum.Font.GothamBold,
-                        TextColor3 = PvZTheme.Colors.CoinGold,
+                        [OnEvent "Activated"] = props.OnBack,
+                        [Children] = { New(scope, "UICorner") { CornerRadius = UDim.new(0, 12) } },
+                    },
+                    
+                    -- Title
+                    New(scope, "TextLabel") {
+                        Size = UDim2.fromOffset(150, 50),
+                        Position = UDim2.new(0.5, 0, 0, 32),
+                        AnchorPoint = Vector2.new(0.5, 0),
+                        BackgroundTransparency = 1,
+                        Text = "🛒 SHOP",
+                        TextColor3 = Colors.TextWhite,
+                        TextSize = 26,
+                        Font = Enum.Font.GothamBlack,
+                    },
+                    
+                    -- Coins (RIGHT side, before close button)
+                    New(scope, "Frame") {
+                        Size = UDim2.fromOffset(140, 44),
+                        Position = UDim2.new(1, -70, 0, 35),
+                        AnchorPoint = Vector2.new(1, 0),
+                        BackgroundColor3 = Colors.CardBg,
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 20) },
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 1, 0),
+                                BackgroundTransparency = 1,
+                                Text = Computed(scope, function(use)
+                                    local data = use(props.PlayerData)
+                                    return if data then `🪙 {data.Coins}` else "🪙 ---"
+                                end),
+                                TextColor3 = Colors.Gold,
+                                TextSize = 18,
+                                Font = Enum.Font.GothamBold,
+                            },
+                        },
                     },
                 },
             },
             
-            -- Filter buttons
+            -- Filters
             New(scope, "Frame") {
-                Size = UDim2.new(0.9, 0, 0, 40),
-                Position = UDim2.new(0.05, 0, 0, 85),
+                Size = UDim2.new(1, 0, 0, 50),
+                Position = UDim2.fromOffset(0, 95),
                 BackgroundTransparency = 1,
-                
                 [Children] = {
                     New(scope, "UIListLayout") {
                         FillDirection = Enum.FillDirection.Horizontal,
                         HorizontalAlignment = Enum.HorizontalAlignment.Center,
+                        VerticalAlignment = Enum.VerticalAlignment.Center,
                         Padding = UDim.new(0, 10),
                     },
-                    
-                    -- Filter buttons
-                    table.unpack((function()
-                        local filters = {"All", "Owned", "Locked"}
-                        local buttons = {}
-                        for _, filter in filters do
-                            local isActive = Computed(scope, function(use)
-                                return use(selectedFilter) == filter
-                            end)
-                            table.insert(buttons, New(scope, "TextButton") {
-                                Size = UDim2.new(0, 100, 0, 35),
-                                BackgroundColor3 = Computed(scope, function(use)
-                                    return if use(isActive) then PvZTheme.Colors.GrassGreen else PvZTheme.Colors.WoodBrown
-                                end),
-                                Text = filter,
-                                TextSize = 16,
-                                Font = Enum.Font.GothamBold,
-                                TextColor3 = PvZTheme.Colors.TextWhite,
-                                
-                                [OnEvent "Activated"] = function()
-                                    selectedFilter:set(filter)
-                                end,
-                                
-                                [Children] = {
-                                    New(scope, "UICorner") {
-                                        CornerRadius = UDim.new(0, 8),
-                                    },
-                                },
-                            })
-                        end
-                        return buttons
-                    end)()),
+                    FilterPill(scope, "All", Computed(scope, function(use) return use(selectedFilter) == "All" end), 
+                        function() selectedFilter:set("All") end),
+                    FilterPill(scope, "Owned", Computed(scope, function(use) return use(selectedFilter) == "Owned" end), 
+                        function() selectedFilter:set("Owned") end),
+                    FilterPill(scope, "Locked", Computed(scope, function(use) return use(selectedFilter) == "Locked" end), 
+                        function() selectedFilter:set("Locked") end),
                 },
             },
             
-            -- Plants grid (scrolling)
+            -- Grid
             New(scope, "ScrollingFrame") {
-                Size = UDim2.new(0.95, 0, 0.65, 0),
-                Position = UDim2.new(0.025, 0, 0.18, 0),
-                BackgroundColor3 = PvZTheme.Colors.WoodLight,
-                BackgroundTransparency = 0.3,
-                ScrollBarThickness = 8,
-                CanvasSize = UDim2.new(0, 0, 0, 1200),
+                Size = UDim2.new(1, -30, 1, -160),
+                Position = UDim2.fromOffset(15, 150),
+                BackgroundTransparency = 1,
+                ScrollBarThickness = 6,
+                ScrollBarImageColor3 = Colors.Border,
                 AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                CanvasSize = UDim2.new(0, 0, 0, 0),
                 
                 [Children] = {
-                    New(scope, "UICorner") {
-                        CornerRadius = UDim.new(0, 10),
-                    },
-                    
-                    New(scope, "UIPadding") {
-                        PaddingTop = UDim.new(0, 15),
-                        PaddingBottom = UDim.new(0, 15),
-                        PaddingLeft = UDim.new(0, 15),
-                        PaddingRight = UDim.new(0, 15),
-                    },
-                    
+                    New(scope, "UIPadding") { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 20), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) },
                     New(scope, "UIGridLayout") {
-                        CellSize = UDim2.new(0, 140, 0, 180),
-                        CellPadding = UDim2.new(0, 12, 0, 12),
+                        CellSize = UDim2.fromOffset(180, 245),
+                        CellPadding = UDim2.fromOffset(18, 18),
                         HorizontalAlignment = Enum.HorizontalAlignment.Center,
                         SortOrder = Enum.SortOrder.LayoutOrder,
                     },
                     
-                    -- Generate plant cards dynamically
                     Computed(scope, function(use)
                         local plants = use(filteredPlants)
                         local playerData = use(props.PlayerData)
@@ -318,32 +391,22 @@ return function(scope: any, props: ShopViewProps)
                         local unlockedSet: {[string]: boolean} = {}
                         
                         if playerData and playerData.UnlockedPlants then
-                            for _, plantType in ipairs(playerData.UnlockedPlants) do
-                                unlockedSet[plantType] = true
+                            for _, pt in ipairs(playerData.UnlockedPlants) do
+                                unlockedSet[pt] = true
                             end
                         end
                         
                         local cards = {}
-                        for i, plant in ipairs(plants) do
-                            local isUnlocked = Value(scope, unlockedSet[plant.PlantType] == true)
-                            local canAfford = Value(scope, coins >= plant.Info.Cost)
-                            
+                        for _, plant in ipairs(plants) do
                             table.insert(cards, PlantCard(scope, {
                                 PlantType = plant.PlantType,
                                 Cost = plant.Info.Cost,
-                                IsUnlocked = isUnlocked,
-                                CanAfford = canAfford,
-                                OnPurchase = function()
-                                    props.OnPurchase(plant.PlantType)
-                                end,
+                                IsUnlocked = Value(scope, unlockedSet[plant.PlantType] == true),
+                                CanAfford = Value(scope, coins >= plant.Info.Cost),
+                                OnPurchase = function() props.OnPurchase(plant.PlantType) end,
                             }))
                         end
-                        
-                        return New(scope, "Frame") {
-                            Size = UDim2.new(1, 0, 1, 0),
-                            BackgroundTransparency = 1,
-                            [Children] = cards,
-                        }
+                        return cards
                     end),
                 },
             },

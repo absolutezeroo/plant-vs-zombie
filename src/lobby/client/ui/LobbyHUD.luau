@@ -1,12 +1,12 @@
 --!strict
 --[[
-    LobbyHUD.luau - Minimal overlay HUD for lobby
+    LobbyHUD.luau - Modern Lobby HUD
     
-    Shows:
-    - Player level, coins, gems (top bar)
-    - Current deck (bottom bar)
+    Minimal, clean overlay showing:
+    - Player resources (top-left pills)
+    - Current deck preview (bottom bar)
     
-    Uses PvZ cartoon style - wooden frames, nature colors, drop shadows.
+    Dark modern style matching ShopView/DeckBuilderView.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,12 +15,49 @@ local Players = game:GetService("Players")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
-local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
-
 local New = Fusion.New
 local Children = Fusion.Children
 local Computed = Fusion.Computed
-local Value = Fusion.Value
+
+-- Modern dark color palette (matching ShopView)
+local Colors = {
+    PanelBg = Color3.fromRGB(30, 30, 40),
+    PanelBgLight = Color3.fromRGB(45, 45, 58),
+    SlotEmpty = Color3.fromRGB(40, 40, 52),
+    SlotFilled = Color3.fromRGB(50, 70, 50),
+    Gold = Color3.fromRGB(255, 193, 7),
+    Cyan = Color3.fromRGB(0, 200, 220),
+    Purple = Color3.fromRGB(180, 100, 255),
+    Green = Color3.fromRGB(100, 200, 100),
+    TextWhite = Color3.new(1, 1, 1),
+    TextMuted = Color3.fromRGB(140, 140, 150),
+    Border = Color3.fromRGB(60, 60, 75),
+}
+
+-- Plant emojis
+local PlantEmojis: {[string]: string} = {
+    Peashooter = "🌱", Sunflower = "🌻", WallNut = "🥜",
+    PotatoMine = "💣", SnowPea = "❄️", Repeater = "🌿",
+    CherryBomb = "🍒", Chomper = "🦷", Jalapeno = "🌶️",
+    TallNut = "🧱", Squash = "🎃", ThreePeater = "🌾",
+    TorchWood = "🔥", Spikeweed = "⚔️", Starfruit = "⭐",
+    CobCannon = "🌽", Bonkchoy = "🥬", Snapdragon = "🐉",
+    IceBerg = "🧊", SunShroom = "🍄",
+}
+
+local function getPlantEmoji(plantType: string): string
+    return PlantEmojis[plantType] or "🌱"
+end
+
+-- Mutation emojis
+local MutationEmojis: {[string]: string} = {
+    Fire = "🔥", Ice = "❄️", Electric = "⚡", Toxic = "☠️",
+    Shadow = "🌑", Solar = "☀️", Reinforced = "🛡️", Primal = "💥", Swift = "💨",
+}
+
+local function getMutationEmoji(mutationId: string): string
+    return MutationEmojis[mutationId] or "✨"
+end
 
 export type PlayerData = {
     Coins: number,
@@ -36,13 +73,160 @@ export type PlayerData = {
     Deck: {string},
 }
 
+-- Resource pill component
+local function ResourcePill(scope: any, props: {
+    Icon: string,
+    Value: any, -- Computed<string>
+    Color: Color3,
+}): Frame
+    return New(scope, "Frame") {
+        Size = UDim2.fromOffset(110, 38),
+        BackgroundColor3 = Colors.PanelBg,
+        
+        [Children] = {
+            New(scope, "UICorner") { CornerRadius = UDim.new(0, 19) },
+            New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2 },
+            
+            New(scope, "TextLabel") {
+                Size = UDim2.fromOffset(30, 38),
+                Position = UDim2.fromOffset(6, 0),
+                BackgroundTransparency = 1,
+                Text = props.Icon,
+                TextSize = 20,
+            },
+            
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, -42, 1, 0),
+                Position = UDim2.fromOffset(36, 0),
+                BackgroundTransparency = 1,
+                Text = props.Value,
+                TextColor3 = props.Color,
+                TextSize = 16,
+                Font = Enum.Font.GothamBold,
+                TextXAlignment = Enum.TextXAlignment.Left,
+            },
+        },
+    }
+end
+
+-- Deck slot component
+local function DeckSlot(scope: any, props: {
+    Index: number,
+    PlantType: any, -- Computed<string?>
+    Mutations: any, -- Computed<{string}?>
+}): Frame
+    return New(scope, "Frame") {
+        Size = UDim2.fromOffset(80, 78),
+        BackgroundColor3 = Computed(scope, function(use)
+            local plant = use(props.PlantType)
+            return if plant then Colors.SlotFilled else Colors.SlotEmpty
+        end),
+        
+        [Children] = {
+            New(scope, "UICorner") { CornerRadius = UDim.new(0, 12) },
+            New(scope, "UIStroke") { 
+                Color = Computed(scope, function(use)
+                    local plant = use(props.PlantType)
+                    local mutations = use(props.Mutations)
+                    local hasMutation = mutations and #mutations > 0
+                    if hasMutation then return Color3.fromRGB(255, 150, 50) end
+                    return if plant then Colors.Green else Colors.Border
+                end),
+                Thickness = Computed(scope, function(use)
+                    local mutations = use(props.Mutations)
+                    return if mutations and #mutations > 0 then 3 else 2
+                end),
+            },
+            
+            -- Mutation badge
+            Computed(scope, function(use)
+                local mutations = use(props.Mutations)
+                if mutations and #mutations > 0 then
+                    return New(scope, "Frame") {
+                        Size = UDim2.fromOffset(22, 22),
+                        Position = UDim2.new(1, -4, 0, 4),
+                        AnchorPoint = Vector2.new(1, 0),
+                        BackgroundColor3 = Color3.fromRGB(255, 100, 50),
+                        ZIndex = 6,
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 1, 0),
+                                BackgroundTransparency = 1,
+                                Text = getMutationEmoji(mutations[1]),
+                                TextSize = 12,
+                            },
+                        },
+                    }
+                end
+                return nil
+            end),
+            
+            -- Slot number
+            New(scope, "TextLabel") {
+                Size = UDim2.fromOffset(18, 18),
+                Position = UDim2.fromOffset(4, 4),
+                BackgroundColor3 = Colors.PanelBg,
+                Text = tostring(props.Index),
+                TextColor3 = Colors.TextMuted,
+                TextSize = 10,
+                Font = Enum.Font.GothamBold,
+                [Children] = { New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) } },
+            },
+            
+            -- Plant emoji or +
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, 0, 0, 36),
+                Position = UDim2.fromOffset(0, 20),
+                BackgroundTransparency = 1,
+                Text = Computed(scope, function(use)
+                    local plant = use(props.PlantType)
+                    return if plant then getPlantEmoji(plant) else "+"
+                end),
+                TextSize = Computed(scope, function(use)
+                    local plant = use(props.PlantType)
+                    return if plant then 28 else 32
+                end),
+                TextColor3 = Computed(scope, function(use)
+                    local plant = use(props.PlantType)
+                    return if plant then Colors.TextWhite else Colors.TextMuted
+                end),
+                TextTransparency = Computed(scope, function(use)
+                    local plant = use(props.PlantType)
+                    return if plant then 0 else 0.5
+                end),
+            },
+            
+            -- Plant name
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, -8, 0, 18),
+                Position = UDim2.new(0, 4, 1, -20),
+                BackgroundTransparency = 1,
+                Text = Computed(scope, function(use)
+                    local plant = use(props.PlantType)
+                    if plant then
+                        return if #plant > 9 then plant:sub(1, 8) .. "." else plant
+                    end
+                    return ""
+                end),
+                TextColor3 = Colors.TextWhite,
+                TextSize = 10,
+                Font = Enum.Font.GothamBold,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+            },
+        },
+    }
+end
+
 local function LobbyHUD(scope: any, props: {
     PlayerData: Fusion.Value<PlayerData?>,
     CurrentDeck: Fusion.Value<{string}>,
+    PlantMutations: Fusion.Value<{[string]: {string}}>?,
 }): ScreenGui
     
     local playerData = props.PlayerData
     local currentDeck = props.CurrentDeck
+    local plantMutations = props.PlantMutations
     
     return New(scope, "ScreenGui") {
         Name = "LobbyHUD",
@@ -52,301 +236,136 @@ local function LobbyHUD(scope: any, props: {
         
         [Children] = {
             -- ============================================
-            -- LEFT PANEL: Resources & Player Stats (PvZ Style - same as Arena)
+            -- TOP LEFT: Resource Pills
             -- ============================================
-            PvZTheme.WoodPanel(scope, {
-                Name = "ResourcePanel",
-                Position = UDim2.new(0, 15, 0, 70),
-                Size = UDim2.fromOffset(180, 165),
-                Children = {
-                    -- Level & XP Row
-                    New(scope, "Frame") {
-                        Name = "LevelRow",
-                        Position = UDim2.fromOffset(10, 10),
-                        Size = UDim2.new(1, -20, 0, 40),
-                        BackgroundColor3 = PvZTheme.Colors.WoodDark,
-                        BackgroundTransparency = 0.5,
-                        
-                        [Children] = {
-                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
-                            New(scope, "TextLabel") {
-                                Name = "StarIcon",
-                                Position = UDim2.fromOffset(5, 0),
-                                Size = UDim2.new(0, 30, 1, 0),
-                                BackgroundTransparency = 1,
-                                Text = PvZTheme.Icons.Star,
-                                TextScaled = true,
-                            },
-                            PvZTheme.StrokedText(scope, {
-                                Position = UDim2.new(0, 38, 0.5, 0),
-                                Size = UDim2.new(0, 50, 0.6, 0),
-                                AnchorPoint = Vector2.new(0, 0.5),
-                                Text = Computed(scope, function(use)
-                                    local data = use(playerData)
-                                    return "Lv." .. tostring(data and data.Level or 1)
-                                end),
-                                TextColor3 = PvZTheme.Colors.TextGold,
-                                TextXAlignment = Enum.TextXAlignment.Left,
-                                TextSize = 16,
-                            }),
-                            -- XP Progress Bar
-                            PvZTheme.ProgressBar(scope, {
-                                Position = UDim2.new(0, 90, 0.5, 0),
-                                Size = UDim2.new(1, -100, 0.4, 0),
-                                AnchorPoint = Vector2.new(0, 0.5),
-                                Current = Computed(scope, function(use)
-                                    local data = use(playerData)
-                                    return data and data.XP or 0
-                                end),
-                                Max = Computed(scope, function(use)
-                                    local data = use(playerData)
-                                    return data and data.TotalXPForNextLevel or 100
-                                end),
-                                Color = PvZTheme.Colors.XPPurple,
-                                ShowText = false,
-                            }),
-                        },
+            New(scope, "Frame") {
+                Name = "ResourceBar",
+                Size = UDim2.fromOffset(360, 45),
+                Position = UDim2.fromOffset(15, 50),
+                BackgroundTransparency = 1,
+                
+                [Children] = {
+                    New(scope, "UIListLayout") {
+                        FillDirection = Enum.FillDirection.Horizontal,
+                        Padding = UDim.new(0, 10),
+                        VerticalAlignment = Enum.VerticalAlignment.Center,
                     },
                     
-                    -- Coins Row
-                    New(scope, "Frame") {
-                        Name = "CoinsRow",
-                        Position = UDim2.fromOffset(10, 55),
-                        Size = UDim2.new(1, -20, 0, 40),
-                        BackgroundColor3 = PvZTheme.Colors.WoodDark,
-                        BackgroundTransparency = 0.5,
-                        
-                        [Children] = {
-                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
-                            New(scope, "TextLabel") {
-                                Name = "CoinIcon",
-                                Position = UDim2.fromOffset(5, 0),
-                                Size = UDim2.new(0, 30, 1, 0),
-                                BackgroundTransparency = 1,
-                                Text = PvZTheme.Icons.Coin,
-                                TextScaled = true,
-                            },
-                            PvZTheme.StrokedText(scope, {
-                                Position = UDim2.new(0, 40, 0.5, 0),
-                                Size = UDim2.new(1, -50, 0.7, 0),
-                                AnchorPoint = Vector2.new(0, 0.5),
-                                Text = Computed(scope, function(use)
-                                    local data = use(playerData)
-                                    return tostring(data and data.Coins or 0)
-                                end),
-                                TextColor3 = PvZTheme.Colors.CoinGold,
-                                TextXAlignment = Enum.TextXAlignment.Left,
-                                TextSize = 18,
-                            }),
-                        },
-                    },
+                    -- Level pill
+                    ResourcePill(scope, {
+                        Icon = "⭐",
+                        Value = Computed(scope, function(use)
+                            local data = use(playerData)
+                            return "Lv." .. tostring(data and data.Level or 1)
+                        end),
+                        Color = Colors.Purple,
+                    }),
                     
-                    -- Gems Row
-                    New(scope, "Frame") {
-                        Name = "GemsRow",
-                        Position = UDim2.fromOffset(10, 100),
-                        Size = UDim2.new(1, -20, 0, 40),
-                        BackgroundColor3 = PvZTheme.Colors.WoodDark,
-                        BackgroundTransparency = 0.5,
-                        
-                        [Children] = {
-                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
-                            New(scope, "TextLabel") {
-                                Name = "GemIcon",
-                                Position = UDim2.fromOffset(5, 0),
-                                Size = UDim2.new(0, 30, 1, 0),
-                                BackgroundTransparency = 1,
-                                Text = PvZTheme.Icons.Gem,
-                                TextScaled = true,
-                            },
-                            PvZTheme.StrokedText(scope, {
-                                Position = UDim2.new(0, 40, 0.5, 0),
-                                Size = UDim2.new(1, -50, 0.7, 0),
-                                AnchorPoint = Vector2.new(0, 0.5),
-                                Text = Computed(scope, function(use)
-                                    local data = use(playerData)
-                                    return tostring(data and data.Gems or 0)
-                                end),
-                                TextColor3 = PvZTheme.Colors.GemCyan,
-                                TextXAlignment = Enum.TextXAlignment.Left,
-                                TextSize = 18,
-                            }),
-                        },
-                    },
+                    -- Coins pill
+                    ResourcePill(scope, {
+                        Icon = "🪙",
+                        Value = Computed(scope, function(use)
+                            local data = use(playerData)
+                            return tostring(data and data.Coins or 0)
+                        end),
+                        Color = Colors.Gold,
+                    }),
+                    
+                    -- Gems pill
+                    ResourcePill(scope, {
+                        Icon = "💎",
+                        Value = Computed(scope, function(use)
+                            local data = use(playerData)
+                            return tostring(data and data.Gems or 0)
+                        end),
+                        Color = Colors.Cyan,
+                    }),
                 },
-            }),
+            },
             
             -- ============================================
-            -- TOP RIGHT: Player name with leaf decoration
+            -- TOP RIGHT: Player Badge
             -- ============================================
             New(scope, "Frame") {
                 Name = "PlayerBadge",
-                Size = UDim2.new(0, 200, 0, 44),
-                Position = UDim2.new(1, -215, 0, 15),
-                BackgroundColor3 = PvZTheme.Colors.GrassMedium,
+                Size = UDim2.fromOffset(180, 42),
+                Position = UDim2.new(1, -195, 0, 50),
+                BackgroundColor3 = Colors.PanelBg,
                 
                 [Children] = {
-                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 10) },
-                    New(scope, "UIStroke") { 
-                        Color = PvZTheme.Colors.GrassDark, 
-                        Thickness = 3,
-                    },
+                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 21) },
+                    New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2 },
                     
                     New(scope, "TextLabel") {
-                        Size = UDim2.new(0, 30, 0, 30),
-                        Position = UDim2.new(0, 8, 0.5, -15),
+                        Size = UDim2.fromOffset(28, 28),
+                        Position = UDim2.fromOffset(8, 7),
                         BackgroundTransparency = 1,
                         Text = "🌿",
-                        TextSize = 24,
+                        TextSize = 20,
                     },
                     
                     New(scope, "TextLabel") {
-                        Size = UDim2.new(1, -45, 1, 0),
-                        Position = UDim2.new(0, 38, 0, 0),
+                        Size = UDim2.new(1, -48, 1, 0),
+                        Position = UDim2.fromOffset(38, 0),
                         BackgroundTransparency = 1,
                         Text = Players.LocalPlayer.Name,
-                        TextColor3 = PvZTheme.Colors.TextLight,
-                        TextSize = 16,
-                        Font = PvZTheme.Fonts.Button,
+                        TextColor3 = Colors.TextWhite,
+                        TextSize = 14,
+                        Font = Enum.Font.GothamBold,
                         TextXAlignment = Enum.TextXAlignment.Left,
                         TextTruncate = Enum.TextTruncate.AtEnd,
-                        
-                        [Children] = {
-                            New(scope, "UIStroke") {
-                                Color = PvZTheme.Colors.TextShadow,
-                                Thickness = 1,
-                            },
-                        },
                     },
                 },
             },
             
             -- ============================================
-            -- BOTTOM BAR (Current Deck Display)
+            -- BOTTOM: Deck Preview Bar
             -- ============================================
             New(scope, "Frame") {
-                Name = "BottomBar",
-                Size = UDim2.new(0, 560, 0, 85),
-                Position = UDim2.new(0.5, -280, 1, -95),
-                BackgroundColor3 = PvZTheme.Colors.WoodMedium,
+                Name = "DeckBar",
+                Size = UDim2.fromOffset(600, 100),
+                Position = UDim2.new(0.5, 0, 1, -20),
+                AnchorPoint = Vector2.new(0.5, 1),
+                BackgroundColor3 = Colors.PanelBg,
                 BackgroundTransparency = 0.1,
                 
                 [Children] = {
-                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 14) },
-                    New(scope, "UIStroke") { 
-                        Color = PvZTheme.Colors.WoodBorder, 
-                        Thickness = 4,
-                    },
+                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 18) },
+                    New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2 },
                     
-                    -- Label with plant icon
+                    -- Deck slots
                     New(scope, "Frame") {
-                        Size = UDim2.new(0, 110, 0, 26),
-                        Position = UDim2.new(0, 10, 0, 5),
-                        BackgroundColor3 = PvZTheme.Colors.GrassMedium,
-                        
-                        [Children] = {
-                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 6) },
-                            New(scope, "TextLabel") {
-                                Size = UDim2.new(1, 0, 1, 0),
-                                BackgroundTransparency = 1,
-                                Text = "🌱 Your Deck",
-                                TextColor3 = PvZTheme.Colors.TextLight,
-                                TextSize = 13,
-                                Font = PvZTheme.Fonts.Button,
-                                
-                                [Children] = {
-                                    New(scope, "UIStroke") {
-                                        Color = PvZTheme.Colors.GrassDark,
-                                        Thickness = 1,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    
-                    -- Deck slots container
-                    New(scope, "Frame") {
-                        Size = UDim2.new(1, -24, 0, 52),
-                        Position = UDim2.new(0, 12, 0, 28),
+                        Size = UDim2.new(1, 0, 1, 0),
                         BackgroundTransparency = 1,
                         
                         [Children] = {
                             New(scope, "UIListLayout") {
                                 FillDirection = Enum.FillDirection.Horizontal,
-                                Padding = UDim.new(0, 10),
+                                Padding = UDim.new(0, 14),
                                 HorizontalAlignment = Enum.HorizontalAlignment.Center,
+                                VerticalAlignment = Enum.VerticalAlignment.Center,
                             },
                             
-                            -- 6 deck slots
+                            -- 6 slots
                             (function()
                                 local slots = {}
                                 for i = 1, 6 do
-                                    table.insert(slots, New(scope, "Frame") {
-                                        Name = `Slot{i}`,
-                                        Size = UDim2.new(0, 80, 0, 52),
-                                        BackgroundColor3 = Computed(scope, function(use)
+                                    table.insert(slots, DeckSlot(scope, {
+                                        Index = i,
+                                        PlantType = Computed(scope, function(use)
                                             local deck = use(currentDeck)
-                                            return if deck[i] 
-                                                then PvZTheme.Colors.Owned
-                                                else PvZTheme.Colors.WoodDark
+                                            return deck[i]
                                         end),
-                                        
-                                        [Children] = {
-                                            New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
-                                            New(scope, "UIStroke") { 
-                                                Color = Computed(scope, function(use)
-                                                    local deck = use(currentDeck)
-                                                    return if deck[i]
-                                                        then PvZTheme.Colors.GrassDark
-                                                        else PvZTheme.Colors.WoodBorder
-                                                end),
-                                                Thickness = 2,
-                                            },
-                                            
-                                            -- Plant icon
-                                            New(scope, "TextLabel") {
-                                                Size = UDim2.new(1, 0, 0, 25),
-                                                Position = UDim2.new(0, 0, 0, 3),
-                                                BackgroundTransparency = 1,
-                                                Text = Computed(scope, function(use)
-                                                    local deck = use(currentDeck)
-                                                    return if deck[i] then "🌱" else "➕"
-                                                end),
-                                                TextSize = 20,
-                                                TextTransparency = Computed(scope, function(use)
-                                                    local deck = use(currentDeck)
-                                                    return if deck[i] then 0 else 0.7
-                                                end),
-                                            },
-                                            
-                                            -- Plant name
-                                            New(scope, "TextLabel") {
-                                                Size = UDim2.new(1, -6, 0, 22),
-                                                Position = UDim2.new(0, 3, 0, 27),
-                                                BackgroundTransparency = 1,
-                                                Text = Computed(scope, function(use)
-                                                    local deck = use(currentDeck)
-                                                    if deck[i] then
-                                                        local name = deck[i]
-                                                        if #name > 9 then
-                                                            name = name:sub(1, 8) .. ".."
-                                                        end
-                                                        return name
-                                                    end
-                                                    return ""
-                                                end),
-                                                TextColor3 = Computed(scope, function(use)
-                                                    local deck = use(currentDeck)
-                                                    return if deck[i]
-                                                        then PvZTheme.Colors.TextDark
-                                                        else PvZTheme.Colors.Locked
-                                                end),
-                                                TextSize = 10,
-                                                Font = PvZTheme.Fonts.Button,
-                                                TextWrapped = true,
-                                            },
-                                        },
-                                    })
+                                        Mutations = Computed(scope, function(use)
+                                            local deck = use(currentDeck)
+                                            local plant = deck[i]
+                                            if plant and plantMutations then
+                                                local mutations = use(plantMutations)
+                                                return mutations[plant]
+                                            end
+                                            return nil
+                                        end),
+                                    }))
                                 end
                                 return slots
                             end)(),

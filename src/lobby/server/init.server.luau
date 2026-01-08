@@ -31,6 +31,7 @@ local LobbyService = require(script.services.LobbyService)
 -- Import modules
 local ShopHandler = require(script.modules.ShopHandler)
 local MutationHandler = require(script.modules.MutationHandler)
+local DevCommands = require(script.modules.DevCommands)
 
 -- Import Zap generated network module
 local ZapServer = require(script.network.generated)
@@ -50,6 +51,10 @@ Logger.Info("Lobby", "ShopHandler initialized")
 -- Initialize MutationHandler
 MutationHandler.Initialize()
 Logger.Info("Lobby", "MutationHandler initialized")
+
+-- Initialize DevCommands
+DevCommands.Initialize(PlayerDataService)
+Logger.Info("Lobby", "DevCommands initialized")
 
 -- Track players in lobby
 local playersInLobby: { [Player]: boolean } = {}
@@ -246,6 +251,44 @@ ZapServer.SaveDeck.SetCallback(function(player, data)
 		Logger.Info("Lobby", `{player.Name} deck saved`, {deckSize = #deckStrings})
 	else
 		Logger.Warn("Lobby", `Failed to save deck for {player.Name}`)
+	end
+end)
+
+-- Handle DevCommand request
+ZapServer.DevCommand.SetCallback(function(player, data)
+	local command = data.Command
+	local stringArg = data.StringArg
+	local numberArg = data.NumberArg
+	
+	Logger.Info("Lobby", `DevCommand received: command={command}, type={typeof(command)}`)
+	
+	local success, message = DevCommands.HandleCommand(player, command, stringArg, numberArg)
+	
+	-- Send response
+	ZapServer.DevCommandResponse.Fire(player, {
+		Success = success,
+		Message = message,
+	})
+	
+	-- If successful, sync player data
+	if success then
+		local profile = PlayerDataService.GetProfile(player)
+		if profile then
+			ZapServer.FullPlayerDataSync.Fire(player, {
+				Coins = profile.Data.Coins or 0,
+				Gems = profile.Data.Gems or 0,
+				Level = profile.Data.Level or 1,
+				XP = profile.Data.XP or 0,
+				TotalXPForNextLevel = profile.Data.TotalXPForNextLevel or 100,
+				GamesPlayed = profile.Data.GamesPlayed or 0,
+				GamesWon = profile.Data.GamesWon or 0,
+				ZombiesKilled = profile.Data.ZombiesKilled or 0,
+				PlantsPlaced = profile.Data.PlantsPlaced or 0,
+				UnlockedPlants = profile.Data.UnlockedPlants or {},
+				Deck = profile.Data.Deck or {},
+				PlantMutations = profile.Data.PlantMutations or {},
+			})
+		end
 	end
 end)
 

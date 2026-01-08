@@ -33,14 +33,22 @@ end
 
 -- Send full player data sync to a player
 function ShopHandler.SyncPlayerData(player: Player)
-    local coins = PlayerDataService.GetCoins(player)
-    local gems = PlayerDataService.GetGems(player)
-    local level = PlayerDataService.GetLevel(player)
-    local xp = PlayerDataService.GetXP(player)
-    local xpForNext = PlayerDataService.GetXPForNextLevel(player)
-    local stats = PlayerDataService.GetStats(player)
-    local unlockedPlants = PlayerDataService.GetUnlockedPlants(player)
+    -- Wait for profile to be loaded
+    local profile = PlayerDataService.WaitForProfile(player)
+    if not profile then
+        Logger.Warn("ShopHandler", `Profile not loaded for {player.Name}`)
+        return
+    end
+    
+    local coins = PlayerDataService.GetCoins(player) or 0
+    local gems = PlayerDataService.GetGems(player) or 0
+    local level = PlayerDataService.GetLevel(player) or 1
+    local xp = PlayerDataService.GetXP(player) or 0
+    local xpForNext = PlayerDataService.GetXPForNextLevel(player) or 100
+    local stats = PlayerDataService.GetStats(player) or {GamesPlayed = 0, GamesWon = 0, ZombiesKilled = 0, PlantsPlaced = 0}
+    local unlockedPlants = PlayerDataService.GetUnlockedPlants(player) or {}
     local deck = PlayerDataService.GetDeck(player) or {"Sunflower", "Peashooter", "WallNut"}
+    local mutations = PlayerDataService.GetAllPlantMutations(player) or {}
     
     Network.FullPlayerDataSync.Fire(player, {
         Coins = coins,
@@ -48,15 +56,16 @@ function ShopHandler.SyncPlayerData(player: Player)
         Level = level,
         XP = xp,
         TotalXPForNextLevel = xpForNext,
-        GamesPlayed = stats.GamesPlayed,
-        GamesWon = stats.GamesWon,
-        ZombiesKilled = stats.ZombiesKilled,
-        PlantsPlaced = stats.PlantsPlaced,
+        GamesPlayed = stats.GamesPlayed or 0,
+        GamesWon = stats.GamesWon or 0,
+        ZombiesKilled = stats.ZombiesKilled or 0,
+        PlantsPlaced = stats.PlantsPlaced or 0,
         UnlockedPlants = unlockedPlants,
         Deck = deck,
+        PlantMutations = mutations,
     })
     
-    Logger.Debug("ShopHandler", `Synced full player data to {player.Name}`)
+    Logger.Debug("ShopHandler", `Synced full player data to {player.Name}: {coins} coins, level {level}`)
 end
 
 -- Handle purchase request

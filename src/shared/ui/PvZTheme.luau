@@ -143,6 +143,58 @@ local PvZTheme = {
 }
 
 -- ============================================
+-- BACK BUTTON COMPONENT
+-- Standard back button for views
+-- ============================================
+function PvZTheme.BackButton(scope: any, onBack: () -> ()): TextButton
+    return New(scope, "TextButton") {
+        Name = "BackButton",
+        Size = UDim2.fromOffset(100, 40),
+        Position = UDim2.fromOffset(20, 20),
+        BackgroundColor3 = Colors.WoodDark,
+        
+        [Children] = {
+            New(scope, "UICorner") { CornerRadius = UDim.new(0, 8) },
+            New(scope, "UIStroke") { Color = Colors.WoodBorder, Thickness = 2 },
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Text = "← Back",
+                TextColor3 = Colors.TextLight,
+                TextSize = 18,
+                Font = Fonts.Bold,
+            },
+        },
+        
+        [Fusion.OnEvent("Activated")] = function()
+            if onBack then
+                onBack()
+            end
+        end,
+    }
+end
+
+-- ============================================
+-- HEADER COMPONENT
+-- Title header for views
+-- ============================================
+function PvZTheme.Header(scope: any, text: string): TextLabel
+    return New(scope, "TextLabel") {
+        Name = "Header",
+        Size = UDim2.new(1, 0, 0, 60),
+        Position = UDim2.new(0.5, 0, 0, 10),
+        AnchorPoint = Vector2.new(0.5, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Colors.TextLight,
+        TextSize = 36,
+        Font = Fonts.Title,
+        TextStrokeTransparency = 0.5,
+        TextStrokeColor3 = Colors.TextShadow,
+    }
+end
+
+-- ============================================
 -- WOOD PANEL COMPONENT
 -- Main container with wood texture feel
 -- ============================================

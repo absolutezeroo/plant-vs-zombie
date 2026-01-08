@@ -54,6 +54,7 @@ local PlayerDataService = {}
 
 local Store = ProfileStore.New("PlayerData_v1", PROFILE_TEMPLATE)
 local Profiles: { [Player]: any } = {}
+local ProfileLoadedCallbacks: { [Player]: {(any) -> ()} } = {}
 
 function PlayerDataService.Initialize()
     Logger.Info("LobbyPlayerData", "Initializing PlayerDataService for Lobby")
@@ -95,6 +96,15 @@ function PlayerDataService.LoadProfile(player: Player)
         if player.Parent == Players then
             Profiles[player] = profile
             Logger.Info("LobbyPlayerData", `Profile loaded for {player.Name}`)
+            
+            -- Fire any waiting callbacks
+            local callbacks = ProfileLoadedCallbacks[player]
+            if callbacks then
+                for _, callback in callbacks do
+                    task.spawn(callback, profile)
+                end
+                ProfileLoadedCallbacks[player] = nil
+            end
         else
             profile:EndSession()
         end
@@ -109,10 +119,52 @@ function PlayerDataService.ReleaseProfile(player: Player)
         profile:EndSession()
         Profiles[player] = nil
     end
+    
+    -- Clean up any pending callbacks
+    ProfileLoadedCallbacks[player] = nil
 end
 
 function PlayerDataService.GetProfile(player: Player)
     return Profiles[player]
+end
+
+--[[
+    Wait for a player's profile to be loaded.
+    Returns the profile once loaded, or nil if timeout/player left.
+]]
+function PlayerDataService.WaitForProfile(player: Player, timeout: number?): any
+    -- Already loaded?
+    local profile = Profiles[player]
+    if profile then
+        return profile
+    end
+    
+    -- Player already left?
+    if player.Parent ~= Players then
+        return nil
+    end
+    
+    local maxWait = timeout or 10
+    local loaded = false
+    local resultProfile = nil
+    
+    -- Register callback
+    if not ProfileLoadedCallbacks[player] then
+        ProfileLoadedCallbacks[player] = {}
+    end
+    table.insert(ProfileLoadedCallbacks[player], function(p)
+        resultProfile = p
+        loaded = true
+    end)
+    
+    -- Wait with timeout
+    local elapsed = 0
+    while not loaded and elapsed < maxWait and player.Parent == Players do
+        task.wait(0.1)
+        elapsed += 0.1
+    end
+    
+    return resultProfile
 end
 
 function PlayerDataService.GetData(player: Player)

@@ -70,6 +70,7 @@ type PlayerData = {
 
 local playerData = scope:Value(nil :: PlayerData?)
 local currentDeck = scope:Value({} :: {string})
+local plantMutations = scope:Value({} :: {[string]: {string}})
 
 -- ============================================
 -- NETWORK FUNCTIONS
@@ -153,6 +154,7 @@ Logger.Info("LobbyClient", "✅ ZoneInteractionController initialized")
 local hudGui = LobbyHUD(scope, {
     PlayerData = playerData,
     CurrentDeck = currentDeck,
+    PlantMutations = plantMutations,
 })
 hudGui.Parent = PlayerGui
 
@@ -179,21 +181,27 @@ ZapClient.FullPlayerDataSync.On(function(data)
     Logger.Info("LobbyClient", `Received player data: Level={data.Level}, Coins={data.Coins}`)
     
     local newData: PlayerData = {
-        Coins = data.Coins,
-        Gems = data.Gems,
-        Level = data.Level,
-        XP = data.XP,
-        TotalXPForNextLevel = data.TotalXPForNextLevel,
-        GamesPlayed = data.GamesPlayed,
-        GamesWon = data.GamesWon,
-        ZombiesKilled = data.ZombiesKilled,
-        PlantsPlaced = data.PlantsPlaced,
-        UnlockedPlants = data.UnlockedPlants,
-        Deck = data.Deck,
+        Coins = data.Coins or 0,
+        Gems = data.Gems or 0,
+        Level = data.Level or 1,
+        XP = data.XP or 0,
+        TotalXPForNextLevel = data.TotalXPForNextLevel or 100,
+        GamesPlayed = data.GamesPlayed or 0,
+        GamesWon = data.GamesWon or 0,
+        ZombiesKilled = data.ZombiesKilled or 0,
+        PlantsPlaced = data.PlantsPlaced or 0,
+        UnlockedPlants = data.UnlockedPlants or {},
+        Deck = data.Deck or {},
     }
     
     playerData:set(newData)
     currentDeck:set(data.Deck or {})
+    
+    -- Update mutations if provided
+    if data.PlantMutations then
+        plantMutations:set(data.PlantMutations)
+        ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
+    end
     
     -- Update ZoneInteractionController
     ZoneInteractionController.SetPlayerData(newData)
@@ -267,12 +275,18 @@ end)
 ZapClient.SyncPlantMutations.On(function(data)
     Logger.Info("LobbyClient", `Synced mutations for {data.PlantType}: {#data.Mutations}`)
     ZoneInteractionController.UpdatePlantMutations({[data.PlantType] = data.Mutations})
+    -- Update local state for LobbyHUD
+    local current = Fusion.peek(plantMutations)
+    current[data.PlantType] = data.Mutations
+    plantMutations:set(current)
 end)
 
 -- Listen for all mutations sync
 ZapClient.SyncAllMutations.On(function(data)
     Logger.Info("LobbyClient", "Synced all plant mutations")
     ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
+    -- Update local state for LobbyHUD
+    plantMutations:set(data.PlantMutations)
 end)
 
 -- Listen for battle results

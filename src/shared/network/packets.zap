@@ -221,6 +221,46 @@ event RemoveMutationRequest = {
 }
 
 -- ==========================
+-- DEV COMMANDS (Client -> Server)
+-- ==========================
+
+-- Dev command types
+type DevCommandType = enum {
+    GiveCoins,
+    GiveGems,
+    SetLevel,
+    UnlockAllPlants,
+    UnlockPlant,
+    AddMutation,
+    ResetData,
+    GiveXP,
+    MaxResources
+}
+
+-- Generic dev command request
+event DevCommand = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Command: DevCommandType,
+        StringArg: string.utf8(..50)?,
+        NumberArg: i32?,
+    }
+}
+
+-- Dev command response
+event DevCommandResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        Message: string.utf8(..200),
+    }
+}
+
+-- ==========================
 -- ARENA: SERVER -> CLIENT
 -- ==========================
 

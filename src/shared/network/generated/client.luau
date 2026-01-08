@@ -312,6 +312,12 @@ if not RunService:IsRunning() then
 		EntityDamaged = table.freeze({
 			On = noop
 		}),
+		DevCommandResponse = table.freeze({
+			On = noop
+		}),
+		DevCommand = table.freeze({
+			Fire = noop
+		}),
 		DeckSync = table.freeze({
 			SetCallback = noop
 		}),
@@ -343,14 +349,15 @@ assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to
 assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
 assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
 assert(unreliable[5]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_4 to be an UnreliableRemoteEvent")
+export type RequestId = (number)
+export type Column = (number)
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
+export type DevCommandType = ("GiveCoins" | "GiveGems" | "SetLevel" | "UnlockAllPlants" | "UnlockPlant" | "AddMutation" | "ResetData" | "GiveXP" | "MaxResources")
+export type MutationType = ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty")
+export type Lane = (number)
 export type EntityId = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
-export type MutationType = ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty")
-export type Column = (number)
-export type Lane = (number)
 export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
-export type RequestId = (number)
 
 local function SendEvents()
 	if outgoing_used ~= 0 then
@@ -368,101 +375,103 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(46)
-local reliable_event_queue: { [number]: { any } } = table.create(46)
+local reliable_events = table.create(47)
+local reliable_event_queue: { [number]: { any } } = table.create(47)
 local unreliable_events = table.create(5)
 local unreliable_event_queue: { [number]: { any } } = table.create(5)
-reliable_events[2] = {}
-reliable_event_queue[2] = {}
-unreliable_events[3] = {}
-unreliable_event_queue[3] = {}
-reliable_event_queue[20] = {}
-reliable_events[9] = {}
-reliable_event_queue[9] = {}
-reliable_events[10] = {}
-reliable_event_queue[10] = {}
-reliable_events[32] = {}
-reliable_event_queue[32] = {}
-reliable_events[27] = {}
-reliable_event_queue[27] = {}
-reliable_events[40] = {}
-reliable_event_queue[40] = {}
-reliable_events[33] = {}
-reliable_event_queue[33] = {}
-reliable_events[44] = {}
-reliable_event_queue[44] = {}
-reliable_events[45] = {}
-reliable_event_queue[45] = {}
-reliable_events[4] = {}
-reliable_event_queue[4] = {}
-unreliable_events[2] = {}
-unreliable_event_queue[2] = {}
-reliable_events[5] = {}
-reliable_event_queue[5] = {}
-reliable_events[6] = {}
-reliable_event_queue[6] = {}
-reliable_events[34] = {}
-reliable_event_queue[34] = {}
-reliable_events[0] = {}
-reliable_event_queue[0] = {}
-reliable_events[43] = {}
-reliable_event_queue[43] = {}
-reliable_events[39] = {}
-reliable_event_queue[39] = {}
-reliable_events[42] = {}
-reliable_event_queue[42] = {}
-unreliable_events[1] = {}
-unreliable_event_queue[1] = {}
-reliable_event_queue[28] = {}
-reliable_event_queue[13] = {}
-reliable_events[1] = {}
-reliable_event_queue[1] = {}
-reliable_events[17] = {}
-reliable_event_queue[17] = {}
-reliable_event_queue[19] = {}
-reliable_events[18] = {}
-reliable_event_queue[18] = {}
-reliable_events[35] = {}
-reliable_event_queue[35] = {}
-reliable_events[30] = {}
-reliable_event_queue[30] = {}
-unreliable_events[4] = {}
-unreliable_event_queue[4] = {}
-reliable_events[31] = {}
-reliable_event_queue[31] = {}
-reliable_events[29] = {}
-reliable_event_queue[29] = {}
-reliable_event_queue[21] = {}
-reliable_events[37] = {}
-reliable_event_queue[37] = {}
-reliable_events[36] = {}
-reliable_event_queue[36] = {}
-reliable_event_queue[22] = {}
-reliable_events[25] = {}
-reliable_event_queue[25] = {}
-reliable_events[11] = {}
-reliable_event_queue[11] = {}
-reliable_events[8] = {}
-reliable_event_queue[8] = {}
-reliable_event_queue[15] = {}
-reliable_event_queue[26] = {}
-reliable_event_queue[12] = {}
-reliable_events[41] = {}
-reliable_event_queue[41] = {}
-reliable_events[16] = {}
-reliable_event_queue[16] = {}
 reliable_events[3] = {}
 reliable_event_queue[3] = {}
-unreliable_events[0] = {}
-unreliable_event_queue[0] = {}
-reliable_event_queue[24] = {}
-reliable_event_queue[23] = {}
-reliable_events[38] = {}
-reliable_event_queue[38] = {}
-reliable_events[14] = {}
-reliable_event_queue[14] = {}
+unreliable_events[3] = {}
+unreliable_event_queue[3] = {}
+reliable_event_queue[21] = {}
+reliable_events[10] = {}
+reliable_event_queue[10] = {}
+reliable_events[11] = {}
+reliable_event_queue[11] = {}
+reliable_events[33] = {}
+reliable_event_queue[33] = {}
+reliable_events[28] = {}
+reliable_event_queue[28] = {}
+reliable_events[41] = {}
+reliable_event_queue[41] = {}
+reliable_events[34] = {}
+reliable_event_queue[34] = {}
+reliable_events[45] = {}
+reliable_event_queue[45] = {}
+reliable_events[46] = {}
+reliable_event_queue[46] = {}
+reliable_events[5] = {}
+reliable_event_queue[5] = {}
+unreliable_events[2] = {}
+unreliable_event_queue[2] = {}
+reliable_events[6] = {}
+reliable_event_queue[6] = {}
 reliable_events[7] = {}
 reliable_event_queue[7] = {}
+reliable_events[35] = {}
+reliable_event_queue[35] = {}
+reliable_events[1] = {}
+reliable_event_queue[1] = {}
+reliable_events[44] = {}
+reliable_event_queue[44] = {}
+reliable_events[40] = {}
+reliable_event_queue[40] = {}
+reliable_events[43] = {}
+reliable_event_queue[43] = {}
+unreliable_events[1] = {}
+unreliable_event_queue[1] = {}
+reliable_event_queue[29] = {}
+reliable_event_queue[14] = {}
+reliable_events[2] = {}
+reliable_event_queue[2] = {}
+reliable_events[18] = {}
+reliable_event_queue[18] = {}
+reliable_event_queue[20] = {}
+reliable_events[19] = {}
+reliable_event_queue[19] = {}
+reliable_events[36] = {}
+reliable_event_queue[36] = {}
+reliable_events[31] = {}
+reliable_event_queue[31] = {}
+unreliable_events[4] = {}
+unreliable_event_queue[4] = {}
+reliable_events[32] = {}
+reliable_event_queue[32] = {}
+reliable_events[30] = {}
+reliable_event_queue[30] = {}
+reliable_event_queue[22] = {}
+reliable_events[38] = {}
+reliable_event_queue[38] = {}
+reliable_events[37] = {}
+reliable_event_queue[37] = {}
+reliable_event_queue[23] = {}
+reliable_events[26] = {}
+reliable_event_queue[26] = {}
+reliable_events[12] = {}
+reliable_event_queue[12] = {}
+reliable_events[9] = {}
+reliable_event_queue[9] = {}
+reliable_event_queue[16] = {}
+reliable_event_queue[27] = {}
+reliable_event_queue[13] = {}
+reliable_events[42] = {}
+reliable_event_queue[42] = {}
+reliable_events[17] = {}
+reliable_event_queue[17] = {}
+reliable_events[4] = {}
+reliable_event_queue[4] = {}
+unreliable_events[0] = {}
+unreliable_event_queue[0] = {}
+reliable_events[0] = {}
+reliable_event_queue[0] = {}
+reliable_event_queue[25] = {}
+reliable_event_queue[24] = {}
+reliable_events[39] = {}
+reliable_event_queue[39] = {}
+reliable_events[15] = {}
+reliable_event_queue[15] = {}
+reliable_events[8] = {}
+reliable_event_queue[8] = {}
 reliable.OnClientEvent:Connect(function(buff, inst)
 	incoming_buff = buff
 	incoming_inst = inst
@@ -471,7 +480,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 	local len = buffer.len(buff)
 	while incoming_read < len do
 		local id = buffer.readu8(buff, read(1))
-		if id == 2 then -- ZombieSpawned
+		if id == 3 then -- ZombieSpawned
 			local value
 			local bool_1 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -497,52 +506,36 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			assert(value["Lane"] >= 1, "value is less than 1!")
 			assert(value["Lane"] <= 5, "value is more than 5!")
 			value["PositionX"] = buffer.readf32(incoming_buff, read(4))
-			if reliable_events[2][1] then
-				for _, cb in reliable_events[2] do
+			if reliable_events[3][1] then
+				for _, cb in reliable_events[3] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[2], value)
-				if #reliable_event_queue[2] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[2]} events in queue for ZombieSpawned. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[3], value)
+				if #reliable_event_queue[3] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[3]} events in queue for ZombieSpawned. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 20 then -- XPGained
+		elseif id == 21 then -- XPGained
 			local value
 			value = {  }
 			value["Amount"] = buffer.readu16(incoming_buff, read(2))
 			value["TotalXP"] = buffer.readu32(incoming_buff, read(4))
 			value["CurrentLevel"] = buffer.readu8(incoming_buff, read(1))
 			value["LevelProgress"] = buffer.readf32(incoming_buff, read(4))
-			if reliable_events[20] then
-				task.spawn(reliable_events[20], value)
+			if reliable_events[21] then
+				task.spawn(reliable_events[21], value)
 			else
-				table.insert(reliable_event_queue[20], value)
-				if #reliable_event_queue[20] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[20]} events in queue for XPGained. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[21], value)
+				if #reliable_event_queue[21] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[21]} events in queue for XPGained. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 9 then -- WaveStarted
+		elseif id == 10 then -- WaveStarted
 			local value
 			value = {  }
 			value["WaveNumber"] = buffer.readu8(incoming_buff, read(1))
 			value["ZombieCount"] = buffer.readu16(incoming_buff, read(2))
-			if reliable_events[9][1] then
-				for _, cb in reliable_events[9] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[9], value)
-				if #reliable_event_queue[9] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[9]} events in queue for WaveStarted. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 10 then -- WaveCompleted
-			local value
-			local bool_2 = buffer.readu8(incoming_buff, read(1))
-			value = {  }
-			value["WaveNumber"] = buffer.readu8(incoming_buff, read(1))
-			value["Survived"] = bit32.btest(bool_2, 0b0000000000000001)
 			if reliable_events[10][1] then
 				for _, cb in reliable_events[10] do
 					task.spawn(cb, value)
@@ -550,10 +543,26 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				table.insert(reliable_event_queue[10], value)
 				if #reliable_event_queue[10] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[10]} events in queue for WaveCompleted. Did you forget to attach a listener?`)
+					warn(`[ZAP] {#reliable_event_queue[10]} events in queue for WaveStarted. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 32 then -- TeleportToArenaResponse
+		elseif id == 11 then -- WaveCompleted
+			local value
+			local bool_2 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			value["WaveNumber"] = buffer.readu8(incoming_buff, read(1))
+			value["Survived"] = bit32.btest(bool_2, 0b0000000000000001)
+			if reliable_events[11][1] then
+				for _, cb in reliable_events[11] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[11], value)
+				if #reliable_event_queue[11] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[11]} events in queue for WaveCompleted. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 33 then -- TeleportToArenaResponse
 			local value
 			local bool_3 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -571,31 +580,31 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["ErrorMessage"] = nil
 			end
-			if reliable_events[32][1] then
-				for _, cb in reliable_events[32] do
+			if reliable_events[33][1] then
+				for _, cb in reliable_events[33] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[32], value)
-				if #reliable_event_queue[32] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[32]} events in queue for TeleportToArenaResponse. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[33], value)
+				if #reliable_event_queue[33] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[33]} events in queue for TeleportToArenaResponse. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 27 then -- TeleportCountdown
+		elseif id == 28 then -- TeleportCountdown
 			local value
 			value = {  }
 			value["TimeRemaining"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[27][1] then
-				for _, cb in reliable_events[27] do
+			if reliable_events[28][1] then
+				for _, cb in reliable_events[28] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[27], value)
-				if #reliable_event_queue[27] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[27]} events in queue for TeleportCountdown. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[28], value)
+				if #reliable_event_queue[28] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[28]} events in queue for TeleportCountdown. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 40 then -- SyncUnlockedPlants
+		elseif id == 41 then -- SyncUnlockedPlants
 			local value
 			value = {  }
 			local len_2 = buffer.readu8(incoming_buff, read(1))
@@ -704,34 +713,34 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["UnlockedPlants"][i_1] = val_1
 			end
-			if reliable_events[40][1] then
-				for _, cb in reliable_events[40] do
+			if reliable_events[41][1] then
+				for _, cb in reliable_events[41] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[40], value)
-				if #reliable_event_queue[40] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[40]} events in queue for SyncUnlockedPlants. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[41], value)
+				if #reliable_event_queue[41] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[41]} events in queue for SyncUnlockedPlants. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 33 then -- SyncPlayerData
+		elseif id == 34 then -- SyncPlayerData
 			local value
 			value = {  }
 			value["Coins"] = buffer.readu32(incoming_buff, read(4))
 			value["Gems"] = buffer.readu32(incoming_buff, read(4))
 			value["Level"] = buffer.readu8(incoming_buff, read(1))
 			value["XP"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[33][1] then
-				for _, cb in reliable_events[33] do
+			if reliable_events[34][1] then
+				for _, cb in reliable_events[34] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[33], value)
-				if #reliable_event_queue[33] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[33]} events in queue for SyncPlayerData. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[34], value)
+				if #reliable_event_queue[34] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[34]} events in queue for SyncPlayerData. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 44 then -- SyncPlantMutations
+		elseif id == 45 then -- SyncPlantMutations
 			local value
 			value = {  }
 			local variant_2 = buffer.readu8(incoming_buff, read(1))
@@ -878,17 +887,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["Mutations"][i_2] = val_2
 			end
-			if reliable_events[44][1] then
-				for _, cb in reliable_events[44] do
+			if reliable_events[45][1] then
+				for _, cb in reliable_events[45] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[44], value)
-				if #reliable_event_queue[44] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[44]} events in queue for SyncPlantMutations. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[45], value)
+				if #reliable_event_queue[45] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[45]} events in queue for SyncPlantMutations. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 45 then -- SyncAllMutations
+		elseif id == 46 then -- SyncAllMutations
 			local value
 			value = {  }
 			local len_4 = buffer.readu8(incoming_buff, read(1))
@@ -1044,17 +1053,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["PlantMutations"][i_3] = val_3
 			end
-			if reliable_events[45][1] then
-				for _, cb in reliable_events[45] do
+			if reliable_events[46][1] then
+				for _, cb in reliable_events[46] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[45], value)
-				if #reliable_event_queue[45] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[45]} events in queue for SyncAllMutations. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[46], value)
+				if #reliable_event_queue[46] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[46]} events in queue for SyncAllMutations. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 4 then -- SunSpawned
+		elseif id == 5 then -- SunSpawned
 			local value
 			value = {  }
 			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
@@ -1063,20 +1072,6 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["PositionZ"] = buffer.readf32(incoming_buff, read(4))
 			value["Value"] = buffer.readu8(incoming_buff, read(1))
 			value["TargetY"] = buffer.readf32(incoming_buff, read(4))
-			if reliable_events[4][1] then
-				for _, cb in reliable_events[4] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[4], value)
-				if #reliable_event_queue[4] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[4]} events in queue for SunSpawned. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 5 then -- SunDespawned
-			local value
-			value = {  }
-			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 			if reliable_events[5][1] then
 				for _, cb in reliable_events[5] do
 					task.spawn(cb, value)
@@ -1084,15 +1079,13 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				table.insert(reliable_event_queue[5], value)
 				if #reliable_event_queue[5] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[5]} events in queue for SunDespawned. Did you forget to attach a listener?`)
+					warn(`[ZAP] {#reliable_event_queue[5]} events in queue for SunSpawned. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 6 then -- SunCollected
+		elseif id == 6 then -- SunDespawned
 			local value
 			value = {  }
-			value["SunEntityId"] = buffer.readu32(incoming_buff, read(4))
-			value["CollectorId"] = buffer.readf64(incoming_buff, read(8))
-			value["NewTotal"] = buffer.readu16(incoming_buff, read(2))
+			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 			if reliable_events[6][1] then
 				for _, cb in reliable_events[6] do
 					task.spawn(cb, value)
@@ -1100,10 +1093,26 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				table.insert(reliable_event_queue[6], value)
 				if #reliable_event_queue[6] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[6]} events in queue for SunCollected. Did you forget to attach a listener?`)
+					warn(`[ZAP] {#reliable_event_queue[6]} events in queue for SunDespawned. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 34 then -- ShowResults
+		elseif id == 7 then -- SunCollected
+			local value
+			value = {  }
+			value["SunEntityId"] = buffer.readu32(incoming_buff, read(4))
+			value["CollectorId"] = buffer.readf64(incoming_buff, read(8))
+			value["NewTotal"] = buffer.readu16(incoming_buff, read(2))
+			if reliable_events[7][1] then
+				for _, cb in reliable_events[7] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[7], value)
+				if #reliable_event_queue[7] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[7]} events in queue for SunCollected. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 35 then -- ShowResults
 			local value
 			local bool_4 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -1119,17 +1128,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["Stars"] = buffer.readu8(incoming_buff, read(1))
 			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
 			value["XPEarned"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[34][1] then
-				for _, cb in reliable_events[34] do
+			if reliable_events[35][1] then
+				for _, cb in reliable_events[35] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[34], value)
-				if #reliable_event_queue[34] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[34]} events in queue for ShowResults. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[35], value)
+				if #reliable_event_queue[35] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[35]} events in queue for ShowResults. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 0 then -- RequestResponse
+		elseif id == 1 then -- RequestResponse
 			local value
 			local bool_5 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -1140,17 +1149,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["ErrorCode"] = nil
 			end
-			if reliable_events[0][1] then
-				for _, cb in reliable_events[0] do
+			if reliable_events[1][1] then
+				for _, cb in reliable_events[1] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[0], value)
-				if #reliable_event_queue[0] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[0]} events in queue for RequestResponse. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[1], value)
+				if #reliable_event_queue[1] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[1]} events in queue for RequestResponse. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 43 then -- RemoveMutationResponse
+		elseif id == 44 then -- RemoveMutationResponse
 			local value
 			local bool_6 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -1291,17 +1300,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			elseif variant_7 == 17 then
 				value["MutationType"] = "Hasty"
 			end
-			if reliable_events[43][1] then
-				for _, cb in reliable_events[43] do
+			if reliable_events[44][1] then
+				for _, cb in reliable_events[44] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[43], value)
-				if #reliable_event_queue[43] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[43]} events in queue for RemoveMutationResponse. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[44], value)
+				if #reliable_event_queue[44] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[44]} events in queue for RemoveMutationResponse. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 39 then -- PurchasePlantResponse
+		elseif id == 40 then -- PurchasePlantResponse
 			local value
 			local bool_7 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -1414,17 +1423,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["NewCoins"] = nil
 			end
-			if reliable_events[39][1] then
-				for _, cb in reliable_events[39] do
+			if reliable_events[40][1] then
+				for _, cb in reliable_events[40] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[39], value)
-				if #reliable_event_queue[39] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[39]} events in queue for PurchasePlantResponse. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[40], value)
+				if #reliable_event_queue[40] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[40]} events in queue for PurchasePlantResponse. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 42 then -- PurchaseMutationResponse
+		elseif id == 43 then -- PurchaseMutationResponse
 			local value
 			local bool_8 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -1575,17 +1584,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["NewCoins"] = nil
 			end
-			if reliable_events[42][1] then
-				for _, cb in reliable_events[42] do
+			if reliable_events[43][1] then
+				for _, cb in reliable_events[43] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[42], value)
-				if #reliable_event_queue[42] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[42]} events in queue for PurchaseMutationResponse. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[43], value)
+				if #reliable_event_queue[43] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[43]} events in queue for PurchaseMutationResponse. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 28 then -- ProgressionSync
+		elseif id == 29 then -- ProgressionSync
 			local value
 			value = {  }
 			value["Level"] = buffer.readu16(incoming_buff, read(2))
@@ -1610,15 +1619,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				assert(utf8.len(val_6) ~= nil, "value is not valid utf-8")
 				value["OwnedSkins"][i_6] = val_6
 			end
-			if reliable_events[28] then
-				task.spawn(reliable_events[28], value)
+			if reliable_events[29] then
+				task.spawn(reliable_events[29], value)
 			else
-				table.insert(reliable_event_queue[28], value)
-				if #reliable_event_queue[28] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[28]} events in queue for ProgressionSync. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[29], value)
+				if #reliable_event_queue[29] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[29]} events in queue for ProgressionSync. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 13 then -- PlayerDataSync
+		elseif id == 14 then -- PlayerDataSync
 			local value
 			value = {  }
 			value["Coins"] = buffer.readu32(incoming_buff, read(4))
@@ -1731,15 +1740,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["UnlockedPlants"][i_7] = val_7
 			end
-			if reliable_events[13] then
-				task.spawn(reliable_events[13], value)
+			if reliable_events[14] then
+				task.spawn(reliable_events[14], value)
 			else
-				table.insert(reliable_event_queue[13], value)
-				if #reliable_event_queue[13] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[13]} events in queue for PlayerDataSync. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[14], value)
+				if #reliable_event_queue[14] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[14]} events in queue for PlayerDataSync. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 1 then -- PlantSpawned
+		elseif id == 2 then -- PlantSpawned
 			local value
 			value = {  }
 			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
@@ -1848,45 +1857,45 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			assert(value["Column"] >= 1, "value is less than 1!")
 			assert(value["Column"] <= 9, "value is more than 9!")
 			value["OwnerId"] = buffer.readf64(incoming_buff, read(8))
-			if reliable_events[1][1] then
-				for _, cb in reliable_events[1] do
+			if reliable_events[2][1] then
+				for _, cb in reliable_events[2] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[1], value)
-				if #reliable_event_queue[1] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[1]} events in queue for PlantSpawned. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[2], value)
+				if #reliable_event_queue[2] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[2]} events in queue for PlantSpawned. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 17 then -- PlantFoodCollected
+		elseif id == 18 then -- PlantFoodCollected
 			local value
 			value = {  }
 			value["CollectorId"] = buffer.readf64(incoming_buff, read(8))
 			value["NewChargeCount"] = buffer.readu8(incoming_buff, read(1))
 			value["ZombieEntityId"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[17][1] then
-				for _, cb in reliable_events[17] do
+			if reliable_events[18][1] then
+				for _, cb in reliable_events[18] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[17], value)
-				if #reliable_event_queue[17] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[17]} events in queue for PlantFoodCollected. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[18], value)
+				if #reliable_event_queue[18] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[18]} events in queue for PlantFoodCollected. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 19 then -- PlantFoodChargeUpdate
+		elseif id == 20 then -- PlantFoodChargeUpdate
 			local value
 			value = {  }
 			value["ChargeCount"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[19] then
-				task.spawn(reliable_events[19], value)
+			if reliable_events[20] then
+				task.spawn(reliable_events[20], value)
 			else
-				table.insert(reliable_event_queue[19], value)
-				if #reliable_event_queue[19] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[19]} events in queue for PlantFoodChargeUpdate. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[20], value)
+				if #reliable_event_queue[20] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[20]} events in queue for PlantFoodChargeUpdate. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 18 then -- PlantFoodActivated
+		elseif id == 19 then -- PlantFoodActivated
 			local value
 			value = {  }
 			value["PlantEntityId"] = buffer.readu32(incoming_buff, read(4))
@@ -1989,17 +1998,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				value["PlantType"] = "ExplodeONut"
 			end
 			value["OwnerId"] = buffer.readf64(incoming_buff, read(8))
-			if reliable_events[18][1] then
-				for _, cb in reliable_events[18] do
+			if reliable_events[19][1] then
+				for _, cb in reliable_events[19] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[18], value)
-				if #reliable_event_queue[18] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[18]} events in queue for PlantFoodActivated. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[19], value)
+				if #reliable_event_queue[19] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[19]} events in queue for PlantFoodActivated. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 35 then -- PadStateUpdate
+		elseif id == 36 then -- PadStateUpdate
 			local value
 			local bool_9 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -2030,41 +2039,23 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["PlayerNames"] = nil
 			end
-			if reliable_events[35][1] then
-				for _, cb in reliable_events[35] do
+			if reliable_events[36][1] then
+				for _, cb in reliable_events[36] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[35], value)
-				if #reliable_event_queue[35] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[35]} events in queue for PadStateUpdate. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[36], value)
+				if #reliable_event_queue[36] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[36]} events in queue for PadStateUpdate. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 30 then -- MapLoadingStarted
+		elseif id == 31 then -- MapLoadingStarted
 			local value
 			value = {  }
 			local len_17 = buffer.readu16(incoming_buff, read(2))
 			value["MapId"] = buffer.readstring(incoming_buff, read(len_17), len_17)
 			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
 			value["TotalAssets"] = buffer.readu16(incoming_buff, read(2))
-			if reliable_events[30][1] then
-				for _, cb in reliable_events[30] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[30], value)
-				if #reliable_event_queue[30] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[30]} events in queue for MapLoadingStarted. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 31 then -- MapLoadingComplete
-			local value
-			local bool_10 = buffer.readu8(incoming_buff, read(1))
-			value = {  }
-			local len_18 = buffer.readu16(incoming_buff, read(2))
-			value["MapId"] = buffer.readstring(incoming_buff, read(len_18), len_18)
-			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
-			value["Success"] = bit32.btest(bool_10, 0b0000000000000001)
 			if reliable_events[31][1] then
 				for _, cb in reliable_events[31] do
 					task.spawn(cb, value)
@@ -2072,10 +2063,28 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				table.insert(reliable_event_queue[31], value)
 				if #reliable_event_queue[31] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[31]} events in queue for MapLoadingComplete. Did you forget to attach a listener?`)
+					warn(`[ZAP] {#reliable_event_queue[31]} events in queue for MapLoadingStarted. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 29 then -- MapConfigSync
+		elseif id == 32 then -- MapLoadingComplete
+			local value
+			local bool_10 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			local len_18 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_18), len_18)
+			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
+			value["Success"] = bit32.btest(bool_10, 0b0000000000000001)
+			if reliable_events[32][1] then
+				for _, cb in reliable_events[32] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[32], value)
+				if #reliable_event_queue[32] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[32]} events in queue for MapLoadingComplete. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 30 then -- MapConfigSync
 			local value
 			value = {  }
 			local len_19 = buffer.readu16(incoming_buff, read(2))
@@ -2095,17 +2104,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["BasePositionZ"] = buffer.readf32(incoming_buff, read(4))
 			value["ZombieDirectionX"] = buffer.readf32(incoming_buff, read(4))
 			value["ZombieDirectionZ"] = buffer.readf32(incoming_buff, read(4))
-			if reliable_events[29][1] then
-				for _, cb in reliable_events[29] do
+			if reliable_events[30][1] then
+				for _, cb in reliable_events[30] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[29], value)
-				if #reliable_event_queue[29] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[29]} events in queue for MapConfigSync. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[30], value)
+				if #reliable_event_queue[30] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[30]} events in queue for MapConfigSync. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 21 then -- LevelUp
+		elseif id == 22 then -- LevelUp
 			local value
 			local bool_11 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -2222,28 +2231,28 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["UnlockedPlant"] = nil
 			end
-			if reliable_events[21] then
-				task.spawn(reliable_events[21], value)
+			if reliable_events[22] then
+				task.spawn(reliable_events[22], value)
 			else
-				table.insert(reliable_event_queue[21], value)
-				if #reliable_event_queue[21] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[21]} events in queue for LevelUp. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[22], value)
+				if #reliable_event_queue[22] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[22]} events in queue for LevelUp. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 37 then -- LeftPad
+		elseif id == 38 then -- LeftPad
 			local value
 			value = {  }
-			if reliable_events[37][1] then
-				for _, cb in reliable_events[37] do
+			if reliable_events[38][1] then
+				for _, cb in reliable_events[38] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[37], value)
-				if #reliable_event_queue[37] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[37]} events in queue for LeftPad. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[38], value)
+				if #reliable_event_queue[38] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[38]} events in queue for LeftPad. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 36 then -- JoinedPad
+		elseif id == 37 then -- JoinedPad
 			local value
 			value = {  }
 			local len_20 = buffer.readu16(incoming_buff, read(2))
@@ -2259,31 +2268,31 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_22), len_22)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			value["Position"] = Vector3.new(buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)))
-			if reliable_events[36][1] then
-				for _, cb in reliable_events[36] do
+			if reliable_events[37][1] then
+				for _, cb in reliable_events[37] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[36], value)
-				if #reliable_event_queue[36] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[36]} events in queue for JoinedPad. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[37], value)
+				if #reliable_event_queue[37] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[37]} events in queue for JoinedPad. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 22 then -- GemsEarned
+		elseif id == 23 then -- GemsEarned
 			local value
 			value = {  }
 			value["Amount"] = buffer.readu8(incoming_buff, read(1))
 			value["TotalGems"] = buffer.readu32(incoming_buff, read(4))
 			value["Reason"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[22] then
-				task.spawn(reliable_events[22], value)
+			if reliable_events[23] then
+				task.spawn(reliable_events[23], value)
 			else
-				table.insert(reliable_event_queue[22], value)
-				if #reliable_event_queue[22] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[22]} events in queue for GemsEarned. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[23], value)
+				if #reliable_event_queue[23] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[23]} events in queue for GemsEarned. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 25 then -- GameStarted
+		elseif id == 26 then -- GameStarted
 			local value
 			value = {  }
 			local len_23 = buffer.readu16(incoming_buff, read(2))
@@ -2293,17 +2302,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_24), len_24)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			value["WaveCount"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[25][1] then
-				for _, cb in reliable_events[25] do
+			if reliable_events[26][1] then
+				for _, cb in reliable_events[26] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[25], value)
-				if #reliable_event_queue[25] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[25]} events in queue for GameStarted. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[26], value)
+				if #reliable_event_queue[26] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[26]} events in queue for GameStarted. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 11 then -- GamePhaseChanged
+		elseif id == 12 then -- GamePhaseChanged
 			local value
 			local bool_12 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -2316,33 +2325,33 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			elseif bit32.btest(bool_12, 0b0000000000001000) then
 				value["Phase"] = "GameOver"
 			end
-			if reliable_events[11][1] then
-				for _, cb in reliable_events[11] do
+			if reliable_events[12][1] then
+				for _, cb in reliable_events[12] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[11], value)
-				if #reliable_event_queue[11] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[11]} events in queue for GamePhaseChanged. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[12], value)
+				if #reliable_event_queue[12] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[12]} events in queue for GamePhaseChanged. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 8 then -- GameOver
+		elseif id == 9 then -- GameOver
 			local value
 			local bool_13 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["Victory"] = bit32.btest(bool_13, 0b0000000000000001)
 			value["WaveReached"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[8][1] then
-				for _, cb in reliable_events[8] do
+			if reliable_events[9][1] then
+				for _, cb in reliable_events[9] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[8], value)
-				if #reliable_event_queue[8] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[8]} events in queue for GameOver. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[9], value)
+				if #reliable_event_queue[9] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[9]} events in queue for GameOver. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 15 then -- GameEndRewards
+		elseif id == 16 then -- GameEndRewards
 			local value
 			local bool_14 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -2356,15 +2365,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["GemsEarned"] = buffer.readu8(incoming_buff, read(1))
 			value["NewLevel"] = buffer.readu8(incoming_buff, read(1))
 			value["LevelsGained"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[15] then
-				task.spawn(reliable_events[15], value)
+			if reliable_events[16] then
+				task.spawn(reliable_events[16], value)
 			else
-				table.insert(reliable_event_queue[15], value)
-				if #reliable_event_queue[15] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[15]} events in queue for GameEndRewards. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[16], value)
+				if #reliable_event_queue[16] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[16]} events in queue for GameEndRewards. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 26 then -- GameComplete
+		elseif id == 27 then -- GameComplete
 			local value
 			local bool_15 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -2378,15 +2387,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["WavesSurvived"] = buffer.readu8(incoming_buff, read(1))
 			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
 			value["XPEarned"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[26] then
-				task.spawn(reliable_events[26], value)
+			if reliable_events[27] then
+				task.spawn(reliable_events[27], value)
 			else
-				table.insert(reliable_event_queue[26], value)
-				if #reliable_event_queue[26] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[26]} events in queue for GameComplete. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[27], value)
+				if #reliable_event_queue[27] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[27]} events in queue for GameComplete. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 12 then -- FullStateSync
+		elseif id == 13 then -- FullStateSync
 			local value
 			local bool_16 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
@@ -2401,15 +2410,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			elseif bit32.btest(bool_16, 0b0000000000001000) then
 				value["Phase"] = "GameOver"
 			end
-			if reliable_events[12] then
-				task.spawn(reliable_events[12], value)
+			if reliable_events[13] then
+				task.spawn(reliable_events[13], value)
 			else
-				table.insert(reliable_event_queue[12], value)
-				if #reliable_event_queue[12] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[12]} events in queue for FullStateSync. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[13], value)
+				if #reliable_event_queue[13] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[13]} events in queue for FullStateSync. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 41 then -- FullPlayerDataSync
+		elseif id == 42 then -- FullPlayerDataSync
 			local value
 			value = {  }
 			value["Coins"] = buffer.readu32(incoming_buff, read(4))
@@ -2633,52 +2642,71 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["Deck"][i_9] = val_9
 			end
-			if reliable_events[41][1] then
-				for _, cb in reliable_events[41] do
+			if reliable_events[42][1] then
+				for _, cb in reliable_events[42] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[41], value)
-				if #reliable_event_queue[41] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[41]} events in queue for FullPlayerDataSync. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[42], value)
+				if #reliable_event_queue[42] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[42]} events in queue for FullPlayerDataSync. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 16 then -- ExplosionVFX
+		elseif id == 17 then -- ExplosionVFX
 			local value
 			value = {  }
 			value["PositionX"] = buffer.readf32(incoming_buff, read(4))
 			value["PositionY"] = buffer.readf32(incoming_buff, read(4))
 			value["PositionZ"] = buffer.readf32(incoming_buff, read(4))
 			value["Radius"] = buffer.readf32(incoming_buff, read(4))
-			if reliable_events[16][1] then
-				for _, cb in reliable_events[16] do
+			if reliable_events[17][1] then
+				for _, cb in reliable_events[17] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[16], value)
-				if #reliable_event_queue[16] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[16]} events in queue for ExplosionVFX. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[17], value)
+				if #reliable_event_queue[17] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[17]} events in queue for ExplosionVFX. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 3 then -- EntityDied
+		elseif id == 4 then -- EntityDied
 			local value
 			value = {  }
 			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[3][1] then
-				for _, cb in reliable_events[3] do
+			if reliable_events[4][1] then
+				for _, cb in reliable_events[4] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[3], value)
-				if #reliable_event_queue[3] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[3]} events in queue for EntityDied. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[4], value)
+				if #reliable_event_queue[4] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[4]} events in queue for EntityDied. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 24 then -- DeckSync
+		elseif id == 0 then -- DevCommandResponse
 			local value
 			local bool_17 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			if bit32.btest(bool_17, 0b0000000000000001) then
+			value["Success"] = bit32.btest(bool_17, 0b0000000000000001)
+			local len_29 = buffer.readu16(incoming_buff, read(2))
+			assert(len_29 <= 800, "value is more than 800!")
+			value["Message"] = buffer.readstring(incoming_buff, read(len_29), len_29)
+			assert(utf8.len(value["Message"]) ~= nil, "value is not valid utf-8")
+			if reliable_events[0][1] then
+				for _, cb in reliable_events[0] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[0], value)
+				if #reliable_event_queue[0] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[0]} events in queue for DevCommandResponse. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 25 then -- DeckSync
+			local value
+			local bool_18 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			if bit32.btest(bool_18, 0b0000000000000001) then
 				local variant_17 = buffer.readu8(incoming_buff, read(1))
 				if variant_17 == 0 then
 					value["Slot1"] = "Sunflower"
@@ -2780,7 +2808,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot1"] = nil
 			end
-			if bit32.btest(bool_17, 0b0000000000000010) then
+			if bit32.btest(bool_18, 0b0000000000000010) then
 				local variant_18 = buffer.readu8(incoming_buff, read(1))
 				if variant_18 == 0 then
 					value["Slot2"] = "Sunflower"
@@ -2882,7 +2910,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot2"] = nil
 			end
-			if bit32.btest(bool_17, 0b0000000000000100) then
+			if bit32.btest(bool_18, 0b0000000000000100) then
 				local variant_19 = buffer.readu8(incoming_buff, read(1))
 				if variant_19 == 0 then
 					value["Slot3"] = "Sunflower"
@@ -2984,7 +3012,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot3"] = nil
 			end
-			if bit32.btest(bool_17, 0b0000000000001000) then
+			if bit32.btest(bool_18, 0b0000000000001000) then
 				local variant_20 = buffer.readu8(incoming_buff, read(1))
 				if variant_20 == 0 then
 					value["Slot4"] = "Sunflower"
@@ -3086,7 +3114,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot4"] = nil
 			end
-			if bit32.btest(bool_17, 0b0000000000010000) then
+			if bit32.btest(bool_18, 0b0000000000010000) then
 				local variant_21 = buffer.readu8(incoming_buff, read(1))
 				if variant_21 == 0 then
 					value["Slot5"] = "Sunflower"
@@ -3188,7 +3216,7 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot5"] = nil
 			end
-			if bit32.btest(bool_17, 0b0000000000100000) then
+			if bit32.btest(bool_18, 0b0000000000100000) then
 				local variant_22 = buffer.readu8(incoming_buff, read(1))
 				if variant_22 == 0 then
 					value["Slot6"] = "Sunflower"
@@ -3290,42 +3318,42 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			else
 				value["Slot6"] = nil
 			end
+			if reliable_events[25] then
+				task.spawn(reliable_events[25], value)
+			else
+				table.insert(reliable_event_queue[25], value)
+				if #reliable_event_queue[25] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[25]} events in queue for DeckSync. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 24 then -- DeckSaved
+			local value
+			local bool_19 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			value["Success"] = bit32.btest(bool_19, 0b0000000000000001)
+			if bit32.btest(bool_19, 0b0000000000000010) then
+				local len_30 = buffer.readu16(incoming_buff, read(2))
+				value["Error"] = buffer.readstring(incoming_buff, read(len_30), len_30)
+				assert(utf8.len(value["Error"]) ~= nil, "value is not valid utf-8")
+			else
+				value["Error"] = nil
+			end
 			if reliable_events[24] then
 				task.spawn(reliable_events[24], value)
 			else
 				table.insert(reliable_event_queue[24], value)
 				if #reliable_event_queue[24] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[24]} events in queue for DeckSync. Did you forget to attach a listener?`)
+					warn(`[ZAP] {#reliable_event_queue[24]} events in queue for DeckSaved. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 23 then -- DeckSaved
-			local value
-			local bool_18 = buffer.readu8(incoming_buff, read(1))
-			value = {  }
-			value["Success"] = bit32.btest(bool_18, 0b0000000000000001)
-			if bit32.btest(bool_18, 0b0000000000000010) then
-				local len_29 = buffer.readu16(incoming_buff, read(2))
-				value["Error"] = buffer.readstring(incoming_buff, read(len_29), len_29)
-				assert(utf8.len(value["Error"]) ~= nil, "value is not valid utf-8")
-			else
-				value["Error"] = nil
-			end
-			if reliable_events[23] then
-				task.spawn(reliable_events[23], value)
-			else
-				table.insert(reliable_event_queue[23], value)
-				if #reliable_event_queue[23] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[23]} events in queue for DeckSaved. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 38 then -- DeckChanged
+		elseif id == 39 then -- DeckChanged
 			local value
 			value = {  }
-			local len_30 = buffer.readu8(incoming_buff, read(1)) + 1
-			assert(len_30 >= 1, "value is less than 1!")
-			assert(len_30 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_30)
-			for i_10 = 1, len_30 do
+			local len_31 = buffer.readu8(incoming_buff, read(1)) + 1
+			assert(len_31 >= 1, "value is less than 1!")
+			assert(len_31 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_31)
+			for i_10 = 1, len_31 do
 				local val_10
 				local variant_23 = buffer.readu8(incoming_buff, read(1))
 				if variant_23 == 0 then
@@ -3427,56 +3455,56 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				end
 				value["Deck"][i_10] = val_10
 			end
-			if reliable_events[38][1] then
-				for _, cb in reliable_events[38] do
+			if reliable_events[39][1] then
+				for _, cb in reliable_events[39] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[38], value)
-				if #reliable_event_queue[38] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[38]} events in queue for DeckChanged. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[39], value)
+				if #reliable_event_queue[39] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[39]} events in queue for DeckChanged. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 14 then -- CoinGained
+		elseif id == 15 then -- CoinGained
 			local value
-			local bool_19 = buffer.readu8(incoming_buff, read(1))
+			local bool_20 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["Amount"] = buffer.readu16(incoming_buff, read(2))
 			value["TotalCoins"] = buffer.readu32(incoming_buff, read(4))
-			if bit32.btest(bool_19, 0b0000000000000001) then
+			if bit32.btest(bool_20, 0b0000000000000001) then
 				value["SourceX"] = buffer.readf32(incoming_buff, read(4))
 			else
 				value["SourceX"] = nil
 			end
-			if bit32.btest(bool_19, 0b0000000000000010) then
+			if bit32.btest(bool_20, 0b0000000000000010) then
 				value["SourceZ"] = buffer.readf32(incoming_buff, read(4))
 			else
 				value["SourceZ"] = nil
 			end
-			if reliable_events[14][1] then
-				for _, cb in reliable_events[14] do
+			if reliable_events[15][1] then
+				for _, cb in reliable_events[15] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[14], value)
-				if #reliable_event_queue[14] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[14]} events in queue for CoinGained. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[15], value)
+				if #reliable_event_queue[15] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[15]} events in queue for CoinGained. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 7 then -- BaseHealthUpdated
+		elseif id == 8 then -- BaseHealthUpdated
 			local value
 			value = {  }
 			value["CurrentHealth"] = buffer.readu16(incoming_buff, read(2))
 			value["MaxHealth"] = buffer.readu16(incoming_buff, read(2))
 			value["DamageAmount"] = buffer.readu16(incoming_buff, read(2))
-			if reliable_events[7][1] then
-				for _, cb in reliable_events[7] do
+			if reliable_events[8][1] then
+				for _, cb in reliable_events[8] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[7], value)
-				if #reliable_event_queue[7] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[7]} events in queue for BaseHealthUpdated. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[8], value)
+				if #reliable_event_queue[8] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[8]} events in queue for BaseHealthUpdated. Did you forget to attach a listener?`)
 				end
 			end
 		else
@@ -3491,18 +3519,18 @@ unreliable[4].OnClientEvent:Connect(function(buff, inst) -- ZombiePositionBatch
 	incoming_ipos = 0
 	local value
 	value = {  }
-	local len_31 = buffer.readu8(incoming_buff, read(1))
-	assert(len_31 <= 100, "value is more than 100!")
-	value["EntityIds"] = table.create(len_31)
-	for i_11 = 1, len_31 do
+	local len_32 = buffer.readu8(incoming_buff, read(1))
+	assert(len_32 <= 100, "value is more than 100!")
+	value["EntityIds"] = table.create(len_32)
+	for i_11 = 1, len_32 do
 		local val_11
 		val_11 = buffer.readu32(incoming_buff, read(4))
 		value["EntityIds"][i_11] = val_11
 	end
-	local len_32 = buffer.readu8(incoming_buff, read(1))
-	assert(len_32 <= 100, "value is more than 100!")
-	value["PositionsX"] = table.create(len_32)
-	for i_12 = 1, len_32 do
+	local len_33 = buffer.readu8(incoming_buff, read(1))
+	assert(len_33 <= 100, "value is more than 100!")
+	value["PositionsX"] = table.create(len_33)
+	for i_12 = 1, len_33 do
 		local val_12
 		val_12 = buffer.readf32(incoming_buff, read(4))
 		value["PositionsX"][i_12] = val_12
@@ -3524,11 +3552,11 @@ unreliable[3].OnClientEvent:Connect(function(buff, inst) -- SunPositionUpdate
 	incoming_read = 0
 	incoming_ipos = 0
 	local value
-	local bool_20 = buffer.readu8(incoming_buff, read(1))
+	local bool_21 = buffer.readu8(incoming_buff, read(1))
 	value = {  }
 	value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 	value["PositionY"] = buffer.readf32(incoming_buff, read(4))
-	value["Falling"] = bit32.btest(bool_20, 0b0000000000000001)
+	value["Falling"] = bit32.btest(bool_21, 0b0000000000000001)
 	if unreliable_events[2][1] then
 		for _, cb in unreliable_events[2] do
 			task.spawn(cb, value)
@@ -3546,14 +3574,14 @@ unreliable[2].OnClientEvent:Connect(function(buff, inst) -- ProjectileSpawned
 	incoming_read = 0
 	incoming_ipos = 0
 	local value
-	local bool_21 = buffer.readu8(incoming_buff, read(1))
+	local bool_22 = buffer.readu8(incoming_buff, read(1))
 	value = {  }
 	value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 	value["Lane"] = buffer.readu8(incoming_buff, read(1))
 	assert(value["Lane"] >= 1, "value is less than 1!")
 	assert(value["Lane"] <= 5, "value is more than 5!")
 	value["StartX"] = buffer.readf32(incoming_buff, read(4))
-	if bit32.btest(bool_21, 0b0000000000000001) then
+	if bit32.btest(bool_22, 0b0000000000000001) then
 		value["TargetEntityId"] = buffer.readu32(incoming_buff, read(4))
 	else
 		value["TargetEntityId"] = nil
@@ -3578,9 +3606,9 @@ unreliable[5].OnClientEvent:Connect(function(buff, inst) -- MapLoadingProgress
 	value = {  }
 	value["LoadedAssets"] = buffer.readu16(incoming_buff, read(2))
 	value["TotalAssets"] = buffer.readu16(incoming_buff, read(2))
-	local len_33 = buffer.readu16(incoming_buff, read(2))
-	assert(len_33 <= 256, "value is more than 256!")
-	value["AssetName"] = buffer.readstring(incoming_buff, read(len_33), len_33)
+	local len_34 = buffer.readu16(incoming_buff, read(2))
+	assert(len_34 <= 256, "value is more than 256!")
+	value["AssetName"] = buffer.readstring(incoming_buff, read(len_34), len_34)
 	assert(utf8.len(value["AssetName"]) ~= nil, "value is not valid utf-8")
 	if unreliable_events[4][1] then
 		for _, cb in unreliable_events[4] do
@@ -3626,13 +3654,13 @@ local returns = {
 			["Lane"]: (number),
 			["PositionX"]: (number),
 		})) -> ())
-			table.insert(reliable_events[2], Callback)
-			for _, value in reliable_event_queue[2] do
+			table.insert(reliable_events[3], Callback)
+			for _, value in reliable_event_queue[3] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[2] = {}
+			reliable_event_queue[3] = {}
 			return function()
-				table.remove(reliable_events[2], table.find(reliable_events[2], Callback))
+				table.remove(reliable_events[3], table.find(reliable_events[3], Callback))
 			end
 		end,
 	},
@@ -3658,13 +3686,13 @@ local returns = {
 			["CurrentLevel"]: (number),
 			["LevelProgress"]: (number),
 		})) -> ()): () -> ()
-			reliable_events[20] = Callback
-			for _, value in reliable_event_queue[20] do
+			reliable_events[21] = Callback
+			for _, value in reliable_event_queue[21] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[20] = {}
+			reliable_event_queue[21] = {}
 			return function()
-				reliable_events[20] = nil
+				reliable_events[21] = nil
 			end
 		end,
 	},
@@ -3673,13 +3701,13 @@ local returns = {
 			["WaveNumber"]: (number),
 			["ZombieCount"]: (number),
 		})) -> ())
-			table.insert(reliable_events[9], Callback)
-			for _, value in reliable_event_queue[9] do
+			table.insert(reliable_events[10], Callback)
+			for _, value in reliable_event_queue[10] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[9] = {}
+			reliable_event_queue[10] = {}
 			return function()
-				table.remove(reliable_events[9], table.find(reliable_events[9], Callback))
+				table.remove(reliable_events[10], table.find(reliable_events[10], Callback))
 			end
 		end,
 	},
@@ -3688,13 +3716,13 @@ local returns = {
 			["WaveNumber"]: (number),
 			["Survived"]: (boolean),
 		})) -> ())
-			table.insert(reliable_events[10], Callback)
-			for _, value in reliable_event_queue[10] do
+			table.insert(reliable_events[11], Callback)
+			for _, value in reliable_event_queue[11] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[10] = {}
+			reliable_event_queue[11] = {}
 			return function()
-				table.remove(reliable_events[10], table.find(reliable_events[10], Callback))
+				table.remove(reliable_events[11], table.find(reliable_events[11], Callback))
 			end
 		end,
 	},
@@ -3862,13 +3890,13 @@ local returns = {
 			["ErrorCode"]: ((number)?),
 			["ErrorMessage"]: ((string)?),
 		})) -> ())
-			table.insert(reliable_events[32], Callback)
-			for _, value in reliable_event_queue[32] do
+			table.insert(reliable_events[33], Callback)
+			for _, value in reliable_event_queue[33] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[32] = {}
+			reliable_event_queue[33] = {}
 			return function()
-				table.remove(reliable_events[32], table.find(reliable_events[32], Callback))
+				table.remove(reliable_events[33], table.find(reliable_events[33], Callback))
 			end
 		end,
 	},
@@ -3880,26 +3908,26 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local len_34 = #Value["WorldId"]
-			assert(len_34 <= 200, "value is more than 200!")
+			local len_35 = #Value["WorldId"]
+			assert(len_35 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_34)
-			alloc(len_34)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_34)
-			local len_35 = #Value["Difficulty"]
-			assert(len_35 <= 80, "value is more than 80!")
-			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, len_35)
 			alloc(len_35)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_35)
-			local len_36 = #Value["Deck"]
-			assert(len_36 >= 1, "value is less than 1!")
-			assert(len_36 <= 6, "value is more than 6!")
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_35)
+			local len_36 = #Value["Difficulty"]
+			assert(len_36 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_36 - 1)
-			for i_13 = 1, len_36 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_36)
+			alloc(len_36)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_36)
+			local len_37 = #Value["Deck"]
+			assert(len_37 >= 1, "value is less than 1!")
+			assert(len_37 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_37 - 1)
+			for i_13 = 1, len_37 do
 				local val_13 = Value["Deck"][i_13]
 				if val_13 == "Sunflower" then
 					alloc(1)
@@ -4055,13 +4083,13 @@ local returns = {
 		On = function(Callback: (Value: ({
 			["TimeRemaining"]: (number),
 		})) -> ())
-			table.insert(reliable_events[27], Callback)
-			for _, value in reliable_event_queue[27] do
+			table.insert(reliable_events[28], Callback)
+			for _, value in reliable_event_queue[28] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[27] = {}
+			reliable_event_queue[28] = {}
 			return function()
-				table.remove(reliable_events[27], table.find(reliable_events[27], Callback))
+				table.remove(reliable_events[28], table.find(reliable_events[28], Callback))
 			end
 		end,
 	},
@@ -4069,13 +4097,13 @@ local returns = {
 		On = function(Callback: (Value: ({
 			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		})) -> ())
-			table.insert(reliable_events[40], Callback)
-			for _, value in reliable_event_queue[40] do
+			table.insert(reliable_events[41], Callback)
+			for _, value in reliable_event_queue[41] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[40] = {}
+			reliable_event_queue[41] = {}
 			return function()
-				table.remove(reliable_events[40], table.find(reliable_events[40], Callback))
+				table.remove(reliable_events[41], table.find(reliable_events[41], Callback))
 			end
 		end,
 	},
@@ -4086,13 +4114,13 @@ local returns = {
 			["Level"]: (number),
 			["XP"]: (number),
 		})) -> ())
-			table.insert(reliable_events[33], Callback)
-			for _, value in reliable_event_queue[33] do
+			table.insert(reliable_events[34], Callback)
+			for _, value in reliable_event_queue[34] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[33] = {}
+			reliable_event_queue[34] = {}
 			return function()
-				table.remove(reliable_events[33], table.find(reliable_events[33], Callback))
+				table.remove(reliable_events[34], table.find(reliable_events[34], Callback))
 			end
 		end,
 	},
@@ -4101,13 +4129,13 @@ local returns = {
 			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
 			["Mutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
 		})) -> ())
-			table.insert(reliable_events[44], Callback)
-			for _, value in reliable_event_queue[44] do
+			table.insert(reliable_events[45], Callback)
+			for _, value in reliable_event_queue[45] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[44] = {}
+			reliable_event_queue[45] = {}
 			return function()
-				table.remove(reliable_events[44], table.find(reliable_events[44], Callback))
+				table.remove(reliable_events[45], table.find(reliable_events[45], Callback))
 			end
 		end,
 	},
@@ -4118,13 +4146,13 @@ local returns = {
 				["Mutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
 			}) }),
 		})) -> ())
-			table.insert(reliable_events[45], Callback)
-			for _, value in reliable_event_queue[45] do
+			table.insert(reliable_events[46], Callback)
+			for _, value in reliable_event_queue[46] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[45] = {}
+			reliable_event_queue[46] = {}
 			return function()
-				table.remove(reliable_events[45], table.find(reliable_events[45], Callback))
+				table.remove(reliable_events[46], table.find(reliable_events[46], Callback))
 			end
 		end,
 	},
@@ -4137,13 +4165,13 @@ local returns = {
 			["Value"]: (number),
 			["TargetY"]: (number),
 		})) -> ())
-			table.insert(reliable_events[4], Callback)
-			for _, value in reliable_event_queue[4] do
+			table.insert(reliable_events[5], Callback)
+			for _, value in reliable_event_queue[5] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[4] = {}
+			reliable_event_queue[5] = {}
 			return function()
-				table.remove(reliable_events[4], table.find(reliable_events[4], Callback))
+				table.remove(reliable_events[5], table.find(reliable_events[5], Callback))
 			end
 		end,
 	},
@@ -4167,13 +4195,13 @@ local returns = {
 		On = function(Callback: (Value: ({
 			["EntityId"]: (number),
 		})) -> ())
-			table.insert(reliable_events[5], Callback)
-			for _, value in reliable_event_queue[5] do
+			table.insert(reliable_events[6], Callback)
+			for _, value in reliable_event_queue[6] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[5] = {}
+			reliable_event_queue[6] = {}
 			return function()
-				table.remove(reliable_events[5], table.find(reliable_events[5], Callback))
+				table.remove(reliable_events[6], table.find(reliable_events[6], Callback))
 			end
 		end,
 	},
@@ -4183,13 +4211,13 @@ local returns = {
 			["CollectorId"]: (number),
 			["NewTotal"]: (number),
 		})) -> ())
-			table.insert(reliable_events[6], Callback)
-			for _, value in reliable_event_queue[6] do
+			table.insert(reliable_events[7], Callback)
+			for _, value in reliable_event_queue[7] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[6] = {}
+			reliable_event_queue[7] = {}
 			return function()
-				table.remove(reliable_events[6], table.find(reliable_events[6], Callback))
+				table.remove(reliable_events[7], table.find(reliable_events[7], Callback))
 			end
 		end,
 	},
@@ -4210,18 +4238,18 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
-			local len_37 = #Value["WorldId"]
+			local len_38 = #Value["WorldId"]
 			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_37)
-			alloc(len_37)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_37)
-			local len_38 = #Value["Difficulty"]
-			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
 			buffer.writeu16(outgoing_buff, outgoing_apos, len_38)
 			alloc(len_38)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_38)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_38)
+			local len_39 = #Value["Difficulty"]
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_39)
+			alloc(len_39)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_39)
 		end,
 	},
 	ShowResults = {
@@ -4233,13 +4261,13 @@ local returns = {
 			["CoinsEarned"]: (number),
 			["XPEarned"]: (number),
 		})) -> ())
-			table.insert(reliable_events[34], Callback)
-			for _, value in reliable_event_queue[34] do
+			table.insert(reliable_events[35], Callback)
+			for _, value in reliable_event_queue[35] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[34] = {}
+			reliable_event_queue[35] = {}
 			return function()
-				table.remove(reliable_events[34], table.find(reliable_events[34], Callback))
+				table.remove(reliable_events[35], table.find(reliable_events[35], Callback))
 			end
 		end,
 	},
@@ -4267,10 +4295,10 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local bool_22 = 0
-			local bool_22_pos_1 = alloc(1)
+			local bool_23 = 0
+			local bool_23_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_22 = bit32.bor(bool_22, 0b0000000000000001)
+				bool_23 = bit32.bor(bool_23, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4420,7 +4448,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_22 = bit32.bor(bool_22, 0b0000000000000010)
+				bool_23 = bit32.bor(bool_23, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4570,7 +4598,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_22 = bit32.bor(bool_22, 0b0000000000000100)
+				bool_23 = bit32.bor(bool_23, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4720,7 +4748,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_22 = bit32.bor(bool_22, 0b0000000000001000)
+				bool_23 = bit32.bor(bool_23, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4870,7 +4898,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_22 = bit32.bor(bool_22, 0b0000000000010000)
+				bool_23 = bit32.bor(bool_23, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -5020,7 +5048,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_22 = bit32.bor(bool_22, 0b0000000000100000)
+				bool_23 = bit32.bor(bool_23, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -5169,7 +5197,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_22_pos_1, bool_22)
+			buffer.writeu8(outgoing_buff, bool_23_pos_1, bool_23)
 		end,
 	},
 	SaveDeck = {
@@ -5178,12 +5206,12 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 10)
-			local len_39 = #Value["Deck"]
-			assert(len_39 >= 1, "value is less than 1!")
-			assert(len_39 <= 6, "value is more than 6!")
+			local len_40 = #Value["Deck"]
+			assert(len_40 >= 1, "value is less than 1!")
+			assert(len_40 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_39 - 1)
-			for i_14 = 1, len_39 do
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_40 - 1)
+			for i_14 = 1, len_40 do
 				local val_14 = Value["Deck"][i_14]
 				if val_14 == "Sunflower" then
 					alloc(1)
@@ -5341,13 +5369,13 @@ local returns = {
 			["Success"]: (boolean),
 			["ErrorCode"]: ((number)?),
 		})) -> ())
-			table.insert(reliable_events[0], Callback)
-			for _, value in reliable_event_queue[0] do
+			table.insert(reliable_events[1], Callback)
+			for _, value in reliable_event_queue[1] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[0] = {}
+			reliable_event_queue[1] = {}
 			return function()
-				table.remove(reliable_events[0], table.find(reliable_events[0], Callback))
+				table.remove(reliable_events[1], table.find(reliable_events[1], Callback))
 			end
 		end,
 	},
@@ -5364,13 +5392,13 @@ local returns = {
 			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
 			["MutationType"]: ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty"),
 		})) -> ())
-			table.insert(reliable_events[43], Callback)
-			for _, value in reliable_event_queue[43] do
+			table.insert(reliable_events[44], Callback)
+			for _, value in reliable_event_queue[44] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[43] = {}
+			reliable_event_queue[44] = {}
 			return function()
-				table.remove(reliable_events[43], table.find(reliable_events[43], Callback))
+				table.remove(reliable_events[44], table.find(reliable_events[44], Callback))
 			end
 		end,
 	},
@@ -5594,13 +5622,13 @@ local returns = {
 			["ErrorCode"]: ((number)?),
 			["NewCoins"]: ((number)?),
 		})) -> ())
-			table.insert(reliable_events[39], Callback)
-			for _, value in reliable_event_queue[39] do
+			table.insert(reliable_events[40], Callback)
+			for _, value in reliable_event_queue[40] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[39] = {}
+			reliable_event_queue[40] = {}
 			return function()
-				table.remove(reliable_events[39], table.find(reliable_events[39], Callback))
+				table.remove(reliable_events[40], table.find(reliable_events[40], Callback))
 			end
 		end,
 	},
@@ -5767,13 +5795,13 @@ local returns = {
 			["ErrorCode"]: ((number)?),
 			["NewCoins"]: ((number)?),
 		})) -> ())
-			table.insert(reliable_events[42], Callback)
-			for _, value in reliable_event_queue[42] do
+			table.insert(reliable_events[43], Callback)
+			for _, value in reliable_event_queue[43] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[42] = {}
+			reliable_event_queue[43] = {}
 			return function()
-				table.remove(reliable_events[42], table.find(reliable_events[42], Callback))
+				table.remove(reliable_events[43], table.find(reliable_events[43], Callback))
 			end
 		end,
 	},
@@ -6016,13 +6044,13 @@ local returns = {
 			["UnlockedPlants"]: ({ (string) }),
 			["OwnedSkins"]: ({ (string) }),
 		})) -> ()): () -> ()
-			reliable_events[28] = Callback
-			for _, value in reliable_event_queue[28] do
+			reliable_events[29] = Callback
+			for _, value in reliable_event_queue[29] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[28] = {}
+			reliable_event_queue[29] = {}
 			return function()
-				reliable_events[28] = nil
+				reliable_events[29] = nil
 			end
 		end,
 	},
@@ -6035,13 +6063,13 @@ local returns = {
 			["LevelProgress"]: (number),
 			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		})) -> ()): () -> ()
-			reliable_events[13] = Callback
-			for _, value in reliable_event_queue[13] do
+			reliable_events[14] = Callback
+			for _, value in reliable_event_queue[14] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[13] = {}
+			reliable_event_queue[14] = {}
 			return function()
-				reliable_events[13] = nil
+				reliable_events[14] = nil
 			end
 		end,
 	},
@@ -6053,13 +6081,13 @@ local returns = {
 			["Column"]: (number),
 			["OwnerId"]: (number),
 		})) -> ())
-			table.insert(reliable_events[1], Callback)
-			for _, value in reliable_event_queue[1] do
+			table.insert(reliable_events[2], Callback)
+			for _, value in reliable_event_queue[2] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[1] = {}
+			reliable_event_queue[2] = {}
 			return function()
-				table.remove(reliable_events[1], table.find(reliable_events[1], Callback))
+				table.remove(reliable_events[2], table.find(reliable_events[2], Callback))
 			end
 		end,
 	},
@@ -6079,13 +6107,13 @@ local returns = {
 			["NewChargeCount"]: (number),
 			["ZombieEntityId"]: (number),
 		})) -> ())
-			table.insert(reliable_events[17], Callback)
-			for _, value in reliable_event_queue[17] do
+			table.insert(reliable_events[18], Callback)
+			for _, value in reliable_event_queue[18] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[17] = {}
+			reliable_event_queue[18] = {}
 			return function()
-				table.remove(reliable_events[17], table.find(reliable_events[17], Callback))
+				table.remove(reliable_events[18], table.find(reliable_events[18], Callback))
 			end
 		end,
 	},
@@ -6093,13 +6121,13 @@ local returns = {
 		SetCallback = function(Callback: (Value: ({
 			["ChargeCount"]: (number),
 		})) -> ()): () -> ()
-			reliable_events[19] = Callback
-			for _, value in reliable_event_queue[19] do
+			reliable_events[20] = Callback
+			for _, value in reliable_event_queue[20] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[19] = {}
+			reliable_event_queue[20] = {}
 			return function()
-				reliable_events[19] = nil
+				reliable_events[20] = nil
 			end
 		end,
 	},
@@ -6109,13 +6137,13 @@ local returns = {
 			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
 			["OwnerId"]: (number),
 		})) -> ())
-			table.insert(reliable_events[18], Callback)
-			for _, value in reliable_event_queue[18] do
+			table.insert(reliable_events[19], Callback)
+			for _, value in reliable_event_queue[19] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[18] = {}
+			reliable_event_queue[19] = {}
 			return function()
-				table.remove(reliable_events[18], table.find(reliable_events[18], Callback))
+				table.remove(reliable_events[19], table.find(reliable_events[19], Callback))
 			end
 		end,
 	},
@@ -6297,13 +6325,13 @@ local returns = {
 			["CountdownRemaining"]: ((number)?),
 			["PlayerNames"]: ((string)?),
 		})) -> ())
-			table.insert(reliable_events[35], Callback)
-			for _, value in reliable_event_queue[35] do
+			table.insert(reliable_events[36], Callback)
+			for _, value in reliable_event_queue[36] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[35] = {}
+			reliable_event_queue[36] = {}
 			return function()
-				table.remove(reliable_events[35], table.find(reliable_events[35], Callback))
+				table.remove(reliable_events[36], table.find(reliable_events[36], Callback))
 			end
 		end,
 	},
@@ -6312,13 +6340,13 @@ local returns = {
 			["MapId"]: (string),
 			["TotalAssets"]: (number),
 		})) -> ())
-			table.insert(reliable_events[30], Callback)
-			for _, value in reliable_event_queue[30] do
+			table.insert(reliable_events[31], Callback)
+			for _, value in reliable_event_queue[31] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[30] = {}
+			reliable_event_queue[31] = {}
 			return function()
-				table.remove(reliable_events[30], table.find(reliable_events[30], Callback))
+				table.remove(reliable_events[31], table.find(reliable_events[31], Callback))
 			end
 		end,
 	},
@@ -6343,13 +6371,13 @@ local returns = {
 			["MapId"]: (string),
 			["Success"]: (boolean),
 		})) -> ())
-			table.insert(reliable_events[31], Callback)
-			for _, value in reliable_event_queue[31] do
+			table.insert(reliable_events[32], Callback)
+			for _, value in reliable_event_queue[32] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[31] = {}
+			reliable_event_queue[32] = {}
 			return function()
-				table.remove(reliable_events[31], table.find(reliable_events[31], Callback))
+				table.remove(reliable_events[32], table.find(reliable_events[32], Callback))
 			end
 		end,
 	},
@@ -6371,13 +6399,13 @@ local returns = {
 			["ZombieDirectionX"]: (number),
 			["ZombieDirectionZ"]: (number),
 		})) -> ())
-			table.insert(reliable_events[29], Callback)
-			for _, value in reliable_event_queue[29] do
+			table.insert(reliable_events[30], Callback)
+			for _, value in reliable_event_queue[30] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[29] = {}
+			reliable_event_queue[30] = {}
 			return function()
-				table.remove(reliable_events[29], table.find(reliable_events[29], Callback))
+				table.remove(reliable_events[30], table.find(reliable_events[30], Callback))
 			end
 		end,
 	},
@@ -6388,26 +6416,26 @@ local returns = {
 			["RewardGems"]: ((number)?),
 			["UnlockedPlant"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
 		})) -> ()): () -> ()
-			reliable_events[21] = Callback
-			for _, value in reliable_event_queue[21] do
+			reliable_events[22] = Callback
+			for _, value in reliable_event_queue[22] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[21] = {}
+			reliable_event_queue[22] = {}
 			return function()
-				reliable_events[21] = nil
+				reliable_events[22] = nil
 			end
 		end,
 	},
 	LeftPad = {
 		On = function(Callback: (Value: ({
 		})) -> ())
-			table.insert(reliable_events[37], Callback)
-			for _, value in reliable_event_queue[37] do
+			table.insert(reliable_events[38], Callback)
+			for _, value in reliable_event_queue[38] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[37] = {}
+			reliable_event_queue[38] = {}
 			return function()
-				table.remove(reliable_events[37], table.find(reliable_events[37], Callback))
+				table.remove(reliable_events[38], table.find(reliable_events[38], Callback))
 			end
 		end,
 	},
@@ -6425,13 +6453,13 @@ local returns = {
 			["Difficulty"]: (string),
 			["Position"]: (Vector3),
 		})) -> ())
-			table.insert(reliable_events[36], Callback)
-			for _, value in reliable_event_queue[36] do
+			table.insert(reliable_events[37], Callback)
+			for _, value in reliable_event_queue[37] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[36] = {}
+			reliable_event_queue[37] = {}
 			return function()
-				table.remove(reliable_events[36], table.find(reliable_events[36], Callback))
+				table.remove(reliable_events[37], table.find(reliable_events[37], Callback))
 			end
 		end,
 	},
@@ -6441,13 +6469,13 @@ local returns = {
 			["TotalGems"]: (number),
 			["Reason"]: (number),
 		})) -> ()): () -> ()
-			reliable_events[22] = Callback
-			for _, value in reliable_event_queue[22] do
+			reliable_events[23] = Callback
+			for _, value in reliable_event_queue[23] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[22] = {}
+			reliable_event_queue[23] = {}
 			return function()
-				reliable_events[22] = nil
+				reliable_events[23] = nil
 			end
 		end,
 	},
@@ -6457,13 +6485,13 @@ local returns = {
 			["Difficulty"]: (string),
 			["WaveCount"]: (number),
 		})) -> ())
-			table.insert(reliable_events[25], Callback)
-			for _, value in reliable_event_queue[25] do
+			table.insert(reliable_events[26], Callback)
+			for _, value in reliable_event_queue[26] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[25] = {}
+			reliable_event_queue[26] = {}
 			return function()
-				table.remove(reliable_events[25], table.find(reliable_events[25], Callback))
+				table.remove(reliable_events[26], table.find(reliable_events[26], Callback))
 			end
 		end,
 	},
@@ -6471,13 +6499,13 @@ local returns = {
 		On = function(Callback: (Value: ({
 			["Phase"]: ("Pregame" | "Wave" | "Intermission" | "GameOver"),
 		})) -> ())
-			table.insert(reliable_events[11], Callback)
-			for _, value in reliable_event_queue[11] do
+			table.insert(reliable_events[12], Callback)
+			for _, value in reliable_event_queue[12] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[11] = {}
+			reliable_event_queue[12] = {}
 			return function()
-				table.remove(reliable_events[11], table.find(reliable_events[11], Callback))
+				table.remove(reliable_events[12], table.find(reliable_events[12], Callback))
 			end
 		end,
 	},
@@ -6486,13 +6514,13 @@ local returns = {
 			["Victory"]: (boolean),
 			["WaveReached"]: (number),
 		})) -> ())
-			table.insert(reliable_events[8], Callback)
-			for _, value in reliable_event_queue[8] do
+			table.insert(reliable_events[9], Callback)
+			for _, value in reliable_event_queue[9] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[8] = {}
+			reliable_event_queue[9] = {}
 			return function()
-				table.remove(reliable_events[8], table.find(reliable_events[8], Callback))
+				table.remove(reliable_events[9], table.find(reliable_events[9], Callback))
 			end
 		end,
 	},
@@ -6509,13 +6537,13 @@ local returns = {
 			["NewLevel"]: (number),
 			["LevelsGained"]: (number),
 		})) -> ()): () -> ()
-			reliable_events[15] = Callback
-			for _, value in reliable_event_queue[15] do
+			reliable_events[16] = Callback
+			for _, value in reliable_event_queue[16] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[15] = {}
+			reliable_event_queue[16] = {}
 			return function()
-				reliable_events[15] = nil
+				reliable_events[16] = nil
 			end
 		end,
 	},
@@ -6528,13 +6556,13 @@ local returns = {
 			["CoinsEarned"]: (number),
 			["XPEarned"]: (number),
 		})) -> ()): () -> ()
-			reliable_events[26] = Callback
-			for _, value in reliable_event_queue[26] do
+			reliable_events[27] = Callback
+			for _, value in reliable_event_queue[27] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[26] = {}
+			reliable_event_queue[27] = {}
 			return function()
-				reliable_events[26] = nil
+				reliable_events[27] = nil
 			end
 		end,
 	},
@@ -6544,13 +6572,13 @@ local returns = {
 			["WaveNumber"]: (number),
 			["Phase"]: ("Pregame" | "Wave" | "Intermission" | "GameOver"),
 		})) -> ()): () -> ()
-			reliable_events[12] = Callback
-			for _, value in reliable_event_queue[12] do
+			reliable_events[13] = Callback
+			for _, value in reliable_event_queue[13] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[12] = {}
+			reliable_event_queue[13] = {}
 			return function()
-				reliable_events[12] = nil
+				reliable_events[13] = nil
 			end
 		end,
 	},
@@ -6568,13 +6596,13 @@ local returns = {
 			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		})) -> ())
-			table.insert(reliable_events[41], Callback)
-			for _, value in reliable_event_queue[41] do
+			table.insert(reliable_events[42], Callback)
+			for _, value in reliable_event_queue[42] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[41] = {}
+			reliable_event_queue[42] = {}
 			return function()
-				table.remove(reliable_events[41], table.find(reliable_events[41], Callback))
+				table.remove(reliable_events[42], table.find(reliable_events[42], Callback))
 			end
 		end,
 	},
@@ -6585,13 +6613,13 @@ local returns = {
 			["PositionZ"]: (number),
 			["Radius"]: (number),
 		})) -> ())
-			table.insert(reliable_events[16], Callback)
-			for _, value in reliable_event_queue[16] do
+			table.insert(reliable_events[17], Callback)
+			for _, value in reliable_event_queue[17] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[16] = {}
+			reliable_event_queue[17] = {}
 			return function()
-				table.remove(reliable_events[16], table.find(reliable_events[16], Callback))
+				table.remove(reliable_events[17], table.find(reliable_events[17], Callback))
 			end
 		end,
 	},
@@ -6599,13 +6627,13 @@ local returns = {
 		On = function(Callback: (Value: ({
 			["EntityId"]: (number),
 		})) -> ())
-			table.insert(reliable_events[3], Callback)
-			for _, value in reliable_event_queue[3] do
+			table.insert(reliable_events[4], Callback)
+			for _, value in reliable_event_queue[4] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[3] = {}
+			reliable_event_queue[4] = {}
 			return function()
-				table.remove(reliable_events[3], table.find(reliable_events[3], Callback))
+				table.remove(reliable_events[4], table.find(reliable_events[4], Callback))
 			end
 		end,
 	},
@@ -6625,6 +6653,70 @@ local returns = {
 			end
 		end,
 	},
+	DevCommandResponse = {
+		On = function(Callback: (Value: ({
+			["Success"]: (boolean),
+			["Message"]: (string),
+		})) -> ())
+			table.insert(reliable_events[0], Callback)
+			for _, value in reliable_event_queue[0] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[0] = {}
+			return function()
+				table.remove(reliable_events[0], table.find(reliable_events[0], Callback))
+			end
+		end,
+	},
+	DevCommand = {
+		Fire = function(Value: ({
+			["Command"]: ("GiveCoins" | "GiveGems" | "SetLevel" | "UnlockAllPlants" | "UnlockPlant" | "AddMutation" | "ResetData" | "GiveXP" | "MaxResources"),
+			["StringArg"]: ((string)?),
+			["NumberArg"]: ((number)?),
+		}))
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			local bool_24 = 0
+			local bool_24_pos_1 = alloc(2)
+			if Value["Command"] == "GiveCoins" then
+				bool_24 = bit32.bor(bool_24, 0b0000000000000001)
+			elseif Value["Command"] == "GiveGems" then
+				bool_24 = bit32.bor(bool_24, 0b0000000000000010)
+			elseif Value["Command"] == "SetLevel" then
+				bool_24 = bit32.bor(bool_24, 0b0000000000000100)
+			elseif Value["Command"] == "UnlockAllPlants" then
+				bool_24 = bit32.bor(bool_24, 0b0000000000001000)
+			elseif Value["Command"] == "UnlockPlant" then
+				bool_24 = bit32.bor(bool_24, 0b0000000000010000)
+			elseif Value["Command"] == "AddMutation" then
+				bool_24 = bit32.bor(bool_24, 0b0000000000100000)
+			elseif Value["Command"] == "ResetData" then
+				bool_24 = bit32.bor(bool_24, 0b0000000001000000)
+			elseif Value["Command"] == "GiveXP" then
+				bool_24 = bit32.bor(bool_24, 0b0000000010000000)
+			elseif Value["Command"] == "MaxResources" then
+				bool_24 = bit32.bor(bool_24, 0b0000000100000000)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["StringArg"] ~= nil then
+				bool_24 = bit32.bor(bool_24, 0b0000001000000000)
+				local len_41 = #Value["StringArg"]
+				assert(len_41 <= 200, "value is more than 200!")
+				assert(utf8.len(Value["StringArg"]) ~= nil, "value is not valid utf-8")
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, len_41)
+				alloc(len_41)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["StringArg"], len_41)
+			end
+			if Value["NumberArg"] ~= nil then
+				bool_24 = bit32.bor(bool_24, 0b0000010000000000)
+				alloc(4)
+				buffer.writei32(outgoing_buff, outgoing_apos, Value["NumberArg"])
+			end
+			buffer.writeu16(outgoing_buff, bool_24_pos_1, bool_24)
+		end,
+	},
 	DeckSync = {
 		SetCallback = function(Callback: (Value: ({
 			["Slot1"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
@@ -6633,6 +6725,21 @@ local returns = {
 			["Slot4"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
 			["Slot5"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
 			["Slot6"]: (("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")?),
+		})) -> ()): () -> ()
+			reliable_events[25] = Callback
+			for _, value in reliable_event_queue[25] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[25] = {}
+			return function()
+				reliable_events[25] = nil
+			end
+		end,
+	},
+	DeckSaved = {
+		SetCallback = function(Callback: (Value: ({
+			["Success"]: (boolean),
+			["Error"]: ((string)?),
 		})) -> ()): () -> ()
 			reliable_events[24] = Callback
 			for _, value in reliable_event_queue[24] do
@@ -6644,32 +6751,17 @@ local returns = {
 			end
 		end,
 	},
-	DeckSaved = {
-		SetCallback = function(Callback: (Value: ({
-			["Success"]: (boolean),
-			["Error"]: ((string)?),
-		})) -> ()): () -> ()
-			reliable_events[23] = Callback
-			for _, value in reliable_event_queue[23] do
-				task.spawn(Callback, value)
-			end
-			reliable_event_queue[23] = {}
-			return function()
-				reliable_events[23] = nil
-			end
-		end,
-	},
 	DeckChanged = {
 		On = function(Callback: (Value: ({
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		})) -> ())
-			table.insert(reliable_events[38], Callback)
-			for _, value in reliable_event_queue[38] do
+			table.insert(reliable_events[39], Callback)
+			for _, value in reliable_event_queue[39] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[38] = {}
+			reliable_event_queue[39] = {}
 			return function()
-				table.remove(reliable_events[38], table.find(reliable_events[38], Callback))
+				table.remove(reliable_events[39], table.find(reliable_events[39], Callback))
 			end
 		end,
 	},
@@ -6693,13 +6785,13 @@ local returns = {
 			["SourceX"]: ((number)?),
 			["SourceZ"]: ((number)?),
 		})) -> ())
-			table.insert(reliable_events[14], Callback)
-			for _, value in reliable_event_queue[14] do
+			table.insert(reliable_events[15], Callback)
+			for _, value in reliable_event_queue[15] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[14] = {}
+			reliable_event_queue[15] = {}
 			return function()
-				table.remove(reliable_events[14], table.find(reliable_events[14], Callback))
+				table.remove(reliable_events[15], table.find(reliable_events[15], Callback))
 			end
 		end,
 	},
@@ -6709,13 +6801,13 @@ local returns = {
 			["MaxHealth"]: (number),
 			["DamageAmount"]: (number),
 		})) -> ())
-			table.insert(reliable_events[7], Callback)
-			for _, value in reliable_event_queue[7] do
+			table.insert(reliable_events[8], Callback)
+			for _, value in reliable_event_queue[8] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[7] = {}
+			reliable_event_queue[8] = {}
 			return function()
-				table.remove(reliable_events[7], table.find(reliable_events[7], Callback))
+				table.remove(reliable_events[8], table.find(reliable_events[8], Callback))
 			end
 		end,
 	},

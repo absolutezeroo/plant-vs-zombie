@@ -4,6 +4,6 @@
 -- while the actual generated code lives in shared/network/generated/
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Shared = ReplicatedStorage.shared
+local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 return require(Shared.network.generated.server)
