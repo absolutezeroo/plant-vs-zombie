@@ -135,7 +135,7 @@ local function onPurchasePlantRequest(player: Player, data: {PlantType: any})
             UnlockedPlants = unlockedPlants,
         })
         
-        Logger.Info("ShopHandler", `✅ {player.Name} purchased {plantType}!`)
+        Logger.Info("ShopHandler", `{player.Name} purchased {plantType}!`)
     else
         Logger.Warn("ShopHandler", `Purchase failed for {player.Name}: {err or "unknown"}`)
         Network.PurchasePlantResponse.Fire(player, {
@@ -161,7 +161,7 @@ function ShopHandler.Initialize()
     -- Listen for data sync requests
     Network.RequestPlayerData.SetCallback(onRequestPlayerData)
     
-    Logger.Info("ShopHandler", "✅ Shop Handler ready")
+    Logger.Info("ShopHandler", "Shop Handler ready")
 end
 
 return ShopHandler

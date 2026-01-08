@@ -29,23 +29,20 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local TeleportData = require(Shared.data.TeleportData)
-
--- Import Zap generated network module
-local ZapClient = require(script:WaitForChild("network"):WaitForChild("generated"))
-
--- Import UI components
-local LobbyHUD = require(script:WaitForChild("ui"):WaitForChild("LobbyHUD"))
-
--- Import controllers
-local PadUIController = require(script:WaitForChild("controllers"):WaitForChild("PadUIController"))
-local ZoneInteractionController = require(script:WaitForChild("controllers"):WaitForChild("ZoneInteractionController"))
-local UIStateManager = require(script:WaitForChild("controllers"):WaitForChild("UIStateManager"))
+local ServiceLoader = require(Shared.utils.ServiceLoader)
 
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-Logger.Info("LobbyClient", `Initializing 3D lobby for {LocalPlayer.Name}`)
+-- ============================================
+-- DEFERRED MODULE REFERENCES
+-- ============================================
+local ZapClient
+local LobbyHUD
+local PadUIController
+local ZoneInteractionController
+local UIStateManager
 
 -- Create a scope for Fusion cleanup
 local scope = Fusion.scoped(Fusion)
@@ -71,6 +68,21 @@ type PlayerData = {
 local playerData = scope:Value(nil :: PlayerData?)
 local currentDeck = scope:Value({} :: {string})
 local plantMutations = scope:Value({} :: {[string]: {string}})
+
+-- ============================================
+-- LOADER INITIALIZATION
+-- ============================================
+
+local loader = ServiceLoader.new({
+    stages = {
+        { name = "Modules", tip = "Loading game modules..." },
+        { name = "Network", tip = "Establishing connection..." },
+        { name = "Controllers", tip = "Setting up controllers..." },
+        { name = "UI", tip = "Building interface..." },
+        { name = "PlayerData", tip = "Loading your profile..." },
+        { name = "Ready", tip = "Entering the lobby!" },
+    }
+})
 
 -- ============================================
 -- NETWORK FUNCTIONS
@@ -132,184 +144,197 @@ local function checkReturnData()
 end
 
 -- ============================================
--- INITIALIZE CONTROLLERS
+-- NETWORK EVENT LISTENERS SETUP
 -- ============================================
 
--- Initialize Pad UI Controller (BillboardGui on pads + leave button)
-PadUIController.Initialize()
-Logger.Info("LobbyClient", "✅ PadUIController initialized")
+local function setupNetworkListeners()
+    -- Listen for teleport response
+    ZapClient.TeleportToArenaResponse.On(function(response)
+        if response.Success then
+            Logger.Info("LobbyClient", "Teleport initiated successfully!")
+        else
+            Logger.Warn("LobbyClient", `Teleport failed: {response.ErrorMessage or "Unknown error"}`)
+        end
+    end)
 
--- Initialize Zone Interaction Controller (Shop, DeckBuilder, Profile, Mutations)
-ZoneInteractionController.Initialize()
-ZoneInteractionController.SetOnPurchasePlant(purchasePlant)
-ZoneInteractionController.SetOnSaveDeck(saveDeck)
-ZoneInteractionController.SetOnPurchaseMutation(purchaseMutation)
-ZoneInteractionController.SetOnRemoveMutation(removeMutation)
-Logger.Info("LobbyClient", "✅ ZoneInteractionController initialized")
+    -- Listen for full player data sync
+    ZapClient.FullPlayerDataSync.On(function(data)
+        Logger.Info("LobbyClient", `Received player data: Level={data.Level}, Coins={data.Coins}`)
+        
+        local newData: PlayerData = {
+            Coins = data.Coins or 0,
+            Gems = data.Gems or 0,
+            Level = data.Level or 1,
+            XP = data.XP or 0,
+            TotalXPForNextLevel = data.TotalXPForNextLevel or 100,
+            GamesPlayed = data.GamesPlayed or 0,
+            GamesWon = data.GamesWon or 0,
+            ZombiesKilled = data.ZombiesKilled or 0,
+            PlantsPlaced = data.PlantsPlaced or 0,
+            UnlockedPlants = data.UnlockedPlants or {},
+            Deck = data.Deck or {},
+        }
+        
+        playerData:set(newData)
+        currentDeck:set(data.Deck or {})
+        
+        -- Update mutations if provided
+        if data.PlantMutations then
+            plantMutations:set(data.PlantMutations)
+            ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
+        end
+        
+        -- Update ZoneInteractionController
+        ZoneInteractionController.SetPlayerData(newData)
+    end)
 
--- ============================================
--- MOUNT HUD
--- ============================================
+    -- Listen for purchase response
+    ZapClient.PurchasePlantResponse.On(function(response)
+        if response.Success then
+            Logger.Info("LobbyClient", `Purchased {response.PlantType}! New balance: {response.NewCoins}`)
+            requestPlayerData()
+        else
+            local errorMsg = response.ErrorCode == 1 and "Already owned"
+                or response.ErrorCode == 2 and "Not enough coins"
+                or response.ErrorCode == 3 and "Invalid plant"
+                or "Unknown error"
+            Logger.Warn("LobbyClient", `Purchase failed: {errorMsg}`)
+        end
+    end)
 
-local hudGui = LobbyHUD(scope, {
-    PlayerData = playerData,
-    CurrentDeck = currentDeck,
-    PlantMutations = plantMutations,
-})
-hudGui.Parent = PlayerGui
+    -- Listen for unlocked plants sync
+    ZapClient.SyncUnlockedPlants.On(function(data)
+        Logger.Info("LobbyClient", `Synced {#data.UnlockedPlants} unlocked plants`)
+        
+        local current = Fusion.peek(playerData)
+        if current then
+            current.UnlockedPlants = data.UnlockedPlants
+            playerData:set(current)
+        end
+        
+        ZoneInteractionController.UpdateUnlockedPlants(data.UnlockedPlants)
+    end)
 
--- Register HUD with UIStateManager (will be hidden when in queue)
-UIStateManager.Register("LobbyHUD", hudGui)
+    -- Listen for deck changes
+    ZapClient.DeckChanged.On(function(data)
+        Logger.Info("LobbyClient", `Deck updated: {#data.Deck} plants`)
+        currentDeck:set(data.Deck)
+        ZoneInteractionController.UpdateDeck(data.Deck)
+    end)
 
-Logger.Info("LobbyClient", "✅ LobbyHUD mounted")
+    -- Listen for mutation purchase response
+    ZapClient.PurchaseMutationResponse.On(function(response)
+        if response.Success then
+            Logger.Info("LobbyClient", `Purchased mutation {response.MutationType} for {response.PlantType}! New balance: {response.NewCoins}`)
+            requestPlayerData()
+        else
+            local errorMsg = response.ErrorCode == 1 and "Already owned"
+                or response.ErrorCode == 2 and "Not enough coins"
+                or response.ErrorCode == 3 and "Level too low"
+                or response.ErrorCode == 4 and "Plant not owned"
+                or response.ErrorCode == 5 and "Incompatible mutation"
+                or response.ErrorCode == 6 and "Invalid mutation"
+                or "Unknown error"
+            Logger.Warn("LobbyClient", `Mutation purchase failed: {errorMsg}`)
+        end
+    end)
 
--- ============================================
--- NETWORK EVENT LISTENERS
--- ============================================
+    -- Listen for mutation remove response
+    ZapClient.RemoveMutationResponse.On(function(response)
+        if response.Success then
+            Logger.Info("LobbyClient", `Removed mutation {response.MutationType} from {response.PlantType}`)
+            requestPlayerData()
+        else
+            Logger.Warn("LobbyClient", `Mutation removal failed`)
+        end
+    end)
 
--- Listen for teleport response
-ZapClient.TeleportToArenaResponse.On(function(response)
-    if response.Success then
-        Logger.Info("LobbyClient", "Teleport initiated successfully!")
-    else
-        Logger.Warn("LobbyClient", `Teleport failed: {response.ErrorMessage or "Unknown error"}`)
-    end
-end)
+    -- Listen for plant mutations sync
+    ZapClient.SyncPlantMutations.On(function(data)
+        Logger.Info("LobbyClient", `Synced mutations for {data.PlantType}: {#data.Mutations}`)
+        ZoneInteractionController.UpdatePlantMutations({[data.PlantType] = data.Mutations})
+        local current = Fusion.peek(plantMutations)
+        current[data.PlantType] = data.Mutations
+        plantMutations:set(current)
+    end)
 
--- Listen for full player data sync
-ZapClient.FullPlayerDataSync.On(function(data)
-    Logger.Info("LobbyClient", `Received player data: Level={data.Level}, Coins={data.Coins}`)
-    
-    local newData: PlayerData = {
-        Coins = data.Coins or 0,
-        Gems = data.Gems or 0,
-        Level = data.Level or 1,
-        XP = data.XP or 0,
-        TotalXPForNextLevel = data.TotalXPForNextLevel or 100,
-        GamesPlayed = data.GamesPlayed or 0,
-        GamesWon = data.GamesWon or 0,
-        ZombiesKilled = data.ZombiesKilled or 0,
-        PlantsPlaced = data.PlantsPlaced or 0,
-        UnlockedPlants = data.UnlockedPlants or {},
-        Deck = data.Deck or {},
-    }
-    
-    playerData:set(newData)
-    currentDeck:set(data.Deck or {})
-    
-    -- Update mutations if provided
-    if data.PlantMutations then
-        plantMutations:set(data.PlantMutations)
+    -- Listen for all mutations sync
+    ZapClient.SyncAllMutations.On(function(data)
+        Logger.Info("LobbyClient", "Synced all plant mutations")
         ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
-    end
-    
-    -- Update ZoneInteractionController
-    ZoneInteractionController.SetPlayerData(newData)
-end)
+        plantMutations:set(data.PlantMutations)
+    end)
 
--- Listen for purchase response
-ZapClient.PurchasePlantResponse.On(function(response)
-    if response.Success then
-        Logger.Info("LobbyClient", `✅ Purchased {response.PlantType}! New balance: {response.NewCoins}`)
-        -- Request updated player data
+    -- Listen for battle results
+    ZapClient.ShowResults.On(function(results)
+        Logger.Info("LobbyClient", "Battle results received", {
+            victory = results.Victory,
+            stars = results.Stars,
+            coins = results.CoinsEarned,
+            xp = results.XPEarned,
+        })
         requestPlayerData()
-    else
-        local errorMsg = response.ErrorCode == 1 and "Already owned"
-            or response.ErrorCode == 2 and "Not enough coins"
-            or response.ErrorCode == 3 and "Invalid plant"
-            or "Unknown error"
-        Logger.Warn("LobbyClient", `❌ Purchase failed: {errorMsg}`)
-    end
-end)
+    end)
+end
 
--- Listen for unlocked plants sync
-ZapClient.SyncUnlockedPlants.On(function(data)
-    Logger.Info("LobbyClient", `Synced {#data.UnlockedPlants} unlocked plants`)
+-- ============================================
+-- LOADER STEPS
+-- ============================================
+
+-- Step 1: Load Modules
+loader:AddStep("Modules", function()
+    ZapClient = require(script:WaitForChild("network"):WaitForChild("generated"))
+    LobbyHUD = require(script:WaitForChild("ui"):WaitForChild("LobbyHUD"))
+    PadUIController = require(script:WaitForChild("controllers"):WaitForChild("PadUIController"))
+    ZoneInteractionController = require(script:WaitForChild("controllers"):WaitForChild("ZoneInteractionController"))
+    UIStateManager = require(script:WaitForChild("controllers"):WaitForChild("UIStateManager"))
+end, 2)
+
+-- Step 2: Setup Network Events
+loader:AddStep("Network", function()
+    setupNetworkListeners()
+end, 1)
+
+-- Step 3: Initialize Controllers
+loader:AddStep("Controllers", function()
+    PadUIController.Initialize()
+    Logger.Info("LobbyClient", "PadUIController initialized")
     
-    -- Update player data
-    local current = Fusion.peek(playerData)
-    if current then
-        current.UnlockedPlants = data.UnlockedPlants
-        playerData:set(current)
-    end
-    
-    -- Update ZoneInteractionController
-    ZoneInteractionController.UpdateUnlockedPlants(data.UnlockedPlants)
-end)
+    ZoneInteractionController.Initialize()
+    ZoneInteractionController.SetOnPurchasePlant(purchasePlant)
+    ZoneInteractionController.SetOnSaveDeck(saveDeck)
+    ZoneInteractionController.SetOnPurchaseMutation(purchaseMutation)
+    ZoneInteractionController.SetOnRemoveMutation(removeMutation)
+    Logger.Info("LobbyClient", "ZoneInteractionController initialized")
+end, 2)
 
--- Listen for deck changes
-ZapClient.DeckChanged.On(function(data)
-    Logger.Info("LobbyClient", `Deck updated: {#data.Deck} plants`)
-    currentDeck:set(data.Deck)
-    ZoneInteractionController.UpdateDeck(data.Deck)
-end)
-
--- Listen for mutation purchase response
-ZapClient.PurchaseMutationResponse.On(function(response)
-    if response.Success then
-        Logger.Info("LobbyClient", `✅ Purchased mutation {response.MutationType} for {response.PlantType}! New balance: {response.NewCoins}`)
-        requestPlayerData()
-    else
-        local errorMsg = response.ErrorCode == 1 and "Already owned"
-            or response.ErrorCode == 2 and "Not enough coins"
-            or response.ErrorCode == 3 and "Level too low"
-            or response.ErrorCode == 4 and "Plant not owned"
-            or response.ErrorCode == 5 and "Incompatible mutation"
-            or response.ErrorCode == 6 and "Invalid mutation"
-            or "Unknown error"
-        Logger.Warn("LobbyClient", `❌ Mutation purchase failed: {errorMsg}`)
-    end
-end)
-
--- Listen for mutation remove response
-ZapClient.RemoveMutationResponse.On(function(response)
-    if response.Success then
-        Logger.Info("LobbyClient", `✅ Removed mutation {response.MutationType} from {response.PlantType}`)
-        requestPlayerData()
-    else
-        Logger.Warn("LobbyClient", `❌ Mutation removal failed`)
-    end
-end)
-
--- Listen for plant mutations sync
-ZapClient.SyncPlantMutations.On(function(data)
-    Logger.Info("LobbyClient", `Synced mutations for {data.PlantType}: {#data.Mutations}`)
-    ZoneInteractionController.UpdatePlantMutations({[data.PlantType] = data.Mutations})
-    -- Update local state for LobbyHUD
-    local current = Fusion.peek(plantMutations)
-    current[data.PlantType] = data.Mutations
-    plantMutations:set(current)
-end)
-
--- Listen for all mutations sync
-ZapClient.SyncAllMutations.On(function(data)
-    Logger.Info("LobbyClient", "Synced all plant mutations")
-    ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
-    -- Update local state for LobbyHUD
-    plantMutations:set(data.PlantMutations)
-end)
-
--- Listen for battle results
-ZapClient.ShowResults.On(function(results)
-    Logger.Info("LobbyClient", "Battle results received", {
-        victory = results.Victory,
-        stars = results.Stars,
-        coins = results.CoinsEarned,
-        xp = results.XPEarned,
+-- Step 4: Mount HUD
+loader:AddStep("UI", function()
+    local hudGui = LobbyHUD(scope, {
+        PlayerData = playerData,
+        CurrentDeck = currentDeck,
+        PlantMutations = plantMutations,
     })
-    
-    -- Refresh player data after battle
+    hudGui.Parent = PlayerGui
+    UIStateManager.Register("LobbyHUD", hudGui)
+    Logger.Info("LobbyClient", "LobbyHUD mounted")
+end, 1)
+
+-- Step 5: Request Player Data
+loader:AddStep("PlayerData", function()
+    checkReturnData()
     requestPlayerData()
-end)
+    -- Small delay to let initial data sync
+    task.wait(0.3)
+end, 1)
+
+-- Step 6: Ready
+loader:AddStep("Ready", function()
+    Logger.Info("LobbyClient", "3D Lobby client fully initialized")
+end, 0.5)
 
 -- ============================================
--- STARTUP
+-- RUN LOADER
 -- ============================================
 
--- Check for return data from arena
-checkReturnData()
-
--- Request initial player data
-task.defer(requestPlayerData)
-
-Logger.Info("LobbyClient", "✅ 3D Lobby client fully initialized")
+loader:Run()

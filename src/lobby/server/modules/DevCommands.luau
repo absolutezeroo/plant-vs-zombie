@@ -285,7 +285,7 @@ end
 -- Initialize with PlayerDataService reference
 function DevCommands.Initialize(playerDataServiceRef: any)
     PlayerDataService = playerDataServiceRef
-    Logger.Info("DevCommands", "✅ DevCommands initialized")
+    Logger.Info("DevCommands", "DevCommands initialized")
 end
 
 return DevCommands

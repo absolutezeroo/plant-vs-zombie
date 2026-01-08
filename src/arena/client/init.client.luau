@@ -26,14 +26,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
--- Now create the proper LoaderUI
-local UI_Folder = script:WaitForChild("ui")
-local LoaderUI = require(UI_Folder.LoaderUI)
-local loader = LoaderUI.new()
-
-loader:SetStage(1, "Initializing...")
-
--- Import shared modules
+-- Import shared modules first to get LoaderUI
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local ErrorHandler = require(Shared.utils.ErrorHandler)
@@ -41,7 +34,11 @@ local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local MapConfig = require(Shared.config.MapConfig)
 
-loader:SetStage(2, "Loading packages...")
+-- Now create the proper LoaderUI from shared
+local LoaderUI = require(Shared.ui.LoaderUI)
+local loader = LoaderUI.new()
+
+loader:SetStage(1, "Initializing...")
 
 -- Import client folders (init.client.luau IS the Client script, children are direct)
 local Systems = script:WaitForChild("systems")
@@ -52,7 +49,7 @@ local LocalPlayer = Players.LocalPlayer
 
 Logger.Info("Client", `Initializing client for {LocalPlayer.Name}`)
 
-loader:SetStage(3, "Setting up ECS...")
+loader:SetStage(2, "Setting up ECS...")
 
 -- Create client Matter World (separate from server world)
 local world = Matter.World.new()
@@ -63,7 +60,7 @@ local loop = Matter.Loop.new(world)
 
 Logger.Info("Client", "Client Matter World created")
 
-loader:SetStage(4, "Loading systems...")
+loader:SetStage(3, "Loading systems...")
 
 -- Load all client systems from systems folder (RECURSIVELY scan subfolders)
 local systemModules: {any} = {}
@@ -94,7 +91,7 @@ Logger.Info("Client", `Loaded {#systemModules} client systems`)
 -- Schedule systems in the loop
 loop:scheduleSystems(systemModules)
 
-loader:SetStage(5, "Preparing UI...")
+loader:SetStage(4, "Preparing UI...")
 
 -- Start the loop at 60 Hz (RenderStepped for client)
 loop:begin({
@@ -131,7 +128,7 @@ victoryScreen:Mount()
 
 Logger.Info("Client", "HUD and VictoryScreen mounted")
 
-loader:SetStage(6, "Syncing with server...")
+loader:SetStage(5, "Syncing with server...")
 
 -- Performance monitoring (less frequent on client to save cycles)
 local frameCount = 0
