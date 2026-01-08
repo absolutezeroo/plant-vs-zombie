@@ -8,7 +8,6 @@
 	- Deck management
 	
 	Note: Upgrades replaced by Mutations system (see MutationHandler)
-	Note: Stage system replaced by World/Difficulty system (see WorldData, DifficultyData)
 ]]
 
 local Players = game:GetService("Players")

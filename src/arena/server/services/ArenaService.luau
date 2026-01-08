@@ -8,10 +8,9 @@
     - Setting up world + difficulty and deck
     - Returning to Lobby with results
     
-    NEW SYSTEM (v2):
-    - Uses WorldData + DifficultyData instead of StageData
-    - World determines map, mechanics, zombie pool
-    - Difficulty determines wave count, budget, multipliers
+    Configuration:
+    - World determines map, mechanics, zombie pool (see WorldData)
+    - Difficulty determines wave count, budget, multipliers (see DifficultyData)
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

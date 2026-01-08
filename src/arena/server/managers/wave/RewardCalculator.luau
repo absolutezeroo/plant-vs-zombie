@@ -22,7 +22,7 @@ export type SessionStats = {
 export type RewardResult = {
     TotalCoins: number,
     BonusCoins: number,
-    StageCoins: number,
+    CompletionCoins: number,
     FirstClearBonus: number,
     XPEarned: number,
     GemsEarned: number,
@@ -72,14 +72,12 @@ function RewardCalculator:CalculateRewards(params: RewardParams): RewardResult
     local result: RewardResult = {
         TotalCoins = 0,
         BonusCoins = 0,
-        StageCoins = 0,
+        CompletionCoins = 0,
         FirstClearBonus = 0,
         XPEarned = 0,
         GemsEarned = 0,
         StarRating = params.StarRating,
         LevelsGained = 0,
-        IsFirstClear = params.IsFirstClear or false,
-        IsNewBest = params.IsNewBest or false,
     }
     
     local stats = params.SessionStats
@@ -94,16 +92,16 @@ function RewardCalculator:CalculateRewards(params: RewardParams): RewardResult
         result.TotalCoins += result.BonusCoins
     end
     
-    -- Difficulty-based completion rewards (new system)
+    -- Difficulty-based completion rewards
     if difficultyConfig then
         if params.IsVictory then
-            result.StageCoins = params.BaseCoins or difficultyConfig.CoinReward or 0
-            result.TotalCoins += result.StageCoins
+            result.CompletionCoins = params.BaseCoins or difficultyConfig.CoinReward or 0
+            result.TotalCoins += result.CompletionCoins
         end
     elseif params.BaseCoins then
         -- Use BaseCoins directly if provided (e.g., endless mode)
-        result.StageCoins = params.BaseCoins
-        result.TotalCoins += result.StageCoins
+        result.CompletionCoins = params.BaseCoins
+        result.TotalCoins += result.CompletionCoins
     end
     
     -- XP calculation

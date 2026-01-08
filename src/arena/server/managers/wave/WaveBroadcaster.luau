@@ -2,7 +2,7 @@
 --[[
     WaveBroadcaster.luau - Handles network events for wave system
     
-    Single Responsibility: Broadcast wave/stage events to clients
+    Single Responsibility: Broadcast wave and game events to clients
 ]]
 
 local Players = game:GetService("Players")
@@ -17,43 +17,26 @@ export type RewardResult = RewardCalculator.RewardResult
 
 export type WaveBroadcaster = {
     BroadcastGameStarted: (self: WaveBroadcaster, worldId: string, difficulty: string, worldName: string, difficultyName: string, waveCount: number) -> (),
-    BroadcastStageStarted: (self: WaveBroadcaster, stageId: string, stageName: string, waveCount: number) -> (),
     BroadcastWaveStarted: (self: WaveBroadcaster, waveNumber: number, zombieCount: number) -> (),
     BroadcastWaveCompleted: (self: WaveBroadcaster, waveNumber: number, survived: boolean) -> (),
     BroadcastGameOver: (self: WaveBroadcaster, victory: boolean, waveReached: number) -> (),
-    BroadcastStageComplete: (self: WaveBroadcaster, player: Player, data: StageCompleteData) -> (),
     BroadcastGameEndRewards: (self: WaveBroadcaster, player: Player, data: GameEndRewardsData) -> (),
     BroadcastTeleportCountdown: (self: WaveBroadcaster, timeRemaining: number) -> (),
     BroadcastPreparationTime: (self: WaveBroadcaster, timeRemaining: number) -> (),
     BroadcastIntermissionTime: (self: WaveBroadcaster, timeRemaining: number) -> (),
 }
 
-export type StageCompleteData = {
-    StageId: string,
-    Victory: boolean,
-    Stars: number,
-    CoinsEarned: number,
-    XPEarned: number,
-    IsFirstClear: boolean,
-    IsNewBest: boolean,
-    PreviousStars: number,
-}
-
 export type GameEndRewardsData = {
-    WorldId: string?,
-    Difficulty: string?,
     Victory: boolean,
     CoinsEarned: number,
     ZombiesKilled: number,
     WavesCompleted: number,
-    TotalWaves: number?,
     BonusCoins: number,
     StarRating: number,
     XPEarned: number,
-    GemsEarned: number?,
+    GemsEarned: number,
     NewLevel: number,
     LevelsGained: number,
-    IsEndless: boolean?,
 }
 
 local WaveBroadcaster = {}
@@ -113,13 +96,6 @@ function WaveBroadcaster:BroadcastGameOver(victory: boolean, waveReached: number
         WaveReached = waveReached,
     })
     Logger.Info("WaveBroadcaster", `Game over: {if victory then "VICTORY" else "DEFEAT"} at wave {waveReached}`)
-end
-
--- Broadcast stage complete to a specific player
-function WaveBroadcaster:BroadcastStageComplete(player: Player, data: StageCompleteData)
-    local Network = getNetwork()
-    Network.StageComplete.Fire(player, data)
-    Logger.Debug("WaveBroadcaster", `Stage complete sent to {player.Name}`)
 end
 
 -- Broadcast end game rewards to a specific player

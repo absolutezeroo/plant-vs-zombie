@@ -318,7 +318,7 @@ local MAX_LEVEL = 50              -- Maximum player level
 -- Gem rewards
 local GEMS_PER_LEVEL_UP = 10      -- Gems earned per level up
 local GEMS_VICTORY_3_STAR = 5     -- Gems for 3-star victory
-local GEMS_FIRST_CLEAR = 25       -- Gems for first-time stage clear
+local GEMS_FIRST_CLEAR = 25       -- Gems for first-time world/difficulty clear
 
 -- Calculate XP required for a specific level
 local function getXPForLevel(level: number): number

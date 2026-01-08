@@ -2,7 +2,7 @@
 --[[
     MapLoader.luau - Dynamic map loading service
     
-    Loads map models from ReplicatedStorage.Maps based on stage configuration.
+    Loads map models from ReplicatedStorage.Maps based on world configuration.
     Handles map cleanup, grid reconfiguration, and spawn point setup.
     
     Expected structure in ReplicatedStorage:

@@ -16,8 +16,7 @@
     - Assault phase (50% budget): Main wave
     - Flag phase (30% budget): Final push
     
-    NEW SYSTEM (v2):
-    - Uses WorldData + DifficultyData instead of StageData
+    Configuration:
     - World = map, mechanics, zombie pool
     - Difficulty = wave count, budget, multipliers
     
@@ -57,26 +56,6 @@ local ZombieTypeComponent = Components.ZombieTypeComponent
 type GameState = GameStateManager.GameState
 type SpawnPhase = WaveSpawner.SpawnPhase
 
--- Stage config type (mirrors StageData.StageConfig for local use)
-type StageConfig = {
-    Id: string,
-    Name: string,
-    Description: string?,
-    World: number,
-    Level: number,
-    MapId: string?,
-    Waves: any?,
-    TotalWaves: number,
-    BaseBudget: number,
-    BudgetScale: number,
-    DefaultZombiePool: {string}?,
-    SunGeneration: number?,
-    StartingSun: number?,
-    Rewards: any?,
-    Stars: any?,
-    UnlockRequirement: any?,
-}
-
 -- Wave timing configuration
 local WaveConfig = {
     FIRST_WAVE_DELAY = 20,    -- Preparation time
@@ -97,7 +76,7 @@ local _phaseBudget = 0
 local _totalBudget = 0
 local _zombiesSpawnedThisWave = 0
 
--- NEW: World + Difficulty instead of StageId
+-- World + Difficulty config
 local _currentWorldId = "day"
 local _currentDifficulty = "normal"
 local _currentWorldConfig: WorldData.WorldConfig? = nil
@@ -259,7 +238,7 @@ local function handleGameEnd(isVictory: boolean)
             BaseCoins = baseCoins,
             BaseXP = baseXP,
             WaveMultiplier = waveMultiplier,
-            IsFirstClear = false,  -- No longer tracking per-stage completion
+            IsFirstClear = false,  -- Not tracking per-run completion
             IsNewBest = false,
         })
         
@@ -283,17 +262,14 @@ local function handleGameEnd(isVictory: boolean)
         
         -- Broadcast to client (World + Difficulty based)
         _broadcaster:BroadcastGameEndRewards(player, {
-            WorldId = _currentWorldId,
-            Difficulty = _currentDifficulty,
             Victory = isVictory,
-            Stars = starRating,
             CoinsEarned = rewards.TotalCoins or baseCoins,
-            XPEarned = rewards.XPEarned or baseXP,
             ZombiesKilled = sessionStats.ZombiesKilled,
             WavesCompleted = _currentWave,
-            TotalWaves = _totalWaves,
             BonusCoins = rewards.BonusCoins or 0,
             StarRating = starRating,
+            XPEarned = rewards.XPEarned or baseXP,
+            GemsEarned = rewards.GemsEarned or 0,
             NewLevel = newLevel,
             LevelsGained = levelsGained,
         })

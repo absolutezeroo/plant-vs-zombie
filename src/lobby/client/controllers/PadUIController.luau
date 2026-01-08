@@ -5,7 +5,7 @@
     Responsibilities:
     - Create/update BillboardGui for each pad
     - Listen for PadStateUpdate from server
-    - Display: Stage info, X/Y players, countdown, status
+    - Display: World info, X/Y players, countdown, status
     - Show Leave button when player is on pad (TDS-style)
 ]]
 
