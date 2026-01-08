@@ -10,8 +10,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
--- Zap generated module
-local ZapServer = require(script.Parent.Parent.network.generated)
+-- Network (unified Zap schema in shared/network)
+local ZapServer = require(Shared.network.generated.server)
 
 -- Dependencies
 local PadManager = require(script.Parent.Parent.modules.PadManager)

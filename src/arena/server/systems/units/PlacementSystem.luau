@@ -32,10 +32,15 @@ local HealthComponent = Components.HealthComponent
 local PlantTypeComponent = Components.PlantTypeComponent
 local OwnerComponent = Components.OwnerComponent
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+-- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent.Parent
 local GridService = require(Server.services.GridService)
-local Network = require(Server.network.generated)
+
+-- Import MutationApplySystem for mutation queries
+local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
 
 -- Player sun tracking (temporary until ProfileStore integration)
 local playerSun: {[Player]: number} = {}
@@ -221,7 +226,14 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		cooldowns[plantType] = os.clock() + stats.Cooldown
 	end
 	
-	Logger.Info("PlacementSystem", `Spawned {plantType} at ({column}, {lane}) for {player.Name} - Entity {entityId}`)
+	-- Get equipped mutations for this plant
+	local mutations = MutationApplySystemModule.API.GetPlantMutations(player.UserId, plantType)
+	local mutationInfo = ""
+	if #mutations > 0 then
+		mutationInfo = ` with {#mutations} mutation(s): {table.concat(mutations, ", ")}`
+	end
+	
+	Logger.Info("PlacementSystem", `Spawned {plantType} at ({column}, {lane}) for {player.Name} - Entity {entityId}{mutationInfo}`)
 	
 	-- Broadcast to all clients
 	Network.PlantSpawned.FireAll({

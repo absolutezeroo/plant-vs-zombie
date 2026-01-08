@@ -29,7 +29,7 @@ local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 assert(Modules, "SunRenderSystem: modules folder not found")
 local SelectionState = require(Modules.SelectionState)
-local Network = require(Client.network.generated)
+local Network = require(Shared.network.generated.client)
 
 -- VFX/Audio services (lazy loaded to avoid circular deps)
 local _vfxService: any = nil

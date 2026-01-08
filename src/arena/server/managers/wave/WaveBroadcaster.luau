@@ -63,8 +63,8 @@ WaveBroadcaster.__index = WaveBroadcaster
 local _network: any = nil
 local function getNetwork()
     if not _network then
-        local Server = script.Parent.Parent.Parent
-        _network = require(Server.network.generated)
+        local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+        _network = require(Shared.network.generated.server)
     end
     return _network
 end
@@ -77,29 +77,12 @@ end
 -- Broadcast game started (new World + Difficulty system)
 function WaveBroadcaster:BroadcastGameStarted(worldId: string, difficulty: string, worldName: string, difficultyName: string, waveCount: number)
     local Network = getNetwork()
-    -- Use StageStarted event for compatibility, or add GameStarted to packets.zap
-    Network.StageStarted.FireAll({
-        StageId = `{worldId}-{difficulty}`,
-        StageName = `{worldName} ({difficultyName})`,
-        WaveCount = waveCount,
-        -- New fields (will be ignored by old clients)
+    Network.GameStarted.FireAll({
         WorldId = worldId,
         Difficulty = difficulty,
-        WorldName = worldName,
-        DifficultyName = difficultyName,
-    })
-    Logger.Debug("WaveBroadcaster", `Game started: {worldName} | {difficultyName}`)
-end
-
--- Broadcast stage started (legacy)
-function WaveBroadcaster:BroadcastStageStarted(stageId: string, stageName: string, waveCount: number)
-    local Network = getNetwork()
-    Network.StageStarted.FireAll({
-        StageId = stageId,
-        StageName = stageName,
         WaveCount = waveCount,
     })
-    Logger.Debug("WaveBroadcaster", `Stage started: {stageId}`)
+    Logger.Debug("WaveBroadcaster", `Game started: {worldName} | {difficultyName}`)
 end
 
 -- Broadcast wave started
@@ -156,20 +139,14 @@ function WaveBroadcaster:BroadcastTeleportCountdown(timeRemaining: number)
     end
 end
 
--- Broadcast preparation time
-function WaveBroadcaster:BroadcastPreparationTime(timeRemaining: number)
-    local Network = getNetwork()
-    Network.PreparationTime.FireAll({
-        TimeRemaining = timeRemaining,
-    })
+-- Broadcast preparation time (client handles countdown locally via WaveStarted with WaveNumber=0)
+function WaveBroadcaster:BroadcastPreparationTime(_timeRemaining: number)
+    -- No-op: Client counts down locally after receiving WaveStarted with WaveNumber=0
 end
 
--- Broadcast intermission time
-function WaveBroadcaster:BroadcastIntermissionTime(timeRemaining: number)
-    local Network = getNetwork()
-    Network.IntermissionTime.FireAll({
-        TimeRemaining = timeRemaining,
-    })
+-- Broadcast intermission time (client handles countdown locally via WaveCompleted)
+function WaveBroadcaster:BroadcastIntermissionTime(_timeRemaining: number)
+    -- No-op: Client counts down locally after receiving WaveCompleted
 end
 
 -- Singleton instance

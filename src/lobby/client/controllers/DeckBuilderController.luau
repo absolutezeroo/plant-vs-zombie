@@ -19,9 +19,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local PlantData = require(Shared.data.PlantData)
 
--- Import Zap (navigate from controllers/ to client/ then to network/)
-local LobbyClient = script.Parent.Parent
-local ZapClient = require(LobbyClient:WaitForChild("network"):WaitForChild("generated"))
+-- Network (unified Zap schema in shared/network)
+local ZapClient = require(Shared.network.generated.client)
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")

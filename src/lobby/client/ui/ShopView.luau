@@ -13,6 +13,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ProgressionData = require(Shared.data.ProgressionData)
 local PlantData = require(Shared.data.PlantData)
+local ModernTheme = require(Shared.ui.ModernTheme)
 
 local New = Fusion.New
 local Children = Fusion.Children
@@ -21,20 +22,21 @@ local Computed = Fusion.Computed
 local Value = Fusion.Value
 local peek = Fusion.peek
 
--- Modern dark color palette
+-- Use shared theme colors with local aliases for convenience
+local ThemeColors = ModernTheme.Colors
 local Colors = {
-    Background = Color3.fromRGB(22, 22, 30),
-    CardBg = Color3.fromRGB(38, 38, 50),
-    CardHover = Color3.fromRGB(50, 50, 65),
-    TopBar = Color3.fromRGB(30, 30, 42),
-    Gold = Color3.fromRGB(255, 193, 7),
-    GoldDark = Color3.fromRGB(200, 150, 0),
-    Green = Color3.fromRGB(76, 175, 80),
-    GreenLight = Color3.fromRGB(129, 199, 132),
-    TextWhite = Color3.new(1, 1, 1),
-    TextMuted = Color3.fromRGB(150, 150, 160),
-    Disabled = Color3.fromRGB(80, 80, 90),
-    Border = Color3.fromRGB(60, 60, 75),
+    Background = ThemeColors.Background,
+    CardBg = ThemeColors.Card,
+    CardHover = ThemeColors.CardHover,
+    TopBar = ThemeColors.Panel,
+    Gold = ThemeColors.Gold,
+    GoldDark = ThemeColors.GoldDark,
+    Green = ThemeColors.Success,
+    GreenLight = ThemeColors.SuccessLight,
+    TextWhite = ThemeColors.TextWhite,
+    TextMuted = ThemeColors.TextMuted,
+    Disabled = ThemeColors.Disabled,
+    Border = ThemeColors.Border,
 }
 
 export type ShopViewProps = {
@@ -43,21 +45,8 @@ export type ShopViewProps = {
     OnPurchase: (plantType: string) -> (),
 }
 
--- Plant emoji mapping
-local PlantEmojis: {[string]: string} = {
-    Peashooter = "🌱", Sunflower = "🌻", WallNut = "🥜",
-    PotatoMine = "💣", SnowPea = "❄️", Repeater = "🌿",
-    CherryBomb = "🍒", Chomper = "🦷", Jalapeno = "🌶️",
-    TallNut = "🧱", Squash = "🎃", ThreePeater = "🌾",
-    TorchWood = "🔥", Spikeweed = "⚔️", Pumpkin = "🎃",
-    Starfruit = "⭐", MagnifyingGrass = "🔍", CattailPlant = "🐱",
-    CobCannon = "🌽", Bonkchoy = "🥬", Snapdragon = "🐉",
-    IceBerg = "🧊", SunShroom = "🍄",
-}
-
-local function getPlantEmoji(plantType: string): string
-    return PlantEmojis[plantType] or "🌱"
-end
+-- Use shared emoji function from ModernTheme
+local getPlantEmoji = ModernTheme.GetPlantEmoji
 
 local function getSortedPlants(): {{PlantType: string, Info: ProgressionData.PlantUnlockInfo}}
     local plants = {}
@@ -207,6 +196,7 @@ local function PlantCard(scope: any, props: {
                     BackgroundColor3 = if canAfford then Colors.Gold else Colors.Disabled,
                     Text = "",
                     AutoButtonColor = false,
+                    ZIndex = 15, -- Above hover detector
                     
                     [OnEvent "Activated"] = function()
                         if peek(props.CanAfford) then props.OnPurchase() end
@@ -226,9 +216,9 @@ local function PlantCard(scope: any, props: {
                 }
             end),
             
-            -- Hover detector
+            -- Hover detector (covers card EXCEPT buy button area at bottom)
             New(scope, "TextButton") {
-                Size = UDim2.new(1, 0, 1, 0),
+                Size = UDim2.new(1, 0, 1, -60), -- Stop before the buy button
                 BackgroundTransparency = 1,
                 Text = "",
                 ZIndex = 10,

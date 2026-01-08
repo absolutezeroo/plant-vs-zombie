@@ -2,11 +2,11 @@
 --[[
 	ZombieSpawnSystem.luau - Server-side zombie spawning
 	
-	Priority: 100 (Simulation phase - early)
+	@deprecated Use WaveManagerSystem for wave-based spawning.
+	This system is kept only for its API.SpawnZombie() utility.
+	The system loop is DISABLED (ENABLED = false).
 	
-	Spawns zombies at the right edge of the grid.
-	For MVP: spawns test zombies on a timer.
-	Later: integrates with WaveManager for wave-based spawning.
+	Priority: 100 (Simulation phase - early)
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,13 +16,16 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+-- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
 
 -- Components (via index module)
 local PositionComponent = Components.PositionComponent

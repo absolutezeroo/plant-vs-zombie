@@ -422,17 +422,6 @@ function WaveManager.StartGame(worldId: string?, difficulty: string?): boolean
     return true
 end
 
--- Legacy function for compatibility
-function WaveManager.StartStage(stageId: string): boolean
-    -- Parse legacy format "world-difficulty" if needed
-    local worldId, difficulty = stageId:match("^(%w+)%-(%w+)$")
-    if worldId and difficulty then
-        return WaveManager.StartGame(worldId, difficulty)
-    end
-    -- Default fallback
-    return WaveManager.StartGame("day", "normal")
-end
-
 function WaveManager.StartWaves(): boolean
     if _stateManager:GetState() ~= "Preparation" then
         return false

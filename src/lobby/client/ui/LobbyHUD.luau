@@ -15,49 +15,32 @@ local Players = game:GetService("Players")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ModernTheme = require(Shared.ui.ModernTheme)
+
 local New = Fusion.New
 local Children = Fusion.Children
 local Computed = Fusion.Computed
 
--- Modern dark color palette (matching ShopView)
+-- Use shared theme colors with local aliases for convenience
+local ThemeColors = ModernTheme.Colors
 local Colors = {
-    PanelBg = Color3.fromRGB(30, 30, 40),
-    PanelBgLight = Color3.fromRGB(45, 45, 58),
-    SlotEmpty = Color3.fromRGB(40, 40, 52),
-    SlotFilled = Color3.fromRGB(50, 70, 50),
-    Gold = Color3.fromRGB(255, 193, 7),
-    Cyan = Color3.fromRGB(0, 200, 220),
-    Purple = Color3.fromRGB(180, 100, 255),
-    Green = Color3.fromRGB(100, 200, 100),
-    TextWhite = Color3.new(1, 1, 1),
-    TextMuted = Color3.fromRGB(140, 140, 150),
-    Border = Color3.fromRGB(60, 60, 75),
+    PanelBg = ThemeColors.BackgroundLight,
+    PanelBgLight = ThemeColors.PanelLight,
+    SlotEmpty = ThemeColors.SlotEmpty,
+    SlotFilled = ThemeColors.SlotFilled,
+    Gold = ThemeColors.Coins,
+    Cyan = ThemeColors.XP,
+    Purple = ThemeColors.Gems,
+    Green = ThemeColors.SuccessLight,
+    TextWhite = ThemeColors.TextWhite,
+    TextMuted = ThemeColors.TextMuted,
+    Border = ThemeColors.Border,
 }
 
--- Plant emojis
-local PlantEmojis: {[string]: string} = {
-    Peashooter = "🌱", Sunflower = "🌻", WallNut = "🥜",
-    PotatoMine = "💣", SnowPea = "❄️", Repeater = "🌿",
-    CherryBomb = "🍒", Chomper = "🦷", Jalapeno = "🌶️",
-    TallNut = "🧱", Squash = "🎃", ThreePeater = "🌾",
-    TorchWood = "🔥", Spikeweed = "⚔️", Starfruit = "⭐",
-    CobCannon = "🌽", Bonkchoy = "🥬", Snapdragon = "🐉",
-    IceBerg = "🧊", SunShroom = "🍄",
-}
-
-local function getPlantEmoji(plantType: string): string
-    return PlantEmojis[plantType] or "🌱"
-end
-
--- Mutation emojis
-local MutationEmojis: {[string]: string} = {
-    Fire = "🔥", Ice = "❄️", Electric = "⚡", Toxic = "☠️",
-    Shadow = "🌑", Solar = "☀️", Reinforced = "🛡️", Primal = "💥", Swift = "💨",
-}
-
-local function getMutationEmoji(mutationId: string): string
-    return MutationEmojis[mutationId] or "✨"
-end
+-- Use shared emoji functions from ModernTheme
+local getPlantEmoji = ModernTheme.GetPlantEmoji
+local getMutationEmoji = ModernTheme.GetMutationEmoji
 
 export type PlayerData = {
     Coins: number,
@@ -221,12 +204,12 @@ end
 local function LobbyHUD(scope: any, props: {
     PlayerData: Fusion.Value<PlayerData?>,
     CurrentDeck: Fusion.Value<{string}>,
-    PlantMutations: Fusion.Value<{[string]: {string}}>?,
+    EquippedMutations: Fusion.Value<{[string]: {string}}>?,
 }): ScreenGui
     
     local playerData = props.PlayerData
     local currentDeck = props.CurrentDeck
-    local plantMutations = props.PlantMutations
+    local plantMutations = props.EquippedMutations -- Renamed for HUD display
     
     return New(scope, "ScreenGui") {
         Name = "LobbyHUD",

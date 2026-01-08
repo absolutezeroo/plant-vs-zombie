@@ -14,6 +14,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local ProgressionData = require(Shared.data.ProgressionData)
 local MutationData = require(Shared.data.MutationData)
+local ModernTheme = require(Shared.ui.ModernTheme)
 
 local New = Fusion.New
 local Children = Fusion.Children
@@ -22,24 +23,26 @@ local Computed = Fusion.Computed
 local Value = Fusion.Value
 local peek = Fusion.peek
 
--- Modern dark color palette
+-- Use nature-themed colors from ModernTheme + standard colors
+local NatureColors = ModernTheme.ColorsNature
+local ThemeColors = ModernTheme.Colors
 local Colors = {
-    Background = Color3.fromRGB(20, 25, 20),
-    CardBg = Color3.fromRGB(35, 45, 35),
-    CardHover = Color3.fromRGB(50, 65, 50),
-    CardSelected = Color3.fromRGB(60, 90, 60),
-    TopBar = Color3.fromRGB(28, 35, 28),
+    Background = NatureColors.Background,
+    CardBg = NatureColors.Card,
+    CardHover = NatureColors.CardHover,
+    CardSelected = NatureColors.CardSelected,
+    TopBar = NatureColors.Panel,
     DeckBar = Color3.fromRGB(40, 50, 40),
-    SlotEmpty = Color3.fromRGB(30, 40, 30),
-    SlotFilled = Color3.fromRGB(55, 80, 55),
-    Gold = Color3.fromRGB(255, 193, 7),
-    Green = Color3.fromRGB(76, 175, 80),
-    GreenBright = Color3.fromRGB(100, 200, 100),
-    Red = Color3.fromRGB(244, 67, 54),
-    TextWhite = Color3.new(1, 1, 1),
-    TextMuted = Color3.fromRGB(140, 155, 140),
-    Border = Color3.fromRGB(60, 75, 60),
-    Locked = Color3.fromRGB(60, 60, 65),
+    SlotEmpty = NatureColors.SlotEmpty,
+    SlotFilled = NatureColors.SlotFilled,
+    Gold = ThemeColors.Gold,
+    Green = ThemeColors.Success,
+    GreenBright = ThemeColors.SuccessLight,
+    Red = ThemeColors.Error,
+    TextWhite = ThemeColors.TextWhite,
+    TextMuted = NatureColors.TextMuted,
+    Border = NatureColors.Border,
+    Locked = ThemeColors.Disabled,
 }
 
 export type DeckBuilderViewProps = {
@@ -51,38 +54,9 @@ export type DeckBuilderViewProps = {
     OnSaveDeck: (deck: {string}) -> (),
 }
 
--- Mutation emoji mapping
-local MutationEmojis: {[string]: string} = {
-    Fire = "🔥", Inferno = "🔥",
-    Ice = "❄️", Frost = "❄️",
-    Electric = "⚡", Thunder = "⚡",
-    Toxic = "☠️", Plague = "☠️",
-    Shadow = "🌑", Void = "🌑",
-    Solar = "☀️", Radiant = "☀️",
-    Reinforced = "🛡️", Fortress = "🛡️",
-    Primal = "💥", Savage = "💥",
-    Swift = "💨", Sonic = "💨",
-}
-
-local function getMutationEmoji(mutationType: string): string
-    return MutationEmojis[mutationType] or "✨"
-end
-
--- Plant emojis
-local PlantEmojis: {[string]: string} = {
-    Peashooter = "🌱", Sunflower = "🌻", WallNut = "🥜",
-    PotatoMine = "💣", SnowPea = "❄️", Repeater = "🌿",
-    CherryBomb = "🍒", Chomper = "🦷", Jalapeno = "🌶️",
-    TallNut = "🧱", Squash = "🎃", ThreePeater = "🌾",
-    TorchWood = "🔥", Spikeweed = "⚔️", Pumpkin = "🎃",
-    Starfruit = "⭐", MagnifyingGrass = "🔍", CattailPlant = "🐱",
-    CobCannon = "🌽", Bonkchoy = "🥬", Snapdragon = "🐉",
-    IceBerg = "🧊", SunShroom = "🍄",
-}
-
-local function getPlantEmoji(plantType: string): string
-    return PlantEmojis[plantType] or "🌱"
-end
+-- Use shared emoji functions from ModernTheme
+local getMutationEmoji = ModernTheme.GetMutationEmoji
+local getPlantEmoji = ModernTheme.GetPlantEmoji
 
 -- Deck slot component
 local function DeckSlot(scope: any, props: {

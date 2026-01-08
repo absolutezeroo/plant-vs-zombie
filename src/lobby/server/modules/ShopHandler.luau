@@ -12,9 +12,11 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ProgressionData = require(Shared.data.ProgressionData)
 local Logger = require(Shared.utils.Logger)
 
--- Network (generated from Zap)
+-- Network (unified Zap schema in shared/network)
+local Network = require(Shared.network.generated.server)
+
+-- Server reference for services
 local Server = script.Parent.Parent
-local Network = require(Server.network.generated)
 
 -- Services
 local Services = Server.services
@@ -48,8 +50,10 @@ function ShopHandler.SyncPlayerData(player: Player)
     local stats = PlayerDataService.GetStats(player) or {GamesPlayed = 0, GamesWon = 0, ZombiesKilled = 0, PlantsPlaced = 0}
     local unlockedPlants = PlayerDataService.GetUnlockedPlants(player) or {}
     local deck = PlayerDataService.GetDeck(player) or {"Sunflower", "Peashooter", "WallNut"}
-    local mutations = PlayerDataService.GetAllPlantMutations(player) or {}
+    local ownedMutations = PlayerDataService.GetAllOwnedMutations(player) or {}
+    local equippedMutations = PlayerDataService.GetAllEquippedMutations(player) or {}
     
+    -- Sync base player data
     Network.FullPlayerDataSync.Fire(player, {
         Coins = coins,
         Gems = gems,
@@ -62,7 +66,23 @@ function ShopHandler.SyncPlayerData(player: Player)
         PlantsPlaced = stats.PlantsPlaced or 0,
         UnlockedPlants = unlockedPlants,
         Deck = deck,
-        PlantMutations = mutations,
+    })
+    
+    -- Build mutation arrays for SyncAllMutations
+    local ownedArray = {}
+    for plantType, mutations in pairs(ownedMutations) do
+        table.insert(ownedArray, {PlantType = plantType, Mutations = mutations})
+    end
+    
+    local equippedArray = {}
+    for plantType, mutations in pairs(equippedMutations) do
+        table.insert(equippedArray, {PlantType = plantType, Mutations = mutations})
+    end
+    
+    -- Sync mutations separately
+    Network.SyncAllMutations.Fire(player, {
+        OwnedMutations = ownedArray,
+        EquippedMutations = equippedArray,
     })
     
     Logger.Debug("ShopHandler", `Synced full player data to {player.Name}: {coins} coins, level {level}`)

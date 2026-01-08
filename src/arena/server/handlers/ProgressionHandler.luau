@@ -17,9 +17,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
+-- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent
-local Network = require(Server.network.generated)
 local PlayerDataService = require(Server.services.PlayerDataService)
+local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
 
 local ProgressionHandler = {}
 
@@ -39,6 +43,18 @@ local function syncPlayerData(player: Player)
 		end
 	end
 	
+	-- Get equipped mutations from MutationApplySystem cache
+	local equippedMutationsDict = MutationApplySystemModule.API.GetPlayerMutations(player.UserId)
+	
+	-- Convert to array format for Zap
+	local equippedMutationsArray = {}
+	for plantType, mutations in equippedMutationsDict do
+		table.insert(equippedMutationsArray, {
+			PlantType = plantType,
+			Mutations = mutations,
+		})
+	end
+	
 	Network.PlayerDataSync.Fire(player, {
 		Coins = data.Coins,
 		Gems = data.Gems or 0,
@@ -46,6 +62,7 @@ local function syncPlayerData(player: Player)
 		Level = data.Level or 1,
 		LevelProgress = PlayerDataService.GetLevelProgress(player),
 		UnlockedPlants = unlockedPlants,
+		EquippedMutations = equippedMutationsArray,
 	})
 	
 	Logger.Debug("Progression", `Synced player data to {player.Name}`)
@@ -124,36 +141,29 @@ function ProgressionHandler.Initialize()
 		syncPlayerData(player)
 	end)
 	
-	-- Handle player joins - send initial data with delay to ensure profile is loaded
-	Players.PlayerAdded:Connect(function(player)
-		-- Wait for profile to load
-		task.wait(1)
-		
-		-- Check if profile loaded
-		local attempts = 0
-		while not PlayerDataService.GetProfile(player) and attempts < 10 do
-			task.wait(0.5)
-			attempts += 1
-		end
-		
-		syncPlayerData(player)
-		syncDeck(player)
-	end)
-	
-	-- Handle existing players (for Studio hot-reload)
-	for _, player in Players:GetPlayers() do
-		task.spawn(function()
-			task.wait(0.5)
-			syncPlayerData(player)
-			syncDeck(player)
-		end)
-	end
+	-- NOTE: Player join handling is now centralized in TeleportDataHandler
+	-- TeleportDataHandler.OnPlayerReady fires AFTER:
+	--   1. Profile is loaded
+	--   2. Teleport data is validated
+	--   3. Deck is saved to profile
+	--   4. Mutations are loaded into cache
+	-- Then init.server.luau calls SyncPlayerData and SyncDeck
 	
 	-- Register network handlers
 	Network.UnlockPlantRequest.SetCallback(handleUnlockPlant)
 	Network.SaveDeckRequest.SetCallback(handleSaveDeck)
 	
 	Logger.Info("Progression", "ProgressionHandler initialized")
+end
+
+-- Expose syncDeck for external use (e.g., after teleport deck save)
+function ProgressionHandler.SyncDeck(player: Player)
+	syncDeck(player)
+end
+
+-- Expose syncPlayerData for external use (e.g., after mutations loaded)
+function ProgressionHandler.SyncPlayerData(player: Player)
+	syncPlayerData(player)
 end
 
 return ProgressionHandler

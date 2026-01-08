@@ -2,10 +2,11 @@
 --[[
 	CardDeck.luau - Plant selection card deck UI component
 	
-	Displays 3 plant cards at bottom of screen.
-	- Tap to select plant
-	- Shows cost, cooldown overlay
+	Modern card deck UI matching Lobby style:
+	- Shows plant cards with mutation badges
+	- Displays cost, cooldown overlay
 	- Highlights selected card
+	- Includes shovel button
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,12 +17,10 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
+local ModernTheme = require(Shared.ui.ModernTheme)
 
 local Client = script.Parent.Parent
 local PlayerDataClient = require(Client.modules.PlayerDataClient)
-
--- Theme
-local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
 
 -- Fusion primitives
 local New = Fusion.New
@@ -31,20 +30,29 @@ local Computed = Fusion.Computed
 local Value = Fusion.Value
 local ForValues = Fusion.ForValues
 
--- Card configuration
-local CARD_SIZE = UDim2.fromOffset(60, 80) -- Smaller cards to fit 7 on mobile
-local CARD_SPACING = 6
-
--- Custom icon colors per plant type
-local PLANT_ICON_COLORS: {[string]: Color3} = {
-	Sunflower = Color3.fromRGB(255, 220, 50),   -- Yellow
-	Peashooter = Color3.fromRGB(100, 200, 100), -- Green
-	WallNut = Color3.fromRGB(180, 140, 80),     -- Brown
-	SnowPea = Color3.fromRGB(130, 200, 255),    -- Ice blue
-	CherryBomb = Color3.fromRGB(220, 60, 60),   -- Red
-	PotatoMine = Color3.fromRGB(140, 100, 60),  -- Dark brown
-	Repeater = Color3.fromRGB(60, 180, 60),     -- Darker green (double pea)
+-- Use shared theme colors
+local ThemeColors = ModernTheme.Colors
+local Colors = {
+	CardBg = ThemeColors.PanelLight,
+	CardSelected = ThemeColors.SuccessLight,
+	CardDisabled = ThemeColors.Disabled,
+	SlotEmpty = ThemeColors.SlotEmpty,
+	SlotFilled = ThemeColors.SlotFilled,
+	Green = ThemeColors.SuccessLight,
+	Red = ThemeColors.Error,
+	Gold = ThemeColors.Coins,
+	TextWhite = ThemeColors.TextWhite,
+	TextMuted = ThemeColors.TextMuted,
+	Border = ThemeColors.Border,
 }
+
+-- Use shared emoji functions
+local getPlantEmoji = ModernTheme.GetPlantEmoji
+local getMutationEmoji = ModernTheme.GetMutationEmoji
+
+-- Card configuration
+local CARD_SIZE = UDim2.fromOffset(75, 95)
+local CARD_SPACING = 8
 
 export type CardDeckProps = {
 	Scope: any, -- Fusion.Scope
@@ -52,6 +60,7 @@ export type CardDeckProps = {
 	SunCount: any, -- Fusion.Value<number>
 	Cooldowns: any, -- Fusion.Value<{[string]: number}>
 	ShovelMode: any, -- Fusion.Value<boolean>
+	PlayerMutations: any?, -- Fusion.Value<{[string]: {string}}>?
 	OnSelect: (plantType: string) -> (),
 	OnShovelToggle: () -> (),
 }
@@ -62,6 +71,7 @@ local function PlantCard(props: {
 	SelectedPlant: any,
 	SunCount: any,
 	Cooldowns: any,
+	Mutations: {string}?,
 	OnSelect: (plantType: string) -> (),
 	LayoutOrder: number?,
 })
@@ -87,7 +97,7 @@ local function PlantCard(props: {
 	-- Cooldown remaining
 	local cooldownRemaining = Value(scope, 0)
 	
-	-- Update cooldown every frame (using Fusion's internal clock would be better but this works)
+	-- Update cooldown every frame
 	task.spawn(function()
 		while true do
 			local cooldowns = Fusion.peek(props.Cooldowns)
@@ -105,43 +115,35 @@ local function PlantCard(props: {
 		return use(cooldownRemaining) > 0
 	end)
 	
-	-- Card background color (PvZ style)
+	-- Modern card colors
 	local backgroundColor = Computed(scope, function(use)
 		if use(isOnCooldown) then
-			return PvZTheme.Colors.Disabled
+			return Colors.CardDisabled
 		elseif not use(canAfford) then
-			return Color3.fromRGB(140, 80, 60) -- Brownish red when can't afford
+			return Color3.fromRGB(80, 50, 50) -- Dark red when can't afford
 		elseif use(isSelected) then
-			return PvZTheme.Colors.GrassGreen
+			return Colors.CardSelected
 		else
-			return PvZTheme.Colors.WoodBrown
+			return Colors.SlotFilled
 		end
 	end)
 	
-	-- Border color (PvZ style)
 	local borderColor = Computed(scope, function(use)
-		if use(isSelected) then
-			return PvZTheme.Colors.SunYellow
+		local hasMutation = props.Mutations and #props.Mutations > 0
+		if hasMutation then
+			return Color3.fromRGB(255, 150, 50) -- Orange for mutations
+		elseif use(isSelected) then
+			return Colors.Gold
 		else
-			return PvZTheme.Colors.WoodDark
+			return Colors.Green
 		end
 	end)
 	
-	-- Hover state for animation
+	local borderThickness = if props.Mutations and #props.Mutations > 0 then 3 else 2
+	
+	-- Hover state
 	local isHovered = Value(scope, false)
 	
-	-- Card scale based on hover/selection
-	local cardScale = Computed(scope, function(use)
-		if use(isSelected) then
-			return 1.05
-		elseif use(isHovered) then
-			return 1.08
-		else
-			return 1
-		end
-	end)
-	
-	-- Create the button with animation
 	local button = New(scope, "TextButton")({
 		Name = `Card_{plantType}`,
 		Size = CARD_SIZE,
@@ -163,88 +165,108 @@ local function PlantCard(props: {
 		end,
 		
 		[Children] = {
-			-- Scale container for animation
-			New(scope, "UIScale")({
-				Scale = cardScale,
-			}),
-			-- Border
+			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
 			New(scope, "UIStroke")({
 				Color = borderColor,
-				Thickness = 3,
+				Thickness = borderThickness,
 			}),
 			
-			-- Corner rounding
-			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
-			
-			-- Plant icon placeholder (colored square for MVP)
-			New(scope, "Frame")({
-				Name = "Icon",
-				Position = UDim2.new(0.5, 0, 0.35, 0),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(40, 40), -- Smaller icon for smaller cards
-				BackgroundColor3 = PLANT_ICON_COLORS[plantType] or Color3.fromRGB(150, 150, 150),
-				BorderSizePixel = 0,
-				
+			-- Mutation badge (top-right)
+			(props.Mutations and #props.Mutations > 0) and New(scope, "Frame")({
+				Size = UDim2.fromOffset(24, 24),
+				Position = UDim2.new(1, -4, 0, 4),
+				AnchorPoint = Vector2.new(1, 0),
+				BackgroundColor3 = Color3.fromRGB(255, 100, 50),
+				ZIndex = 6,
 				[Children] = {
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 6) }),
+					New(scope, "UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 					New(scope, "TextLabel")({
-						Size = UDim2.fromScale(1, 1),
+						Size = UDim2.new(1, 0, 1, 0),
 						BackgroundTransparency = 1,
-						Text = string.sub(plantType, 1, 1), -- First letter
-						TextColor3 = Color3.new(1, 1, 1),
-						TextScaled = true,
+						Text = getMutationEmoji(props.Mutations[1]),
+						TextSize = 14,
+					}),
+				},
+			}) or nil,
+			
+			-- Plant emoji
+			New(scope, "TextLabel")({
+				Size = UDim2.new(1, 0, 0, 40),
+				Position = UDim2.fromOffset(0, 10),
+				BackgroundTransparency = 1,
+				Text = getPlantEmoji(plantType),
+				TextSize = 32,
+			}),
+			
+			-- Cost
+			New(scope, "Frame")({
+				Size = UDim2.fromOffset(45, 22),
+				Position = UDim2.new(0.5, 0, 0, 50),
+				AnchorPoint = Vector2.new(0.5, 0),
+				BackgroundColor3 = Colors.CardBg,
+				[Children] = {
+					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
+					New(scope, "UIStroke")({
+						Color = Colors.Border,
+						Thickness = 1,
+					}),
+					New(scope, "TextLabel")({
+						Size = UDim2.fromOffset(16, 22),
+						Position = UDim2.fromOffset(2, 0),
+						BackgroundTransparency = 1,
+						Text = "☀️",
+						TextSize = 12,
+					}),
+					New(scope, "TextLabel")({
+						Size = UDim2.fromOffset(25, 22),
+						Position = UDim2.fromOffset(18, 0),
+						BackgroundTransparency = 1,
+						Text = tostring(stats.Cost),
+						TextColor3 = Computed(scope, function(use)
+							return if use(canAfford) then Colors.Gold else Colors.Red
+						end),
+						TextSize = 13,
 						Font = Enum.Font.GothamBold,
 					}),
 				},
 			}),
 			
-			-- Cost display with stroke
+			-- Plant name (small, bottom)
 			New(scope, "TextLabel")({
-				Name = "Cost",
-				Position = UDim2.new(0.5, 0, 0.75, 0),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.new(0.9, 0, 0.2, 0),
+				Size = UDim2.new(1, -8, 0, 18),
+				Position = UDim2.new(0, 4, 1, -20),
 				BackgroundTransparency = 1,
-				Text = Computed(scope, function(use)
-					if use(isOnCooldown) then
-						return string.format("%.1fs", use(cooldownRemaining))
-					else
-						return PvZTheme.Icons.Sun .. " " .. tostring(stats.Cost)
-					end
-				end),
-				TextColor3 = Computed(scope, function(use)
-					if use(canAfford) and not use(isOnCooldown) then
-						return PvZTheme.Colors.SunYellow
-					else
-						return Color3.fromRGB(255, 150, 150)
-					end
-				end),
-				TextScaled = true,
+				Text = if #plantType > 9 then plantType:sub(1, 8) .. "." else plantType,
+				TextColor3 = Colors.TextWhite,
+				TextSize = 10,
 				Font = Enum.Font.GothamBold,
-				
-				[Children] = {
-					New(scope, "UIStroke")({
-						Color = Color3.fromRGB(0, 0, 0),
-						Thickness = 1,
-					}),
-				},
+				TextTruncate = Enum.TextTruncate.AtEnd,
 			}),
 			
 			-- Cooldown overlay
-			New(scope, "Frame")({
-				Name = "CooldownOverlay",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundColor3 = Color3.new(0, 0, 0),
-				BackgroundTransparency = Computed(scope, function(use)
-					return use(isOnCooldown) and 0.5 or 1
-				end),
-				BorderSizePixel = 0,
-				ZIndex = 10,
-				
-				[Children] = {
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
-				},
-			}),
+			Computed(scope, function(use)
+				if use(isOnCooldown) then
+					local cd = use(cooldownRemaining)
+					return New(scope, "Frame")({
+						Size = UDim2.new(1, 0, 1, 0),
+						BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+						BackgroundTransparency = 0.6,
+						ZIndex = 3,
+						[Children] = {
+							New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
+							New(scope, "TextLabel")({
+								Size = UDim2.new(1, 0, 1, 0),
+								BackgroundTransparency = 1,
+								Text = string.format("%.1f", cd),
+								TextColor3 = Color3.fromRGB(255, 255, 255),
+								TextSize = 20,
+								Font = Enum.Font.GothamBold,
+							}),
+						},
+					})
+				end
+				return nil
+			end),
 		},
 	})
 	
@@ -254,7 +276,7 @@ end
 local function CardDeck(props: CardDeckProps)
 	local scope = props.Scope
 	
-	-- Get player's saved deck (sorted by cost for display)
+	-- Get player's saved deck
 	local sortedDeckPlants = Computed(scope, function(use)
 		local deck = use(PlayerDataClient.GetDeckValue())
 		local sorted = table.clone(deck)
@@ -281,14 +303,14 @@ local function CardDeck(props: CardDeckProps)
 	-- Shovel button style
 	local shovelBgColor = Computed(scope, function(use)
 		return if use(props.ShovelMode) 
-			then PvZTheme.Colors.HealthRed -- Active = red
-			else PvZTheme.Colors.WoodBrown
+			then Colors.Red -- Active = red
+			else Colors.CardBg
 	end)
 	
 	local shovelBorderColor = Computed(scope, function(use)
 		return if use(props.ShovelMode)
-			then PvZTheme.Colors.SunYellow
-			else PvZTheme.Colors.WoodDark
+			then Colors.Gold
+			else Colors.Border
 	end)
 	
 	return New(scope, "Frame")({
@@ -296,15 +318,15 @@ local function CardDeck(props: CardDeckProps)
 		Position = UDim2.new(0.5, 0, 1, -15),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Size = deckSize,
-		BackgroundColor3 = PvZTheme.Colors.WoodBrown,
-		BackgroundTransparency = 0,
+		BackgroundColor3 = Colors.CardBg,
+		BackgroundTransparency = 0.1,
 		BorderSizePixel = 0,
 		
 		[Children] = {
-			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 14) }),
+			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 16) }),
 			New(scope, "UIStroke")({
-				Color = PvZTheme.Colors.WoodDark,
-				Thickness = 3,
+				Color = Colors.Border,
+				Thickness = 2,
 			}),
 			New(scope, "UIListLayout")({
 				FillDirection = Enum.FillDirection.Horizontal,
@@ -325,12 +347,25 @@ local function CardDeck(props: CardDeckProps)
 				local stats = PlantData[plantType]
 				local layoutOrder = if stats then stats.Cost else 999
 				
+				-- Get mutations for this plant (reactive)
+				local mutations = nil
+				if props.PlayerMutations then
+					local allMutations = use(props.PlayerMutations)
+					if allMutations then
+						mutations = allMutations[plantType]
+						if mutations and #mutations > 0 then
+							Logger.Info("CardDeck", `{plantType} has {#mutations} mutations: {table.concat(mutations, ", ")}`)
+						end
+					end
+				end
+				
 				return PlantCard({
 					Scope = innerScope,
 					PlantType = plantType,
 					SelectedPlant = props.SelectedPlant,
 					SunCount = props.SunCount,
 					Cooldowns = props.Cooldowns,
+					Mutations = mutations,
 					OnSelect = props.OnSelect,
 					LayoutOrder = layoutOrder,
 				})
@@ -350,14 +385,11 @@ local function CardDeck(props: CardDeckProps)
 				end,
 				
 				[Children] = {
-					-- Border
+					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
 					New(scope, "UIStroke")({
 						Color = shovelBorderColor,
-						Thickness = 3,
+						Thickness = 2,
 					}),
-					
-					-- Corner rounding
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
 					
 					-- Shovel icon (emoji)
 					New(scope, "TextLabel")({
@@ -366,7 +398,7 @@ local function CardDeck(props: CardDeckProps)
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						Size = UDim2.fromOffset(40, 40),
 						BackgroundTransparency = 1,
-						Text = "🪓", -- Axe emoji as shovel alternative
+						Text = "🪓",
 						TextScaled = true,
 					}),
 					
@@ -380,7 +412,7 @@ local function CardDeck(props: CardDeckProps)
 						Text = Computed(scope, function(use)
 							return if use(props.ShovelMode) then "CANCEL" else "DIG"
 						end),
-						TextColor3 = PvZTheme.Colors.TextWhite,
+						TextColor3 = Colors.TextWhite,
 						TextScaled = true,
 						Font = Enum.Font.GothamBold,
 						

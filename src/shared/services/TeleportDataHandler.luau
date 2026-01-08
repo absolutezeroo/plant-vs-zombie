@@ -1,0 +1,357 @@
+--!strict
+--[[
+    TeleportDataHandler.luau - Unified teleport data handling for Lobby and Arena
+    
+    This module provides a clean abstraction for handling teleport data flow:
+    - Arena: Processes incoming players from Lobby
+    - Lobby: Processes returning players from Arena
+    
+    Key features:
+    - Signal-based coordination (no polling)
+    - Waits for profile before processing teleport data
+    - Atomic deck/mutation application
+    - Single point of synchronization
+    
+    Usage in Arena:
+    ```lua
+    local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
+    
+    -- Initialize with dependencies
+    TeleportDataHandler.InitializeArena({
+        PlayerDataService = PlayerDataService,
+        MutationApplySystem = MutationApplySystem,
+        ArenaService = ArenaService,
+    })
+    
+    -- Listen to ready signal
+    TeleportDataHandler.OnPlayerReady:Connect(function(player, teleportData)
+        ProgressionHandler.SyncPlayerData(player)
+        ProgressionHandler.SyncDeck(player)
+    end)
+    ```
+    
+    Usage in Lobby:
+    ```lua
+    TeleportDataHandler.InitializeLobby({
+        PlayerDataService = PlayerDataService,
+    })
+    
+    TeleportDataHandler.OnPlayerReturned:Connect(function(player, returnData)
+        -- Apply rewards, show results UI
+    end)
+    ```
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local TeleportData = require(Shared.data.TeleportData)
+local PlayerDataCore = require(Shared.services.PlayerDataCore)
+local Logger = require(Shared.utils.Logger)
+
+local TeleportDataHandler = {}
+
+-- Signals (BindableEvents for cross-module communication)
+local _onPlayerReadyEvent = Instance.new("BindableEvent")
+local _onPlayerReturnedEvent = Instance.new("BindableEvent")
+
+-- Public signals
+TeleportDataHandler.OnPlayerReady = _onPlayerReadyEvent.Event -- (player, teleportData: ArenaJoinData)
+TeleportDataHandler.OnPlayerReturned = _onPlayerReturnedEvent.Event -- (player, returnData: LobbyReturnData)
+
+-- Cache for teleport data (by userId for persistence across quick reconnects)
+local _playerTeleportData: { [number]: TeleportData.ArenaJoinData } = {}
+local _playerReturnData: { [number]: TeleportData.LobbyReturnData } = {}
+
+-- Dependencies (set during initialization)
+local _dependencies: {
+    PlayerDataService: any?,
+    MutationApplySystem: any?,
+    ArenaService: any?,
+    ProgressionHandler: any?,
+} = {}
+
+-- Profile waiter instance
+local _profileWaiter = PlayerDataCore.CreateProfileWaiter()
+
+--------------------------------------------------------------------------------
+-- Public API: Get Teleport Data
+--------------------------------------------------------------------------------
+
+-- Get the teleport data for a player (Arena)
+function TeleportDataHandler.GetTeleportData(player: Player): TeleportData.ArenaJoinData?
+    return _playerTeleportData[player.UserId]
+end
+
+-- Get the return data for a player (Lobby)
+function TeleportDataHandler.GetReturnData(player: Player): TeleportData.LobbyReturnData?
+    return _playerReturnData[player.UserId]
+end
+
+--------------------------------------------------------------------------------
+-- Arena Initialization
+--------------------------------------------------------------------------------
+
+export type ArenaDependencies = {
+    PlayerDataService: any,
+    MutationApplySystem: any?,
+    ArenaService: any?,
+    ProgressionHandler: any?,
+}
+
+--[[
+    Initialize the handler for Arena place.
+    Call this once in init.server.luau.
+]]
+function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
+    Logger.Info("TeleportDataHandler", "Initializing for Arena")
+    
+    _dependencies.PlayerDataService = deps.PlayerDataService
+    _dependencies.MutationApplySystem = deps.MutationApplySystem
+    _dependencies.ArenaService = deps.ArenaService
+    _dependencies.ProgressionHandler = deps.ProgressionHandler
+    
+    -- Connect to PlayerAdded (single handler for all teleport logic)
+    Players.PlayerAdded:Connect(function(player)
+        task.spawn(function()
+            TeleportDataHandler._handleArenaPlayerJoin(player)
+        end)
+    end)
+    
+    -- Handle players already in game
+    for _, player in Players:GetPlayers() do
+        task.spawn(function()
+            TeleportDataHandler._handleArenaPlayerJoin(player)
+        end)
+    end
+    
+    -- Cleanup on player leave
+    Players.PlayerRemoving:Connect(function(player)
+        _profileWaiter.Cleanup(player)
+        _playerTeleportData[player.UserId] = nil
+    end)
+end
+
+-- Internal: Handle a player joining Arena
+function TeleportDataHandler._handleArenaPlayerJoin(player: Player)
+    local PlayerDataService = _dependencies.PlayerDataService
+    if not PlayerDataService then
+        Logger.Warn("TeleportDataHandler", "PlayerDataService not set")
+        return
+    end
+    
+    -- Step 1: Extract teleport data immediately (before it expires)
+    local joinData = player:GetJoinData()
+    local rawTeleportData = joinData.TeleportData :: any
+    local teleportData: TeleportData.ArenaJoinData? = nil
+    
+    if rawTeleportData then
+        local isValid, errorMsg = TeleportData.ValidateArenaJoinData(rawTeleportData)
+        if isValid then
+            teleportData = rawTeleportData
+            _playerTeleportData[player.UserId] = rawTeleportData
+            Logger.Info("TeleportDataHandler", `Valid teleport data for {player.Name}: World={rawTeleportData.WorldId}, Difficulty={rawTeleportData.Difficulty}, Deck={#rawTeleportData.Deck} plants`)
+        else
+            Logger.Warn("TeleportDataHandler", `Invalid teleport data for {player.Name}: {errorMsg}`)
+        end
+    else
+        Logger.Info("TeleportDataHandler", `No teleport data for {player.Name} (direct join or Studio test)`)
+    end
+    
+    -- Step 2: Wait for profile to load (using signal-based waiter, not polling)
+    Logger.Debug("TeleportDataHandler", `Waiting for profile: {player.Name}`)
+    
+    local profileData = _profileWaiter.WaitForProfile(
+        player, 
+        PlayerDataService.GetProfile, 
+        15 -- 15 second timeout
+    )
+    
+    if not profileData then
+        Logger.Error("TeleportDataHandler", `Profile load timeout for {player.Name}`)
+        -- Could kick player here or use default data
+        return
+    end
+    
+    Logger.Info("TeleportDataHandler", `Profile loaded for {player.Name}`)
+    
+    -- Step 3: Apply teleport data if present
+    if teleportData then
+        TeleportDataHandler._applyTeleportData(player, teleportData, profileData)
+    end
+    
+    -- Step 4: Fire OnPlayerReady signal (other systems can react)
+    _onPlayerReadyEvent:Fire(player, teleportData)
+end
+
+-- Internal: Apply teleport data to player profile
+function TeleportDataHandler._applyTeleportData(
+    player: Player, 
+    teleportData: TeleportData.ArenaJoinData,
+    profileData: PlayerDataCore.ProfileData
+)
+    local PlayerDataService = _dependencies.PlayerDataService
+    local MutationApplySystem = _dependencies.MutationApplySystem
+    
+    -- Auto-unlock any plants in the teleported deck that aren't unlocked
+    local needsUnlock = false
+    for _, plantType in teleportData.Deck do
+        if not profileData.UnlockedPlants[plantType] then
+            Logger.Info("TeleportDataHandler", `Auto-unlocking plant {plantType} for {player.Name}`)
+            PlayerDataService.UnlockPlant(player, plantType)
+            needsUnlock = true
+        end
+    end
+    
+    -- Save the teleported deck to profile (atomic operation)
+    local deckValid, cleanedDeck, deckError = PlayerDataCore.ValidateDeck(
+        teleportData.Deck, 
+        profileData.UnlockedPlants
+    )
+    
+    if deckValid then
+        local success, saveError = PlayerDataService.SaveDeck(player, cleanedDeck)
+        if success then
+            Logger.Info("TeleportDataHandler", `Deck saved for {player.Name}: {#cleanedDeck} plants`)
+        else
+            Logger.Warn("TeleportDataHandler", `Failed to save deck for {player.Name}: {saveError}`)
+        end
+    else
+        Logger.Warn("TeleportDataHandler", `Invalid deck for {player.Name}: {deckError}`)
+    end
+    
+    -- Load mutations into the MutationApplySystem cache
+    if MutationApplySystem and teleportData.EquippedMutations then
+        local mutationCount = 0
+        for plantType, mutations in teleportData.EquippedMutations do
+            mutationCount += #mutations
+        end
+        
+        if mutationCount > 0 then
+            MutationApplySystem.LoadPlayerMutations(player.UserId, teleportData.EquippedMutations)
+            Logger.Info("TeleportDataHandler", `Loaded {mutationCount} mutations for {player.Name}`)
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+-- Lobby Initialization
+--------------------------------------------------------------------------------
+
+export type LobbyDependencies = {
+    PlayerDataService: any,
+}
+
+--[[
+    Initialize the handler for Lobby place.
+    Call this once in init.server.luau.
+]]
+function TeleportDataHandler.InitializeLobby(deps: LobbyDependencies)
+    Logger.Info("TeleportDataHandler", "Initializing for Lobby")
+    
+    _dependencies.PlayerDataService = deps.PlayerDataService
+    
+    -- Connect to PlayerAdded
+    Players.PlayerAdded:Connect(function(player)
+        task.spawn(function()
+            TeleportDataHandler._handleLobbyPlayerJoin(player)
+        end)
+    end)
+    
+    -- Handle players already in game
+    for _, player in Players:GetPlayers() do
+        task.spawn(function()
+            TeleportDataHandler._handleLobbyPlayerJoin(player)
+        end)
+    end
+    
+    -- Cleanup on player leave
+    Players.PlayerRemoving:Connect(function(player)
+        _profileWaiter.Cleanup(player)
+        _playerReturnData[player.UserId] = nil
+    end)
+end
+
+-- Internal: Handle a player joining Lobby
+function TeleportDataHandler._handleLobbyPlayerJoin(player: Player)
+    local PlayerDataService = _dependencies.PlayerDataService
+    if not PlayerDataService then
+        Logger.Warn("TeleportDataHandler", "PlayerDataService not set")
+        return
+    end
+    
+    -- Step 1: Extract return data if coming from Arena
+    local joinData = player:GetJoinData()
+    local rawReturnData = joinData.TeleportData :: any
+    local returnData: TeleportData.LobbyReturnData? = nil
+    
+    if rawReturnData then
+        local isValid, errorMsg = TeleportData.ValidateLobbyReturnData(rawReturnData)
+        if isValid then
+            returnData = rawReturnData
+            _playerReturnData[player.UserId] = rawReturnData
+            Logger.Info("TeleportDataHandler", `Player {player.Name} returned from Arena: Victory={rawReturnData.Victory}, Stars={rawReturnData.Stars}`)
+        else
+            Logger.Debug("TeleportDataHandler", `Return data invalid for {player.Name}: {errorMsg} (normal for fresh join)`)
+        end
+    end
+    
+    -- Step 2: Wait for profile
+    local profileData = _profileWaiter.WaitForProfile(
+        player,
+        PlayerDataService.GetProfile,
+        15
+    )
+    
+    if not profileData then
+        Logger.Error("TeleportDataHandler", `Profile load timeout for {player.Name}`)
+        return
+    end
+    
+    -- Step 3: Apply rewards if returning from Arena
+    if returnData then
+        TeleportDataHandler._applyReturnRewards(player, returnData)
+    end
+    
+    -- Step 4: Fire OnPlayerReturned signal
+    if returnData then
+        _onPlayerReturnedEvent:Fire(player, returnData)
+    end
+end
+
+-- Internal: Apply rewards from Arena return
+function TeleportDataHandler._applyReturnRewards(player: Player, returnData: TeleportData.LobbyReturnData)
+    local PlayerDataService = _dependencies.PlayerDataService
+    
+    -- Add coins earned
+    if returnData.CoinsEarned and returnData.CoinsEarned > 0 then
+        PlayerDataService.AddCoins(player, returnData.CoinsEarned)
+        Logger.Info("TeleportDataHandler", `Added {returnData.CoinsEarned} coins to {player.Name}`)
+    end
+    
+    -- Add XP earned
+    if returnData.XPEarned and returnData.XPEarned > 0 then
+        PlayerDataService.AddXP(player, returnData.XPEarned)
+        Logger.Info("TeleportDataHandler", `Added {returnData.XPEarned} XP to {player.Name}`)
+    end
+    
+    -- Increment games played stat
+    if PlayerDataService.IncrementStat then
+        PlayerDataService.IncrementStat(player, "GamesPlayed", 1)
+        if returnData.Victory then
+            PlayerDataService.IncrementStat(player, "GamesWon", 1)
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+-- Profile Waiter Integration
+--------------------------------------------------------------------------------
+
+-- Call this when a profile loads (from PlayerDataService.LoadProfile)
+function TeleportDataHandler.NotifyProfileLoaded(player: Player, profileData: PlayerDataCore.ProfileData)
+    _profileWaiter.FireCallbacks(player, profileData)
+end
+
+return TeleportDataHandler

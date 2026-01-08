@@ -55,7 +55,6 @@ export type SpawnConfig = {
 
 export type WaveSpawner = {
     SetWorldConfig: (self: WaveSpawner, config: any?) -> (),
-    SetStageConfig: (self: WaveSpawner, stageConfig: any?) -> (),  -- Legacy
     SetWaveDefinitions: (self: WaveSpawner, waves: {WaveDefinition}?) -> (),
     HasDefinedWave: (self: WaveSpawner, waveNumber: number) -> boolean,
     GetWaveDefinition: (self: WaveSpawner, waveNumber: number) -> WaveDefinition?,
@@ -103,8 +102,8 @@ end
 local _network: any = nil
 local function getNetwork()
     if not _network then
-        local Server = script.Parent.Parent.Parent
-        _network = require(Server.network.generated)
+        local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+        _network = require(Shared.network.generated.server)
     end
     return _network
 end
@@ -114,7 +113,7 @@ function WaveSpawner.new(): WaveSpawner
     return self :: any
 end
 
--- Set world configuration (merged WorldData + DifficultyData)
+-- Set world configuration
 function WaveSpawner:SetWorldConfig(config: any?)
     _worldConfig = config
     
@@ -129,21 +128,6 @@ function WaveSpawner:SetWorldConfig(config: any?)
     
     -- Clear wave definitions (use budget-based for new system)
     _waveDefinitions = nil
-    
-    self:RebuildSpawnPools()
-end
-
--- Set stage configuration (legacy support)
-function WaveSpawner:SetStageConfig(stageConfig: any?)
-    _worldConfig = stageConfig
-    
-    -- Extract wave definitions if present (old system)
-    if stageConfig and stageConfig.Waves then
-        _waveDefinitions = stageConfig.Waves
-        Logger.Info("WaveSpawner", `Loaded {#stageConfig.Waves} wave definitions`)
-    else
-        _waveDefinitions = nil
-    end
     
     self:RebuildSpawnPools()
 end

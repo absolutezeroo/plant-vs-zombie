@@ -67,7 +67,8 @@ type PlayerData = {
 
 local playerData = scope:Value(nil :: PlayerData?)
 local currentDeck = scope:Value({} :: {string})
-local plantMutations = scope:Value({} :: {[string]: {string}})
+local ownedMutations = scope:Value({} :: {[string]: {string}})
+local equippedMutations = scope:Value({} :: {[string]: {string}})
 
 -- ============================================
 -- LOADER INITIALIZATION
@@ -116,9 +117,17 @@ local function purchaseMutation(plantType: string, mutationType: string)
     })
 end
 
-local function removeMutation(plantType: string, mutationType: string)
-    Logger.Info("LobbyClient", `Removing mutation {mutationType} from {plantType}`)
-    ZapClient.RemoveMutationRequest.Fire({
+local function equipMutation(plantType: string, mutationType: string)
+    Logger.Info("LobbyClient", `Equipping mutation {mutationType} on {plantType}`)
+    ZapClient.EquipMutationRequest.Fire({
+        PlantType = plantType,
+        MutationType = mutationType,
+    })
+end
+
+local function unequipMutation(plantType: string, mutationType: string)
+    Logger.Info("LobbyClient", `Unequipping mutation {mutationType} from {plantType}`)
+    ZapClient.UnequipMutationRequest.Fire({
         PlantType = plantType,
         MutationType = mutationType,
     })
@@ -178,12 +187,6 @@ local function setupNetworkListeners()
         playerData:set(newData)
         currentDeck:set(data.Deck or {})
         
-        -- Update mutations if provided
-        if data.PlantMutations then
-            plantMutations:set(data.PlantMutations)
-            ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
-        end
-        
         -- Update ZoneInteractionController
         ZoneInteractionController.SetPlayerData(newData)
     end)
@@ -211,8 +214,6 @@ local function setupNetworkListeners()
             current.UnlockedPlants = data.UnlockedPlants
             playerData:set(current)
         end
-        
-        ZoneInteractionController.UpdateUnlockedPlants(data.UnlockedPlants)
     end)
 
     -- Listen for deck changes
@@ -228,41 +229,87 @@ local function setupNetworkListeners()
             Logger.Info("LobbyClient", `Purchased mutation {response.MutationType} for {response.PlantType}! New balance: {response.NewCoins}`)
             requestPlayerData()
         else
+            -- Error codes from MutationHandler:
+            -- 1 = AlreadyHas, 2 = NotEnoughCoins, 3 = InvalidMutation
+            -- 4 = Incompatible, 5 = LevelTooLow, 6 = PlantNotUnlocked
             local errorMsg = response.ErrorCode == 1 and "Already owned"
                 or response.ErrorCode == 2 and "Not enough coins"
-                or response.ErrorCode == 3 and "Level too low"
-                or response.ErrorCode == 4 and "Plant not owned"
-                or response.ErrorCode == 5 and "Incompatible mutation"
-                or response.ErrorCode == 6 and "Invalid mutation"
+                or response.ErrorCode == 3 and "Invalid mutation"
+                or response.ErrorCode == 4 and "Incompatible mutation"
+                or response.ErrorCode == 5 and "Level too low"
+                or response.ErrorCode == 6 and "Plant not owned"
                 or "Unknown error"
             Logger.Warn("LobbyClient", `Mutation purchase failed: {errorMsg}`)
         end
     end)
-
-    -- Listen for mutation remove response
-    ZapClient.RemoveMutationResponse.On(function(response)
+    
+    -- Listen for equip mutation response
+    ZapClient.EquipMutationResponse.On(function(response)
         if response.Success then
-            Logger.Info("LobbyClient", `Removed mutation {response.MutationType} from {response.PlantType}`)
-            requestPlayerData()
+            Logger.Info("LobbyClient", `Equipped mutation {response.MutationType} on {response.PlantType}`)
         else
-            Logger.Warn("LobbyClient", `Mutation removal failed`)
+            local errorMsg = response.ErrorCode == 1 and "Not owned"
+                or response.ErrorCode == 2 and "Already equipped"
+                or response.ErrorCode == 3 and "Incompatible"
+                or "Unknown error"
+            Logger.Warn("LobbyClient", `Equip failed: {errorMsg}`)
+        end
+    end)
+    
+    -- Listen for unequip mutation response
+    ZapClient.UnequipMutationResponse.On(function(response)
+        if response.Success then
+            Logger.Info("LobbyClient", `Unequipped mutation {response.MutationType} from {response.PlantType}`)
+        else
+            Logger.Warn("LobbyClient", `Unequip failed`)
         end
     end)
 
-    -- Listen for plant mutations sync
+    -- Listen for plant mutations sync (owned + equipped)
     ZapClient.SyncPlantMutations.On(function(data)
-        Logger.Info("LobbyClient", `Synced mutations for {data.PlantType}: {#data.Mutations}`)
-        ZoneInteractionController.UpdatePlantMutations({[data.PlantType] = data.Mutations})
-        local current = Fusion.peek(plantMutations)
-        current[data.PlantType] = data.Mutations
-        plantMutations:set(current)
+        Logger.Info("LobbyClient", `Synced mutations for {data.PlantType}: {#data.OwnedMutations} owned, {#data.EquippedMutations} equipped`)
+        
+        -- Create new tables to trigger Fusion reactivity
+        local newOwned = {}
+        for k, v in Fusion.peek(ownedMutations) do
+            newOwned[k] = v
+        end
+        newOwned[data.PlantType] = data.OwnedMutations
+        ownedMutations:set(newOwned)
+        
+        local newEquipped = {}
+        for k, v in Fusion.peek(equippedMutations) do
+            newEquipped[k] = v
+        end
+        newEquipped[data.PlantType] = data.EquippedMutations
+        equippedMutations:set(newEquipped)
+        
+        -- Update ZoneInteractionController
+        ZoneInteractionController.UpdateOwnedMutations(newOwned)
+        ZoneInteractionController.UpdateEquippedMutations(newEquipped)
     end)
 
-    -- Listen for all mutations sync
+    -- Listen for all mutations sync (owned + equipped)
     ZapClient.SyncAllMutations.On(function(data)
         Logger.Info("LobbyClient", "Synced all plant mutations")
-        ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
-        plantMutations:set(data.PlantMutations)
+        
+        -- Convert owned array to dictionary
+        local ownedDict = {}
+        for _, entry in data.OwnedMutations do
+            ownedDict[entry.PlantType] = entry.Mutations
+        end
+        ownedMutations:set(ownedDict)
+        
+        -- Convert equipped array to dictionary
+        local equippedDict = {}
+        for _, entry in data.EquippedMutations do
+            equippedDict[entry.PlantType] = entry.Mutations
+        end
+        equippedMutations:set(equippedDict)
+        
+        -- Update ZoneInteractionController
+        ZoneInteractionController.UpdateOwnedMutations(ownedDict)
+        ZoneInteractionController.UpdateEquippedMutations(equippedDict)
     end)
 
     -- Listen for battle results
@@ -283,7 +330,7 @@ end
 
 -- Step 1: Load Modules
 loader:AddStep("Modules", function()
-    ZapClient = require(script:WaitForChild("network"):WaitForChild("generated"))
+    ZapClient = require(Shared.network.generated.client)
     LobbyHUD = require(script:WaitForChild("ui"):WaitForChild("LobbyHUD"))
     PadUIController = require(script:WaitForChild("controllers"):WaitForChild("PadUIController"))
     ZoneInteractionController = require(script:WaitForChild("controllers"):WaitForChild("ZoneInteractionController"))
@@ -304,7 +351,8 @@ loader:AddStep("Controllers", function()
     ZoneInteractionController.SetOnPurchasePlant(purchasePlant)
     ZoneInteractionController.SetOnSaveDeck(saveDeck)
     ZoneInteractionController.SetOnPurchaseMutation(purchaseMutation)
-    ZoneInteractionController.SetOnRemoveMutation(removeMutation)
+    ZoneInteractionController.SetOnEquipMutation(equipMutation)
+    ZoneInteractionController.SetOnUnequipMutation(unequipMutation)
     Logger.Info("LobbyClient", "ZoneInteractionController initialized")
 end, 2)
 
@@ -313,7 +361,7 @@ loader:AddStep("UI", function()
     local hudGui = LobbyHUD(scope, {
         PlayerData = playerData,
         CurrentDeck = currentDeck,
-        PlantMutations = plantMutations,
+        EquippedMutations = equippedMutations,
     })
     hudGui.Parent = PlayerGui
     UIStateManager.Register("LobbyHUD", hudGui)

@@ -23,9 +23,11 @@ local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 local ProgressionData = require(Shared.data.ProgressionData)
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+-- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
 local GridService = require(Server.services.GridService)
 
 -- Components (via index module)

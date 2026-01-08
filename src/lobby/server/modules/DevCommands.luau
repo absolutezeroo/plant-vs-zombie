@@ -189,21 +189,29 @@ CommandHandlers["AddMutation"] = function(player, stringArg, numberArg)
         return false, "Profile not loaded"
     end
     
-    if not profile.Data.PlantMutations then
-        profile.Data.PlantMutations = {}
+    if not profile.Data.PlantOwnedMutations then
+        profile.Data.PlantOwnedMutations = {}
+    end
+    if not profile.Data.PlantEquippedMutations then
+        profile.Data.PlantEquippedMutations = {}
     end
     
-    if not profile.Data.PlantMutations[plantType] then
-        profile.Data.PlantMutations[plantType] = {}
+    if not profile.Data.PlantOwnedMutations[plantType] then
+        profile.Data.PlantOwnedMutations[plantType] = {}
+    end
+    if not profile.Data.PlantEquippedMutations[plantType] then
+        profile.Data.PlantEquippedMutations[plantType] = {}
     end
     
-    -- Check if already has this mutation
-    if table.find(profile.Data.PlantMutations[plantType], mutationType) then
-        return false, `{plantType} already has {mutationType}`
+    -- Check if already owns this mutation
+    if table.find(profile.Data.PlantOwnedMutations[plantType], mutationType) then
+        return false, `{plantType} already owns {mutationType}`
     end
     
-    table.insert(profile.Data.PlantMutations[plantType], mutationType)
-    Logger.Info("DevCommands", `Added {mutationType} to {plantType} for {player.Name}`)
+    -- Add to both owned AND equipped
+    table.insert(profile.Data.PlantOwnedMutations[plantType], mutationType)
+    table.insert(profile.Data.PlantEquippedMutations[plantType], mutationType)
+    Logger.Info("DevCommands", `Added {mutationType} to {plantType} for {player.Name} (owned + equipped)`)
     return true, `Added {mutationType} to {plantType}`
 end
 
@@ -247,7 +255,8 @@ CommandHandlers["ResetData"] = function(player, stringArg, numberArg)
         WallNut = true,
     }
     profile.Data.Deck = {"Sunflower", "Peashooter", "WallNut"}
-    profile.Data.PlantMutations = {}
+    profile.Data.PlantOwnedMutations = {}
+    profile.Data.PlantEquippedMutations = {}
     
     Logger.Info("DevCommands", `Reset all data for {player.Name}`)
     return true, "Data reset to defaults"
@@ -260,6 +269,14 @@ function DevCommands.HandleCommand(player: Player, command: string, stringArg: s
         Logger.Warn("DevCommands", `{player.Name} tried to use dev commands but is not authorized`)
         return false, "Not authorized"
     end
+    
+    -- Debug: log available commands
+    Logger.Info("DevCommands", `Looking for command: "{command}" (len={#command})`)
+    local available = {}
+    for cmd, _ in CommandHandlers do
+        table.insert(available, cmd)
+    end
+    Logger.Info("DevCommands", `Available commands: {table.concat(available, ", ")}`)
     
     -- Find handler
     local handler = CommandHandlers[command]

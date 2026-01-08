@@ -27,7 +27,7 @@ local Modules = Client:FindFirstChild("modules")
 assert(Modules, "ZombieRenderSystem: modules folder not found")
 local UI = Client:FindFirstChild("ui")
 assert(UI, "ZombieRenderSystem: ui folder not found")
-local Network = require(Client.network.generated)
+local Network = require(Shared.network.generated.client)
 
 -- VFX/Audio services (lazy loaded)
 local _vfxService: any = nil

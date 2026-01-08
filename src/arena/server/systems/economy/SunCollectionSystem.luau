@@ -19,9 +19,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/economy/)
-local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
+-- Network
+local Network = require(Shared.network.generated.server)
 
 -- Components (via index module)
 local PositionComponent = Components.PositionComponent

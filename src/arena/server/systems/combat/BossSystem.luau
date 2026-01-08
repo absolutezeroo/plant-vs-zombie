@@ -23,9 +23,8 @@ local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/combat/)
-local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
+-- Network
+local Network = require(Shared.network.generated.server)
 
 -- Type alias for world parameter
 type MatterWorld = Types.MatterWorld

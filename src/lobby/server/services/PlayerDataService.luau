@@ -1,60 +1,41 @@
 --!strict
 --[[
-    Lobby Services - Re-exports from server/services
+    PlayerDataService.luau - Lobby player data management
     
-    For the Lobby place, we need access to PlayerDataService
-    but not the full Arena game logic.
+    Uses ProfileStore for cross-session persistence.
+    Manages: Coins, Gems, XP, Level, Plants, Mutations, Deck
+    
+    Server-side only. Clients receive replicated data via events.
+    
+    Integrated with:
+    - shared/data/ProfileTemplate (single source of truth)
+    - shared/services/PlayerDataCore (shared utilities)
+    - shared/services/TeleportDataHandler (teleport flow)
 ]]
-
-local _Server = game:GetService("ServerScriptService"):WaitForChild("LobbyServer") -- Reserved for future use
-
--- FaiDataService is the same across both places
--- In production, this would be in a shared location
--- For now, we duplicate the essential functionality
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local _RunService = game:GetService("RunService") -- Reserved for future use
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local ProfileStore = require(Packages:WaitForChild("ProfileStore"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local ProfileTemplate = require(Shared.data.ProfileTemplate) :: any
+local PlayerDataCore = require(Shared.services.PlayerDataCore) :: any
+local ProgressionData = require(Shared.data.ProgressionData)
 
--- Profile template (same as Arena)
-local PROFILE_TEMPLATE = {
-    Coins = 0,
-    TotalCoinsEarned = 0,
-    Gems = 0,
-    TotalGemsEarned = 0,
-    XP = 0,
-    Level = 1,
-    UnlockedPlants = {
-        Sunflower = true,
-        Peashooter = true,
-        WallNut = true,
-    },
-    PlantMutations = {} :: {[string]: {string}}, -- [PlantType] = {"Fire", "Swift", ...}
-    PlantMastery = {} :: {[string]: { Rank: number, XP: number }},
-    Deck = {"Sunflower", "Peashooter", "WallNut"} :: {string}, -- Default starter deck
-    Stats = {
-        GamesPlayed = 0,
-        GamesWon = 0,
-        ZombiesKilled = 0,
-        PlantsPlaced = 0,
-    },
-    Settings = {
-        MusicVolume = 1.0,
-        SFXVolume = 1.0,
-    },
-}
+-- Use shared profile template (single source of truth)
+local PROFILE_TEMPLATE = ProfileTemplate.PROFILE_TEMPLATE
 
 local PlayerDataService = {}
 
 local Store = ProfileStore.New("PlayerData_v1", PROFILE_TEMPLATE)
 local Profiles: { [Player]: any } = {}
-local ProfileLoadedCallbacks: { [Player]: {(any) -> ()} } = {}
+
+-- Use shared systems for callbacks and profile waiting
+local _dataChangeNotifier = PlayerDataCore.CreateDataChangeNotifier()
+local _profileWaiter = PlayerDataCore.CreateProfileWaiter()
 
 function PlayerDataService.Initialize()
     Logger.Info("LobbyPlayerData", "Initializing PlayerDataService for Lobby")
@@ -71,6 +52,13 @@ function PlayerDataService.Initialize()
     for _, player in Players:GetPlayers() do
         task.spawn(PlayerDataService.LoadProfile, player)
     end
+    
+    -- Ensure profiles are saved on shutdown
+    game:BindToClose(function()
+        for player, profile in Profiles do
+            profile:EndSession()
+        end
+    end)
 end
 
 function PlayerDataService.LoadProfile(player: Player)
@@ -97,14 +85,15 @@ function PlayerDataService.LoadProfile(player: Player)
             Profiles[player] = profile
             Logger.Info("LobbyPlayerData", `Profile loaded for {player.Name}`)
             
-            -- Fire any waiting callbacks
-            local callbacks = ProfileLoadedCallbacks[player]
-            if callbacks then
-                for _, callback in callbacks do
-                    task.spawn(callback, profile)
-                end
-                ProfileLoadedCallbacks[player] = nil
-            end
+            -- Notify data change listeners
+            _dataChangeNotifier.Notify(player, profile.Data)
+            
+            -- Fire profile waiter callbacks (for WaitForProfile)
+            _profileWaiter.FireCallbacks(player, profile.Data)
+            
+            -- Notify TeleportDataHandler that profile is ready
+            local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
+            TeleportDataHandler.NotifyProfileLoaded(player, profile.Data)
         else
             profile:EndSession()
         end
@@ -120,8 +109,8 @@ function PlayerDataService.ReleaseProfile(player: Player)
         Profiles[player] = nil
     end
     
-    -- Clean up any pending callbacks
-    ProfileLoadedCallbacks[player] = nil
+    -- Clean up profile waiter
+    _profileWaiter.Cleanup(player)
 end
 
 function PlayerDataService.GetProfile(player: Player)
@@ -130,13 +119,14 @@ end
 
 --[[
     Wait for a player's profile to be loaded.
-    Returns the profile once loaded, or nil if timeout/player left.
+    Uses signal-based waiting (no polling).
+    Returns the profile data once loaded, or nil if timeout/player left.
 ]]
 function PlayerDataService.WaitForProfile(player: Player, timeout: number?): any
     -- Already loaded?
     local profile = Profiles[player]
     if profile then
-        return profile
+        return profile.Data
     end
     
     -- Player already left?
@@ -144,27 +134,12 @@ function PlayerDataService.WaitForProfile(player: Player, timeout: number?): any
         return nil
     end
     
-    local maxWait = timeout or 10
-    local loaded = false
-    local resultProfile = nil
-    
-    -- Register callback
-    if not ProfileLoadedCallbacks[player] then
-        ProfileLoadedCallbacks[player] = {}
-    end
-    table.insert(ProfileLoadedCallbacks[player], function(p)
-        resultProfile = p
-        loaded = true
-    end)
-    
-    -- Wait with timeout
-    local elapsed = 0
-    while not loaded and elapsed < maxWait and player.Parent == Players do
-        task.wait(0.1)
-        elapsed += 0.1
-    end
-    
-    return resultProfile
+    return _profileWaiter.WaitForProfile(player, PlayerDataService.GetData, timeout)
+end
+
+-- Register callback for data changes (returns unsubscribe function)
+function PlayerDataService.OnDataChanged(callback: (player: Player, data: any) -> ()): () -> ()
+    return _dataChangeNotifier.Subscribe(callback)
 end
 
 function PlayerDataService.GetData(player: Player)
@@ -210,14 +185,95 @@ function PlayerDataService.AddCoins(player: Player, amount: number): boolean
     profile.Data.TotalCoinsEarned += amount
     
     Logger.Info("LobbyPlayerData", `{player.Name} +{amount} coins (Total: {profile.Data.Coins})`)
+    _dataChangeNotifier.Notify(player, profile.Data)
     return true
+end
+
+-- Spend coins (returns false if not enough)
+function PlayerDataService.SpendCoins(player: Player, amount: number): boolean
+    local profile = Profiles[player]
+    if not profile then
+        return false
+    end
+    
+    if profile.Data.Coins < amount then
+        return false
+    end
+    
+    profile.Data.Coins -= amount
+    Logger.Debug("LobbyPlayerData", `{player.Name} -{amount} coins (Remaining: {profile.Data.Coins})`)
+    _dataChangeNotifier.Notify(player, profile.Data)
+    return true
+end
+
+-- Add gems to a player
+function PlayerDataService.AddGems(player: Player, amount: number): boolean
+    local profile = Profiles[player]
+    if not profile then
+        return false
+    end
+    
+    profile.Data.Gems += amount
+    profile.Data.TotalGemsEarned += amount
+    
+    Logger.Info("LobbyPlayerData", `{player.Name} +{amount} gems (Total: {profile.Data.Gems})`)
+    _dataChangeNotifier.Notify(player, profile.Data)
+    return true
+end
+
+-- Spend gems (returns false if not enough)
+function PlayerDataService.SpendGems(player: Player, amount: number): boolean
+    local profile = Profiles[player]
+    if not profile then
+        return false
+    end
+    
+    if profile.Data.Gems < amount then
+        return false
+    end
+    
+    profile.Data.Gems -= amount
+    Logger.Debug("LobbyPlayerData", `{player.Name} -{amount} gems (Remaining: {profile.Data.Gems})`)
+    _dataChangeNotifier.Notify(player, profile.Data)
+    return true
+end
+
+-- Get XP progress to next level (0.0 - 1.0)
+function PlayerDataService.GetLevelProgress(player: Player): number
+    local profile = Profiles[player]
+    if not profile then
+        return 0
+    end
+    
+    if profile.Data.Level >= ProgressionData.MAX_LEVEL then
+        return 1.0
+    end
+    
+    local currentLevelTotalXP = ProgressionData.GetTotalXPForLevel(profile.Data.Level)
+    local nextLevelTotalXP = ProgressionData.GetTotalXPForLevel(profile.Data.Level + 1)
+    local xpInCurrentLevel = profile.Data.XP - currentLevelTotalXP
+    local xpNeededForLevel = nextLevelTotalXP - currentLevelTotalXP
+    
+    return math.clamp(xpInCurrentLevel / xpNeededForLevel, 0, 1)
+end
+
+-- Increment a stat
+function PlayerDataService.IncrementStat(player: Player, statName: string, amount: number?)
+    local profile = Profiles[player]
+    if not profile then
+        return
+    end
+    
+    local currentValue = profile.Data.Stats[statName] or 0
+    profile.Data.Stats[statName] = currentValue + (amount or 1)
+    _dataChangeNotifier.Notify(player, profile.Data)
 end
 
 -- ============================================
 -- XP / LEVEL SYSTEM
 -- ============================================
 
--- Add XP to a player (simplified version - full progression is in Arena)
+-- Add XP to a player (uses ProgressionData for proper level calculation)
 function PlayerDataService.AddXP(player: Player, amount: number): number
     local profile = Profiles[player]
     if not profile then
@@ -227,17 +283,49 @@ function PlayerDataService.AddXP(player: Player, amount: number): number
     local oldLevel = profile.Data.Level
     profile.Data.XP += amount
     
-    -- Simple level up check (100 XP per level for now)
-    local XP_PER_LEVEL = 100
-    local newLevel = math.floor(profile.Data.XP / XP_PER_LEVEL) + 1
-    local levelsGained = newLevel - oldLevel
-    
-    if levelsGained > 0 then
-        profile.Data.Level = newLevel
-        Logger.Info("LobbyPlayerData", `🎉 {player.Name} leveled up! {oldLevel} -> {newLevel}`)
+    -- Check for level ups using ProgressionData
+    local levelsGained = 0
+    while profile.Data.Level < ProgressionData.MAX_LEVEL do
+        local xpNeeded = ProgressionData.GetXPForLevel(profile.Data.Level + 1)
+        local currentLevelXP = profile.Data.XP - ProgressionData.GetTotalXPForLevel(profile.Data.Level)
+        
+        if currentLevelXP >= xpNeeded then
+            profile.Data.Level += 1
+            levelsGained += 1
+            
+            Logger.Info("LobbyPlayerData", `🎉 {player.Name} leveled up to {profile.Data.Level}!`)
+            
+            -- Award level-up gems
+            profile.Data.Gems += ProgressionData.GEMS_PER_LEVEL_UP
+            profile.Data.TotalGemsEarned += ProgressionData.GEMS_PER_LEVEL_UP
+            
+            -- Check for milestone rewards
+            local reward = ProgressionData.LevelRewards[profile.Data.Level]
+            if reward then
+                if reward.Coins then
+                    profile.Data.Coins += reward.Coins
+                    profile.Data.TotalCoinsEarned += reward.Coins
+                end
+                if reward.Gems then
+                    profile.Data.Gems += reward.Gems
+                    profile.Data.TotalGemsEarned += reward.Gems
+                end
+                if reward.UnlockPlant then
+                    profile.Data.UnlockedPlants[reward.UnlockPlant] = true
+                    Logger.Info("LobbyPlayerData", `  Unlocked: {reward.UnlockPlant}!`)
+                end
+            end
+        else
+            break
+        end
     end
     
     Logger.Info("LobbyPlayerData", `{player.Name} +{amount} XP (Level {profile.Data.Level}, Total: {profile.Data.XP})`)
+    
+    if levelsGained > 0 or amount > 0 then
+        _dataChangeNotifier.Notify(player, profile.Data)
+    end
+    
     return levelsGained
 end
 
@@ -340,10 +428,9 @@ end
 -- Get total XP needed for next level
 function PlayerDataService.GetXPForNextLevel(player: Player): number
     local profile = Profiles[player]
-    if not profile then return 100 end
+    if not profile then return ProgressionData.GetXPForLevel(2) end
     local level = profile.Data.Level
-    -- Simple formula: 100 XP per level
-    return level * 100
+    return ProgressionData.GetXPForLevel(level + 1)
 end
 
 -- ============================================
@@ -353,32 +440,51 @@ end
 local MutationData = require(Shared.data.MutationData)
 local PlantData = require(Shared.data.PlantData)
 
--- Get mutations for a specific plant
-function PlayerDataService.GetPlantMutations(player: Player, plantType: string): {string}
+-- ============================================
+-- MUTATION SYSTEM (Owned vs Equipped)
+-- ============================================
+
+-- Get OWNED mutations for a specific plant (purchased)
+function PlayerDataService.GetOwnedMutations(player: Player, plantType: string): {string}
     local profile = Profiles[player]
     if not profile then return {} end
-    return profile.Data.PlantMutations[plantType] or {}
+    return profile.Data.PlantOwnedMutations[plantType] or {}
 end
 
--- Get all plant mutations for a player
-function PlayerDataService.GetAllPlantMutations(player: Player): {[string]: {string}}
+-- Get all OWNED mutations for all plants
+function PlayerDataService.GetAllOwnedMutations(player: Player): {[string]: {string}}
     local profile = Profiles[player]
     if not profile then return {} end
-    return profile.Data.PlantMutations or {}
+    return profile.Data.PlantOwnedMutations or {}
 end
 
--- Check if a plant has a specific mutation
-function PlayerDataService.HasMutation(player: Player, plantType: string, mutationType: string): boolean
-    local mutations = PlayerDataService.GetPlantMutations(player, plantType)
-    for _, mutation in mutations do
-        if mutation == mutationType then
-            return true
-        end
-    end
-    return false
+-- Check if player OWNS a mutation for a plant
+function PlayerDataService.OwnsMutation(player: Player, plantType: string, mutationType: string): boolean
+    local mutations = PlayerDataService.GetOwnedMutations(player, plantType)
+    return table.find(mutations, mutationType) ~= nil
 end
 
--- Purchase a mutation for a plant
+-- Get EQUIPPED mutations for a specific plant (active in game)
+function PlayerDataService.GetEquippedMutations(player: Player, plantType: string): {string}
+    local profile = Profiles[player]
+    if not profile then return {} end
+    return profile.Data.PlantEquippedMutations[plantType] or {}
+end
+
+-- Get all EQUIPPED mutations for all plants
+function PlayerDataService.GetAllEquippedMutations(player: Player): {[string]: {string}}
+    local profile = Profiles[player]
+    if not profile then return {} end
+    return profile.Data.PlantEquippedMutations or {}
+end
+
+-- Check if a mutation is EQUIPPED on a plant
+function PlayerDataService.HasMutationEquipped(player: Player, plantType: string, mutationType: string): boolean
+    local mutations = PlayerDataService.GetEquippedMutations(player, plantType)
+    return table.find(mutations, mutationType) ~= nil
+end
+
+-- Purchase a mutation for a plant (adds to PlantOwnedMutations)
 function PlayerDataService.PurchaseMutation(player: Player, plantType: string, mutationType: string): (boolean, string?, number?)
     local profile = Profiles[player]
     if not profile then 
@@ -401,24 +507,16 @@ function PlayerDataService.PurchaseMutation(player: Player, plantType: string, m
         return false, "LevelTooLow", nil
     end
     
-    -- Check if already has this mutation
-    if PlayerDataService.HasMutation(player, plantType, mutationType) then
+    -- Check if already OWNS this mutation for this plant
+    if PlayerDataService.OwnsMutation(player, plantType, mutationType) then
         return false, "AlreadyHas", nil
     end
     
     -- Check plant category compatibility
-    local plantStats = PlantData.Get(plantType)
+    local plantStats = PlantData[plantType]
     if plantStats then
         local category = plantStats.Category
         if not MutationData.IsCompatibleWith(mutationType, category) then
-            return false, "Incompatible", nil
-        end
-    end
-    
-    -- Check incompatibility with existing mutations
-    local existingMutations = PlayerDataService.GetPlantMutations(player, plantType)
-    for _, existingMutation in existingMutations do
-        if not MutationData.AreCompatible(mutationType, existingMutation) then
             return false, "Incompatible", nil
         end
     end
@@ -431,30 +529,64 @@ function PlayerDataService.PurchaseMutation(player: Player, plantType: string, m
     -- Deduct coins
     profile.Data.Coins -= mutationInfo.Cost
     
-    -- Add mutation
-    if not profile.Data.PlantMutations[plantType] then
-        profile.Data.PlantMutations[plantType] = {}
+    -- Add to OWNED mutations
+    if not profile.Data.PlantOwnedMutations[plantType] then
+        profile.Data.PlantOwnedMutations[plantType] = {}
     end
-    table.insert(profile.Data.PlantMutations[plantType], mutationType)
+    table.insert(profile.Data.PlantOwnedMutations[plantType], mutationType)
     
-    Logger.Info("LobbyPlayerData", `🧬 {player.Name} purchased {mutationType} mutation for {plantType} (Cost: {mutationInfo.Cost}, Remaining: {profile.Data.Coins})`)
+    Logger.Info("LobbyPlayerData", `🧬 {player.Name} purchased {mutationType} for {plantType} (Cost: {mutationInfo.Cost}, Remaining: {profile.Data.Coins})`)
     return true, nil, profile.Data.Coins
 end
 
--- Remove a mutation from a plant
-function PlayerDataService.RemoveMutation(player: Player, plantType: string, mutationType: string): boolean
+-- Equip a mutation on a plant (must be owned first)
+function PlayerDataService.EquipMutation(player: Player, plantType: string, mutationType: string): (boolean, string?)
+    local profile = Profiles[player]
+    if not profile then 
+        return false, "ProfileNotLoaded"
+    end
+    
+    -- Check if player owns this mutation for this plant
+    if not PlayerDataService.OwnsMutation(player, plantType, mutationType) then
+        return false, "NotOwned"
+    end
+    
+    -- Check if already equipped
+    if PlayerDataService.HasMutationEquipped(player, plantType, mutationType) then
+        return false, "AlreadyEquipped"
+    end
+    
+    -- Check incompatibility with currently equipped mutations
+    local equippedMutations = PlayerDataService.GetEquippedMutations(player, plantType)
+    for _, existingMutation in equippedMutations do
+        if not MutationData.AreCompatible(mutationType, existingMutation) then
+            return false, "Incompatible"
+        end
+    end
+    
+    -- Equip the mutation
+    if not profile.Data.PlantEquippedMutations[plantType] then
+        profile.Data.PlantEquippedMutations[plantType] = {}
+    end
+    table.insert(profile.Data.PlantEquippedMutations[plantType], mutationType)
+    
+    Logger.Info("LobbyPlayerData", `🧬 {player.Name} equipped {mutationType} on {plantType}`)
+    return true, nil
+end
+
+-- Unequip a mutation from a plant (stays in owned)
+function PlayerDataService.UnequipMutation(player: Player, plantType: string, mutationType: string): boolean
     local profile = Profiles[player]
     if not profile then return false end
     
-    local mutations = profile.Data.PlantMutations[plantType]
+    local mutations = profile.Data.PlantEquippedMutations[plantType]
     if not mutations then return false end
     
-    for i, mutation in mutations do
-        if mutation == mutationType then
-            table.remove(mutations, i)
-            Logger.Info("LobbyPlayerData", `🧬 {player.Name} removed {mutationType} mutation from {plantType}`)
-            return true
-        end
+    local index = table.find(mutations, mutationType)
+    if index then
+        table.remove(mutations, index)
+        Logger.Info("LobbyPlayerData", `🧬 {player.Name} unequipped {mutationType} from {plantType}`)
+        return true
     end
     
     return false

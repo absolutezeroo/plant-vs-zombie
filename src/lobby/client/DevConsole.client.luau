@@ -26,8 +26,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Import Zap network
-local ZapClient = require(script.Parent:WaitForChild("network"):WaitForChild("generated"))
+-- Network (unified Zap schema in shared/network)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ZapClient = require(Shared.network.generated.client)
 
 -- State
 local isVisible = false
@@ -101,6 +102,12 @@ end
 
 -- Parse and execute command
 local function executeCommand(input: string)
+    -- Trim whitespace and handle empty input
+    input = string.gsub(input, "^%s+", "")  -- Trim leading
+    input = string.gsub(input, "%s+$", "")  -- Trim trailing
+    
+    if input == "" then return end
+    
     local parts = string.split(string.lower(input), " ")
     local cmd = parts[1]
     local arg1 = parts[2]
@@ -292,14 +299,16 @@ local function createConsoleUI()
     -- Handle Enter key
     inputBox.FocusLost:Connect(function(enterPressed)
         if enterPressed then
-            local text = inputBox.Text
+            local text = string.gsub(inputBox.Text, "^%s+", "")
+            text = string.gsub(text, "%s+$", "")
+            -- Clear text FIRST before executing (prevents residual text issues)
+            inputBox.Text = ""
             if text ~= "" then
                 executeCommand(text)
-                inputBox.Text = ""
             end
-            -- Re-focus for continuous input
-            task.defer(function()
-                if isVisible then
+            -- Re-focus for continuous input with small delay
+            task.delay(0.05, function()
+                if isVisible and inputBox then
                     inputBox:CaptureFocus()
                 end
             end)

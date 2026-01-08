@@ -23,8 +23,10 @@ local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
 -- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
 local GridService = require(Server.services.GridService)
 
 -- Components

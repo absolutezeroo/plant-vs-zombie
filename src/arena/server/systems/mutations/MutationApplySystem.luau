@@ -59,11 +59,21 @@ function API.ClearPlayerMutations(userId: number)
 	playerMutationsCache[userId] = nil
 end
 
--- Get mutations for a player's plant
-local function getPlayerMutations(userId: number, plantType: string): {string}
+-- Get all mutations for a player (all plants)
+function API.GetPlayerMutations(userId: number): {[string]: {string}}
+	return playerMutationsCache[userId] or {}
+end
+
+-- Get mutations for a specific plant
+function API.GetPlantMutations(userId: number, plantType: string): {string}
 	local playerMutations = playerMutationsCache[userId]
 	if not playerMutations then return {} end
 	return playerMutations[plantType] or {}
+end
+
+-- Get mutations for a player's plant
+local function getPlayerMutations(userId: number, plantType: string): {string}
+	return API.GetPlantMutations(userId, plantType)
 end
 
 -- Apply mutation components to a plant entity

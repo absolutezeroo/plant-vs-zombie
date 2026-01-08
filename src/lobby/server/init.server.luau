@@ -23,6 +23,7 @@ local TeleportData = require(Shared.data.TeleportData)
 local WorldData = require(Shared.data.WorldData)
 local DifficultyData = require(Shared.data.DifficultyData)
 local PlantData = require(Shared.data.PlantData)
+local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
 
 -- Import services from this folder
 local PlayerDataService = require(script.services.PlayerDataService)
@@ -33,8 +34,8 @@ local ShopHandler = require(script.modules.ShopHandler)
 local MutationHandler = require(script.modules.MutationHandler)
 local DevCommands = require(script.modules.DevCommands)
 
--- Import Zap generated network module
-local ZapServer = require(script.network.generated)
+-- Network (unified Zap schema in shared/network)
+local ZapServer = require(Shared.network.generated.server)
 
 -- Initialize services
 PlayerDataService.Initialize()
@@ -55,6 +56,27 @@ Logger.Info("Lobby", "MutationHandler initialized")
 -- Initialize DevCommands
 DevCommands.Initialize(PlayerDataService)
 Logger.Info("Lobby", "DevCommands initialized")
+
+-- Initialize TeleportDataHandler for Lobby (handles return from Arena)
+TeleportDataHandler.InitializeLobby({
+    PlayerDataService = PlayerDataService,
+})
+Logger.Info("Lobby", "TeleportDataHandler initialized")
+
+-- Subscribe to OnPlayerReturned to show results UI
+TeleportDataHandler.OnPlayerReturned:Connect(function(player: Player, returnData: TeleportData.LobbyReturnData)
+    Logger.Info("Lobby", `{player.Name} returned from Arena: Victory={returnData.Victory}, Stars={returnData.Stars}`)
+    
+    -- Send results to client for display
+    ZapServer.ShowResults.Fire(player, {
+        WorldId = returnData.WorldId,
+        Difficulty = returnData.Difficulty,
+        Victory = returnData.Victory,
+        Stars = returnData.Stars,
+        CoinsEarned = returnData.CoinsEarned,
+        XPEarned = returnData.XPEarned,
+    })
+end)
 
 -- Track players in lobby
 local playersInLobby: { [Player]: boolean } = {}
@@ -114,9 +136,12 @@ local function handleTeleportToArena(player: Player, worldId: string, difficulty
         return true, 0, "Teleport simulated (Studio mode)"
     end
     
+    -- Get equipped mutations for the deck plants
+    local equippedMutations = PlayerDataService.GetAllEquippedMutations(player) or {}
+    
     -- Create teleport data
     local teleportOptions = Instance.new("TeleportOptions")
-    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck)
+    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck, equippedMutations)
     teleportOptions:SetTeleportData(arenaData)
     
     -- Teleport to Arena
@@ -138,62 +163,12 @@ end
 
 --[[
     Handle player joining Lobby
-    Could be fresh join or return from Arena
+    NOTE: TeleportDataHandler now handles return data processing (rewards, etc.)
+    This function just tracks players in lobby
 ]]
 local function onPlayerAdded(player: Player)
     Logger.Info("Lobby", `{player.Name} joined lobby`)
     playersInLobby[player] = true
-    
-    -- Check if returning from Arena with results
-    local teleportData = player:GetJoinData().TeleportData
-    if teleportData then
-        local isValid, err = TeleportData.ValidateLobbyReturnData(teleportData)
-        if isValid then
-			local returnData = teleportData :: TeleportData.LobbyReturnData
-			Logger.Info("Lobby", `{player.Name} returned from Arena`, {
-				worldId = returnData.WorldId,
-				difficulty = returnData.Difficulty,
-				victory = returnData.Victory,
-				stars = returnData.Stars,
-			})
-			
-			-- Process rewards on server side
-			task.spawn(function()
-				-- Wait for profile to load (up to 10 seconds)
-				local attempts = 0
-				while attempts < 100 do
-					local profile = PlayerDataService.GetProfile(player)
-					if profile then
-						-- Apply rewards (no stage completion tracking in new system)
-						PlayerDataService.AddCoins(player, returnData.CoinsEarned)
-						PlayerDataService.AddXP(player, returnData.XPEarned)
-						
-						Logger.Info("Lobby", `Rewards applied: +{returnData.CoinsEarned} coins, +{returnData.XPEarned} XP`)
-						
-						-- Send results to client for display
-						ZapServer.ShowResults.Fire(player, {
-							WorldId = returnData.WorldId,
-							Difficulty = returnData.Difficulty,
-							Victory = returnData.Victory,
-							Stars = returnData.Stars,
-							CoinsEarned = returnData.CoinsEarned,
-							XPEarned = returnData.XPEarned,
-						})
-						
-						break
-					end
-					task.wait(0.1)
-					attempts += 1
-				end
-				
-				if attempts >= 100 then
-					Logger.Error("Lobby", `Profile load timeout for {player.Name} - rewards not applied!`)
-				end
-			end)
-		else
-			Logger.Warn("Lobby", `Invalid return data: {err}`)
-		end
-	end
 end
 
 local function onPlayerRemoving(player: Player)
@@ -272,23 +247,8 @@ ZapServer.DevCommand.SetCallback(function(player, data)
 	
 	-- If successful, sync player data
 	if success then
-		local profile = PlayerDataService.GetProfile(player)
-		if profile then
-			ZapServer.FullPlayerDataSync.Fire(player, {
-				Coins = profile.Data.Coins or 0,
-				Gems = profile.Data.Gems or 0,
-				Level = profile.Data.Level or 1,
-				XP = profile.Data.XP or 0,
-				TotalXPForNextLevel = profile.Data.TotalXPForNextLevel or 100,
-				GamesPlayed = profile.Data.GamesPlayed or 0,
-				GamesWon = profile.Data.GamesWon or 0,
-				ZombiesKilled = profile.Data.ZombiesKilled or 0,
-				PlantsPlaced = profile.Data.PlantsPlaced or 0,
-				UnlockedPlants = profile.Data.UnlockedPlants or {},
-				Deck = profile.Data.Deck or {},
-				PlantMutations = profile.Data.PlantMutations or {},
-			})
-		end
+		-- Use ShopHandler to sync data properly (converts dict to array)
+		ShopHandler.SyncPlayerData(player)
 	end
 end)
 

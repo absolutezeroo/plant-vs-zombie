@@ -150,6 +150,12 @@ if not RunService:IsRunning() then
 		UnlockPlantRequest = table.freeze({
 			Fire = noop
 		}),
+		UnequipMutationResponse = table.freeze({
+			On = noop
+		}),
+		UnequipMutationRequest = table.freeze({
+			Fire = noop
+		}),
 		TeleportToArenaResponse = table.freeze({
 			On = noop
 		}),
@@ -306,6 +312,12 @@ if not RunService:IsRunning() then
 		ExplosionVFX = table.freeze({
 			On = noop
 		}),
+		EquipMutationResponse = table.freeze({
+			On = noop
+		}),
+		EquipMutationRequest = table.freeze({
+			Fire = noop
+		}),
 		EntityDied = table.freeze({
 			On = noop
 		}),
@@ -349,15 +361,15 @@ assert(unreliable[2]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_1 to
 assert(unreliable[3]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_2 to be an UnreliableRemoteEvent")
 assert(unreliable[4]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_3 to be an UnreliableRemoteEvent")
 assert(unreliable[5]:IsA("UnreliableRemoteEvent"), "Expected ZAP_UNRELIABLE_4 to be an UnreliableRemoteEvent")
-export type RequestId = (number)
 export type Column = (number)
-export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
-export type DevCommandType = ("GiveCoins" | "GiveGems" | "SetLevel" | "UnlockAllPlants" | "UnlockPlant" | "AddMutation" | "ResetData" | "GiveXP" | "MaxResources")
 export type MutationType = ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty")
 export type Lane = (number)
-export type EntityId = (number)
+export type DevCommandType = ("GiveCoins" | "GiveGems" | "SetLevel" | "UnlockAllPlants" | "UnlockPlant" | "AddMutation" | "ResetData" | "GiveXP" | "MaxResources")
+export type RequestId = (number)
 export type GamePhase = ("Pregame" | "Wave" | "Intermission" | "GameOver")
 export type ZombieType = ("Basic" | "Cone" | "Bucket" | "Pole" | "Newspaper" | "Football" | "Imp" | "Flag")
+export type EntityId = (number)
+export type PlantType = ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut")
 
 local function SendEvents()
 	if outgoing_used ~= 0 then
@@ -375,8 +387,8 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(47)
-local reliable_event_queue: { [number]: { any } } = table.create(47)
+local reliable_events = table.create(49)
+local reliable_event_queue: { [number]: { any } } = table.create(49)
 local unreliable_events = table.create(5)
 local unreliable_event_queue: { [number]: { any } } = table.create(5)
 reliable_events[3] = {}
@@ -388,6 +400,8 @@ reliable_events[10] = {}
 reliable_event_queue[10] = {}
 reliable_events[11] = {}
 reliable_event_queue[11] = {}
+reliable_events[46] = {}
+reliable_event_queue[46] = {}
 reliable_events[33] = {}
 reliable_event_queue[33] = {}
 reliable_events[28] = {}
@@ -396,10 +410,10 @@ reliable_events[41] = {}
 reliable_event_queue[41] = {}
 reliable_events[34] = {}
 reliable_event_queue[34] = {}
-reliable_events[45] = {}
-reliable_event_queue[45] = {}
-reliable_events[46] = {}
-reliable_event_queue[46] = {}
+reliable_events[47] = {}
+reliable_event_queue[47] = {}
+reliable_events[48] = {}
+reliable_event_queue[48] = {}
 reliable_events[5] = {}
 reliable_event_queue[5] = {}
 unreliable_events[2] = {}
@@ -458,6 +472,8 @@ reliable_events[42] = {}
 reliable_event_queue[42] = {}
 reliable_events[17] = {}
 reliable_event_queue[17] = {}
+reliable_events[45] = {}
+reliable_event_queue[45] = {}
 reliable_events[4] = {}
 reliable_event_queue[4] = {}
 unreliable_events[0] = {}
@@ -562,17 +578,168 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 					warn(`[ZAP] {#reliable_event_queue[11]} events in queue for WaveCompleted. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 33 then -- TeleportToArenaResponse
+		elseif id == 46 then -- UnequipMutationResponse
 			local value
 			local bool_3 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["Success"] = bit32.btest(bool_3, 0b0000000000000001)
-			if bit32.btest(bool_3, 0b0000000000000010) then
+			local variant_1 = buffer.readu8(incoming_buff, read(1))
+			if variant_1 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_1 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_1 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_1 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_1 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_1 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_1 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_1 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_1 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_1 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_1 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_1 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_1 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_1 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_1 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_1 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_1 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_1 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_1 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_1 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_1 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_1 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_1 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_1 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_1 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_1 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_1 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_1 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_1 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_1 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_1 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_1 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_1 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_1 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_1 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_1 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_1 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_1 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_1 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_1 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_1 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_1 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_1 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_1 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_1 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_1 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_1 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_1 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
+			local variant_2 = buffer.readu8(incoming_buff, read(1))
+			if variant_2 == 0 then
+				value["MutationType"] = "Fire"
+			elseif variant_2 == 1 then
+				value["MutationType"] = "Inferno"
+			elseif variant_2 == 2 then
+				value["MutationType"] = "Ice"
+			elseif variant_2 == 3 then
+				value["MutationType"] = "Frost"
+			elseif variant_2 == 4 then
+				value["MutationType"] = "Electric"
+			elseif variant_2 == 5 then
+				value["MutationType"] = "Tesla"
+			elseif variant_2 == 6 then
+				value["MutationType"] = "Toxic"
+			elseif variant_2 == 7 then
+				value["MutationType"] = "Venomous"
+			elseif variant_2 == 8 then
+				value["MutationType"] = "Shadow"
+			elseif variant_2 == 9 then
+				value["MutationType"] = "Void"
+			elseif variant_2 == 10 then
+				value["MutationType"] = "Solar"
+			elseif variant_2 == 11 then
+				value["MutationType"] = "Radiant"
+			elseif variant_2 == 12 then
+				value["MutationType"] = "Reinforced"
+			elseif variant_2 == 13 then
+				value["MutationType"] = "Fortified"
+			elseif variant_2 == 14 then
+				value["MutationType"] = "Primal"
+			elseif variant_2 == 15 then
+				value["MutationType"] = "Savage"
+			elseif variant_2 == 16 then
+				value["MutationType"] = "Swift"
+			elseif variant_2 == 17 then
+				value["MutationType"] = "Hasty"
+			end
+			if reliable_events[46][1] then
+				for _, cb in reliable_events[46] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[46], value)
+				if #reliable_event_queue[46] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[46]} events in queue for UnequipMutationResponse. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 33 then -- TeleportToArenaResponse
+			local value
+			local bool_4 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			value["Success"] = bit32.btest(bool_4, 0b0000000000000001)
+			if bit32.btest(bool_4, 0b0000000000000010) then
 				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
 			else
 				value["ErrorCode"] = nil
 			end
-			if bit32.btest(bool_3, 0b0000000000000100) then
+			if bit32.btest(bool_4, 0b0000000000000100) then
 				local len_1 = buffer.readu16(incoming_buff, read(2))
 				assert(len_1 <= 400, "value is more than 400!")
 				value["ErrorMessage"] = buffer.readstring(incoming_buff, read(len_1), len_1)
@@ -613,102 +780,102 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["UnlockedPlants"] = table.create(len_2)
 			for i_1 = 1, len_2 do
 				local val_1
-				local variant_1 = buffer.readu8(incoming_buff, read(1))
-				if variant_1 == 0 then
+				local variant_3 = buffer.readu8(incoming_buff, read(1))
+				if variant_3 == 0 then
 					val_1 = "Sunflower"
-				elseif variant_1 == 1 then
+				elseif variant_3 == 1 then
 					val_1 = "Peashooter"
-				elseif variant_1 == 2 then
+				elseif variant_3 == 2 then
 					val_1 = "WallNut"
-				elseif variant_1 == 3 then
+				elseif variant_3 == 3 then
 					val_1 = "PotatoMine"
-				elseif variant_1 == 4 then
+				elseif variant_3 == 4 then
 					val_1 = "PuffShroom"
-				elseif variant_1 == 5 then
+				elseif variant_3 == 5 then
 					val_1 = "SunShroom"
-				elseif variant_1 == 6 then
+				elseif variant_3 == 6 then
 					val_1 = "Chomper"
-				elseif variant_1 == 7 then
+				elseif variant_3 == 7 then
 					val_1 = "SnowPea"
-				elseif variant_1 == 8 then
+				elseif variant_3 == 8 then
 					val_1 = "Repeater"
-				elseif variant_1 == 9 then
+				elseif variant_3 == 9 then
 					val_1 = "FumeShroom"
-				elseif variant_1 == 10 then
+				elseif variant_3 == 10 then
 					val_1 = "Squash"
-				elseif variant_1 == 11 then
+				elseif variant_3 == 11 then
 					val_1 = "Garlic"
-				elseif variant_1 == 12 then
+				elseif variant_3 == 12 then
 					val_1 = "CherryBomb"
-				elseif variant_1 == 13 then
+				elseif variant_3 == 13 then
 					val_1 = "TallNut"
-				elseif variant_1 == 14 then
+				elseif variant_3 == 14 then
 					val_1 = "Threepeater"
-				elseif variant_1 == 15 then
+				elseif variant_3 == 15 then
 					val_1 = "Jalapeno"
-				elseif variant_1 == 16 then
+				elseif variant_3 == 16 then
 					val_1 = "Spikeweed"
-				elseif variant_1 == 17 then
+				elseif variant_3 == 17 then
 					val_1 = "Torchwood"
-				elseif variant_1 == 18 then
+				elseif variant_3 == 18 then
 					val_1 = "CabbagePult"
-				elseif variant_1 == 19 then
+				elseif variant_3 == 19 then
 					val_1 = "Pumpkin"
-				elseif variant_1 == 20 then
+				elseif variant_3 == 20 then
 					val_1 = "ScaredyShroom"
-				elseif variant_1 == 21 then
+				elseif variant_3 == 21 then
 					val_1 = "HypnoShroom"
-				elseif variant_1 == 22 then
+				elseif variant_3 == 22 then
 					val_1 = "SplitPea"
-				elseif variant_1 == 23 then
+				elseif variant_3 == 23 then
 					val_1 = "KernelPult"
-				elseif variant_1 == 24 then
+				elseif variant_3 == 24 then
 					val_1 = "Starfruit"
-				elseif variant_1 == 25 then
+				elseif variant_3 == 25 then
 					val_1 = "Cactus"
-				elseif variant_1 == 26 then
+				elseif variant_3 == 26 then
 					val_1 = "Blover"
-				elseif variant_1 == 27 then
+				elseif variant_3 == 27 then
 					val_1 = "SeaShroom"
-				elseif variant_1 == 28 then
+				elseif variant_3 == 28 then
 					val_1 = "TwinSunflower"
-				elseif variant_1 == 29 then
+				elseif variant_3 == 29 then
 					val_1 = "MelonPult"
-				elseif variant_1 == 30 then
+				elseif variant_3 == 30 then
 					val_1 = "GatlingPea"
-				elseif variant_1 == 31 then
+				elseif variant_3 == 31 then
 					val_1 = "GloomShroom"
-				elseif variant_1 == 32 then
+				elseif variant_3 == 32 then
 					val_1 = "Cattail"
-				elseif variant_1 == 33 then
+				elseif variant_3 == 33 then
 					val_1 = "WinterMelon"
-				elseif variant_1 == 34 then
+				elseif variant_3 == 34 then
 					val_1 = "IceShroom"
-				elseif variant_1 == 35 then
+				elseif variant_3 == 35 then
 					val_1 = "DoomShroom"
-				elseif variant_1 == 36 then
+				elseif variant_3 == 36 then
 					val_1 = "CobCannon"
-				elseif variant_1 == 37 then
+				elseif variant_3 == 37 then
 					val_1 = "Marigold"
-				elseif variant_1 == 38 then
+				elseif variant_3 == 38 then
 					val_1 = "GoldMagnet"
-				elseif variant_1 == 39 then
+				elseif variant_3 == 39 then
 					val_1 = "Imitater"
-				elseif variant_1 == 40 then
+				elseif variant_3 == 40 then
 					val_1 = "LilyPad"
-				elseif variant_1 == 41 then
+				elseif variant_3 == 41 then
 					val_1 = "FlowerPot"
-				elseif variant_1 == 42 then
+				elseif variant_3 == 42 then
 					val_1 = "TangleKelp"
-				elseif variant_1 == 43 then
+				elseif variant_3 == 43 then
 					val_1 = "GraveBuster"
-				elseif variant_1 == 44 then
+				elseif variant_3 == 44 then
 					val_1 = "Plantern"
-				elseif variant_1 == 45 then
+				elseif variant_3 == 45 then
 					val_1 = "UmbrellaLeaf"
-				elseif variant_1 == 46 then
+				elseif variant_3 == 46 then
 					val_1 = "CoffeeBean"
-				elseif variant_1 == 47 then
+				elseif variant_3 == 47 then
 					val_1 = "ExplodeONut"
 				end
 				value["UnlockedPlants"][i_1] = val_1
@@ -740,327 +907,526 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 					warn(`[ZAP] {#reliable_event_queue[34]} events in queue for SyncPlayerData. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 45 then -- SyncPlantMutations
+		elseif id == 47 then -- SyncPlantMutations
 			local value
 			value = {  }
-			local variant_2 = buffer.readu8(incoming_buff, read(1))
-			if variant_2 == 0 then
+			local variant_4 = buffer.readu8(incoming_buff, read(1))
+			if variant_4 == 0 then
 				value["PlantType"] = "Sunflower"
-			elseif variant_2 == 1 then
+			elseif variant_4 == 1 then
 				value["PlantType"] = "Peashooter"
-			elseif variant_2 == 2 then
+			elseif variant_4 == 2 then
 				value["PlantType"] = "WallNut"
-			elseif variant_2 == 3 then
+			elseif variant_4 == 3 then
 				value["PlantType"] = "PotatoMine"
-			elseif variant_2 == 4 then
+			elseif variant_4 == 4 then
 				value["PlantType"] = "PuffShroom"
-			elseif variant_2 == 5 then
+			elseif variant_4 == 5 then
 				value["PlantType"] = "SunShroom"
-			elseif variant_2 == 6 then
+			elseif variant_4 == 6 then
 				value["PlantType"] = "Chomper"
-			elseif variant_2 == 7 then
+			elseif variant_4 == 7 then
 				value["PlantType"] = "SnowPea"
-			elseif variant_2 == 8 then
+			elseif variant_4 == 8 then
 				value["PlantType"] = "Repeater"
-			elseif variant_2 == 9 then
+			elseif variant_4 == 9 then
 				value["PlantType"] = "FumeShroom"
-			elseif variant_2 == 10 then
+			elseif variant_4 == 10 then
 				value["PlantType"] = "Squash"
-			elseif variant_2 == 11 then
+			elseif variant_4 == 11 then
 				value["PlantType"] = "Garlic"
-			elseif variant_2 == 12 then
+			elseif variant_4 == 12 then
 				value["PlantType"] = "CherryBomb"
-			elseif variant_2 == 13 then
+			elseif variant_4 == 13 then
 				value["PlantType"] = "TallNut"
-			elseif variant_2 == 14 then
+			elseif variant_4 == 14 then
 				value["PlantType"] = "Threepeater"
-			elseif variant_2 == 15 then
+			elseif variant_4 == 15 then
 				value["PlantType"] = "Jalapeno"
-			elseif variant_2 == 16 then
+			elseif variant_4 == 16 then
 				value["PlantType"] = "Spikeweed"
-			elseif variant_2 == 17 then
+			elseif variant_4 == 17 then
 				value["PlantType"] = "Torchwood"
-			elseif variant_2 == 18 then
+			elseif variant_4 == 18 then
 				value["PlantType"] = "CabbagePult"
-			elseif variant_2 == 19 then
+			elseif variant_4 == 19 then
 				value["PlantType"] = "Pumpkin"
-			elseif variant_2 == 20 then
+			elseif variant_4 == 20 then
 				value["PlantType"] = "ScaredyShroom"
-			elseif variant_2 == 21 then
+			elseif variant_4 == 21 then
 				value["PlantType"] = "HypnoShroom"
-			elseif variant_2 == 22 then
+			elseif variant_4 == 22 then
 				value["PlantType"] = "SplitPea"
-			elseif variant_2 == 23 then
+			elseif variant_4 == 23 then
 				value["PlantType"] = "KernelPult"
-			elseif variant_2 == 24 then
+			elseif variant_4 == 24 then
 				value["PlantType"] = "Starfruit"
-			elseif variant_2 == 25 then
+			elseif variant_4 == 25 then
 				value["PlantType"] = "Cactus"
-			elseif variant_2 == 26 then
+			elseif variant_4 == 26 then
 				value["PlantType"] = "Blover"
-			elseif variant_2 == 27 then
+			elseif variant_4 == 27 then
 				value["PlantType"] = "SeaShroom"
-			elseif variant_2 == 28 then
+			elseif variant_4 == 28 then
 				value["PlantType"] = "TwinSunflower"
-			elseif variant_2 == 29 then
+			elseif variant_4 == 29 then
 				value["PlantType"] = "MelonPult"
-			elseif variant_2 == 30 then
+			elseif variant_4 == 30 then
 				value["PlantType"] = "GatlingPea"
-			elseif variant_2 == 31 then
+			elseif variant_4 == 31 then
 				value["PlantType"] = "GloomShroom"
-			elseif variant_2 == 32 then
+			elseif variant_4 == 32 then
 				value["PlantType"] = "Cattail"
-			elseif variant_2 == 33 then
+			elseif variant_4 == 33 then
 				value["PlantType"] = "WinterMelon"
-			elseif variant_2 == 34 then
+			elseif variant_4 == 34 then
 				value["PlantType"] = "IceShroom"
-			elseif variant_2 == 35 then
+			elseif variant_4 == 35 then
 				value["PlantType"] = "DoomShroom"
-			elseif variant_2 == 36 then
+			elseif variant_4 == 36 then
 				value["PlantType"] = "CobCannon"
-			elseif variant_2 == 37 then
+			elseif variant_4 == 37 then
 				value["PlantType"] = "Marigold"
-			elseif variant_2 == 38 then
+			elseif variant_4 == 38 then
 				value["PlantType"] = "GoldMagnet"
-			elseif variant_2 == 39 then
+			elseif variant_4 == 39 then
 				value["PlantType"] = "Imitater"
-			elseif variant_2 == 40 then
+			elseif variant_4 == 40 then
 				value["PlantType"] = "LilyPad"
-			elseif variant_2 == 41 then
+			elseif variant_4 == 41 then
 				value["PlantType"] = "FlowerPot"
-			elseif variant_2 == 42 then
+			elseif variant_4 == 42 then
 				value["PlantType"] = "TangleKelp"
-			elseif variant_2 == 43 then
+			elseif variant_4 == 43 then
 				value["PlantType"] = "GraveBuster"
-			elseif variant_2 == 44 then
+			elseif variant_4 == 44 then
 				value["PlantType"] = "Plantern"
-			elseif variant_2 == 45 then
+			elseif variant_4 == 45 then
 				value["PlantType"] = "UmbrellaLeaf"
-			elseif variant_2 == 46 then
+			elseif variant_4 == 46 then
 				value["PlantType"] = "CoffeeBean"
-			elseif variant_2 == 47 then
+			elseif variant_4 == 47 then
 				value["PlantType"] = "ExplodeONut"
 			end
 			local len_3 = buffer.readu8(incoming_buff, read(1))
 			assert(len_3 >= 0, "value is less than 0!")
 			assert(len_3 <= 8, "value is more than 8!")
-			value["Mutations"] = table.create(len_3)
+			value["OwnedMutations"] = table.create(len_3)
 			for i_2 = 1, len_3 do
 				local val_2
-				local variant_3 = buffer.readu8(incoming_buff, read(1))
-				if variant_3 == 0 then
+				local variant_5 = buffer.readu8(incoming_buff, read(1))
+				if variant_5 == 0 then
 					val_2 = "Fire"
-				elseif variant_3 == 1 then
+				elseif variant_5 == 1 then
 					val_2 = "Inferno"
-				elseif variant_3 == 2 then
+				elseif variant_5 == 2 then
 					val_2 = "Ice"
-				elseif variant_3 == 3 then
+				elseif variant_5 == 3 then
 					val_2 = "Frost"
-				elseif variant_3 == 4 then
+				elseif variant_5 == 4 then
 					val_2 = "Electric"
-				elseif variant_3 == 5 then
+				elseif variant_5 == 5 then
 					val_2 = "Tesla"
-				elseif variant_3 == 6 then
+				elseif variant_5 == 6 then
 					val_2 = "Toxic"
-				elseif variant_3 == 7 then
+				elseif variant_5 == 7 then
 					val_2 = "Venomous"
-				elseif variant_3 == 8 then
+				elseif variant_5 == 8 then
 					val_2 = "Shadow"
-				elseif variant_3 == 9 then
+				elseif variant_5 == 9 then
 					val_2 = "Void"
-				elseif variant_3 == 10 then
+				elseif variant_5 == 10 then
 					val_2 = "Solar"
-				elseif variant_3 == 11 then
+				elseif variant_5 == 11 then
 					val_2 = "Radiant"
-				elseif variant_3 == 12 then
+				elseif variant_5 == 12 then
 					val_2 = "Reinforced"
-				elseif variant_3 == 13 then
+				elseif variant_5 == 13 then
 					val_2 = "Fortified"
-				elseif variant_3 == 14 then
+				elseif variant_5 == 14 then
 					val_2 = "Primal"
-				elseif variant_3 == 15 then
+				elseif variant_5 == 15 then
 					val_2 = "Savage"
-				elseif variant_3 == 16 then
+				elseif variant_5 == 16 then
 					val_2 = "Swift"
-				elseif variant_3 == 17 then
+				elseif variant_5 == 17 then
 					val_2 = "Hasty"
 				end
-				value["Mutations"][i_2] = val_2
+				value["OwnedMutations"][i_2] = val_2
 			end
-			if reliable_events[45][1] then
-				for _, cb in reliable_events[45] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[45], value)
-				if #reliable_event_queue[45] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[45]} events in queue for SyncPlantMutations. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 46 then -- SyncAllMutations
-			local value
-			value = {  }
 			local len_4 = buffer.readu8(incoming_buff, read(1))
 			assert(len_4 >= 0, "value is less than 0!")
-			assert(len_4 <= 48, "value is more than 48!")
-			value["PlantMutations"] = table.create(len_4)
+			assert(len_4 <= 8, "value is more than 8!")
+			value["EquippedMutations"] = table.create(len_4)
 			for i_3 = 1, len_4 do
 				local val_3
-				val_3 = {  }
-				local variant_4 = buffer.readu8(incoming_buff, read(1))
-				if variant_4 == 0 then
-					val_3["PlantType"] = "Sunflower"
-				elseif variant_4 == 1 then
-					val_3["PlantType"] = "Peashooter"
-				elseif variant_4 == 2 then
-					val_3["PlantType"] = "WallNut"
-				elseif variant_4 == 3 then
-					val_3["PlantType"] = "PotatoMine"
-				elseif variant_4 == 4 then
-					val_3["PlantType"] = "PuffShroom"
-				elseif variant_4 == 5 then
-					val_3["PlantType"] = "SunShroom"
-				elseif variant_4 == 6 then
-					val_3["PlantType"] = "Chomper"
-				elseif variant_4 == 7 then
-					val_3["PlantType"] = "SnowPea"
-				elseif variant_4 == 8 then
-					val_3["PlantType"] = "Repeater"
-				elseif variant_4 == 9 then
-					val_3["PlantType"] = "FumeShroom"
-				elseif variant_4 == 10 then
-					val_3["PlantType"] = "Squash"
-				elseif variant_4 == 11 then
-					val_3["PlantType"] = "Garlic"
-				elseif variant_4 == 12 then
-					val_3["PlantType"] = "CherryBomb"
-				elseif variant_4 == 13 then
-					val_3["PlantType"] = "TallNut"
-				elseif variant_4 == 14 then
-					val_3["PlantType"] = "Threepeater"
-				elseif variant_4 == 15 then
-					val_3["PlantType"] = "Jalapeno"
-				elseif variant_4 == 16 then
-					val_3["PlantType"] = "Spikeweed"
-				elseif variant_4 == 17 then
-					val_3["PlantType"] = "Torchwood"
-				elseif variant_4 == 18 then
-					val_3["PlantType"] = "CabbagePult"
-				elseif variant_4 == 19 then
-					val_3["PlantType"] = "Pumpkin"
-				elseif variant_4 == 20 then
-					val_3["PlantType"] = "ScaredyShroom"
-				elseif variant_4 == 21 then
-					val_3["PlantType"] = "HypnoShroom"
-				elseif variant_4 == 22 then
-					val_3["PlantType"] = "SplitPea"
-				elseif variant_4 == 23 then
-					val_3["PlantType"] = "KernelPult"
-				elseif variant_4 == 24 then
-					val_3["PlantType"] = "Starfruit"
-				elseif variant_4 == 25 then
-					val_3["PlantType"] = "Cactus"
-				elseif variant_4 == 26 then
-					val_3["PlantType"] = "Blover"
-				elseif variant_4 == 27 then
-					val_3["PlantType"] = "SeaShroom"
-				elseif variant_4 == 28 then
-					val_3["PlantType"] = "TwinSunflower"
-				elseif variant_4 == 29 then
-					val_3["PlantType"] = "MelonPult"
-				elseif variant_4 == 30 then
-					val_3["PlantType"] = "GatlingPea"
-				elseif variant_4 == 31 then
-					val_3["PlantType"] = "GloomShroom"
-				elseif variant_4 == 32 then
-					val_3["PlantType"] = "Cattail"
-				elseif variant_4 == 33 then
-					val_3["PlantType"] = "WinterMelon"
-				elseif variant_4 == 34 then
-					val_3["PlantType"] = "IceShroom"
-				elseif variant_4 == 35 then
-					val_3["PlantType"] = "DoomShroom"
-				elseif variant_4 == 36 then
-					val_3["PlantType"] = "CobCannon"
-				elseif variant_4 == 37 then
-					val_3["PlantType"] = "Marigold"
-				elseif variant_4 == 38 then
-					val_3["PlantType"] = "GoldMagnet"
-				elseif variant_4 == 39 then
-					val_3["PlantType"] = "Imitater"
-				elseif variant_4 == 40 then
-					val_3["PlantType"] = "LilyPad"
-				elseif variant_4 == 41 then
-					val_3["PlantType"] = "FlowerPot"
-				elseif variant_4 == 42 then
-					val_3["PlantType"] = "TangleKelp"
-				elseif variant_4 == 43 then
-					val_3["PlantType"] = "GraveBuster"
-				elseif variant_4 == 44 then
-					val_3["PlantType"] = "Plantern"
-				elseif variant_4 == 45 then
-					val_3["PlantType"] = "UmbrellaLeaf"
-				elseif variant_4 == 46 then
-					val_3["PlantType"] = "CoffeeBean"
-				elseif variant_4 == 47 then
-					val_3["PlantType"] = "ExplodeONut"
+				local variant_6 = buffer.readu8(incoming_buff, read(1))
+				if variant_6 == 0 then
+					val_3 = "Fire"
+				elseif variant_6 == 1 then
+					val_3 = "Inferno"
+				elseif variant_6 == 2 then
+					val_3 = "Ice"
+				elseif variant_6 == 3 then
+					val_3 = "Frost"
+				elseif variant_6 == 4 then
+					val_3 = "Electric"
+				elseif variant_6 == 5 then
+					val_3 = "Tesla"
+				elseif variant_6 == 6 then
+					val_3 = "Toxic"
+				elseif variant_6 == 7 then
+					val_3 = "Venomous"
+				elseif variant_6 == 8 then
+					val_3 = "Shadow"
+				elseif variant_6 == 9 then
+					val_3 = "Void"
+				elseif variant_6 == 10 then
+					val_3 = "Solar"
+				elseif variant_6 == 11 then
+					val_3 = "Radiant"
+				elseif variant_6 == 12 then
+					val_3 = "Reinforced"
+				elseif variant_6 == 13 then
+					val_3 = "Fortified"
+				elseif variant_6 == 14 then
+					val_3 = "Primal"
+				elseif variant_6 == 15 then
+					val_3 = "Savage"
+				elseif variant_6 == 16 then
+					val_3 = "Swift"
+				elseif variant_6 == 17 then
+					val_3 = "Hasty"
 				end
-				local len_5 = buffer.readu8(incoming_buff, read(1))
-				assert(len_5 >= 0, "value is less than 0!")
-				assert(len_5 <= 8, "value is more than 8!")
-				val_3["Mutations"] = table.create(len_5)
-				for i_4 = 1, len_5 do
-					local val_4
-					local variant_5 = buffer.readu8(incoming_buff, read(1))
-					if variant_5 == 0 then
-						val_4 = "Fire"
-					elseif variant_5 == 1 then
-						val_4 = "Inferno"
-					elseif variant_5 == 2 then
-						val_4 = "Ice"
-					elseif variant_5 == 3 then
-						val_4 = "Frost"
-					elseif variant_5 == 4 then
-						val_4 = "Electric"
-					elseif variant_5 == 5 then
-						val_4 = "Tesla"
-					elseif variant_5 == 6 then
-						val_4 = "Toxic"
-					elseif variant_5 == 7 then
-						val_4 = "Venomous"
-					elseif variant_5 == 8 then
-						val_4 = "Shadow"
-					elseif variant_5 == 9 then
-						val_4 = "Void"
-					elseif variant_5 == 10 then
-						val_4 = "Solar"
-					elseif variant_5 == 11 then
-						val_4 = "Radiant"
-					elseif variant_5 == 12 then
-						val_4 = "Reinforced"
-					elseif variant_5 == 13 then
-						val_4 = "Fortified"
-					elseif variant_5 == 14 then
-						val_4 = "Primal"
-					elseif variant_5 == 15 then
-						val_4 = "Savage"
-					elseif variant_5 == 16 then
-						val_4 = "Swift"
-					elseif variant_5 == 17 then
-						val_4 = "Hasty"
-					end
-					val_3["Mutations"][i_4] = val_4
-				end
-				value["PlantMutations"][i_3] = val_3
+				value["EquippedMutations"][i_3] = val_3
 			end
-			if reliable_events[46][1] then
-				for _, cb in reliable_events[46] do
+			if reliable_events[47][1] then
+				for _, cb in reliable_events[47] do
 					task.spawn(cb, value)
 				end
 			else
-				table.insert(reliable_event_queue[46], value)
-				if #reliable_event_queue[46] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[46]} events in queue for SyncAllMutations. Did you forget to attach a listener?`)
+				table.insert(reliable_event_queue[47], value)
+				if #reliable_event_queue[47] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[47]} events in queue for SyncPlantMutations. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 48 then -- SyncAllMutations
+			local value
+			value = {  }
+			local len_5 = buffer.readu8(incoming_buff, read(1))
+			assert(len_5 >= 0, "value is less than 0!")
+			assert(len_5 <= 48, "value is more than 48!")
+			value["OwnedMutations"] = table.create(len_5)
+			for i_4 = 1, len_5 do
+				local val_4
+				val_4 = {  }
+				local variant_7 = buffer.readu8(incoming_buff, read(1))
+				if variant_7 == 0 then
+					val_4["PlantType"] = "Sunflower"
+				elseif variant_7 == 1 then
+					val_4["PlantType"] = "Peashooter"
+				elseif variant_7 == 2 then
+					val_4["PlantType"] = "WallNut"
+				elseif variant_7 == 3 then
+					val_4["PlantType"] = "PotatoMine"
+				elseif variant_7 == 4 then
+					val_4["PlantType"] = "PuffShroom"
+				elseif variant_7 == 5 then
+					val_4["PlantType"] = "SunShroom"
+				elseif variant_7 == 6 then
+					val_4["PlantType"] = "Chomper"
+				elseif variant_7 == 7 then
+					val_4["PlantType"] = "SnowPea"
+				elseif variant_7 == 8 then
+					val_4["PlantType"] = "Repeater"
+				elseif variant_7 == 9 then
+					val_4["PlantType"] = "FumeShroom"
+				elseif variant_7 == 10 then
+					val_4["PlantType"] = "Squash"
+				elseif variant_7 == 11 then
+					val_4["PlantType"] = "Garlic"
+				elseif variant_7 == 12 then
+					val_4["PlantType"] = "CherryBomb"
+				elseif variant_7 == 13 then
+					val_4["PlantType"] = "TallNut"
+				elseif variant_7 == 14 then
+					val_4["PlantType"] = "Threepeater"
+				elseif variant_7 == 15 then
+					val_4["PlantType"] = "Jalapeno"
+				elseif variant_7 == 16 then
+					val_4["PlantType"] = "Spikeweed"
+				elseif variant_7 == 17 then
+					val_4["PlantType"] = "Torchwood"
+				elseif variant_7 == 18 then
+					val_4["PlantType"] = "CabbagePult"
+				elseif variant_7 == 19 then
+					val_4["PlantType"] = "Pumpkin"
+				elseif variant_7 == 20 then
+					val_4["PlantType"] = "ScaredyShroom"
+				elseif variant_7 == 21 then
+					val_4["PlantType"] = "HypnoShroom"
+				elseif variant_7 == 22 then
+					val_4["PlantType"] = "SplitPea"
+				elseif variant_7 == 23 then
+					val_4["PlantType"] = "KernelPult"
+				elseif variant_7 == 24 then
+					val_4["PlantType"] = "Starfruit"
+				elseif variant_7 == 25 then
+					val_4["PlantType"] = "Cactus"
+				elseif variant_7 == 26 then
+					val_4["PlantType"] = "Blover"
+				elseif variant_7 == 27 then
+					val_4["PlantType"] = "SeaShroom"
+				elseif variant_7 == 28 then
+					val_4["PlantType"] = "TwinSunflower"
+				elseif variant_7 == 29 then
+					val_4["PlantType"] = "MelonPult"
+				elseif variant_7 == 30 then
+					val_4["PlantType"] = "GatlingPea"
+				elseif variant_7 == 31 then
+					val_4["PlantType"] = "GloomShroom"
+				elseif variant_7 == 32 then
+					val_4["PlantType"] = "Cattail"
+				elseif variant_7 == 33 then
+					val_4["PlantType"] = "WinterMelon"
+				elseif variant_7 == 34 then
+					val_4["PlantType"] = "IceShroom"
+				elseif variant_7 == 35 then
+					val_4["PlantType"] = "DoomShroom"
+				elseif variant_7 == 36 then
+					val_4["PlantType"] = "CobCannon"
+				elseif variant_7 == 37 then
+					val_4["PlantType"] = "Marigold"
+				elseif variant_7 == 38 then
+					val_4["PlantType"] = "GoldMagnet"
+				elseif variant_7 == 39 then
+					val_4["PlantType"] = "Imitater"
+				elseif variant_7 == 40 then
+					val_4["PlantType"] = "LilyPad"
+				elseif variant_7 == 41 then
+					val_4["PlantType"] = "FlowerPot"
+				elseif variant_7 == 42 then
+					val_4["PlantType"] = "TangleKelp"
+				elseif variant_7 == 43 then
+					val_4["PlantType"] = "GraveBuster"
+				elseif variant_7 == 44 then
+					val_4["PlantType"] = "Plantern"
+				elseif variant_7 == 45 then
+					val_4["PlantType"] = "UmbrellaLeaf"
+				elseif variant_7 == 46 then
+					val_4["PlantType"] = "CoffeeBean"
+				elseif variant_7 == 47 then
+					val_4["PlantType"] = "ExplodeONut"
+				end
+				local len_6 = buffer.readu8(incoming_buff, read(1))
+				assert(len_6 >= 0, "value is less than 0!")
+				assert(len_6 <= 8, "value is more than 8!")
+				val_4["Mutations"] = table.create(len_6)
+				for i_5 = 1, len_6 do
+					local val_5
+					local variant_8 = buffer.readu8(incoming_buff, read(1))
+					if variant_8 == 0 then
+						val_5 = "Fire"
+					elseif variant_8 == 1 then
+						val_5 = "Inferno"
+					elseif variant_8 == 2 then
+						val_5 = "Ice"
+					elseif variant_8 == 3 then
+						val_5 = "Frost"
+					elseif variant_8 == 4 then
+						val_5 = "Electric"
+					elseif variant_8 == 5 then
+						val_5 = "Tesla"
+					elseif variant_8 == 6 then
+						val_5 = "Toxic"
+					elseif variant_8 == 7 then
+						val_5 = "Venomous"
+					elseif variant_8 == 8 then
+						val_5 = "Shadow"
+					elseif variant_8 == 9 then
+						val_5 = "Void"
+					elseif variant_8 == 10 then
+						val_5 = "Solar"
+					elseif variant_8 == 11 then
+						val_5 = "Radiant"
+					elseif variant_8 == 12 then
+						val_5 = "Reinforced"
+					elseif variant_8 == 13 then
+						val_5 = "Fortified"
+					elseif variant_8 == 14 then
+						val_5 = "Primal"
+					elseif variant_8 == 15 then
+						val_5 = "Savage"
+					elseif variant_8 == 16 then
+						val_5 = "Swift"
+					elseif variant_8 == 17 then
+						val_5 = "Hasty"
+					end
+					val_4["Mutations"][i_5] = val_5
+				end
+				value["OwnedMutations"][i_4] = val_4
+			end
+			local len_7 = buffer.readu8(incoming_buff, read(1))
+			assert(len_7 >= 0, "value is less than 0!")
+			assert(len_7 <= 48, "value is more than 48!")
+			value["EquippedMutations"] = table.create(len_7)
+			for i_6 = 1, len_7 do
+				local val_6
+				val_6 = {  }
+				local variant_9 = buffer.readu8(incoming_buff, read(1))
+				if variant_9 == 0 then
+					val_6["PlantType"] = "Sunflower"
+				elseif variant_9 == 1 then
+					val_6["PlantType"] = "Peashooter"
+				elseif variant_9 == 2 then
+					val_6["PlantType"] = "WallNut"
+				elseif variant_9 == 3 then
+					val_6["PlantType"] = "PotatoMine"
+				elseif variant_9 == 4 then
+					val_6["PlantType"] = "PuffShroom"
+				elseif variant_9 == 5 then
+					val_6["PlantType"] = "SunShroom"
+				elseif variant_9 == 6 then
+					val_6["PlantType"] = "Chomper"
+				elseif variant_9 == 7 then
+					val_6["PlantType"] = "SnowPea"
+				elseif variant_9 == 8 then
+					val_6["PlantType"] = "Repeater"
+				elseif variant_9 == 9 then
+					val_6["PlantType"] = "FumeShroom"
+				elseif variant_9 == 10 then
+					val_6["PlantType"] = "Squash"
+				elseif variant_9 == 11 then
+					val_6["PlantType"] = "Garlic"
+				elseif variant_9 == 12 then
+					val_6["PlantType"] = "CherryBomb"
+				elseif variant_9 == 13 then
+					val_6["PlantType"] = "TallNut"
+				elseif variant_9 == 14 then
+					val_6["PlantType"] = "Threepeater"
+				elseif variant_9 == 15 then
+					val_6["PlantType"] = "Jalapeno"
+				elseif variant_9 == 16 then
+					val_6["PlantType"] = "Spikeweed"
+				elseif variant_9 == 17 then
+					val_6["PlantType"] = "Torchwood"
+				elseif variant_9 == 18 then
+					val_6["PlantType"] = "CabbagePult"
+				elseif variant_9 == 19 then
+					val_6["PlantType"] = "Pumpkin"
+				elseif variant_9 == 20 then
+					val_6["PlantType"] = "ScaredyShroom"
+				elseif variant_9 == 21 then
+					val_6["PlantType"] = "HypnoShroom"
+				elseif variant_9 == 22 then
+					val_6["PlantType"] = "SplitPea"
+				elseif variant_9 == 23 then
+					val_6["PlantType"] = "KernelPult"
+				elseif variant_9 == 24 then
+					val_6["PlantType"] = "Starfruit"
+				elseif variant_9 == 25 then
+					val_6["PlantType"] = "Cactus"
+				elseif variant_9 == 26 then
+					val_6["PlantType"] = "Blover"
+				elseif variant_9 == 27 then
+					val_6["PlantType"] = "SeaShroom"
+				elseif variant_9 == 28 then
+					val_6["PlantType"] = "TwinSunflower"
+				elseif variant_9 == 29 then
+					val_6["PlantType"] = "MelonPult"
+				elseif variant_9 == 30 then
+					val_6["PlantType"] = "GatlingPea"
+				elseif variant_9 == 31 then
+					val_6["PlantType"] = "GloomShroom"
+				elseif variant_9 == 32 then
+					val_6["PlantType"] = "Cattail"
+				elseif variant_9 == 33 then
+					val_6["PlantType"] = "WinterMelon"
+				elseif variant_9 == 34 then
+					val_6["PlantType"] = "IceShroom"
+				elseif variant_9 == 35 then
+					val_6["PlantType"] = "DoomShroom"
+				elseif variant_9 == 36 then
+					val_6["PlantType"] = "CobCannon"
+				elseif variant_9 == 37 then
+					val_6["PlantType"] = "Marigold"
+				elseif variant_9 == 38 then
+					val_6["PlantType"] = "GoldMagnet"
+				elseif variant_9 == 39 then
+					val_6["PlantType"] = "Imitater"
+				elseif variant_9 == 40 then
+					val_6["PlantType"] = "LilyPad"
+				elseif variant_9 == 41 then
+					val_6["PlantType"] = "FlowerPot"
+				elseif variant_9 == 42 then
+					val_6["PlantType"] = "TangleKelp"
+				elseif variant_9 == 43 then
+					val_6["PlantType"] = "GraveBuster"
+				elseif variant_9 == 44 then
+					val_6["PlantType"] = "Plantern"
+				elseif variant_9 == 45 then
+					val_6["PlantType"] = "UmbrellaLeaf"
+				elseif variant_9 == 46 then
+					val_6["PlantType"] = "CoffeeBean"
+				elseif variant_9 == 47 then
+					val_6["PlantType"] = "ExplodeONut"
+				end
+				local len_8 = buffer.readu8(incoming_buff, read(1))
+				assert(len_8 >= 0, "value is less than 0!")
+				assert(len_8 <= 8, "value is more than 8!")
+				val_6["Mutations"] = table.create(len_8)
+				for i_7 = 1, len_8 do
+					local val_7
+					local variant_10 = buffer.readu8(incoming_buff, read(1))
+					if variant_10 == 0 then
+						val_7 = "Fire"
+					elseif variant_10 == 1 then
+						val_7 = "Inferno"
+					elseif variant_10 == 2 then
+						val_7 = "Ice"
+					elseif variant_10 == 3 then
+						val_7 = "Frost"
+					elseif variant_10 == 4 then
+						val_7 = "Electric"
+					elseif variant_10 == 5 then
+						val_7 = "Tesla"
+					elseif variant_10 == 6 then
+						val_7 = "Toxic"
+					elseif variant_10 == 7 then
+						val_7 = "Venomous"
+					elseif variant_10 == 8 then
+						val_7 = "Shadow"
+					elseif variant_10 == 9 then
+						val_7 = "Void"
+					elseif variant_10 == 10 then
+						val_7 = "Solar"
+					elseif variant_10 == 11 then
+						val_7 = "Radiant"
+					elseif variant_10 == 12 then
+						val_7 = "Reinforced"
+					elseif variant_10 == 13 then
+						val_7 = "Fortified"
+					elseif variant_10 == 14 then
+						val_7 = "Primal"
+					elseif variant_10 == 15 then
+						val_7 = "Savage"
+					elseif variant_10 == 16 then
+						val_7 = "Swift"
+					elseif variant_10 == 17 then
+						val_7 = "Hasty"
+					end
+					val_6["Mutations"][i_7] = val_7
+				end
+				value["EquippedMutations"][i_6] = val_6
+			end
+			if reliable_events[48][1] then
+				for _, cb in reliable_events[48] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[48], value)
+				if #reliable_event_queue[48] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[48]} events in queue for SyncAllMutations. Did you forget to attach a listener?`)
 				end
 			end
 		elseif id == 5 then -- SunSpawned
@@ -1114,17 +1480,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 35 then -- ShowResults
 			local value
-			local bool_4 = buffer.readu8(incoming_buff, read(1))
+			local bool_5 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			local len_6 = buffer.readu8(incoming_buff, read(1))
-			assert(len_6 <= 200, "value is more than 200!")
-			value["WorldId"] = buffer.readstring(incoming_buff, read(len_6), len_6)
+			local len_9 = buffer.readu8(incoming_buff, read(1))
+			assert(len_9 <= 200, "value is more than 200!")
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_9), len_9)
 			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
-			local len_7 = buffer.readu8(incoming_buff, read(1))
-			assert(len_7 <= 80, "value is more than 80!")
-			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_7), len_7)
+			local len_10 = buffer.readu8(incoming_buff, read(1))
+			assert(len_10 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_10), len_10)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
-			value["Victory"] = bit32.btest(bool_4, 0b0000000000000001)
+			value["Victory"] = bit32.btest(bool_5, 0b0000000000000001)
 			value["Stars"] = buffer.readu8(incoming_buff, read(1))
 			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
 			value["XPEarned"] = buffer.readu32(incoming_buff, read(4))
@@ -1140,11 +1506,11 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 1 then -- RequestResponse
 			local value
-			local bool_5 = buffer.readu8(incoming_buff, read(1))
+			local bool_6 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["RequestId"] = buffer.readu16(incoming_buff, read(2))
-			value["Success"] = bit32.btest(bool_5, 0b0000000000000001)
-			if bit32.btest(bool_5, 0b0000000000000010) then
+			value["Success"] = bit32.btest(bool_6, 0b0000000000000001)
+			if bit32.btest(bool_6, 0b0000000000000010) then
 				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
 			else
 				value["ErrorCode"] = nil
@@ -1161,143 +1527,143 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 44 then -- RemoveMutationResponse
 			local value
-			local bool_6 = buffer.readu8(incoming_buff, read(1))
+			local bool_7 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Success"] = bit32.btest(bool_6, 0b0000000000000001)
-			local variant_6 = buffer.readu8(incoming_buff, read(1))
-			if variant_6 == 0 then
+			value["Success"] = bit32.btest(bool_7, 0b0000000000000001)
+			local variant_11 = buffer.readu8(incoming_buff, read(1))
+			if variant_11 == 0 then
 				value["PlantType"] = "Sunflower"
-			elseif variant_6 == 1 then
+			elseif variant_11 == 1 then
 				value["PlantType"] = "Peashooter"
-			elseif variant_6 == 2 then
+			elseif variant_11 == 2 then
 				value["PlantType"] = "WallNut"
-			elseif variant_6 == 3 then
+			elseif variant_11 == 3 then
 				value["PlantType"] = "PotatoMine"
-			elseif variant_6 == 4 then
+			elseif variant_11 == 4 then
 				value["PlantType"] = "PuffShroom"
-			elseif variant_6 == 5 then
+			elseif variant_11 == 5 then
 				value["PlantType"] = "SunShroom"
-			elseif variant_6 == 6 then
+			elseif variant_11 == 6 then
 				value["PlantType"] = "Chomper"
-			elseif variant_6 == 7 then
+			elseif variant_11 == 7 then
 				value["PlantType"] = "SnowPea"
-			elseif variant_6 == 8 then
+			elseif variant_11 == 8 then
 				value["PlantType"] = "Repeater"
-			elseif variant_6 == 9 then
+			elseif variant_11 == 9 then
 				value["PlantType"] = "FumeShroom"
-			elseif variant_6 == 10 then
+			elseif variant_11 == 10 then
 				value["PlantType"] = "Squash"
-			elseif variant_6 == 11 then
+			elseif variant_11 == 11 then
 				value["PlantType"] = "Garlic"
-			elseif variant_6 == 12 then
+			elseif variant_11 == 12 then
 				value["PlantType"] = "CherryBomb"
-			elseif variant_6 == 13 then
+			elseif variant_11 == 13 then
 				value["PlantType"] = "TallNut"
-			elseif variant_6 == 14 then
+			elseif variant_11 == 14 then
 				value["PlantType"] = "Threepeater"
-			elseif variant_6 == 15 then
+			elseif variant_11 == 15 then
 				value["PlantType"] = "Jalapeno"
-			elseif variant_6 == 16 then
+			elseif variant_11 == 16 then
 				value["PlantType"] = "Spikeweed"
-			elseif variant_6 == 17 then
+			elseif variant_11 == 17 then
 				value["PlantType"] = "Torchwood"
-			elseif variant_6 == 18 then
+			elseif variant_11 == 18 then
 				value["PlantType"] = "CabbagePult"
-			elseif variant_6 == 19 then
+			elseif variant_11 == 19 then
 				value["PlantType"] = "Pumpkin"
-			elseif variant_6 == 20 then
+			elseif variant_11 == 20 then
 				value["PlantType"] = "ScaredyShroom"
-			elseif variant_6 == 21 then
+			elseif variant_11 == 21 then
 				value["PlantType"] = "HypnoShroom"
-			elseif variant_6 == 22 then
+			elseif variant_11 == 22 then
 				value["PlantType"] = "SplitPea"
-			elseif variant_6 == 23 then
+			elseif variant_11 == 23 then
 				value["PlantType"] = "KernelPult"
-			elseif variant_6 == 24 then
+			elseif variant_11 == 24 then
 				value["PlantType"] = "Starfruit"
-			elseif variant_6 == 25 then
+			elseif variant_11 == 25 then
 				value["PlantType"] = "Cactus"
-			elseif variant_6 == 26 then
+			elseif variant_11 == 26 then
 				value["PlantType"] = "Blover"
-			elseif variant_6 == 27 then
+			elseif variant_11 == 27 then
 				value["PlantType"] = "SeaShroom"
-			elseif variant_6 == 28 then
+			elseif variant_11 == 28 then
 				value["PlantType"] = "TwinSunflower"
-			elseif variant_6 == 29 then
+			elseif variant_11 == 29 then
 				value["PlantType"] = "MelonPult"
-			elseif variant_6 == 30 then
+			elseif variant_11 == 30 then
 				value["PlantType"] = "GatlingPea"
-			elseif variant_6 == 31 then
+			elseif variant_11 == 31 then
 				value["PlantType"] = "GloomShroom"
-			elseif variant_6 == 32 then
+			elseif variant_11 == 32 then
 				value["PlantType"] = "Cattail"
-			elseif variant_6 == 33 then
+			elseif variant_11 == 33 then
 				value["PlantType"] = "WinterMelon"
-			elseif variant_6 == 34 then
+			elseif variant_11 == 34 then
 				value["PlantType"] = "IceShroom"
-			elseif variant_6 == 35 then
+			elseif variant_11 == 35 then
 				value["PlantType"] = "DoomShroom"
-			elseif variant_6 == 36 then
+			elseif variant_11 == 36 then
 				value["PlantType"] = "CobCannon"
-			elseif variant_6 == 37 then
+			elseif variant_11 == 37 then
 				value["PlantType"] = "Marigold"
-			elseif variant_6 == 38 then
+			elseif variant_11 == 38 then
 				value["PlantType"] = "GoldMagnet"
-			elseif variant_6 == 39 then
+			elseif variant_11 == 39 then
 				value["PlantType"] = "Imitater"
-			elseif variant_6 == 40 then
+			elseif variant_11 == 40 then
 				value["PlantType"] = "LilyPad"
-			elseif variant_6 == 41 then
+			elseif variant_11 == 41 then
 				value["PlantType"] = "FlowerPot"
-			elseif variant_6 == 42 then
+			elseif variant_11 == 42 then
 				value["PlantType"] = "TangleKelp"
-			elseif variant_6 == 43 then
+			elseif variant_11 == 43 then
 				value["PlantType"] = "GraveBuster"
-			elseif variant_6 == 44 then
+			elseif variant_11 == 44 then
 				value["PlantType"] = "Plantern"
-			elseif variant_6 == 45 then
+			elseif variant_11 == 45 then
 				value["PlantType"] = "UmbrellaLeaf"
-			elseif variant_6 == 46 then
+			elseif variant_11 == 46 then
 				value["PlantType"] = "CoffeeBean"
-			elseif variant_6 == 47 then
+			elseif variant_11 == 47 then
 				value["PlantType"] = "ExplodeONut"
 			end
-			local variant_7 = buffer.readu8(incoming_buff, read(1))
-			if variant_7 == 0 then
+			local variant_12 = buffer.readu8(incoming_buff, read(1))
+			if variant_12 == 0 then
 				value["MutationType"] = "Fire"
-			elseif variant_7 == 1 then
+			elseif variant_12 == 1 then
 				value["MutationType"] = "Inferno"
-			elseif variant_7 == 2 then
+			elseif variant_12 == 2 then
 				value["MutationType"] = "Ice"
-			elseif variant_7 == 3 then
+			elseif variant_12 == 3 then
 				value["MutationType"] = "Frost"
-			elseif variant_7 == 4 then
+			elseif variant_12 == 4 then
 				value["MutationType"] = "Electric"
-			elseif variant_7 == 5 then
+			elseif variant_12 == 5 then
 				value["MutationType"] = "Tesla"
-			elseif variant_7 == 6 then
+			elseif variant_12 == 6 then
 				value["MutationType"] = "Toxic"
-			elseif variant_7 == 7 then
+			elseif variant_12 == 7 then
 				value["MutationType"] = "Venomous"
-			elseif variant_7 == 8 then
+			elseif variant_12 == 8 then
 				value["MutationType"] = "Shadow"
-			elseif variant_7 == 9 then
+			elseif variant_12 == 9 then
 				value["MutationType"] = "Void"
-			elseif variant_7 == 10 then
+			elseif variant_12 == 10 then
 				value["MutationType"] = "Solar"
-			elseif variant_7 == 11 then
+			elseif variant_12 == 11 then
 				value["MutationType"] = "Radiant"
-			elseif variant_7 == 12 then
+			elseif variant_12 == 12 then
 				value["MutationType"] = "Reinforced"
-			elseif variant_7 == 13 then
+			elseif variant_12 == 13 then
 				value["MutationType"] = "Fortified"
-			elseif variant_7 == 14 then
+			elseif variant_12 == 14 then
 				value["MutationType"] = "Primal"
-			elseif variant_7 == 15 then
+			elseif variant_12 == 15 then
 				value["MutationType"] = "Savage"
-			elseif variant_7 == 16 then
+			elseif variant_12 == 16 then
 				value["MutationType"] = "Swift"
-			elseif variant_7 == 17 then
+			elseif variant_12 == 17 then
 				value["MutationType"] = "Hasty"
 			end
 			if reliable_events[44][1] then
@@ -1312,593 +1678,9 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 40 then -- PurchasePlantResponse
 			local value
-			local bool_7 = buffer.readu8(incoming_buff, read(1))
-			value = {  }
-			value["Success"] = bit32.btest(bool_7, 0b0000000000000001)
-			local variant_8 = buffer.readu8(incoming_buff, read(1))
-			if variant_8 == 0 then
-				value["PlantType"] = "Sunflower"
-			elseif variant_8 == 1 then
-				value["PlantType"] = "Peashooter"
-			elseif variant_8 == 2 then
-				value["PlantType"] = "WallNut"
-			elseif variant_8 == 3 then
-				value["PlantType"] = "PotatoMine"
-			elseif variant_8 == 4 then
-				value["PlantType"] = "PuffShroom"
-			elseif variant_8 == 5 then
-				value["PlantType"] = "SunShroom"
-			elseif variant_8 == 6 then
-				value["PlantType"] = "Chomper"
-			elseif variant_8 == 7 then
-				value["PlantType"] = "SnowPea"
-			elseif variant_8 == 8 then
-				value["PlantType"] = "Repeater"
-			elseif variant_8 == 9 then
-				value["PlantType"] = "FumeShroom"
-			elseif variant_8 == 10 then
-				value["PlantType"] = "Squash"
-			elseif variant_8 == 11 then
-				value["PlantType"] = "Garlic"
-			elseif variant_8 == 12 then
-				value["PlantType"] = "CherryBomb"
-			elseif variant_8 == 13 then
-				value["PlantType"] = "TallNut"
-			elseif variant_8 == 14 then
-				value["PlantType"] = "Threepeater"
-			elseif variant_8 == 15 then
-				value["PlantType"] = "Jalapeno"
-			elseif variant_8 == 16 then
-				value["PlantType"] = "Spikeweed"
-			elseif variant_8 == 17 then
-				value["PlantType"] = "Torchwood"
-			elseif variant_8 == 18 then
-				value["PlantType"] = "CabbagePult"
-			elseif variant_8 == 19 then
-				value["PlantType"] = "Pumpkin"
-			elseif variant_8 == 20 then
-				value["PlantType"] = "ScaredyShroom"
-			elseif variant_8 == 21 then
-				value["PlantType"] = "HypnoShroom"
-			elseif variant_8 == 22 then
-				value["PlantType"] = "SplitPea"
-			elseif variant_8 == 23 then
-				value["PlantType"] = "KernelPult"
-			elseif variant_8 == 24 then
-				value["PlantType"] = "Starfruit"
-			elseif variant_8 == 25 then
-				value["PlantType"] = "Cactus"
-			elseif variant_8 == 26 then
-				value["PlantType"] = "Blover"
-			elseif variant_8 == 27 then
-				value["PlantType"] = "SeaShroom"
-			elseif variant_8 == 28 then
-				value["PlantType"] = "TwinSunflower"
-			elseif variant_8 == 29 then
-				value["PlantType"] = "MelonPult"
-			elseif variant_8 == 30 then
-				value["PlantType"] = "GatlingPea"
-			elseif variant_8 == 31 then
-				value["PlantType"] = "GloomShroom"
-			elseif variant_8 == 32 then
-				value["PlantType"] = "Cattail"
-			elseif variant_8 == 33 then
-				value["PlantType"] = "WinterMelon"
-			elseif variant_8 == 34 then
-				value["PlantType"] = "IceShroom"
-			elseif variant_8 == 35 then
-				value["PlantType"] = "DoomShroom"
-			elseif variant_8 == 36 then
-				value["PlantType"] = "CobCannon"
-			elseif variant_8 == 37 then
-				value["PlantType"] = "Marigold"
-			elseif variant_8 == 38 then
-				value["PlantType"] = "GoldMagnet"
-			elseif variant_8 == 39 then
-				value["PlantType"] = "Imitater"
-			elseif variant_8 == 40 then
-				value["PlantType"] = "LilyPad"
-			elseif variant_8 == 41 then
-				value["PlantType"] = "FlowerPot"
-			elseif variant_8 == 42 then
-				value["PlantType"] = "TangleKelp"
-			elseif variant_8 == 43 then
-				value["PlantType"] = "GraveBuster"
-			elseif variant_8 == 44 then
-				value["PlantType"] = "Plantern"
-			elseif variant_8 == 45 then
-				value["PlantType"] = "UmbrellaLeaf"
-			elseif variant_8 == 46 then
-				value["PlantType"] = "CoffeeBean"
-			elseif variant_8 == 47 then
-				value["PlantType"] = "ExplodeONut"
-			end
-			if bit32.btest(bool_7, 0b0000000000000010) then
-				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
-			else
-				value["ErrorCode"] = nil
-			end
-			if bit32.btest(bool_7, 0b0000000000000100) then
-				value["NewCoins"] = buffer.readu32(incoming_buff, read(4))
-			else
-				value["NewCoins"] = nil
-			end
-			if reliable_events[40][1] then
-				for _, cb in reliable_events[40] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[40], value)
-				if #reliable_event_queue[40] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[40]} events in queue for PurchasePlantResponse. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 43 then -- PurchaseMutationResponse
-			local value
 			local bool_8 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["Success"] = bit32.btest(bool_8, 0b0000000000000001)
-			local variant_9 = buffer.readu8(incoming_buff, read(1))
-			if variant_9 == 0 then
-				value["PlantType"] = "Sunflower"
-			elseif variant_9 == 1 then
-				value["PlantType"] = "Peashooter"
-			elseif variant_9 == 2 then
-				value["PlantType"] = "WallNut"
-			elseif variant_9 == 3 then
-				value["PlantType"] = "PotatoMine"
-			elseif variant_9 == 4 then
-				value["PlantType"] = "PuffShroom"
-			elseif variant_9 == 5 then
-				value["PlantType"] = "SunShroom"
-			elseif variant_9 == 6 then
-				value["PlantType"] = "Chomper"
-			elseif variant_9 == 7 then
-				value["PlantType"] = "SnowPea"
-			elseif variant_9 == 8 then
-				value["PlantType"] = "Repeater"
-			elseif variant_9 == 9 then
-				value["PlantType"] = "FumeShroom"
-			elseif variant_9 == 10 then
-				value["PlantType"] = "Squash"
-			elseif variant_9 == 11 then
-				value["PlantType"] = "Garlic"
-			elseif variant_9 == 12 then
-				value["PlantType"] = "CherryBomb"
-			elseif variant_9 == 13 then
-				value["PlantType"] = "TallNut"
-			elseif variant_9 == 14 then
-				value["PlantType"] = "Threepeater"
-			elseif variant_9 == 15 then
-				value["PlantType"] = "Jalapeno"
-			elseif variant_9 == 16 then
-				value["PlantType"] = "Spikeweed"
-			elseif variant_9 == 17 then
-				value["PlantType"] = "Torchwood"
-			elseif variant_9 == 18 then
-				value["PlantType"] = "CabbagePult"
-			elseif variant_9 == 19 then
-				value["PlantType"] = "Pumpkin"
-			elseif variant_9 == 20 then
-				value["PlantType"] = "ScaredyShroom"
-			elseif variant_9 == 21 then
-				value["PlantType"] = "HypnoShroom"
-			elseif variant_9 == 22 then
-				value["PlantType"] = "SplitPea"
-			elseif variant_9 == 23 then
-				value["PlantType"] = "KernelPult"
-			elseif variant_9 == 24 then
-				value["PlantType"] = "Starfruit"
-			elseif variant_9 == 25 then
-				value["PlantType"] = "Cactus"
-			elseif variant_9 == 26 then
-				value["PlantType"] = "Blover"
-			elseif variant_9 == 27 then
-				value["PlantType"] = "SeaShroom"
-			elseif variant_9 == 28 then
-				value["PlantType"] = "TwinSunflower"
-			elseif variant_9 == 29 then
-				value["PlantType"] = "MelonPult"
-			elseif variant_9 == 30 then
-				value["PlantType"] = "GatlingPea"
-			elseif variant_9 == 31 then
-				value["PlantType"] = "GloomShroom"
-			elseif variant_9 == 32 then
-				value["PlantType"] = "Cattail"
-			elseif variant_9 == 33 then
-				value["PlantType"] = "WinterMelon"
-			elseif variant_9 == 34 then
-				value["PlantType"] = "IceShroom"
-			elseif variant_9 == 35 then
-				value["PlantType"] = "DoomShroom"
-			elseif variant_9 == 36 then
-				value["PlantType"] = "CobCannon"
-			elseif variant_9 == 37 then
-				value["PlantType"] = "Marigold"
-			elseif variant_9 == 38 then
-				value["PlantType"] = "GoldMagnet"
-			elseif variant_9 == 39 then
-				value["PlantType"] = "Imitater"
-			elseif variant_9 == 40 then
-				value["PlantType"] = "LilyPad"
-			elseif variant_9 == 41 then
-				value["PlantType"] = "FlowerPot"
-			elseif variant_9 == 42 then
-				value["PlantType"] = "TangleKelp"
-			elseif variant_9 == 43 then
-				value["PlantType"] = "GraveBuster"
-			elseif variant_9 == 44 then
-				value["PlantType"] = "Plantern"
-			elseif variant_9 == 45 then
-				value["PlantType"] = "UmbrellaLeaf"
-			elseif variant_9 == 46 then
-				value["PlantType"] = "CoffeeBean"
-			elseif variant_9 == 47 then
-				value["PlantType"] = "ExplodeONut"
-			end
-			local variant_10 = buffer.readu8(incoming_buff, read(1))
-			if variant_10 == 0 then
-				value["MutationType"] = "Fire"
-			elseif variant_10 == 1 then
-				value["MutationType"] = "Inferno"
-			elseif variant_10 == 2 then
-				value["MutationType"] = "Ice"
-			elseif variant_10 == 3 then
-				value["MutationType"] = "Frost"
-			elseif variant_10 == 4 then
-				value["MutationType"] = "Electric"
-			elseif variant_10 == 5 then
-				value["MutationType"] = "Tesla"
-			elseif variant_10 == 6 then
-				value["MutationType"] = "Toxic"
-			elseif variant_10 == 7 then
-				value["MutationType"] = "Venomous"
-			elseif variant_10 == 8 then
-				value["MutationType"] = "Shadow"
-			elseif variant_10 == 9 then
-				value["MutationType"] = "Void"
-			elseif variant_10 == 10 then
-				value["MutationType"] = "Solar"
-			elseif variant_10 == 11 then
-				value["MutationType"] = "Radiant"
-			elseif variant_10 == 12 then
-				value["MutationType"] = "Reinforced"
-			elseif variant_10 == 13 then
-				value["MutationType"] = "Fortified"
-			elseif variant_10 == 14 then
-				value["MutationType"] = "Primal"
-			elseif variant_10 == 15 then
-				value["MutationType"] = "Savage"
-			elseif variant_10 == 16 then
-				value["MutationType"] = "Swift"
-			elseif variant_10 == 17 then
-				value["MutationType"] = "Hasty"
-			end
-			if bit32.btest(bool_8, 0b0000000000000010) then
-				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
-			else
-				value["ErrorCode"] = nil
-			end
-			if bit32.btest(bool_8, 0b0000000000000100) then
-				value["NewCoins"] = buffer.readu32(incoming_buff, read(4))
-			else
-				value["NewCoins"] = nil
-			end
-			if reliable_events[43][1] then
-				for _, cb in reliable_events[43] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[43], value)
-				if #reliable_event_queue[43] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[43]} events in queue for PurchaseMutationResponse. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 29 then -- ProgressionSync
-			local value
-			value = {  }
-			value["Level"] = buffer.readu16(incoming_buff, read(2))
-			value["TotalXP"] = buffer.readu32(incoming_buff, read(4))
-			value["Coins"] = buffer.readu32(incoming_buff, read(4))
-			value["Gems"] = buffer.readu32(incoming_buff, read(4))
-			local len_8 = buffer.readu16(incoming_buff, read(2))
-			value["UnlockedPlants"] = table.create(len_8)
-			for i_5 = 1, len_8 do
-				local val_5
-				local len_9 = buffer.readu16(incoming_buff, read(2))
-				val_5 = buffer.readstring(incoming_buff, read(len_9), len_9)
-				assert(utf8.len(val_5) ~= nil, "value is not valid utf-8")
-				value["UnlockedPlants"][i_5] = val_5
-			end
-			local len_10 = buffer.readu16(incoming_buff, read(2))
-			value["OwnedSkins"] = table.create(len_10)
-			for i_6 = 1, len_10 do
-				local val_6
-				local len_11 = buffer.readu16(incoming_buff, read(2))
-				val_6 = buffer.readstring(incoming_buff, read(len_11), len_11)
-				assert(utf8.len(val_6) ~= nil, "value is not valid utf-8")
-				value["OwnedSkins"][i_6] = val_6
-			end
-			if reliable_events[29] then
-				task.spawn(reliable_events[29], value)
-			else
-				table.insert(reliable_event_queue[29], value)
-				if #reliable_event_queue[29] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[29]} events in queue for ProgressionSync. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 14 then -- PlayerDataSync
-			local value
-			value = {  }
-			value["Coins"] = buffer.readu32(incoming_buff, read(4))
-			value["Gems"] = buffer.readu32(incoming_buff, read(4))
-			value["XP"] = buffer.readu32(incoming_buff, read(4))
-			value["Level"] = buffer.readu8(incoming_buff, read(1))
-			value["LevelProgress"] = buffer.readf32(incoming_buff, read(4))
-			local len_12 = buffer.readu8(incoming_buff, read(1))
-			assert(len_12 <= 10, "value is more than 10!")
-			value["UnlockedPlants"] = table.create(len_12)
-			for i_7 = 1, len_12 do
-				local val_7
-				local variant_11 = buffer.readu8(incoming_buff, read(1))
-				if variant_11 == 0 then
-					val_7 = "Sunflower"
-				elseif variant_11 == 1 then
-					val_7 = "Peashooter"
-				elseif variant_11 == 2 then
-					val_7 = "WallNut"
-				elseif variant_11 == 3 then
-					val_7 = "PotatoMine"
-				elseif variant_11 == 4 then
-					val_7 = "PuffShroom"
-				elseif variant_11 == 5 then
-					val_7 = "SunShroom"
-				elseif variant_11 == 6 then
-					val_7 = "Chomper"
-				elseif variant_11 == 7 then
-					val_7 = "SnowPea"
-				elseif variant_11 == 8 then
-					val_7 = "Repeater"
-				elseif variant_11 == 9 then
-					val_7 = "FumeShroom"
-				elseif variant_11 == 10 then
-					val_7 = "Squash"
-				elseif variant_11 == 11 then
-					val_7 = "Garlic"
-				elseif variant_11 == 12 then
-					val_7 = "CherryBomb"
-				elseif variant_11 == 13 then
-					val_7 = "TallNut"
-				elseif variant_11 == 14 then
-					val_7 = "Threepeater"
-				elseif variant_11 == 15 then
-					val_7 = "Jalapeno"
-				elseif variant_11 == 16 then
-					val_7 = "Spikeweed"
-				elseif variant_11 == 17 then
-					val_7 = "Torchwood"
-				elseif variant_11 == 18 then
-					val_7 = "CabbagePult"
-				elseif variant_11 == 19 then
-					val_7 = "Pumpkin"
-				elseif variant_11 == 20 then
-					val_7 = "ScaredyShroom"
-				elseif variant_11 == 21 then
-					val_7 = "HypnoShroom"
-				elseif variant_11 == 22 then
-					val_7 = "SplitPea"
-				elseif variant_11 == 23 then
-					val_7 = "KernelPult"
-				elseif variant_11 == 24 then
-					val_7 = "Starfruit"
-				elseif variant_11 == 25 then
-					val_7 = "Cactus"
-				elseif variant_11 == 26 then
-					val_7 = "Blover"
-				elseif variant_11 == 27 then
-					val_7 = "SeaShroom"
-				elseif variant_11 == 28 then
-					val_7 = "TwinSunflower"
-				elseif variant_11 == 29 then
-					val_7 = "MelonPult"
-				elseif variant_11 == 30 then
-					val_7 = "GatlingPea"
-				elseif variant_11 == 31 then
-					val_7 = "GloomShroom"
-				elseif variant_11 == 32 then
-					val_7 = "Cattail"
-				elseif variant_11 == 33 then
-					val_7 = "WinterMelon"
-				elseif variant_11 == 34 then
-					val_7 = "IceShroom"
-				elseif variant_11 == 35 then
-					val_7 = "DoomShroom"
-				elseif variant_11 == 36 then
-					val_7 = "CobCannon"
-				elseif variant_11 == 37 then
-					val_7 = "Marigold"
-				elseif variant_11 == 38 then
-					val_7 = "GoldMagnet"
-				elseif variant_11 == 39 then
-					val_7 = "Imitater"
-				elseif variant_11 == 40 then
-					val_7 = "LilyPad"
-				elseif variant_11 == 41 then
-					val_7 = "FlowerPot"
-				elseif variant_11 == 42 then
-					val_7 = "TangleKelp"
-				elseif variant_11 == 43 then
-					val_7 = "GraveBuster"
-				elseif variant_11 == 44 then
-					val_7 = "Plantern"
-				elseif variant_11 == 45 then
-					val_7 = "UmbrellaLeaf"
-				elseif variant_11 == 46 then
-					val_7 = "CoffeeBean"
-				elseif variant_11 == 47 then
-					val_7 = "ExplodeONut"
-				end
-				value["UnlockedPlants"][i_7] = val_7
-			end
-			if reliable_events[14] then
-				task.spawn(reliable_events[14], value)
-			else
-				table.insert(reliable_event_queue[14], value)
-				if #reliable_event_queue[14] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[14]} events in queue for PlayerDataSync. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 2 then -- PlantSpawned
-			local value
-			value = {  }
-			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
-			local variant_12 = buffer.readu8(incoming_buff, read(1))
-			if variant_12 == 0 then
-				value["PlantType"] = "Sunflower"
-			elseif variant_12 == 1 then
-				value["PlantType"] = "Peashooter"
-			elseif variant_12 == 2 then
-				value["PlantType"] = "WallNut"
-			elseif variant_12 == 3 then
-				value["PlantType"] = "PotatoMine"
-			elseif variant_12 == 4 then
-				value["PlantType"] = "PuffShroom"
-			elseif variant_12 == 5 then
-				value["PlantType"] = "SunShroom"
-			elseif variant_12 == 6 then
-				value["PlantType"] = "Chomper"
-			elseif variant_12 == 7 then
-				value["PlantType"] = "SnowPea"
-			elseif variant_12 == 8 then
-				value["PlantType"] = "Repeater"
-			elseif variant_12 == 9 then
-				value["PlantType"] = "FumeShroom"
-			elseif variant_12 == 10 then
-				value["PlantType"] = "Squash"
-			elseif variant_12 == 11 then
-				value["PlantType"] = "Garlic"
-			elseif variant_12 == 12 then
-				value["PlantType"] = "CherryBomb"
-			elseif variant_12 == 13 then
-				value["PlantType"] = "TallNut"
-			elseif variant_12 == 14 then
-				value["PlantType"] = "Threepeater"
-			elseif variant_12 == 15 then
-				value["PlantType"] = "Jalapeno"
-			elseif variant_12 == 16 then
-				value["PlantType"] = "Spikeweed"
-			elseif variant_12 == 17 then
-				value["PlantType"] = "Torchwood"
-			elseif variant_12 == 18 then
-				value["PlantType"] = "CabbagePult"
-			elseif variant_12 == 19 then
-				value["PlantType"] = "Pumpkin"
-			elseif variant_12 == 20 then
-				value["PlantType"] = "ScaredyShroom"
-			elseif variant_12 == 21 then
-				value["PlantType"] = "HypnoShroom"
-			elseif variant_12 == 22 then
-				value["PlantType"] = "SplitPea"
-			elseif variant_12 == 23 then
-				value["PlantType"] = "KernelPult"
-			elseif variant_12 == 24 then
-				value["PlantType"] = "Starfruit"
-			elseif variant_12 == 25 then
-				value["PlantType"] = "Cactus"
-			elseif variant_12 == 26 then
-				value["PlantType"] = "Blover"
-			elseif variant_12 == 27 then
-				value["PlantType"] = "SeaShroom"
-			elseif variant_12 == 28 then
-				value["PlantType"] = "TwinSunflower"
-			elseif variant_12 == 29 then
-				value["PlantType"] = "MelonPult"
-			elseif variant_12 == 30 then
-				value["PlantType"] = "GatlingPea"
-			elseif variant_12 == 31 then
-				value["PlantType"] = "GloomShroom"
-			elseif variant_12 == 32 then
-				value["PlantType"] = "Cattail"
-			elseif variant_12 == 33 then
-				value["PlantType"] = "WinterMelon"
-			elseif variant_12 == 34 then
-				value["PlantType"] = "IceShroom"
-			elseif variant_12 == 35 then
-				value["PlantType"] = "DoomShroom"
-			elseif variant_12 == 36 then
-				value["PlantType"] = "CobCannon"
-			elseif variant_12 == 37 then
-				value["PlantType"] = "Marigold"
-			elseif variant_12 == 38 then
-				value["PlantType"] = "GoldMagnet"
-			elseif variant_12 == 39 then
-				value["PlantType"] = "Imitater"
-			elseif variant_12 == 40 then
-				value["PlantType"] = "LilyPad"
-			elseif variant_12 == 41 then
-				value["PlantType"] = "FlowerPot"
-			elseif variant_12 == 42 then
-				value["PlantType"] = "TangleKelp"
-			elseif variant_12 == 43 then
-				value["PlantType"] = "GraveBuster"
-			elseif variant_12 == 44 then
-				value["PlantType"] = "Plantern"
-			elseif variant_12 == 45 then
-				value["PlantType"] = "UmbrellaLeaf"
-			elseif variant_12 == 46 then
-				value["PlantType"] = "CoffeeBean"
-			elseif variant_12 == 47 then
-				value["PlantType"] = "ExplodeONut"
-			end
-			value["Lane"] = buffer.readu8(incoming_buff, read(1))
-			assert(value["Lane"] >= 1, "value is less than 1!")
-			assert(value["Lane"] <= 5, "value is more than 5!")
-			value["Column"] = buffer.readu8(incoming_buff, read(1))
-			assert(value["Column"] >= 1, "value is less than 1!")
-			assert(value["Column"] <= 9, "value is more than 9!")
-			value["OwnerId"] = buffer.readf64(incoming_buff, read(8))
-			if reliable_events[2][1] then
-				for _, cb in reliable_events[2] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[2], value)
-				if #reliable_event_queue[2] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[2]} events in queue for PlantSpawned. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 18 then -- PlantFoodCollected
-			local value
-			value = {  }
-			value["CollectorId"] = buffer.readf64(incoming_buff, read(8))
-			value["NewChargeCount"] = buffer.readu8(incoming_buff, read(1))
-			value["ZombieEntityId"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[18][1] then
-				for _, cb in reliable_events[18] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[18], value)
-				if #reliable_event_queue[18] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[18]} events in queue for PlantFoodCollected. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 20 then -- PlantFoodChargeUpdate
-			local value
-			value = {  }
-			value["ChargeCount"] = buffer.readu8(incoming_buff, read(1))
-			if reliable_events[20] then
-				task.spawn(reliable_events[20], value)
-			else
-				table.insert(reliable_event_queue[20], value)
-				if #reliable_event_queue[20] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[20]} events in queue for PlantFoodChargeUpdate. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 19 then -- PlantFoodActivated
-			local value
-			value = {  }
-			value["PlantEntityId"] = buffer.readu32(incoming_buff, read(4))
 			local variant_13 = buffer.readu8(incoming_buff, read(1))
 			if variant_13 == 0 then
 				value["PlantType"] = "Sunflower"
@@ -1997,6 +1779,590 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			elseif variant_13 == 47 then
 				value["PlantType"] = "ExplodeONut"
 			end
+			if bit32.btest(bool_8, 0b0000000000000010) then
+				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
+			else
+				value["ErrorCode"] = nil
+			end
+			if bit32.btest(bool_8, 0b0000000000000100) then
+				value["NewCoins"] = buffer.readu32(incoming_buff, read(4))
+			else
+				value["NewCoins"] = nil
+			end
+			if reliable_events[40][1] then
+				for _, cb in reliable_events[40] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[40], value)
+				if #reliable_event_queue[40] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[40]} events in queue for PurchasePlantResponse. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 43 then -- PurchaseMutationResponse
+			local value
+			local bool_9 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			value["Success"] = bit32.btest(bool_9, 0b0000000000000001)
+			local variant_14 = buffer.readu8(incoming_buff, read(1))
+			if variant_14 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_14 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_14 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_14 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_14 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_14 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_14 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_14 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_14 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_14 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_14 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_14 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_14 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_14 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_14 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_14 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_14 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_14 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_14 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_14 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_14 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_14 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_14 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_14 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_14 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_14 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_14 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_14 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_14 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_14 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_14 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_14 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_14 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_14 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_14 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_14 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_14 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_14 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_14 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_14 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_14 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_14 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_14 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_14 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_14 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_14 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_14 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_14 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
+			local variant_15 = buffer.readu8(incoming_buff, read(1))
+			if variant_15 == 0 then
+				value["MutationType"] = "Fire"
+			elseif variant_15 == 1 then
+				value["MutationType"] = "Inferno"
+			elseif variant_15 == 2 then
+				value["MutationType"] = "Ice"
+			elseif variant_15 == 3 then
+				value["MutationType"] = "Frost"
+			elseif variant_15 == 4 then
+				value["MutationType"] = "Electric"
+			elseif variant_15 == 5 then
+				value["MutationType"] = "Tesla"
+			elseif variant_15 == 6 then
+				value["MutationType"] = "Toxic"
+			elseif variant_15 == 7 then
+				value["MutationType"] = "Venomous"
+			elseif variant_15 == 8 then
+				value["MutationType"] = "Shadow"
+			elseif variant_15 == 9 then
+				value["MutationType"] = "Void"
+			elseif variant_15 == 10 then
+				value["MutationType"] = "Solar"
+			elseif variant_15 == 11 then
+				value["MutationType"] = "Radiant"
+			elseif variant_15 == 12 then
+				value["MutationType"] = "Reinforced"
+			elseif variant_15 == 13 then
+				value["MutationType"] = "Fortified"
+			elseif variant_15 == 14 then
+				value["MutationType"] = "Primal"
+			elseif variant_15 == 15 then
+				value["MutationType"] = "Savage"
+			elseif variant_15 == 16 then
+				value["MutationType"] = "Swift"
+			elseif variant_15 == 17 then
+				value["MutationType"] = "Hasty"
+			end
+			if bit32.btest(bool_9, 0b0000000000000010) then
+				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
+			else
+				value["ErrorCode"] = nil
+			end
+			if bit32.btest(bool_9, 0b0000000000000100) then
+				value["NewCoins"] = buffer.readu32(incoming_buff, read(4))
+			else
+				value["NewCoins"] = nil
+			end
+			if reliable_events[43][1] then
+				for _, cb in reliable_events[43] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[43], value)
+				if #reliable_event_queue[43] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[43]} events in queue for PurchaseMutationResponse. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 29 then -- ProgressionSync
+			local value
+			value = {  }
+			value["Level"] = buffer.readu16(incoming_buff, read(2))
+			value["TotalXP"] = buffer.readu32(incoming_buff, read(4))
+			value["Coins"] = buffer.readu32(incoming_buff, read(4))
+			value["Gems"] = buffer.readu32(incoming_buff, read(4))
+			local len_11 = buffer.readu16(incoming_buff, read(2))
+			value["UnlockedPlants"] = table.create(len_11)
+			for i_8 = 1, len_11 do
+				local val_8
+				local len_12 = buffer.readu16(incoming_buff, read(2))
+				val_8 = buffer.readstring(incoming_buff, read(len_12), len_12)
+				assert(utf8.len(val_8) ~= nil, "value is not valid utf-8")
+				value["UnlockedPlants"][i_8] = val_8
+			end
+			local len_13 = buffer.readu16(incoming_buff, read(2))
+			value["OwnedSkins"] = table.create(len_13)
+			for i_9 = 1, len_13 do
+				local val_9
+				local len_14 = buffer.readu16(incoming_buff, read(2))
+				val_9 = buffer.readstring(incoming_buff, read(len_14), len_14)
+				assert(utf8.len(val_9) ~= nil, "value is not valid utf-8")
+				value["OwnedSkins"][i_9] = val_9
+			end
+			if reliable_events[29] then
+				task.spawn(reliable_events[29], value)
+			else
+				table.insert(reliable_event_queue[29], value)
+				if #reliable_event_queue[29] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[29]} events in queue for ProgressionSync. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 14 then -- PlayerDataSync
+			local value
+			value = {  }
+			value["Coins"] = buffer.readu32(incoming_buff, read(4))
+			value["Gems"] = buffer.readu32(incoming_buff, read(4))
+			value["XP"] = buffer.readu32(incoming_buff, read(4))
+			value["Level"] = buffer.readu8(incoming_buff, read(1))
+			value["LevelProgress"] = buffer.readf32(incoming_buff, read(4))
+			local len_15 = buffer.readu8(incoming_buff, read(1))
+			assert(len_15 <= 10, "value is more than 10!")
+			value["UnlockedPlants"] = table.create(len_15)
+			for i_10 = 1, len_15 do
+				local val_10
+				local variant_16 = buffer.readu8(incoming_buff, read(1))
+				if variant_16 == 0 then
+					val_10 = "Sunflower"
+				elseif variant_16 == 1 then
+					val_10 = "Peashooter"
+				elseif variant_16 == 2 then
+					val_10 = "WallNut"
+				elseif variant_16 == 3 then
+					val_10 = "PotatoMine"
+				elseif variant_16 == 4 then
+					val_10 = "PuffShroom"
+				elseif variant_16 == 5 then
+					val_10 = "SunShroom"
+				elseif variant_16 == 6 then
+					val_10 = "Chomper"
+				elseif variant_16 == 7 then
+					val_10 = "SnowPea"
+				elseif variant_16 == 8 then
+					val_10 = "Repeater"
+				elseif variant_16 == 9 then
+					val_10 = "FumeShroom"
+				elseif variant_16 == 10 then
+					val_10 = "Squash"
+				elseif variant_16 == 11 then
+					val_10 = "Garlic"
+				elseif variant_16 == 12 then
+					val_10 = "CherryBomb"
+				elseif variant_16 == 13 then
+					val_10 = "TallNut"
+				elseif variant_16 == 14 then
+					val_10 = "Threepeater"
+				elseif variant_16 == 15 then
+					val_10 = "Jalapeno"
+				elseif variant_16 == 16 then
+					val_10 = "Spikeweed"
+				elseif variant_16 == 17 then
+					val_10 = "Torchwood"
+				elseif variant_16 == 18 then
+					val_10 = "CabbagePult"
+				elseif variant_16 == 19 then
+					val_10 = "Pumpkin"
+				elseif variant_16 == 20 then
+					val_10 = "ScaredyShroom"
+				elseif variant_16 == 21 then
+					val_10 = "HypnoShroom"
+				elseif variant_16 == 22 then
+					val_10 = "SplitPea"
+				elseif variant_16 == 23 then
+					val_10 = "KernelPult"
+				elseif variant_16 == 24 then
+					val_10 = "Starfruit"
+				elseif variant_16 == 25 then
+					val_10 = "Cactus"
+				elseif variant_16 == 26 then
+					val_10 = "Blover"
+				elseif variant_16 == 27 then
+					val_10 = "SeaShroom"
+				elseif variant_16 == 28 then
+					val_10 = "TwinSunflower"
+				elseif variant_16 == 29 then
+					val_10 = "MelonPult"
+				elseif variant_16 == 30 then
+					val_10 = "GatlingPea"
+				elseif variant_16 == 31 then
+					val_10 = "GloomShroom"
+				elseif variant_16 == 32 then
+					val_10 = "Cattail"
+				elseif variant_16 == 33 then
+					val_10 = "WinterMelon"
+				elseif variant_16 == 34 then
+					val_10 = "IceShroom"
+				elseif variant_16 == 35 then
+					val_10 = "DoomShroom"
+				elseif variant_16 == 36 then
+					val_10 = "CobCannon"
+				elseif variant_16 == 37 then
+					val_10 = "Marigold"
+				elseif variant_16 == 38 then
+					val_10 = "GoldMagnet"
+				elseif variant_16 == 39 then
+					val_10 = "Imitater"
+				elseif variant_16 == 40 then
+					val_10 = "LilyPad"
+				elseif variant_16 == 41 then
+					val_10 = "FlowerPot"
+				elseif variant_16 == 42 then
+					val_10 = "TangleKelp"
+				elseif variant_16 == 43 then
+					val_10 = "GraveBuster"
+				elseif variant_16 == 44 then
+					val_10 = "Plantern"
+				elseif variant_16 == 45 then
+					val_10 = "UmbrellaLeaf"
+				elseif variant_16 == 46 then
+					val_10 = "CoffeeBean"
+				elseif variant_16 == 47 then
+					val_10 = "ExplodeONut"
+				end
+				value["UnlockedPlants"][i_10] = val_10
+			end
+			if reliable_events[14] then
+				task.spawn(reliable_events[14], value)
+			else
+				table.insert(reliable_event_queue[14], value)
+				if #reliable_event_queue[14] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[14]} events in queue for PlayerDataSync. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 2 then -- PlantSpawned
+			local value
+			value = {  }
+			value["EntityId"] = buffer.readu32(incoming_buff, read(4))
+			local variant_17 = buffer.readu8(incoming_buff, read(1))
+			if variant_17 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_17 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_17 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_17 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_17 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_17 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_17 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_17 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_17 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_17 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_17 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_17 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_17 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_17 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_17 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_17 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_17 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_17 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_17 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_17 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_17 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_17 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_17 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_17 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_17 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_17 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_17 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_17 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_17 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_17 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_17 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_17 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_17 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_17 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_17 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_17 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_17 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_17 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_17 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_17 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_17 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_17 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_17 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_17 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_17 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_17 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_17 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_17 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
+			value["Lane"] = buffer.readu8(incoming_buff, read(1))
+			assert(value["Lane"] >= 1, "value is less than 1!")
+			assert(value["Lane"] <= 5, "value is more than 5!")
+			value["Column"] = buffer.readu8(incoming_buff, read(1))
+			assert(value["Column"] >= 1, "value is less than 1!")
+			assert(value["Column"] <= 9, "value is more than 9!")
+			value["OwnerId"] = buffer.readf64(incoming_buff, read(8))
+			if reliable_events[2][1] then
+				for _, cb in reliable_events[2] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[2], value)
+				if #reliable_event_queue[2] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[2]} events in queue for PlantSpawned. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 18 then -- PlantFoodCollected
+			local value
+			value = {  }
+			value["CollectorId"] = buffer.readf64(incoming_buff, read(8))
+			value["NewChargeCount"] = buffer.readu8(incoming_buff, read(1))
+			value["ZombieEntityId"] = buffer.readu32(incoming_buff, read(4))
+			if reliable_events[18][1] then
+				for _, cb in reliable_events[18] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[18], value)
+				if #reliable_event_queue[18] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[18]} events in queue for PlantFoodCollected. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 20 then -- PlantFoodChargeUpdate
+			local value
+			value = {  }
+			value["ChargeCount"] = buffer.readu8(incoming_buff, read(1))
+			if reliable_events[20] then
+				task.spawn(reliable_events[20], value)
+			else
+				table.insert(reliable_event_queue[20], value)
+				if #reliable_event_queue[20] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[20]} events in queue for PlantFoodChargeUpdate. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 19 then -- PlantFoodActivated
+			local value
+			value = {  }
+			value["PlantEntityId"] = buffer.readu32(incoming_buff, read(4))
+			local variant_18 = buffer.readu8(incoming_buff, read(1))
+			if variant_18 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_18 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_18 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_18 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_18 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_18 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_18 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_18 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_18 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_18 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_18 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_18 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_18 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_18 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_18 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_18 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_18 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_18 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_18 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_18 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_18 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_18 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_18 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_18 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_18 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_18 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_18 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_18 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_18 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_18 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_18 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_18 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_18 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_18 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_18 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_18 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_18 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_18 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_18 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_18 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_18 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_18 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_18 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_18 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_18 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_18 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_18 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_18 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
 			value["OwnerId"] = buffer.readf64(incoming_buff, read(8))
 			if reliable_events[19][1] then
 				for _, cb in reliable_events[19] do
@@ -2010,31 +2376,31 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 36 then -- PadStateUpdate
 			local value
-			local bool_9 = buffer.readu8(incoming_buff, read(1))
+			local bool_10 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			local len_13 = buffer.readu16(incoming_buff, read(2))
-			assert(len_13 <= 400, "value is more than 400!")
-			value["PadId"] = buffer.readstring(incoming_buff, read(len_13), len_13)
+			local len_16 = buffer.readu16(incoming_buff, read(2))
+			assert(len_16 <= 400, "value is more than 400!")
+			value["PadId"] = buffer.readstring(incoming_buff, read(len_16), len_16)
 			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
-			local len_14 = buffer.readu8(incoming_buff, read(1))
-			assert(len_14 <= 200, "value is more than 200!")
-			value["WorldId"] = buffer.readstring(incoming_buff, read(len_14), len_14)
+			local len_17 = buffer.readu8(incoming_buff, read(1))
+			assert(len_17 <= 200, "value is more than 200!")
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_17), len_17)
 			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
-			local len_15 = buffer.readu8(incoming_buff, read(1))
-			assert(len_15 <= 80, "value is more than 80!")
-			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_15), len_15)
+			local len_18 = buffer.readu8(incoming_buff, read(1))
+			assert(len_18 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_18), len_18)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			value["PlayersCount"] = buffer.readu8(incoming_buff, read(1))
 			value["MaxPlayers"] = buffer.readu8(incoming_buff, read(1))
-			if bit32.btest(bool_9, 0b0000000000000001) then
+			if bit32.btest(bool_10, 0b0000000000000001) then
 				value["CountdownRemaining"] = buffer.readu8(incoming_buff, read(1))
 			else
 				value["CountdownRemaining"] = nil
 			end
-			if bit32.btest(bool_9, 0b0000000000000010) then
-				local len_16 = buffer.readu16(incoming_buff, read(2))
-				assert(len_16 <= 800, "value is more than 800!")
-				value["PlayerNames"] = buffer.readstring(incoming_buff, read(len_16), len_16)
+			if bit32.btest(bool_10, 0b0000000000000010) then
+				local len_19 = buffer.readu16(incoming_buff, read(2))
+				assert(len_19 <= 800, "value is more than 800!")
+				value["PlayerNames"] = buffer.readstring(incoming_buff, read(len_19), len_19)
 				assert(utf8.len(value["PlayerNames"]) ~= nil, "value is not valid utf-8")
 			else
 				value["PlayerNames"] = nil
@@ -2052,8 +2418,8 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 		elseif id == 31 then -- MapLoadingStarted
 			local value
 			value = {  }
-			local len_17 = buffer.readu16(incoming_buff, read(2))
-			value["MapId"] = buffer.readstring(incoming_buff, read(len_17), len_17)
+			local len_20 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_20), len_20)
 			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
 			value["TotalAssets"] = buffer.readu16(incoming_buff, read(2))
 			if reliable_events[31][1] then
@@ -2068,12 +2434,12 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 32 then -- MapLoadingComplete
 			local value
-			local bool_10 = buffer.readu8(incoming_buff, read(1))
+			local bool_11 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			local len_18 = buffer.readu16(incoming_buff, read(2))
-			value["MapId"] = buffer.readstring(incoming_buff, read(len_18), len_18)
+			local len_21 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_21), len_21)
 			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
-			value["Success"] = bit32.btest(bool_10, 0b0000000000000001)
+			value["Success"] = bit32.btest(bool_11, 0b0000000000000001)
 			if reliable_events[32][1] then
 				for _, cb in reliable_events[32] do
 					task.spawn(cb, value)
@@ -2087,8 +2453,8 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 		elseif id == 30 then -- MapConfigSync
 			local value
 			value = {  }
-			local len_19 = buffer.readu16(incoming_buff, read(2))
-			value["MapId"] = buffer.readstring(incoming_buff, read(len_19), len_19)
+			local len_22 = buffer.readu16(incoming_buff, read(2))
+			value["MapId"] = buffer.readstring(incoming_buff, read(len_22), len_22)
 			assert(utf8.len(value["MapId"]) ~= nil, "value is not valid utf-8")
 			value["GridCornerAX"] = buffer.readf32(incoming_buff, read(4))
 			value["GridCornerAY"] = buffer.readf32(incoming_buff, read(4))
@@ -2116,116 +2482,116 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 22 then -- LevelUp
 			local value
-			local bool_11 = buffer.readu8(incoming_buff, read(1))
+			local bool_12 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["NewLevel"] = buffer.readu8(incoming_buff, read(1))
-			if bit32.btest(bool_11, 0b0000000000000001) then
+			if bit32.btest(bool_12, 0b0000000000000001) then
 				value["RewardCoins"] = buffer.readu16(incoming_buff, read(2))
 			else
 				value["RewardCoins"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000000010) then
+			if bit32.btest(bool_12, 0b0000000000000010) then
 				value["RewardGems"] = buffer.readu8(incoming_buff, read(1))
 			else
 				value["RewardGems"] = nil
 			end
-			if bit32.btest(bool_11, 0b0000000000000100) then
-				local variant_14 = buffer.readu8(incoming_buff, read(1))
-				if variant_14 == 0 then
+			if bit32.btest(bool_12, 0b0000000000000100) then
+				local variant_19 = buffer.readu8(incoming_buff, read(1))
+				if variant_19 == 0 then
 					value["UnlockedPlant"] = "Sunflower"
-				elseif variant_14 == 1 then
+				elseif variant_19 == 1 then
 					value["UnlockedPlant"] = "Peashooter"
-				elseif variant_14 == 2 then
+				elseif variant_19 == 2 then
 					value["UnlockedPlant"] = "WallNut"
-				elseif variant_14 == 3 then
+				elseif variant_19 == 3 then
 					value["UnlockedPlant"] = "PotatoMine"
-				elseif variant_14 == 4 then
+				elseif variant_19 == 4 then
 					value["UnlockedPlant"] = "PuffShroom"
-				elseif variant_14 == 5 then
+				elseif variant_19 == 5 then
 					value["UnlockedPlant"] = "SunShroom"
-				elseif variant_14 == 6 then
+				elseif variant_19 == 6 then
 					value["UnlockedPlant"] = "Chomper"
-				elseif variant_14 == 7 then
+				elseif variant_19 == 7 then
 					value["UnlockedPlant"] = "SnowPea"
-				elseif variant_14 == 8 then
+				elseif variant_19 == 8 then
 					value["UnlockedPlant"] = "Repeater"
-				elseif variant_14 == 9 then
+				elseif variant_19 == 9 then
 					value["UnlockedPlant"] = "FumeShroom"
-				elseif variant_14 == 10 then
+				elseif variant_19 == 10 then
 					value["UnlockedPlant"] = "Squash"
-				elseif variant_14 == 11 then
+				elseif variant_19 == 11 then
 					value["UnlockedPlant"] = "Garlic"
-				elseif variant_14 == 12 then
+				elseif variant_19 == 12 then
 					value["UnlockedPlant"] = "CherryBomb"
-				elseif variant_14 == 13 then
+				elseif variant_19 == 13 then
 					value["UnlockedPlant"] = "TallNut"
-				elseif variant_14 == 14 then
+				elseif variant_19 == 14 then
 					value["UnlockedPlant"] = "Threepeater"
-				elseif variant_14 == 15 then
+				elseif variant_19 == 15 then
 					value["UnlockedPlant"] = "Jalapeno"
-				elseif variant_14 == 16 then
+				elseif variant_19 == 16 then
 					value["UnlockedPlant"] = "Spikeweed"
-				elseif variant_14 == 17 then
+				elseif variant_19 == 17 then
 					value["UnlockedPlant"] = "Torchwood"
-				elseif variant_14 == 18 then
+				elseif variant_19 == 18 then
 					value["UnlockedPlant"] = "CabbagePult"
-				elseif variant_14 == 19 then
+				elseif variant_19 == 19 then
 					value["UnlockedPlant"] = "Pumpkin"
-				elseif variant_14 == 20 then
+				elseif variant_19 == 20 then
 					value["UnlockedPlant"] = "ScaredyShroom"
-				elseif variant_14 == 21 then
+				elseif variant_19 == 21 then
 					value["UnlockedPlant"] = "HypnoShroom"
-				elseif variant_14 == 22 then
+				elseif variant_19 == 22 then
 					value["UnlockedPlant"] = "SplitPea"
-				elseif variant_14 == 23 then
+				elseif variant_19 == 23 then
 					value["UnlockedPlant"] = "KernelPult"
-				elseif variant_14 == 24 then
+				elseif variant_19 == 24 then
 					value["UnlockedPlant"] = "Starfruit"
-				elseif variant_14 == 25 then
+				elseif variant_19 == 25 then
 					value["UnlockedPlant"] = "Cactus"
-				elseif variant_14 == 26 then
+				elseif variant_19 == 26 then
 					value["UnlockedPlant"] = "Blover"
-				elseif variant_14 == 27 then
+				elseif variant_19 == 27 then
 					value["UnlockedPlant"] = "SeaShroom"
-				elseif variant_14 == 28 then
+				elseif variant_19 == 28 then
 					value["UnlockedPlant"] = "TwinSunflower"
-				elseif variant_14 == 29 then
+				elseif variant_19 == 29 then
 					value["UnlockedPlant"] = "MelonPult"
-				elseif variant_14 == 30 then
+				elseif variant_19 == 30 then
 					value["UnlockedPlant"] = "GatlingPea"
-				elseif variant_14 == 31 then
+				elseif variant_19 == 31 then
 					value["UnlockedPlant"] = "GloomShroom"
-				elseif variant_14 == 32 then
+				elseif variant_19 == 32 then
 					value["UnlockedPlant"] = "Cattail"
-				elseif variant_14 == 33 then
+				elseif variant_19 == 33 then
 					value["UnlockedPlant"] = "WinterMelon"
-				elseif variant_14 == 34 then
+				elseif variant_19 == 34 then
 					value["UnlockedPlant"] = "IceShroom"
-				elseif variant_14 == 35 then
+				elseif variant_19 == 35 then
 					value["UnlockedPlant"] = "DoomShroom"
-				elseif variant_14 == 36 then
+				elseif variant_19 == 36 then
 					value["UnlockedPlant"] = "CobCannon"
-				elseif variant_14 == 37 then
+				elseif variant_19 == 37 then
 					value["UnlockedPlant"] = "Marigold"
-				elseif variant_14 == 38 then
+				elseif variant_19 == 38 then
 					value["UnlockedPlant"] = "GoldMagnet"
-				elseif variant_14 == 39 then
+				elseif variant_19 == 39 then
 					value["UnlockedPlant"] = "Imitater"
-				elseif variant_14 == 40 then
+				elseif variant_19 == 40 then
 					value["UnlockedPlant"] = "LilyPad"
-				elseif variant_14 == 41 then
+				elseif variant_19 == 41 then
 					value["UnlockedPlant"] = "FlowerPot"
-				elseif variant_14 == 42 then
+				elseif variant_19 == 42 then
 					value["UnlockedPlant"] = "TangleKelp"
-				elseif variant_14 == 43 then
+				elseif variant_19 == 43 then
 					value["UnlockedPlant"] = "GraveBuster"
-				elseif variant_14 == 44 then
+				elseif variant_19 == 44 then
 					value["UnlockedPlant"] = "Plantern"
-				elseif variant_14 == 45 then
+				elseif variant_19 == 45 then
 					value["UnlockedPlant"] = "UmbrellaLeaf"
-				elseif variant_14 == 46 then
+				elseif variant_19 == 46 then
 					value["UnlockedPlant"] = "CoffeeBean"
-				elseif variant_14 == 47 then
+				elseif variant_19 == 47 then
 					value["UnlockedPlant"] = "ExplodeONut"
 				end
 			else
@@ -2255,17 +2621,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 		elseif id == 37 then -- JoinedPad
 			local value
 			value = {  }
-			local len_20 = buffer.readu16(incoming_buff, read(2))
-			assert(len_20 <= 400, "value is more than 400!")
-			value["PadId"] = buffer.readstring(incoming_buff, read(len_20), len_20)
+			local len_23 = buffer.readu16(incoming_buff, read(2))
+			assert(len_23 <= 400, "value is more than 400!")
+			value["PadId"] = buffer.readstring(incoming_buff, read(len_23), len_23)
 			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
-			local len_21 = buffer.readu8(incoming_buff, read(1))
-			assert(len_21 <= 200, "value is more than 200!")
-			value["WorldId"] = buffer.readstring(incoming_buff, read(len_21), len_21)
+			local len_24 = buffer.readu8(incoming_buff, read(1))
+			assert(len_24 <= 200, "value is more than 200!")
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_24), len_24)
 			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
-			local len_22 = buffer.readu8(incoming_buff, read(1))
-			assert(len_22 <= 80, "value is more than 80!")
-			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_22), len_22)
+			local len_25 = buffer.readu8(incoming_buff, read(1))
+			assert(len_25 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_25), len_25)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			value["Position"] = Vector3.new(buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)))
 			if reliable_events[37][1] then
@@ -2295,11 +2661,11 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 		elseif id == 26 then -- GameStarted
 			local value
 			value = {  }
-			local len_23 = buffer.readu16(incoming_buff, read(2))
-			value["WorldId"] = buffer.readstring(incoming_buff, read(len_23), len_23)
+			local len_26 = buffer.readu16(incoming_buff, read(2))
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_26), len_26)
 			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
-			local len_24 = buffer.readu16(incoming_buff, read(2))
-			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_24), len_24)
+			local len_27 = buffer.readu16(incoming_buff, read(2))
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_27), len_27)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			value["WaveCount"] = buffer.readu8(incoming_buff, read(1))
 			if reliable_events[26][1] then
@@ -2314,15 +2680,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 12 then -- GamePhaseChanged
 			local value
-			local bool_12 = buffer.readu8(incoming_buff, read(1))
+			local bool_13 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			if bit32.btest(bool_12, 0b0000000000000001) then
+			if bit32.btest(bool_13, 0b0000000000000001) then
 				value["Phase"] = "Pregame"
-			elseif bit32.btest(bool_12, 0b0000000000000010) then
+			elseif bit32.btest(bool_13, 0b0000000000000010) then
 				value["Phase"] = "Wave"
-			elseif bit32.btest(bool_12, 0b0000000000000100) then
+			elseif bit32.btest(bool_13, 0b0000000000000100) then
 				value["Phase"] = "Intermission"
-			elseif bit32.btest(bool_12, 0b0000000000001000) then
+			elseif bit32.btest(bool_13, 0b0000000000001000) then
 				value["Phase"] = "GameOver"
 			end
 			if reliable_events[12][1] then
@@ -2337,9 +2703,9 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 9 then -- GameOver
 			local value
-			local bool_13 = buffer.readu8(incoming_buff, read(1))
+			local bool_14 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Victory"] = bit32.btest(bool_13, 0b0000000000000001)
+			value["Victory"] = bit32.btest(bool_14, 0b0000000000000001)
 			value["WaveReached"] = buffer.readu8(incoming_buff, read(1))
 			if reliable_events[9][1] then
 				for _, cb in reliable_events[9] do
@@ -2353,9 +2719,9 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 16 then -- GameEndRewards
 			local value
-			local bool_14 = buffer.readu8(incoming_buff, read(1))
+			local bool_15 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Victory"] = bit32.btest(bool_14, 0b0000000000000001)
+			value["Victory"] = bit32.btest(bool_15, 0b0000000000000001)
 			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
 			value["ZombiesKilled"] = buffer.readu16(incoming_buff, read(2))
 			value["WavesCompleted"] = buffer.readu8(incoming_buff, read(1))
@@ -2375,15 +2741,15 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 27 then -- GameComplete
 			local value
-			local bool_15 = buffer.readu8(incoming_buff, read(1))
+			local bool_16 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			local len_25 = buffer.readu16(incoming_buff, read(2))
-			value["WorldId"] = buffer.readstring(incoming_buff, read(len_25), len_25)
+			local len_28 = buffer.readu16(incoming_buff, read(2))
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_28), len_28)
 			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
-			local len_26 = buffer.readu16(incoming_buff, read(2))
-			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_26), len_26)
+			local len_29 = buffer.readu16(incoming_buff, read(2))
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_29), len_29)
 			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
-			value["Victory"] = bit32.btest(bool_15, 0b0000000000000001)
+			value["Victory"] = bit32.btest(bool_16, 0b0000000000000001)
 			value["WavesSurvived"] = buffer.readu8(incoming_buff, read(1))
 			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
 			value["XPEarned"] = buffer.readu32(incoming_buff, read(4))
@@ -2397,17 +2763,17 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 13 then -- FullStateSync
 			local value
-			local bool_16 = buffer.readu8(incoming_buff, read(1))
+			local bool_17 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["SunCount"] = buffer.readu16(incoming_buff, read(2))
 			value["WaveNumber"] = buffer.readu8(incoming_buff, read(1))
-			if bit32.btest(bool_16, 0b0000000000000001) then
+			if bit32.btest(bool_17, 0b0000000000000001) then
 				value["Phase"] = "Pregame"
-			elseif bit32.btest(bool_16, 0b0000000000000010) then
+			elseif bit32.btest(bool_17, 0b0000000000000010) then
 				value["Phase"] = "Wave"
-			elseif bit32.btest(bool_16, 0b0000000000000100) then
+			elseif bit32.btest(bool_17, 0b0000000000000100) then
 				value["Phase"] = "Intermission"
-			elseif bit32.btest(bool_16, 0b0000000000001000) then
+			elseif bit32.btest(bool_17, 0b0000000000001000) then
 				value["Phase"] = "GameOver"
 			end
 			if reliable_events[13] then
@@ -2430,217 +2796,217 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			value["GamesWon"] = buffer.readu32(incoming_buff, read(4))
 			value["ZombiesKilled"] = buffer.readu32(incoming_buff, read(4))
 			value["PlantsPlaced"] = buffer.readu32(incoming_buff, read(4))
-			local len_27 = buffer.readu8(incoming_buff, read(1))
-			assert(len_27 >= 0, "value is less than 0!")
-			assert(len_27 <= 48, "value is more than 48!")
-			value["UnlockedPlants"] = table.create(len_27)
-			for i_8 = 1, len_27 do
-				local val_8
-				local variant_15 = buffer.readu8(incoming_buff, read(1))
-				if variant_15 == 0 then
-					val_8 = "Sunflower"
-				elseif variant_15 == 1 then
-					val_8 = "Peashooter"
-				elseif variant_15 == 2 then
-					val_8 = "WallNut"
-				elseif variant_15 == 3 then
-					val_8 = "PotatoMine"
-				elseif variant_15 == 4 then
-					val_8 = "PuffShroom"
-				elseif variant_15 == 5 then
-					val_8 = "SunShroom"
-				elseif variant_15 == 6 then
-					val_8 = "Chomper"
-				elseif variant_15 == 7 then
-					val_8 = "SnowPea"
-				elseif variant_15 == 8 then
-					val_8 = "Repeater"
-				elseif variant_15 == 9 then
-					val_8 = "FumeShroom"
-				elseif variant_15 == 10 then
-					val_8 = "Squash"
-				elseif variant_15 == 11 then
-					val_8 = "Garlic"
-				elseif variant_15 == 12 then
-					val_8 = "CherryBomb"
-				elseif variant_15 == 13 then
-					val_8 = "TallNut"
-				elseif variant_15 == 14 then
-					val_8 = "Threepeater"
-				elseif variant_15 == 15 then
-					val_8 = "Jalapeno"
-				elseif variant_15 == 16 then
-					val_8 = "Spikeweed"
-				elseif variant_15 == 17 then
-					val_8 = "Torchwood"
-				elseif variant_15 == 18 then
-					val_8 = "CabbagePult"
-				elseif variant_15 == 19 then
-					val_8 = "Pumpkin"
-				elseif variant_15 == 20 then
-					val_8 = "ScaredyShroom"
-				elseif variant_15 == 21 then
-					val_8 = "HypnoShroom"
-				elseif variant_15 == 22 then
-					val_8 = "SplitPea"
-				elseif variant_15 == 23 then
-					val_8 = "KernelPult"
-				elseif variant_15 == 24 then
-					val_8 = "Starfruit"
-				elseif variant_15 == 25 then
-					val_8 = "Cactus"
-				elseif variant_15 == 26 then
-					val_8 = "Blover"
-				elseif variant_15 == 27 then
-					val_8 = "SeaShroom"
-				elseif variant_15 == 28 then
-					val_8 = "TwinSunflower"
-				elseif variant_15 == 29 then
-					val_8 = "MelonPult"
-				elseif variant_15 == 30 then
-					val_8 = "GatlingPea"
-				elseif variant_15 == 31 then
-					val_8 = "GloomShroom"
-				elseif variant_15 == 32 then
-					val_8 = "Cattail"
-				elseif variant_15 == 33 then
-					val_8 = "WinterMelon"
-				elseif variant_15 == 34 then
-					val_8 = "IceShroom"
-				elseif variant_15 == 35 then
-					val_8 = "DoomShroom"
-				elseif variant_15 == 36 then
-					val_8 = "CobCannon"
-				elseif variant_15 == 37 then
-					val_8 = "Marigold"
-				elseif variant_15 == 38 then
-					val_8 = "GoldMagnet"
-				elseif variant_15 == 39 then
-					val_8 = "Imitater"
-				elseif variant_15 == 40 then
-					val_8 = "LilyPad"
-				elseif variant_15 == 41 then
-					val_8 = "FlowerPot"
-				elseif variant_15 == 42 then
-					val_8 = "TangleKelp"
-				elseif variant_15 == 43 then
-					val_8 = "GraveBuster"
-				elseif variant_15 == 44 then
-					val_8 = "Plantern"
-				elseif variant_15 == 45 then
-					val_8 = "UmbrellaLeaf"
-				elseif variant_15 == 46 then
-					val_8 = "CoffeeBean"
-				elseif variant_15 == 47 then
-					val_8 = "ExplodeONut"
+			local len_30 = buffer.readu8(incoming_buff, read(1))
+			assert(len_30 >= 0, "value is less than 0!")
+			assert(len_30 <= 48, "value is more than 48!")
+			value["UnlockedPlants"] = table.create(len_30)
+			for i_11 = 1, len_30 do
+				local val_11
+				local variant_20 = buffer.readu8(incoming_buff, read(1))
+				if variant_20 == 0 then
+					val_11 = "Sunflower"
+				elseif variant_20 == 1 then
+					val_11 = "Peashooter"
+				elseif variant_20 == 2 then
+					val_11 = "WallNut"
+				elseif variant_20 == 3 then
+					val_11 = "PotatoMine"
+				elseif variant_20 == 4 then
+					val_11 = "PuffShroom"
+				elseif variant_20 == 5 then
+					val_11 = "SunShroom"
+				elseif variant_20 == 6 then
+					val_11 = "Chomper"
+				elseif variant_20 == 7 then
+					val_11 = "SnowPea"
+				elseif variant_20 == 8 then
+					val_11 = "Repeater"
+				elseif variant_20 == 9 then
+					val_11 = "FumeShroom"
+				elseif variant_20 == 10 then
+					val_11 = "Squash"
+				elseif variant_20 == 11 then
+					val_11 = "Garlic"
+				elseif variant_20 == 12 then
+					val_11 = "CherryBomb"
+				elseif variant_20 == 13 then
+					val_11 = "TallNut"
+				elseif variant_20 == 14 then
+					val_11 = "Threepeater"
+				elseif variant_20 == 15 then
+					val_11 = "Jalapeno"
+				elseif variant_20 == 16 then
+					val_11 = "Spikeweed"
+				elseif variant_20 == 17 then
+					val_11 = "Torchwood"
+				elseif variant_20 == 18 then
+					val_11 = "CabbagePult"
+				elseif variant_20 == 19 then
+					val_11 = "Pumpkin"
+				elseif variant_20 == 20 then
+					val_11 = "ScaredyShroom"
+				elseif variant_20 == 21 then
+					val_11 = "HypnoShroom"
+				elseif variant_20 == 22 then
+					val_11 = "SplitPea"
+				elseif variant_20 == 23 then
+					val_11 = "KernelPult"
+				elseif variant_20 == 24 then
+					val_11 = "Starfruit"
+				elseif variant_20 == 25 then
+					val_11 = "Cactus"
+				elseif variant_20 == 26 then
+					val_11 = "Blover"
+				elseif variant_20 == 27 then
+					val_11 = "SeaShroom"
+				elseif variant_20 == 28 then
+					val_11 = "TwinSunflower"
+				elseif variant_20 == 29 then
+					val_11 = "MelonPult"
+				elseif variant_20 == 30 then
+					val_11 = "GatlingPea"
+				elseif variant_20 == 31 then
+					val_11 = "GloomShroom"
+				elseif variant_20 == 32 then
+					val_11 = "Cattail"
+				elseif variant_20 == 33 then
+					val_11 = "WinterMelon"
+				elseif variant_20 == 34 then
+					val_11 = "IceShroom"
+				elseif variant_20 == 35 then
+					val_11 = "DoomShroom"
+				elseif variant_20 == 36 then
+					val_11 = "CobCannon"
+				elseif variant_20 == 37 then
+					val_11 = "Marigold"
+				elseif variant_20 == 38 then
+					val_11 = "GoldMagnet"
+				elseif variant_20 == 39 then
+					val_11 = "Imitater"
+				elseif variant_20 == 40 then
+					val_11 = "LilyPad"
+				elseif variant_20 == 41 then
+					val_11 = "FlowerPot"
+				elseif variant_20 == 42 then
+					val_11 = "TangleKelp"
+				elseif variant_20 == 43 then
+					val_11 = "GraveBuster"
+				elseif variant_20 == 44 then
+					val_11 = "Plantern"
+				elseif variant_20 == 45 then
+					val_11 = "UmbrellaLeaf"
+				elseif variant_20 == 46 then
+					val_11 = "CoffeeBean"
+				elseif variant_20 == 47 then
+					val_11 = "ExplodeONut"
 				end
-				value["UnlockedPlants"][i_8] = val_8
+				value["UnlockedPlants"][i_11] = val_11
 			end
-			local len_28 = buffer.readu8(incoming_buff, read(1))
-			assert(len_28 >= 0, "value is less than 0!")
-			assert(len_28 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_28)
-			for i_9 = 1, len_28 do
-				local val_9
-				local variant_16 = buffer.readu8(incoming_buff, read(1))
-				if variant_16 == 0 then
-					val_9 = "Sunflower"
-				elseif variant_16 == 1 then
-					val_9 = "Peashooter"
-				elseif variant_16 == 2 then
-					val_9 = "WallNut"
-				elseif variant_16 == 3 then
-					val_9 = "PotatoMine"
-				elseif variant_16 == 4 then
-					val_9 = "PuffShroom"
-				elseif variant_16 == 5 then
-					val_9 = "SunShroom"
-				elseif variant_16 == 6 then
-					val_9 = "Chomper"
-				elseif variant_16 == 7 then
-					val_9 = "SnowPea"
-				elseif variant_16 == 8 then
-					val_9 = "Repeater"
-				elseif variant_16 == 9 then
-					val_9 = "FumeShroom"
-				elseif variant_16 == 10 then
-					val_9 = "Squash"
-				elseif variant_16 == 11 then
-					val_9 = "Garlic"
-				elseif variant_16 == 12 then
-					val_9 = "CherryBomb"
-				elseif variant_16 == 13 then
-					val_9 = "TallNut"
-				elseif variant_16 == 14 then
-					val_9 = "Threepeater"
-				elseif variant_16 == 15 then
-					val_9 = "Jalapeno"
-				elseif variant_16 == 16 then
-					val_9 = "Spikeweed"
-				elseif variant_16 == 17 then
-					val_9 = "Torchwood"
-				elseif variant_16 == 18 then
-					val_9 = "CabbagePult"
-				elseif variant_16 == 19 then
-					val_9 = "Pumpkin"
-				elseif variant_16 == 20 then
-					val_9 = "ScaredyShroom"
-				elseif variant_16 == 21 then
-					val_9 = "HypnoShroom"
-				elseif variant_16 == 22 then
-					val_9 = "SplitPea"
-				elseif variant_16 == 23 then
-					val_9 = "KernelPult"
-				elseif variant_16 == 24 then
-					val_9 = "Starfruit"
-				elseif variant_16 == 25 then
-					val_9 = "Cactus"
-				elseif variant_16 == 26 then
-					val_9 = "Blover"
-				elseif variant_16 == 27 then
-					val_9 = "SeaShroom"
-				elseif variant_16 == 28 then
-					val_9 = "TwinSunflower"
-				elseif variant_16 == 29 then
-					val_9 = "MelonPult"
-				elseif variant_16 == 30 then
-					val_9 = "GatlingPea"
-				elseif variant_16 == 31 then
-					val_9 = "GloomShroom"
-				elseif variant_16 == 32 then
-					val_9 = "Cattail"
-				elseif variant_16 == 33 then
-					val_9 = "WinterMelon"
-				elseif variant_16 == 34 then
-					val_9 = "IceShroom"
-				elseif variant_16 == 35 then
-					val_9 = "DoomShroom"
-				elseif variant_16 == 36 then
-					val_9 = "CobCannon"
-				elseif variant_16 == 37 then
-					val_9 = "Marigold"
-				elseif variant_16 == 38 then
-					val_9 = "GoldMagnet"
-				elseif variant_16 == 39 then
-					val_9 = "Imitater"
-				elseif variant_16 == 40 then
-					val_9 = "LilyPad"
-				elseif variant_16 == 41 then
-					val_9 = "FlowerPot"
-				elseif variant_16 == 42 then
-					val_9 = "TangleKelp"
-				elseif variant_16 == 43 then
-					val_9 = "GraveBuster"
-				elseif variant_16 == 44 then
-					val_9 = "Plantern"
-				elseif variant_16 == 45 then
-					val_9 = "UmbrellaLeaf"
-				elseif variant_16 == 46 then
-					val_9 = "CoffeeBean"
-				elseif variant_16 == 47 then
-					val_9 = "ExplodeONut"
+			local len_31 = buffer.readu8(incoming_buff, read(1))
+			assert(len_31 >= 0, "value is less than 0!")
+			assert(len_31 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_31)
+			for i_12 = 1, len_31 do
+				local val_12
+				local variant_21 = buffer.readu8(incoming_buff, read(1))
+				if variant_21 == 0 then
+					val_12 = "Sunflower"
+				elseif variant_21 == 1 then
+					val_12 = "Peashooter"
+				elseif variant_21 == 2 then
+					val_12 = "WallNut"
+				elseif variant_21 == 3 then
+					val_12 = "PotatoMine"
+				elseif variant_21 == 4 then
+					val_12 = "PuffShroom"
+				elseif variant_21 == 5 then
+					val_12 = "SunShroom"
+				elseif variant_21 == 6 then
+					val_12 = "Chomper"
+				elseif variant_21 == 7 then
+					val_12 = "SnowPea"
+				elseif variant_21 == 8 then
+					val_12 = "Repeater"
+				elseif variant_21 == 9 then
+					val_12 = "FumeShroom"
+				elseif variant_21 == 10 then
+					val_12 = "Squash"
+				elseif variant_21 == 11 then
+					val_12 = "Garlic"
+				elseif variant_21 == 12 then
+					val_12 = "CherryBomb"
+				elseif variant_21 == 13 then
+					val_12 = "TallNut"
+				elseif variant_21 == 14 then
+					val_12 = "Threepeater"
+				elseif variant_21 == 15 then
+					val_12 = "Jalapeno"
+				elseif variant_21 == 16 then
+					val_12 = "Spikeweed"
+				elseif variant_21 == 17 then
+					val_12 = "Torchwood"
+				elseif variant_21 == 18 then
+					val_12 = "CabbagePult"
+				elseif variant_21 == 19 then
+					val_12 = "Pumpkin"
+				elseif variant_21 == 20 then
+					val_12 = "ScaredyShroom"
+				elseif variant_21 == 21 then
+					val_12 = "HypnoShroom"
+				elseif variant_21 == 22 then
+					val_12 = "SplitPea"
+				elseif variant_21 == 23 then
+					val_12 = "KernelPult"
+				elseif variant_21 == 24 then
+					val_12 = "Starfruit"
+				elseif variant_21 == 25 then
+					val_12 = "Cactus"
+				elseif variant_21 == 26 then
+					val_12 = "Blover"
+				elseif variant_21 == 27 then
+					val_12 = "SeaShroom"
+				elseif variant_21 == 28 then
+					val_12 = "TwinSunflower"
+				elseif variant_21 == 29 then
+					val_12 = "MelonPult"
+				elseif variant_21 == 30 then
+					val_12 = "GatlingPea"
+				elseif variant_21 == 31 then
+					val_12 = "GloomShroom"
+				elseif variant_21 == 32 then
+					val_12 = "Cattail"
+				elseif variant_21 == 33 then
+					val_12 = "WinterMelon"
+				elseif variant_21 == 34 then
+					val_12 = "IceShroom"
+				elseif variant_21 == 35 then
+					val_12 = "DoomShroom"
+				elseif variant_21 == 36 then
+					val_12 = "CobCannon"
+				elseif variant_21 == 37 then
+					val_12 = "Marigold"
+				elseif variant_21 == 38 then
+					val_12 = "GoldMagnet"
+				elseif variant_21 == 39 then
+					val_12 = "Imitater"
+				elseif variant_21 == 40 then
+					val_12 = "LilyPad"
+				elseif variant_21 == 41 then
+					val_12 = "FlowerPot"
+				elseif variant_21 == 42 then
+					val_12 = "TangleKelp"
+				elseif variant_21 == 43 then
+					val_12 = "GraveBuster"
+				elseif variant_21 == 44 then
+					val_12 = "Plantern"
+				elseif variant_21 == 45 then
+					val_12 = "UmbrellaLeaf"
+				elseif variant_21 == 46 then
+					val_12 = "CoffeeBean"
+				elseif variant_21 == 47 then
+					val_12 = "ExplodeONut"
 				end
-				value["Deck"][i_9] = val_9
+				value["Deck"][i_12] = val_12
 			end
 			if reliable_events[42][1] then
 				for _, cb in reliable_events[42] do
@@ -2669,6 +3035,162 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 					warn(`[ZAP] {#reliable_event_queue[17]} events in queue for ExplosionVFX. Did you forget to attach a listener?`)
 				end
 			end
+		elseif id == 45 then -- EquipMutationResponse
+			local value
+			local bool_18 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			value["Success"] = bit32.btest(bool_18, 0b0000000000000001)
+			local variant_22 = buffer.readu8(incoming_buff, read(1))
+			if variant_22 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_22 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_22 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_22 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_22 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_22 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_22 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_22 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_22 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_22 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_22 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_22 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_22 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_22 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_22 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_22 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_22 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_22 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_22 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_22 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_22 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_22 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_22 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_22 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_22 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_22 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_22 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_22 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_22 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_22 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_22 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_22 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_22 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_22 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_22 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_22 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_22 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_22 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_22 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_22 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_22 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_22 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_22 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_22 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_22 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_22 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_22 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_22 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
+			local variant_23 = buffer.readu8(incoming_buff, read(1))
+			if variant_23 == 0 then
+				value["MutationType"] = "Fire"
+			elseif variant_23 == 1 then
+				value["MutationType"] = "Inferno"
+			elseif variant_23 == 2 then
+				value["MutationType"] = "Ice"
+			elseif variant_23 == 3 then
+				value["MutationType"] = "Frost"
+			elseif variant_23 == 4 then
+				value["MutationType"] = "Electric"
+			elseif variant_23 == 5 then
+				value["MutationType"] = "Tesla"
+			elseif variant_23 == 6 then
+				value["MutationType"] = "Toxic"
+			elseif variant_23 == 7 then
+				value["MutationType"] = "Venomous"
+			elseif variant_23 == 8 then
+				value["MutationType"] = "Shadow"
+			elseif variant_23 == 9 then
+				value["MutationType"] = "Void"
+			elseif variant_23 == 10 then
+				value["MutationType"] = "Solar"
+			elseif variant_23 == 11 then
+				value["MutationType"] = "Radiant"
+			elseif variant_23 == 12 then
+				value["MutationType"] = "Reinforced"
+			elseif variant_23 == 13 then
+				value["MutationType"] = "Fortified"
+			elseif variant_23 == 14 then
+				value["MutationType"] = "Primal"
+			elseif variant_23 == 15 then
+				value["MutationType"] = "Savage"
+			elseif variant_23 == 16 then
+				value["MutationType"] = "Swift"
+			elseif variant_23 == 17 then
+				value["MutationType"] = "Hasty"
+			end
+			if bit32.btest(bool_18, 0b0000000000000010) then
+				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
+			else
+				value["ErrorCode"] = nil
+			end
+			if reliable_events[45][1] then
+				for _, cb in reliable_events[45] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[45], value)
+				if #reliable_event_queue[45] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[45]} events in queue for EquipMutationResponse. Did you forget to attach a listener?`)
+				end
+			end
 		elseif id == 4 then -- EntityDied
 			local value
 			value = {  }
@@ -2685,12 +3207,12 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 0 then -- DevCommandResponse
 			local value
-			local bool_17 = buffer.readu8(incoming_buff, read(1))
+			local bool_19 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Success"] = bit32.btest(bool_17, 0b0000000000000001)
-			local len_29 = buffer.readu16(incoming_buff, read(2))
-			assert(len_29 <= 800, "value is more than 800!")
-			value["Message"] = buffer.readstring(incoming_buff, read(len_29), len_29)
+			value["Success"] = bit32.btest(bool_19, 0b0000000000000001)
+			local len_32 = buffer.readu16(incoming_buff, read(2))
+			assert(len_32 <= 800, "value is more than 800!")
+			value["Message"] = buffer.readstring(incoming_buff, read(len_32), len_32)
 			assert(utf8.len(value["Message"]) ~= nil, "value is not valid utf-8")
 			if reliable_events[0][1] then
 				for _, cb in reliable_events[0] do
@@ -2704,615 +3226,615 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 25 then -- DeckSync
 			local value
-			local bool_18 = buffer.readu8(incoming_buff, read(1))
+			local bool_20 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			if bit32.btest(bool_18, 0b0000000000000001) then
-				local variant_17 = buffer.readu8(incoming_buff, read(1))
-				if variant_17 == 0 then
+			if bit32.btest(bool_20, 0b0000000000000001) then
+				local variant_24 = buffer.readu8(incoming_buff, read(1))
+				if variant_24 == 0 then
 					value["Slot1"] = "Sunflower"
-				elseif variant_17 == 1 then
+				elseif variant_24 == 1 then
 					value["Slot1"] = "Peashooter"
-				elseif variant_17 == 2 then
+				elseif variant_24 == 2 then
 					value["Slot1"] = "WallNut"
-				elseif variant_17 == 3 then
+				elseif variant_24 == 3 then
 					value["Slot1"] = "PotatoMine"
-				elseif variant_17 == 4 then
+				elseif variant_24 == 4 then
 					value["Slot1"] = "PuffShroom"
-				elseif variant_17 == 5 then
+				elseif variant_24 == 5 then
 					value["Slot1"] = "SunShroom"
-				elseif variant_17 == 6 then
+				elseif variant_24 == 6 then
 					value["Slot1"] = "Chomper"
-				elseif variant_17 == 7 then
+				elseif variant_24 == 7 then
 					value["Slot1"] = "SnowPea"
-				elseif variant_17 == 8 then
+				elseif variant_24 == 8 then
 					value["Slot1"] = "Repeater"
-				elseif variant_17 == 9 then
+				elseif variant_24 == 9 then
 					value["Slot1"] = "FumeShroom"
-				elseif variant_17 == 10 then
+				elseif variant_24 == 10 then
 					value["Slot1"] = "Squash"
-				elseif variant_17 == 11 then
+				elseif variant_24 == 11 then
 					value["Slot1"] = "Garlic"
-				elseif variant_17 == 12 then
+				elseif variant_24 == 12 then
 					value["Slot1"] = "CherryBomb"
-				elseif variant_17 == 13 then
+				elseif variant_24 == 13 then
 					value["Slot1"] = "TallNut"
-				elseif variant_17 == 14 then
+				elseif variant_24 == 14 then
 					value["Slot1"] = "Threepeater"
-				elseif variant_17 == 15 then
+				elseif variant_24 == 15 then
 					value["Slot1"] = "Jalapeno"
-				elseif variant_17 == 16 then
+				elseif variant_24 == 16 then
 					value["Slot1"] = "Spikeweed"
-				elseif variant_17 == 17 then
+				elseif variant_24 == 17 then
 					value["Slot1"] = "Torchwood"
-				elseif variant_17 == 18 then
+				elseif variant_24 == 18 then
 					value["Slot1"] = "CabbagePult"
-				elseif variant_17 == 19 then
+				elseif variant_24 == 19 then
 					value["Slot1"] = "Pumpkin"
-				elseif variant_17 == 20 then
+				elseif variant_24 == 20 then
 					value["Slot1"] = "ScaredyShroom"
-				elseif variant_17 == 21 then
+				elseif variant_24 == 21 then
 					value["Slot1"] = "HypnoShroom"
-				elseif variant_17 == 22 then
+				elseif variant_24 == 22 then
 					value["Slot1"] = "SplitPea"
-				elseif variant_17 == 23 then
+				elseif variant_24 == 23 then
 					value["Slot1"] = "KernelPult"
-				elseif variant_17 == 24 then
+				elseif variant_24 == 24 then
 					value["Slot1"] = "Starfruit"
-				elseif variant_17 == 25 then
+				elseif variant_24 == 25 then
 					value["Slot1"] = "Cactus"
-				elseif variant_17 == 26 then
+				elseif variant_24 == 26 then
 					value["Slot1"] = "Blover"
-				elseif variant_17 == 27 then
+				elseif variant_24 == 27 then
 					value["Slot1"] = "SeaShroom"
-				elseif variant_17 == 28 then
+				elseif variant_24 == 28 then
 					value["Slot1"] = "TwinSunflower"
-				elseif variant_17 == 29 then
+				elseif variant_24 == 29 then
 					value["Slot1"] = "MelonPult"
-				elseif variant_17 == 30 then
+				elseif variant_24 == 30 then
 					value["Slot1"] = "GatlingPea"
-				elseif variant_17 == 31 then
+				elseif variant_24 == 31 then
 					value["Slot1"] = "GloomShroom"
-				elseif variant_17 == 32 then
+				elseif variant_24 == 32 then
 					value["Slot1"] = "Cattail"
-				elseif variant_17 == 33 then
+				elseif variant_24 == 33 then
 					value["Slot1"] = "WinterMelon"
-				elseif variant_17 == 34 then
+				elseif variant_24 == 34 then
 					value["Slot1"] = "IceShroom"
-				elseif variant_17 == 35 then
+				elseif variant_24 == 35 then
 					value["Slot1"] = "DoomShroom"
-				elseif variant_17 == 36 then
+				elseif variant_24 == 36 then
 					value["Slot1"] = "CobCannon"
-				elseif variant_17 == 37 then
+				elseif variant_24 == 37 then
 					value["Slot1"] = "Marigold"
-				elseif variant_17 == 38 then
+				elseif variant_24 == 38 then
 					value["Slot1"] = "GoldMagnet"
-				elseif variant_17 == 39 then
+				elseif variant_24 == 39 then
 					value["Slot1"] = "Imitater"
-				elseif variant_17 == 40 then
+				elseif variant_24 == 40 then
 					value["Slot1"] = "LilyPad"
-				elseif variant_17 == 41 then
+				elseif variant_24 == 41 then
 					value["Slot1"] = "FlowerPot"
-				elseif variant_17 == 42 then
+				elseif variant_24 == 42 then
 					value["Slot1"] = "TangleKelp"
-				elseif variant_17 == 43 then
+				elseif variant_24 == 43 then
 					value["Slot1"] = "GraveBuster"
-				elseif variant_17 == 44 then
+				elseif variant_24 == 44 then
 					value["Slot1"] = "Plantern"
-				elseif variant_17 == 45 then
+				elseif variant_24 == 45 then
 					value["Slot1"] = "UmbrellaLeaf"
-				elseif variant_17 == 46 then
+				elseif variant_24 == 46 then
 					value["Slot1"] = "CoffeeBean"
-				elseif variant_17 == 47 then
+				elseif variant_24 == 47 then
 					value["Slot1"] = "ExplodeONut"
 				end
 			else
 				value["Slot1"] = nil
 			end
-			if bit32.btest(bool_18, 0b0000000000000010) then
-				local variant_18 = buffer.readu8(incoming_buff, read(1))
-				if variant_18 == 0 then
+			if bit32.btest(bool_20, 0b0000000000000010) then
+				local variant_25 = buffer.readu8(incoming_buff, read(1))
+				if variant_25 == 0 then
 					value["Slot2"] = "Sunflower"
-				elseif variant_18 == 1 then
+				elseif variant_25 == 1 then
 					value["Slot2"] = "Peashooter"
-				elseif variant_18 == 2 then
+				elseif variant_25 == 2 then
 					value["Slot2"] = "WallNut"
-				elseif variant_18 == 3 then
+				elseif variant_25 == 3 then
 					value["Slot2"] = "PotatoMine"
-				elseif variant_18 == 4 then
+				elseif variant_25 == 4 then
 					value["Slot2"] = "PuffShroom"
-				elseif variant_18 == 5 then
+				elseif variant_25 == 5 then
 					value["Slot2"] = "SunShroom"
-				elseif variant_18 == 6 then
+				elseif variant_25 == 6 then
 					value["Slot2"] = "Chomper"
-				elseif variant_18 == 7 then
+				elseif variant_25 == 7 then
 					value["Slot2"] = "SnowPea"
-				elseif variant_18 == 8 then
+				elseif variant_25 == 8 then
 					value["Slot2"] = "Repeater"
-				elseif variant_18 == 9 then
+				elseif variant_25 == 9 then
 					value["Slot2"] = "FumeShroom"
-				elseif variant_18 == 10 then
+				elseif variant_25 == 10 then
 					value["Slot2"] = "Squash"
-				elseif variant_18 == 11 then
+				elseif variant_25 == 11 then
 					value["Slot2"] = "Garlic"
-				elseif variant_18 == 12 then
+				elseif variant_25 == 12 then
 					value["Slot2"] = "CherryBomb"
-				elseif variant_18 == 13 then
+				elseif variant_25 == 13 then
 					value["Slot2"] = "TallNut"
-				elseif variant_18 == 14 then
+				elseif variant_25 == 14 then
 					value["Slot2"] = "Threepeater"
-				elseif variant_18 == 15 then
+				elseif variant_25 == 15 then
 					value["Slot2"] = "Jalapeno"
-				elseif variant_18 == 16 then
+				elseif variant_25 == 16 then
 					value["Slot2"] = "Spikeweed"
-				elseif variant_18 == 17 then
+				elseif variant_25 == 17 then
 					value["Slot2"] = "Torchwood"
-				elseif variant_18 == 18 then
+				elseif variant_25 == 18 then
 					value["Slot2"] = "CabbagePult"
-				elseif variant_18 == 19 then
+				elseif variant_25 == 19 then
 					value["Slot2"] = "Pumpkin"
-				elseif variant_18 == 20 then
+				elseif variant_25 == 20 then
 					value["Slot2"] = "ScaredyShroom"
-				elseif variant_18 == 21 then
+				elseif variant_25 == 21 then
 					value["Slot2"] = "HypnoShroom"
-				elseif variant_18 == 22 then
+				elseif variant_25 == 22 then
 					value["Slot2"] = "SplitPea"
-				elseif variant_18 == 23 then
+				elseif variant_25 == 23 then
 					value["Slot2"] = "KernelPult"
-				elseif variant_18 == 24 then
+				elseif variant_25 == 24 then
 					value["Slot2"] = "Starfruit"
-				elseif variant_18 == 25 then
+				elseif variant_25 == 25 then
 					value["Slot2"] = "Cactus"
-				elseif variant_18 == 26 then
+				elseif variant_25 == 26 then
 					value["Slot2"] = "Blover"
-				elseif variant_18 == 27 then
+				elseif variant_25 == 27 then
 					value["Slot2"] = "SeaShroom"
-				elseif variant_18 == 28 then
+				elseif variant_25 == 28 then
 					value["Slot2"] = "TwinSunflower"
-				elseif variant_18 == 29 then
+				elseif variant_25 == 29 then
 					value["Slot2"] = "MelonPult"
-				elseif variant_18 == 30 then
+				elseif variant_25 == 30 then
 					value["Slot2"] = "GatlingPea"
-				elseif variant_18 == 31 then
+				elseif variant_25 == 31 then
 					value["Slot2"] = "GloomShroom"
-				elseif variant_18 == 32 then
+				elseif variant_25 == 32 then
 					value["Slot2"] = "Cattail"
-				elseif variant_18 == 33 then
+				elseif variant_25 == 33 then
 					value["Slot2"] = "WinterMelon"
-				elseif variant_18 == 34 then
+				elseif variant_25 == 34 then
 					value["Slot2"] = "IceShroom"
-				elseif variant_18 == 35 then
+				elseif variant_25 == 35 then
 					value["Slot2"] = "DoomShroom"
-				elseif variant_18 == 36 then
+				elseif variant_25 == 36 then
 					value["Slot2"] = "CobCannon"
-				elseif variant_18 == 37 then
+				elseif variant_25 == 37 then
 					value["Slot2"] = "Marigold"
-				elseif variant_18 == 38 then
+				elseif variant_25 == 38 then
 					value["Slot2"] = "GoldMagnet"
-				elseif variant_18 == 39 then
+				elseif variant_25 == 39 then
 					value["Slot2"] = "Imitater"
-				elseif variant_18 == 40 then
+				elseif variant_25 == 40 then
 					value["Slot2"] = "LilyPad"
-				elseif variant_18 == 41 then
+				elseif variant_25 == 41 then
 					value["Slot2"] = "FlowerPot"
-				elseif variant_18 == 42 then
+				elseif variant_25 == 42 then
 					value["Slot2"] = "TangleKelp"
-				elseif variant_18 == 43 then
+				elseif variant_25 == 43 then
 					value["Slot2"] = "GraveBuster"
-				elseif variant_18 == 44 then
+				elseif variant_25 == 44 then
 					value["Slot2"] = "Plantern"
-				elseif variant_18 == 45 then
+				elseif variant_25 == 45 then
 					value["Slot2"] = "UmbrellaLeaf"
-				elseif variant_18 == 46 then
+				elseif variant_25 == 46 then
 					value["Slot2"] = "CoffeeBean"
-				elseif variant_18 == 47 then
+				elseif variant_25 == 47 then
 					value["Slot2"] = "ExplodeONut"
 				end
 			else
 				value["Slot2"] = nil
 			end
-			if bit32.btest(bool_18, 0b0000000000000100) then
-				local variant_19 = buffer.readu8(incoming_buff, read(1))
-				if variant_19 == 0 then
+			if bit32.btest(bool_20, 0b0000000000000100) then
+				local variant_26 = buffer.readu8(incoming_buff, read(1))
+				if variant_26 == 0 then
 					value["Slot3"] = "Sunflower"
-				elseif variant_19 == 1 then
+				elseif variant_26 == 1 then
 					value["Slot3"] = "Peashooter"
-				elseif variant_19 == 2 then
+				elseif variant_26 == 2 then
 					value["Slot3"] = "WallNut"
-				elseif variant_19 == 3 then
+				elseif variant_26 == 3 then
 					value["Slot3"] = "PotatoMine"
-				elseif variant_19 == 4 then
+				elseif variant_26 == 4 then
 					value["Slot3"] = "PuffShroom"
-				elseif variant_19 == 5 then
+				elseif variant_26 == 5 then
 					value["Slot3"] = "SunShroom"
-				elseif variant_19 == 6 then
+				elseif variant_26 == 6 then
 					value["Slot3"] = "Chomper"
-				elseif variant_19 == 7 then
+				elseif variant_26 == 7 then
 					value["Slot3"] = "SnowPea"
-				elseif variant_19 == 8 then
+				elseif variant_26 == 8 then
 					value["Slot3"] = "Repeater"
-				elseif variant_19 == 9 then
+				elseif variant_26 == 9 then
 					value["Slot3"] = "FumeShroom"
-				elseif variant_19 == 10 then
+				elseif variant_26 == 10 then
 					value["Slot3"] = "Squash"
-				elseif variant_19 == 11 then
+				elseif variant_26 == 11 then
 					value["Slot3"] = "Garlic"
-				elseif variant_19 == 12 then
+				elseif variant_26 == 12 then
 					value["Slot3"] = "CherryBomb"
-				elseif variant_19 == 13 then
+				elseif variant_26 == 13 then
 					value["Slot3"] = "TallNut"
-				elseif variant_19 == 14 then
+				elseif variant_26 == 14 then
 					value["Slot3"] = "Threepeater"
-				elseif variant_19 == 15 then
+				elseif variant_26 == 15 then
 					value["Slot3"] = "Jalapeno"
-				elseif variant_19 == 16 then
+				elseif variant_26 == 16 then
 					value["Slot3"] = "Spikeweed"
-				elseif variant_19 == 17 then
+				elseif variant_26 == 17 then
 					value["Slot3"] = "Torchwood"
-				elseif variant_19 == 18 then
+				elseif variant_26 == 18 then
 					value["Slot3"] = "CabbagePult"
-				elseif variant_19 == 19 then
+				elseif variant_26 == 19 then
 					value["Slot3"] = "Pumpkin"
-				elseif variant_19 == 20 then
+				elseif variant_26 == 20 then
 					value["Slot3"] = "ScaredyShroom"
-				elseif variant_19 == 21 then
+				elseif variant_26 == 21 then
 					value["Slot3"] = "HypnoShroom"
-				elseif variant_19 == 22 then
+				elseif variant_26 == 22 then
 					value["Slot3"] = "SplitPea"
-				elseif variant_19 == 23 then
+				elseif variant_26 == 23 then
 					value["Slot3"] = "KernelPult"
-				elseif variant_19 == 24 then
+				elseif variant_26 == 24 then
 					value["Slot3"] = "Starfruit"
-				elseif variant_19 == 25 then
+				elseif variant_26 == 25 then
 					value["Slot3"] = "Cactus"
-				elseif variant_19 == 26 then
+				elseif variant_26 == 26 then
 					value["Slot3"] = "Blover"
-				elseif variant_19 == 27 then
+				elseif variant_26 == 27 then
 					value["Slot3"] = "SeaShroom"
-				elseif variant_19 == 28 then
+				elseif variant_26 == 28 then
 					value["Slot3"] = "TwinSunflower"
-				elseif variant_19 == 29 then
+				elseif variant_26 == 29 then
 					value["Slot3"] = "MelonPult"
-				elseif variant_19 == 30 then
+				elseif variant_26 == 30 then
 					value["Slot3"] = "GatlingPea"
-				elseif variant_19 == 31 then
+				elseif variant_26 == 31 then
 					value["Slot3"] = "GloomShroom"
-				elseif variant_19 == 32 then
+				elseif variant_26 == 32 then
 					value["Slot3"] = "Cattail"
-				elseif variant_19 == 33 then
+				elseif variant_26 == 33 then
 					value["Slot3"] = "WinterMelon"
-				elseif variant_19 == 34 then
+				elseif variant_26 == 34 then
 					value["Slot3"] = "IceShroom"
-				elseif variant_19 == 35 then
+				elseif variant_26 == 35 then
 					value["Slot3"] = "DoomShroom"
-				elseif variant_19 == 36 then
+				elseif variant_26 == 36 then
 					value["Slot3"] = "CobCannon"
-				elseif variant_19 == 37 then
+				elseif variant_26 == 37 then
 					value["Slot3"] = "Marigold"
-				elseif variant_19 == 38 then
+				elseif variant_26 == 38 then
 					value["Slot3"] = "GoldMagnet"
-				elseif variant_19 == 39 then
+				elseif variant_26 == 39 then
 					value["Slot3"] = "Imitater"
-				elseif variant_19 == 40 then
+				elseif variant_26 == 40 then
 					value["Slot3"] = "LilyPad"
-				elseif variant_19 == 41 then
+				elseif variant_26 == 41 then
 					value["Slot3"] = "FlowerPot"
-				elseif variant_19 == 42 then
+				elseif variant_26 == 42 then
 					value["Slot3"] = "TangleKelp"
-				elseif variant_19 == 43 then
+				elseif variant_26 == 43 then
 					value["Slot3"] = "GraveBuster"
-				elseif variant_19 == 44 then
+				elseif variant_26 == 44 then
 					value["Slot3"] = "Plantern"
-				elseif variant_19 == 45 then
+				elseif variant_26 == 45 then
 					value["Slot3"] = "UmbrellaLeaf"
-				elseif variant_19 == 46 then
+				elseif variant_26 == 46 then
 					value["Slot3"] = "CoffeeBean"
-				elseif variant_19 == 47 then
+				elseif variant_26 == 47 then
 					value["Slot3"] = "ExplodeONut"
 				end
 			else
 				value["Slot3"] = nil
 			end
-			if bit32.btest(bool_18, 0b0000000000001000) then
-				local variant_20 = buffer.readu8(incoming_buff, read(1))
-				if variant_20 == 0 then
+			if bit32.btest(bool_20, 0b0000000000001000) then
+				local variant_27 = buffer.readu8(incoming_buff, read(1))
+				if variant_27 == 0 then
 					value["Slot4"] = "Sunflower"
-				elseif variant_20 == 1 then
+				elseif variant_27 == 1 then
 					value["Slot4"] = "Peashooter"
-				elseif variant_20 == 2 then
+				elseif variant_27 == 2 then
 					value["Slot4"] = "WallNut"
-				elseif variant_20 == 3 then
+				elseif variant_27 == 3 then
 					value["Slot4"] = "PotatoMine"
-				elseif variant_20 == 4 then
+				elseif variant_27 == 4 then
 					value["Slot4"] = "PuffShroom"
-				elseif variant_20 == 5 then
+				elseif variant_27 == 5 then
 					value["Slot4"] = "SunShroom"
-				elseif variant_20 == 6 then
+				elseif variant_27 == 6 then
 					value["Slot4"] = "Chomper"
-				elseif variant_20 == 7 then
+				elseif variant_27 == 7 then
 					value["Slot4"] = "SnowPea"
-				elseif variant_20 == 8 then
+				elseif variant_27 == 8 then
 					value["Slot4"] = "Repeater"
-				elseif variant_20 == 9 then
+				elseif variant_27 == 9 then
 					value["Slot4"] = "FumeShroom"
-				elseif variant_20 == 10 then
+				elseif variant_27 == 10 then
 					value["Slot4"] = "Squash"
-				elseif variant_20 == 11 then
+				elseif variant_27 == 11 then
 					value["Slot4"] = "Garlic"
-				elseif variant_20 == 12 then
+				elseif variant_27 == 12 then
 					value["Slot4"] = "CherryBomb"
-				elseif variant_20 == 13 then
+				elseif variant_27 == 13 then
 					value["Slot4"] = "TallNut"
-				elseif variant_20 == 14 then
+				elseif variant_27 == 14 then
 					value["Slot4"] = "Threepeater"
-				elseif variant_20 == 15 then
+				elseif variant_27 == 15 then
 					value["Slot4"] = "Jalapeno"
-				elseif variant_20 == 16 then
+				elseif variant_27 == 16 then
 					value["Slot4"] = "Spikeweed"
-				elseif variant_20 == 17 then
+				elseif variant_27 == 17 then
 					value["Slot4"] = "Torchwood"
-				elseif variant_20 == 18 then
+				elseif variant_27 == 18 then
 					value["Slot4"] = "CabbagePult"
-				elseif variant_20 == 19 then
+				elseif variant_27 == 19 then
 					value["Slot4"] = "Pumpkin"
-				elseif variant_20 == 20 then
+				elseif variant_27 == 20 then
 					value["Slot4"] = "ScaredyShroom"
-				elseif variant_20 == 21 then
+				elseif variant_27 == 21 then
 					value["Slot4"] = "HypnoShroom"
-				elseif variant_20 == 22 then
+				elseif variant_27 == 22 then
 					value["Slot4"] = "SplitPea"
-				elseif variant_20 == 23 then
+				elseif variant_27 == 23 then
 					value["Slot4"] = "KernelPult"
-				elseif variant_20 == 24 then
+				elseif variant_27 == 24 then
 					value["Slot4"] = "Starfruit"
-				elseif variant_20 == 25 then
+				elseif variant_27 == 25 then
 					value["Slot4"] = "Cactus"
-				elseif variant_20 == 26 then
+				elseif variant_27 == 26 then
 					value["Slot4"] = "Blover"
-				elseif variant_20 == 27 then
+				elseif variant_27 == 27 then
 					value["Slot4"] = "SeaShroom"
-				elseif variant_20 == 28 then
+				elseif variant_27 == 28 then
 					value["Slot4"] = "TwinSunflower"
-				elseif variant_20 == 29 then
+				elseif variant_27 == 29 then
 					value["Slot4"] = "MelonPult"
-				elseif variant_20 == 30 then
+				elseif variant_27 == 30 then
 					value["Slot4"] = "GatlingPea"
-				elseif variant_20 == 31 then
+				elseif variant_27 == 31 then
 					value["Slot4"] = "GloomShroom"
-				elseif variant_20 == 32 then
+				elseif variant_27 == 32 then
 					value["Slot4"] = "Cattail"
-				elseif variant_20 == 33 then
+				elseif variant_27 == 33 then
 					value["Slot4"] = "WinterMelon"
-				elseif variant_20 == 34 then
+				elseif variant_27 == 34 then
 					value["Slot4"] = "IceShroom"
-				elseif variant_20 == 35 then
+				elseif variant_27 == 35 then
 					value["Slot4"] = "DoomShroom"
-				elseif variant_20 == 36 then
+				elseif variant_27 == 36 then
 					value["Slot4"] = "CobCannon"
-				elseif variant_20 == 37 then
+				elseif variant_27 == 37 then
 					value["Slot4"] = "Marigold"
-				elseif variant_20 == 38 then
+				elseif variant_27 == 38 then
 					value["Slot4"] = "GoldMagnet"
-				elseif variant_20 == 39 then
+				elseif variant_27 == 39 then
 					value["Slot4"] = "Imitater"
-				elseif variant_20 == 40 then
+				elseif variant_27 == 40 then
 					value["Slot4"] = "LilyPad"
-				elseif variant_20 == 41 then
+				elseif variant_27 == 41 then
 					value["Slot4"] = "FlowerPot"
-				elseif variant_20 == 42 then
+				elseif variant_27 == 42 then
 					value["Slot4"] = "TangleKelp"
-				elseif variant_20 == 43 then
+				elseif variant_27 == 43 then
 					value["Slot4"] = "GraveBuster"
-				elseif variant_20 == 44 then
+				elseif variant_27 == 44 then
 					value["Slot4"] = "Plantern"
-				elseif variant_20 == 45 then
+				elseif variant_27 == 45 then
 					value["Slot4"] = "UmbrellaLeaf"
-				elseif variant_20 == 46 then
+				elseif variant_27 == 46 then
 					value["Slot4"] = "CoffeeBean"
-				elseif variant_20 == 47 then
+				elseif variant_27 == 47 then
 					value["Slot4"] = "ExplodeONut"
 				end
 			else
 				value["Slot4"] = nil
 			end
-			if bit32.btest(bool_18, 0b0000000000010000) then
-				local variant_21 = buffer.readu8(incoming_buff, read(1))
-				if variant_21 == 0 then
+			if bit32.btest(bool_20, 0b0000000000010000) then
+				local variant_28 = buffer.readu8(incoming_buff, read(1))
+				if variant_28 == 0 then
 					value["Slot5"] = "Sunflower"
-				elseif variant_21 == 1 then
+				elseif variant_28 == 1 then
 					value["Slot5"] = "Peashooter"
-				elseif variant_21 == 2 then
+				elseif variant_28 == 2 then
 					value["Slot5"] = "WallNut"
-				elseif variant_21 == 3 then
+				elseif variant_28 == 3 then
 					value["Slot5"] = "PotatoMine"
-				elseif variant_21 == 4 then
+				elseif variant_28 == 4 then
 					value["Slot5"] = "PuffShroom"
-				elseif variant_21 == 5 then
+				elseif variant_28 == 5 then
 					value["Slot5"] = "SunShroom"
-				elseif variant_21 == 6 then
+				elseif variant_28 == 6 then
 					value["Slot5"] = "Chomper"
-				elseif variant_21 == 7 then
+				elseif variant_28 == 7 then
 					value["Slot5"] = "SnowPea"
-				elseif variant_21 == 8 then
+				elseif variant_28 == 8 then
 					value["Slot5"] = "Repeater"
-				elseif variant_21 == 9 then
+				elseif variant_28 == 9 then
 					value["Slot5"] = "FumeShroom"
-				elseif variant_21 == 10 then
+				elseif variant_28 == 10 then
 					value["Slot5"] = "Squash"
-				elseif variant_21 == 11 then
+				elseif variant_28 == 11 then
 					value["Slot5"] = "Garlic"
-				elseif variant_21 == 12 then
+				elseif variant_28 == 12 then
 					value["Slot5"] = "CherryBomb"
-				elseif variant_21 == 13 then
+				elseif variant_28 == 13 then
 					value["Slot5"] = "TallNut"
-				elseif variant_21 == 14 then
+				elseif variant_28 == 14 then
 					value["Slot5"] = "Threepeater"
-				elseif variant_21 == 15 then
+				elseif variant_28 == 15 then
 					value["Slot5"] = "Jalapeno"
-				elseif variant_21 == 16 then
+				elseif variant_28 == 16 then
 					value["Slot5"] = "Spikeweed"
-				elseif variant_21 == 17 then
+				elseif variant_28 == 17 then
 					value["Slot5"] = "Torchwood"
-				elseif variant_21 == 18 then
+				elseif variant_28 == 18 then
 					value["Slot5"] = "CabbagePult"
-				elseif variant_21 == 19 then
+				elseif variant_28 == 19 then
 					value["Slot5"] = "Pumpkin"
-				elseif variant_21 == 20 then
+				elseif variant_28 == 20 then
 					value["Slot5"] = "ScaredyShroom"
-				elseif variant_21 == 21 then
+				elseif variant_28 == 21 then
 					value["Slot5"] = "HypnoShroom"
-				elseif variant_21 == 22 then
+				elseif variant_28 == 22 then
 					value["Slot5"] = "SplitPea"
-				elseif variant_21 == 23 then
+				elseif variant_28 == 23 then
 					value["Slot5"] = "KernelPult"
-				elseif variant_21 == 24 then
+				elseif variant_28 == 24 then
 					value["Slot5"] = "Starfruit"
-				elseif variant_21 == 25 then
+				elseif variant_28 == 25 then
 					value["Slot5"] = "Cactus"
-				elseif variant_21 == 26 then
+				elseif variant_28 == 26 then
 					value["Slot5"] = "Blover"
-				elseif variant_21 == 27 then
+				elseif variant_28 == 27 then
 					value["Slot5"] = "SeaShroom"
-				elseif variant_21 == 28 then
+				elseif variant_28 == 28 then
 					value["Slot5"] = "TwinSunflower"
-				elseif variant_21 == 29 then
+				elseif variant_28 == 29 then
 					value["Slot5"] = "MelonPult"
-				elseif variant_21 == 30 then
+				elseif variant_28 == 30 then
 					value["Slot5"] = "GatlingPea"
-				elseif variant_21 == 31 then
+				elseif variant_28 == 31 then
 					value["Slot5"] = "GloomShroom"
-				elseif variant_21 == 32 then
+				elseif variant_28 == 32 then
 					value["Slot5"] = "Cattail"
-				elseif variant_21 == 33 then
+				elseif variant_28 == 33 then
 					value["Slot5"] = "WinterMelon"
-				elseif variant_21 == 34 then
+				elseif variant_28 == 34 then
 					value["Slot5"] = "IceShroom"
-				elseif variant_21 == 35 then
+				elseif variant_28 == 35 then
 					value["Slot5"] = "DoomShroom"
-				elseif variant_21 == 36 then
+				elseif variant_28 == 36 then
 					value["Slot5"] = "CobCannon"
-				elseif variant_21 == 37 then
+				elseif variant_28 == 37 then
 					value["Slot5"] = "Marigold"
-				elseif variant_21 == 38 then
+				elseif variant_28 == 38 then
 					value["Slot5"] = "GoldMagnet"
-				elseif variant_21 == 39 then
+				elseif variant_28 == 39 then
 					value["Slot5"] = "Imitater"
-				elseif variant_21 == 40 then
+				elseif variant_28 == 40 then
 					value["Slot5"] = "LilyPad"
-				elseif variant_21 == 41 then
+				elseif variant_28 == 41 then
 					value["Slot5"] = "FlowerPot"
-				elseif variant_21 == 42 then
+				elseif variant_28 == 42 then
 					value["Slot5"] = "TangleKelp"
-				elseif variant_21 == 43 then
+				elseif variant_28 == 43 then
 					value["Slot5"] = "GraveBuster"
-				elseif variant_21 == 44 then
+				elseif variant_28 == 44 then
 					value["Slot5"] = "Plantern"
-				elseif variant_21 == 45 then
+				elseif variant_28 == 45 then
 					value["Slot5"] = "UmbrellaLeaf"
-				elseif variant_21 == 46 then
+				elseif variant_28 == 46 then
 					value["Slot5"] = "CoffeeBean"
-				elseif variant_21 == 47 then
+				elseif variant_28 == 47 then
 					value["Slot5"] = "ExplodeONut"
 				end
 			else
 				value["Slot5"] = nil
 			end
-			if bit32.btest(bool_18, 0b0000000000100000) then
-				local variant_22 = buffer.readu8(incoming_buff, read(1))
-				if variant_22 == 0 then
+			if bit32.btest(bool_20, 0b0000000000100000) then
+				local variant_29 = buffer.readu8(incoming_buff, read(1))
+				if variant_29 == 0 then
 					value["Slot6"] = "Sunflower"
-				elseif variant_22 == 1 then
+				elseif variant_29 == 1 then
 					value["Slot6"] = "Peashooter"
-				elseif variant_22 == 2 then
+				elseif variant_29 == 2 then
 					value["Slot6"] = "WallNut"
-				elseif variant_22 == 3 then
+				elseif variant_29 == 3 then
 					value["Slot6"] = "PotatoMine"
-				elseif variant_22 == 4 then
+				elseif variant_29 == 4 then
 					value["Slot6"] = "PuffShroom"
-				elseif variant_22 == 5 then
+				elseif variant_29 == 5 then
 					value["Slot6"] = "SunShroom"
-				elseif variant_22 == 6 then
+				elseif variant_29 == 6 then
 					value["Slot6"] = "Chomper"
-				elseif variant_22 == 7 then
+				elseif variant_29 == 7 then
 					value["Slot6"] = "SnowPea"
-				elseif variant_22 == 8 then
+				elseif variant_29 == 8 then
 					value["Slot6"] = "Repeater"
-				elseif variant_22 == 9 then
+				elseif variant_29 == 9 then
 					value["Slot6"] = "FumeShroom"
-				elseif variant_22 == 10 then
+				elseif variant_29 == 10 then
 					value["Slot6"] = "Squash"
-				elseif variant_22 == 11 then
+				elseif variant_29 == 11 then
 					value["Slot6"] = "Garlic"
-				elseif variant_22 == 12 then
+				elseif variant_29 == 12 then
 					value["Slot6"] = "CherryBomb"
-				elseif variant_22 == 13 then
+				elseif variant_29 == 13 then
 					value["Slot6"] = "TallNut"
-				elseif variant_22 == 14 then
+				elseif variant_29 == 14 then
 					value["Slot6"] = "Threepeater"
-				elseif variant_22 == 15 then
+				elseif variant_29 == 15 then
 					value["Slot6"] = "Jalapeno"
-				elseif variant_22 == 16 then
+				elseif variant_29 == 16 then
 					value["Slot6"] = "Spikeweed"
-				elseif variant_22 == 17 then
+				elseif variant_29 == 17 then
 					value["Slot6"] = "Torchwood"
-				elseif variant_22 == 18 then
+				elseif variant_29 == 18 then
 					value["Slot6"] = "CabbagePult"
-				elseif variant_22 == 19 then
+				elseif variant_29 == 19 then
 					value["Slot6"] = "Pumpkin"
-				elseif variant_22 == 20 then
+				elseif variant_29 == 20 then
 					value["Slot6"] = "ScaredyShroom"
-				elseif variant_22 == 21 then
+				elseif variant_29 == 21 then
 					value["Slot6"] = "HypnoShroom"
-				elseif variant_22 == 22 then
+				elseif variant_29 == 22 then
 					value["Slot6"] = "SplitPea"
-				elseif variant_22 == 23 then
+				elseif variant_29 == 23 then
 					value["Slot6"] = "KernelPult"
-				elseif variant_22 == 24 then
+				elseif variant_29 == 24 then
 					value["Slot6"] = "Starfruit"
-				elseif variant_22 == 25 then
+				elseif variant_29 == 25 then
 					value["Slot6"] = "Cactus"
-				elseif variant_22 == 26 then
+				elseif variant_29 == 26 then
 					value["Slot6"] = "Blover"
-				elseif variant_22 == 27 then
+				elseif variant_29 == 27 then
 					value["Slot6"] = "SeaShroom"
-				elseif variant_22 == 28 then
+				elseif variant_29 == 28 then
 					value["Slot6"] = "TwinSunflower"
-				elseif variant_22 == 29 then
+				elseif variant_29 == 29 then
 					value["Slot6"] = "MelonPult"
-				elseif variant_22 == 30 then
+				elseif variant_29 == 30 then
 					value["Slot6"] = "GatlingPea"
-				elseif variant_22 == 31 then
+				elseif variant_29 == 31 then
 					value["Slot6"] = "GloomShroom"
-				elseif variant_22 == 32 then
+				elseif variant_29 == 32 then
 					value["Slot6"] = "Cattail"
-				elseif variant_22 == 33 then
+				elseif variant_29 == 33 then
 					value["Slot6"] = "WinterMelon"
-				elseif variant_22 == 34 then
+				elseif variant_29 == 34 then
 					value["Slot6"] = "IceShroom"
-				elseif variant_22 == 35 then
+				elseif variant_29 == 35 then
 					value["Slot6"] = "DoomShroom"
-				elseif variant_22 == 36 then
+				elseif variant_29 == 36 then
 					value["Slot6"] = "CobCannon"
-				elseif variant_22 == 37 then
+				elseif variant_29 == 37 then
 					value["Slot6"] = "Marigold"
-				elseif variant_22 == 38 then
+				elseif variant_29 == 38 then
 					value["Slot6"] = "GoldMagnet"
-				elseif variant_22 == 39 then
+				elseif variant_29 == 39 then
 					value["Slot6"] = "Imitater"
-				elseif variant_22 == 40 then
+				elseif variant_29 == 40 then
 					value["Slot6"] = "LilyPad"
-				elseif variant_22 == 41 then
+				elseif variant_29 == 41 then
 					value["Slot6"] = "FlowerPot"
-				elseif variant_22 == 42 then
+				elseif variant_29 == 42 then
 					value["Slot6"] = "TangleKelp"
-				elseif variant_22 == 43 then
+				elseif variant_29 == 43 then
 					value["Slot6"] = "GraveBuster"
-				elseif variant_22 == 44 then
+				elseif variant_29 == 44 then
 					value["Slot6"] = "Plantern"
-				elseif variant_22 == 45 then
+				elseif variant_29 == 45 then
 					value["Slot6"] = "UmbrellaLeaf"
-				elseif variant_22 == 46 then
+				elseif variant_29 == 46 then
 					value["Slot6"] = "CoffeeBean"
-				elseif variant_22 == 47 then
+				elseif variant_29 == 47 then
 					value["Slot6"] = "ExplodeONut"
 				end
 			else
@@ -3328,12 +3850,12 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 24 then -- DeckSaved
 			local value
-			local bool_19 = buffer.readu8(incoming_buff, read(1))
+			local bool_21 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
-			value["Success"] = bit32.btest(bool_19, 0b0000000000000001)
-			if bit32.btest(bool_19, 0b0000000000000010) then
-				local len_30 = buffer.readu16(incoming_buff, read(2))
-				value["Error"] = buffer.readstring(incoming_buff, read(len_30), len_30)
+			value["Success"] = bit32.btest(bool_21, 0b0000000000000001)
+			if bit32.btest(bool_21, 0b0000000000000010) then
+				local len_33 = buffer.readu16(incoming_buff, read(2))
+				value["Error"] = buffer.readstring(incoming_buff, read(len_33), len_33)
 				assert(utf8.len(value["Error"]) ~= nil, "value is not valid utf-8")
 			else
 				value["Error"] = nil
@@ -3349,111 +3871,111 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 		elseif id == 39 then -- DeckChanged
 			local value
 			value = {  }
-			local len_31 = buffer.readu8(incoming_buff, read(1)) + 1
-			assert(len_31 >= 1, "value is less than 1!")
-			assert(len_31 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_31)
-			for i_10 = 1, len_31 do
-				local val_10
-				local variant_23 = buffer.readu8(incoming_buff, read(1))
-				if variant_23 == 0 then
-					val_10 = "Sunflower"
-				elseif variant_23 == 1 then
-					val_10 = "Peashooter"
-				elseif variant_23 == 2 then
-					val_10 = "WallNut"
-				elseif variant_23 == 3 then
-					val_10 = "PotatoMine"
-				elseif variant_23 == 4 then
-					val_10 = "PuffShroom"
-				elseif variant_23 == 5 then
-					val_10 = "SunShroom"
-				elseif variant_23 == 6 then
-					val_10 = "Chomper"
-				elseif variant_23 == 7 then
-					val_10 = "SnowPea"
-				elseif variant_23 == 8 then
-					val_10 = "Repeater"
-				elseif variant_23 == 9 then
-					val_10 = "FumeShroom"
-				elseif variant_23 == 10 then
-					val_10 = "Squash"
-				elseif variant_23 == 11 then
-					val_10 = "Garlic"
-				elseif variant_23 == 12 then
-					val_10 = "CherryBomb"
-				elseif variant_23 == 13 then
-					val_10 = "TallNut"
-				elseif variant_23 == 14 then
-					val_10 = "Threepeater"
-				elseif variant_23 == 15 then
-					val_10 = "Jalapeno"
-				elseif variant_23 == 16 then
-					val_10 = "Spikeweed"
-				elseif variant_23 == 17 then
-					val_10 = "Torchwood"
-				elseif variant_23 == 18 then
-					val_10 = "CabbagePult"
-				elseif variant_23 == 19 then
-					val_10 = "Pumpkin"
-				elseif variant_23 == 20 then
-					val_10 = "ScaredyShroom"
-				elseif variant_23 == 21 then
-					val_10 = "HypnoShroom"
-				elseif variant_23 == 22 then
-					val_10 = "SplitPea"
-				elseif variant_23 == 23 then
-					val_10 = "KernelPult"
-				elseif variant_23 == 24 then
-					val_10 = "Starfruit"
-				elseif variant_23 == 25 then
-					val_10 = "Cactus"
-				elseif variant_23 == 26 then
-					val_10 = "Blover"
-				elseif variant_23 == 27 then
-					val_10 = "SeaShroom"
-				elseif variant_23 == 28 then
-					val_10 = "TwinSunflower"
-				elseif variant_23 == 29 then
-					val_10 = "MelonPult"
-				elseif variant_23 == 30 then
-					val_10 = "GatlingPea"
-				elseif variant_23 == 31 then
-					val_10 = "GloomShroom"
-				elseif variant_23 == 32 then
-					val_10 = "Cattail"
-				elseif variant_23 == 33 then
-					val_10 = "WinterMelon"
-				elseif variant_23 == 34 then
-					val_10 = "IceShroom"
-				elseif variant_23 == 35 then
-					val_10 = "DoomShroom"
-				elseif variant_23 == 36 then
-					val_10 = "CobCannon"
-				elseif variant_23 == 37 then
-					val_10 = "Marigold"
-				elseif variant_23 == 38 then
-					val_10 = "GoldMagnet"
-				elseif variant_23 == 39 then
-					val_10 = "Imitater"
-				elseif variant_23 == 40 then
-					val_10 = "LilyPad"
-				elseif variant_23 == 41 then
-					val_10 = "FlowerPot"
-				elseif variant_23 == 42 then
-					val_10 = "TangleKelp"
-				elseif variant_23 == 43 then
-					val_10 = "GraveBuster"
-				elseif variant_23 == 44 then
-					val_10 = "Plantern"
-				elseif variant_23 == 45 then
-					val_10 = "UmbrellaLeaf"
-				elseif variant_23 == 46 then
-					val_10 = "CoffeeBean"
-				elseif variant_23 == 47 then
-					val_10 = "ExplodeONut"
+			local len_34 = buffer.readu8(incoming_buff, read(1)) + 1
+			assert(len_34 >= 1, "value is less than 1!")
+			assert(len_34 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_34)
+			for i_13 = 1, len_34 do
+				local val_13
+				local variant_30 = buffer.readu8(incoming_buff, read(1))
+				if variant_30 == 0 then
+					val_13 = "Sunflower"
+				elseif variant_30 == 1 then
+					val_13 = "Peashooter"
+				elseif variant_30 == 2 then
+					val_13 = "WallNut"
+				elseif variant_30 == 3 then
+					val_13 = "PotatoMine"
+				elseif variant_30 == 4 then
+					val_13 = "PuffShroom"
+				elseif variant_30 == 5 then
+					val_13 = "SunShroom"
+				elseif variant_30 == 6 then
+					val_13 = "Chomper"
+				elseif variant_30 == 7 then
+					val_13 = "SnowPea"
+				elseif variant_30 == 8 then
+					val_13 = "Repeater"
+				elseif variant_30 == 9 then
+					val_13 = "FumeShroom"
+				elseif variant_30 == 10 then
+					val_13 = "Squash"
+				elseif variant_30 == 11 then
+					val_13 = "Garlic"
+				elseif variant_30 == 12 then
+					val_13 = "CherryBomb"
+				elseif variant_30 == 13 then
+					val_13 = "TallNut"
+				elseif variant_30 == 14 then
+					val_13 = "Threepeater"
+				elseif variant_30 == 15 then
+					val_13 = "Jalapeno"
+				elseif variant_30 == 16 then
+					val_13 = "Spikeweed"
+				elseif variant_30 == 17 then
+					val_13 = "Torchwood"
+				elseif variant_30 == 18 then
+					val_13 = "CabbagePult"
+				elseif variant_30 == 19 then
+					val_13 = "Pumpkin"
+				elseif variant_30 == 20 then
+					val_13 = "ScaredyShroom"
+				elseif variant_30 == 21 then
+					val_13 = "HypnoShroom"
+				elseif variant_30 == 22 then
+					val_13 = "SplitPea"
+				elseif variant_30 == 23 then
+					val_13 = "KernelPult"
+				elseif variant_30 == 24 then
+					val_13 = "Starfruit"
+				elseif variant_30 == 25 then
+					val_13 = "Cactus"
+				elseif variant_30 == 26 then
+					val_13 = "Blover"
+				elseif variant_30 == 27 then
+					val_13 = "SeaShroom"
+				elseif variant_30 == 28 then
+					val_13 = "TwinSunflower"
+				elseif variant_30 == 29 then
+					val_13 = "MelonPult"
+				elseif variant_30 == 30 then
+					val_13 = "GatlingPea"
+				elseif variant_30 == 31 then
+					val_13 = "GloomShroom"
+				elseif variant_30 == 32 then
+					val_13 = "Cattail"
+				elseif variant_30 == 33 then
+					val_13 = "WinterMelon"
+				elseif variant_30 == 34 then
+					val_13 = "IceShroom"
+				elseif variant_30 == 35 then
+					val_13 = "DoomShroom"
+				elseif variant_30 == 36 then
+					val_13 = "CobCannon"
+				elseif variant_30 == 37 then
+					val_13 = "Marigold"
+				elseif variant_30 == 38 then
+					val_13 = "GoldMagnet"
+				elseif variant_30 == 39 then
+					val_13 = "Imitater"
+				elseif variant_30 == 40 then
+					val_13 = "LilyPad"
+				elseif variant_30 == 41 then
+					val_13 = "FlowerPot"
+				elseif variant_30 == 42 then
+					val_13 = "TangleKelp"
+				elseif variant_30 == 43 then
+					val_13 = "GraveBuster"
+				elseif variant_30 == 44 then
+					val_13 = "Plantern"
+				elseif variant_30 == 45 then
+					val_13 = "UmbrellaLeaf"
+				elseif variant_30 == 46 then
+					val_13 = "CoffeeBean"
+				elseif variant_30 == 47 then
+					val_13 = "ExplodeONut"
 				end
-				value["Deck"][i_10] = val_10
+				value["Deck"][i_13] = val_13
 			end
 			if reliable_events[39][1] then
 				for _, cb in reliable_events[39] do
@@ -3467,16 +3989,16 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 			end
 		elseif id == 15 then -- CoinGained
 			local value
-			local bool_20 = buffer.readu8(incoming_buff, read(1))
+			local bool_22 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			value["Amount"] = buffer.readu16(incoming_buff, read(2))
 			value["TotalCoins"] = buffer.readu32(incoming_buff, read(4))
-			if bit32.btest(bool_20, 0b0000000000000001) then
+			if bit32.btest(bool_22, 0b0000000000000001) then
 				value["SourceX"] = buffer.readf32(incoming_buff, read(4))
 			else
 				value["SourceX"] = nil
 			end
-			if bit32.btest(bool_20, 0b0000000000000010) then
+			if bit32.btest(bool_22, 0b0000000000000010) then
 				value["SourceZ"] = buffer.readf32(incoming_buff, read(4))
 			else
 				value["SourceZ"] = nil
@@ -3519,21 +4041,21 @@ unreliable[4].OnClientEvent:Connect(function(buff, inst) -- ZombiePositionBatch
 	incoming_ipos = 0
 	local value
 	value = {  }
-	local len_32 = buffer.readu8(incoming_buff, read(1))
-	assert(len_32 <= 100, "value is more than 100!")
-	value["EntityIds"] = table.create(len_32)
-	for i_11 = 1, len_32 do
-		local val_11
-		val_11 = buffer.readu32(incoming_buff, read(4))
-		value["EntityIds"][i_11] = val_11
+	local len_35 = buffer.readu8(incoming_buff, read(1))
+	assert(len_35 <= 100, "value is more than 100!")
+	value["EntityIds"] = table.create(len_35)
+	for i_14 = 1, len_35 do
+		local val_14
+		val_14 = buffer.readu32(incoming_buff, read(4))
+		value["EntityIds"][i_14] = val_14
 	end
-	local len_33 = buffer.readu8(incoming_buff, read(1))
-	assert(len_33 <= 100, "value is more than 100!")
-	value["PositionsX"] = table.create(len_33)
-	for i_12 = 1, len_33 do
-		local val_12
-		val_12 = buffer.readf32(incoming_buff, read(4))
-		value["PositionsX"][i_12] = val_12
+	local len_36 = buffer.readu8(incoming_buff, read(1))
+	assert(len_36 <= 100, "value is more than 100!")
+	value["PositionsX"] = table.create(len_36)
+	for i_15 = 1, len_36 do
+		local val_15
+		val_15 = buffer.readf32(incoming_buff, read(4))
+		value["PositionsX"][i_15] = val_15
 	end
 	if unreliable_events[3][1] then
 		for _, cb in unreliable_events[3] do
@@ -3552,11 +4074,11 @@ unreliable[3].OnClientEvent:Connect(function(buff, inst) -- SunPositionUpdate
 	incoming_read = 0
 	incoming_ipos = 0
 	local value
-	local bool_21 = buffer.readu8(incoming_buff, read(1))
+	local bool_23 = buffer.readu8(incoming_buff, read(1))
 	value = {  }
 	value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 	value["PositionY"] = buffer.readf32(incoming_buff, read(4))
-	value["Falling"] = bit32.btest(bool_21, 0b0000000000000001)
+	value["Falling"] = bit32.btest(bool_23, 0b0000000000000001)
 	if unreliable_events[2][1] then
 		for _, cb in unreliable_events[2] do
 			task.spawn(cb, value)
@@ -3574,14 +4096,14 @@ unreliable[2].OnClientEvent:Connect(function(buff, inst) -- ProjectileSpawned
 	incoming_read = 0
 	incoming_ipos = 0
 	local value
-	local bool_22 = buffer.readu8(incoming_buff, read(1))
+	local bool_24 = buffer.readu8(incoming_buff, read(1))
 	value = {  }
 	value["EntityId"] = buffer.readu32(incoming_buff, read(4))
 	value["Lane"] = buffer.readu8(incoming_buff, read(1))
 	assert(value["Lane"] >= 1, "value is less than 1!")
 	assert(value["Lane"] <= 5, "value is more than 5!")
 	value["StartX"] = buffer.readf32(incoming_buff, read(4))
-	if bit32.btest(bool_22, 0b0000000000000001) then
+	if bit32.btest(bool_24, 0b0000000000000001) then
 		value["TargetEntityId"] = buffer.readu32(incoming_buff, read(4))
 	else
 		value["TargetEntityId"] = nil
@@ -3606,9 +4128,9 @@ unreliable[5].OnClientEvent:Connect(function(buff, inst) -- MapLoadingProgress
 	value = {  }
 	value["LoadedAssets"] = buffer.readu16(incoming_buff, read(2))
 	value["TotalAssets"] = buffer.readu16(incoming_buff, read(2))
-	local len_34 = buffer.readu16(incoming_buff, read(2))
-	assert(len_34 <= 256, "value is more than 256!")
-	value["AssetName"] = buffer.readstring(incoming_buff, read(len_34), len_34)
+	local len_37 = buffer.readu16(incoming_buff, read(2))
+	assert(len_37 <= 256, "value is more than 256!")
+	value["AssetName"] = buffer.readstring(incoming_buff, read(len_37), len_37)
 	assert(utf8.len(value["AssetName"]) ~= nil, "value is not valid utf-8")
 	if unreliable_events[4][1] then
 		for _, cb in unreliable_events[4] do
@@ -3884,6 +4406,235 @@ local returns = {
 			end
 		end,
 	},
+	UnequipMutationResponse = {
+		On = function(Callback: (Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["MutationType"]: ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty"),
+		})) -> ())
+			table.insert(reliable_events[46], Callback)
+			for _, value in reliable_event_queue[46] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[46] = {}
+			return function()
+				table.remove(reliable_events[46], table.find(reliable_events[46], Callback))
+			end
+		end,
+	},
+	UnequipMutationRequest = {
+		Fire = function(Value: ({
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["MutationType"]: ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty"),
+		}))
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["MutationType"] == "Fire" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["MutationType"] == "Inferno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["MutationType"] == "Ice" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["MutationType"] == "Frost" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["MutationType"] == "Electric" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["MutationType"] == "Tesla" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["MutationType"] == "Toxic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["MutationType"] == "Venomous" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["MutationType"] == "Shadow" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["MutationType"] == "Void" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["MutationType"] == "Solar" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["MutationType"] == "Radiant" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["MutationType"] == "Reinforced" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["MutationType"] == "Fortified" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["MutationType"] == "Primal" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["MutationType"] == "Savage" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["MutationType"] == "Swift" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["MutationType"] == "Hasty" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			else
+				error("Invalid enumerator")
+			end
+		end,
+	},
 	TeleportToArenaResponse = {
 		On = function(Callback: (Value: ({
 			["Success"]: (boolean),
@@ -3908,169 +4659,169 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-			local len_35 = #Value["WorldId"]
-			assert(len_35 <= 200, "value is more than 200!")
+			local len_38 = #Value["WorldId"]
+			assert(len_38 <= 200, "value is more than 200!")
 			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_35)
-			alloc(len_35)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_35)
-			local len_36 = #Value["Difficulty"]
-			assert(len_36 <= 80, "value is more than 80!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_38)
+			alloc(len_38)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_38)
+			local len_39 = #Value["Difficulty"]
+			assert(len_39 <= 80, "value is more than 80!")
 			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_36)
-			alloc(len_36)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_36)
-			local len_37 = #Value["Deck"]
-			assert(len_37 >= 1, "value is less than 1!")
-			assert(len_37 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_39)
+			alloc(len_39)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_39)
+			local len_40 = #Value["Deck"]
+			assert(len_40 >= 1, "value is less than 1!")
+			assert(len_40 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_37 - 1)
-			for i_13 = 1, len_37 do
-				local val_13 = Value["Deck"][i_13]
-				if val_13 == "Sunflower" then
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_40 - 1)
+			for i_16 = 1, len_40 do
+				local val_16 = Value["Deck"][i_16]
+				if val_16 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
-				elseif val_13 == "Peashooter" then
+				elseif val_16 == "Peashooter" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-				elseif val_13 == "WallNut" then
+				elseif val_16 == "WallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-				elseif val_13 == "PotatoMine" then
+				elseif val_16 == "PotatoMine" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-				elseif val_13 == "PuffShroom" then
+				elseif val_16 == "PuffShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-				elseif val_13 == "SunShroom" then
+				elseif val_16 == "SunShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-				elseif val_13 == "Chomper" then
+				elseif val_16 == "Chomper" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-				elseif val_13 == "SnowPea" then
+				elseif val_16 == "SnowPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
-				elseif val_13 == "Repeater" then
+				elseif val_16 == "Repeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-				elseif val_13 == "FumeShroom" then
+				elseif val_16 == "FumeShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
-				elseif val_13 == "Squash" then
+				elseif val_16 == "Squash" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
-				elseif val_13 == "Garlic" then
+				elseif val_16 == "Garlic" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
-				elseif val_13 == "CherryBomb" then
+				elseif val_16 == "CherryBomb" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-				elseif val_13 == "TallNut" then
+				elseif val_16 == "TallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-				elseif val_13 == "Threepeater" then
+				elseif val_16 == "Threepeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
-				elseif val_13 == "Jalapeno" then
+				elseif val_16 == "Jalapeno" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-				elseif val_13 == "Spikeweed" then
+				elseif val_16 == "Spikeweed" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-				elseif val_13 == "Torchwood" then
+				elseif val_16 == "Torchwood" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
-				elseif val_13 == "CabbagePult" then
+				elseif val_16 == "CabbagePult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
-				elseif val_13 == "Pumpkin" then
+				elseif val_16 == "Pumpkin" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
-				elseif val_13 == "ScaredyShroom" then
+				elseif val_16 == "ScaredyShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
-				elseif val_13 == "HypnoShroom" then
+				elseif val_16 == "HypnoShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
-				elseif val_13 == "SplitPea" then
+				elseif val_16 == "SplitPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-				elseif val_13 == "KernelPult" then
+				elseif val_16 == "KernelPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
-				elseif val_13 == "Starfruit" then
+				elseif val_16 == "Starfruit" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-				elseif val_13 == "Cactus" then
+				elseif val_16 == "Cactus" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-				elseif val_13 == "Blover" then
+				elseif val_16 == "Blover" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
-				elseif val_13 == "SeaShroom" then
+				elseif val_16 == "SeaShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
-				elseif val_13 == "TwinSunflower" then
+				elseif val_16 == "TwinSunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
-				elseif val_13 == "MelonPult" then
+				elseif val_16 == "MelonPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
-				elseif val_13 == "GatlingPea" then
+				elseif val_16 == "GatlingPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
-				elseif val_13 == "GloomShroom" then
+				elseif val_16 == "GloomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
-				elseif val_13 == "Cattail" then
+				elseif val_16 == "Cattail" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
-				elseif val_13 == "WinterMelon" then
+				elseif val_16 == "WinterMelon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
-				elseif val_13 == "IceShroom" then
+				elseif val_16 == "IceShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
-				elseif val_13 == "DoomShroom" then
+				elseif val_16 == "DoomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
-				elseif val_13 == "CobCannon" then
+				elseif val_16 == "CobCannon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
-				elseif val_13 == "Marigold" then
+				elseif val_16 == "Marigold" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
-				elseif val_13 == "GoldMagnet" then
+				elseif val_16 == "GoldMagnet" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
-				elseif val_13 == "Imitater" then
+				elseif val_16 == "Imitater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
-				elseif val_13 == "LilyPad" then
+				elseif val_16 == "LilyPad" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
-				elseif val_13 == "FlowerPot" then
+				elseif val_16 == "FlowerPot" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
-				elseif val_13 == "TangleKelp" then
+				elseif val_16 == "TangleKelp" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
-				elseif val_13 == "GraveBuster" then
+				elseif val_16 == "GraveBuster" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
-				elseif val_13 == "Plantern" then
+				elseif val_16 == "Plantern" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
-				elseif val_13 == "UmbrellaLeaf" then
+				elseif val_16 == "UmbrellaLeaf" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
-				elseif val_13 == "CoffeeBean" then
+				elseif val_16 == "CoffeeBean" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
-				elseif val_13 == "ExplodeONut" then
+				elseif val_16 == "ExplodeONut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
 				else
@@ -4127,32 +4878,37 @@ local returns = {
 	SyncPlantMutations = {
 		On = function(Callback: (Value: ({
 			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
-			["Mutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
+			["OwnedMutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
+			["EquippedMutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
 		})) -> ())
-			table.insert(reliable_events[45], Callback)
-			for _, value in reliable_event_queue[45] do
+			table.insert(reliable_events[47], Callback)
+			for _, value in reliable_event_queue[47] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[45] = {}
+			reliable_event_queue[47] = {}
 			return function()
-				table.remove(reliable_events[45], table.find(reliable_events[45], Callback))
+				table.remove(reliable_events[47], table.find(reliable_events[47], Callback))
 			end
 		end,
 	},
 	SyncAllMutations = {
 		On = function(Callback: (Value: ({
-			["PlantMutations"]: ({ ({
+			["OwnedMutations"]: ({ ({
+				["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+				["Mutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
+			}) }),
+			["EquippedMutations"]: ({ ({
 				["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
 				["Mutations"]: ({ ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty") }),
 			}) }),
 		})) -> ())
-			table.insert(reliable_events[46], Callback)
-			for _, value in reliable_event_queue[46] do
+			table.insert(reliable_events[48], Callback)
+			for _, value in reliable_event_queue[48] do
 				task.spawn(Callback, value)
 			end
-			reliable_event_queue[46] = {}
+			reliable_event_queue[48] = {}
 			return function()
-				table.remove(reliable_events[46], table.find(reliable_events[46], Callback))
+				table.remove(reliable_events[48], table.find(reliable_events[48], Callback))
 			end
 		end,
 	},
@@ -4238,18 +4994,18 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
-			local len_38 = #Value["WorldId"]
+			local len_41 = #Value["WorldId"]
 			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_38)
-			alloc(len_38)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_38)
-			local len_39 = #Value["Difficulty"]
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_41)
+			alloc(len_41)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_41)
+			local len_42 = #Value["Difficulty"]
 			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_39)
-			alloc(len_39)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_39)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_42)
+			alloc(len_42)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_42)
 		end,
 	},
 	ShowResults = {
@@ -4295,10 +5051,10 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local bool_23 = 0
-			local bool_23_pos_1 = alloc(1)
+			local bool_25 = 0
+			local bool_25_pos_1 = alloc(1)
 			if Value["Slot1"] ~= nil then
-				bool_23 = bit32.bor(bool_23, 0b0000000000000001)
+				bool_25 = bit32.bor(bool_25, 0b0000000000000001)
 				if Value["Slot1"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4448,7 +5204,7 @@ local returns = {
 				end
 			end
 			if Value["Slot2"] ~= nil then
-				bool_23 = bit32.bor(bool_23, 0b0000000000000010)
+				bool_25 = bit32.bor(bool_25, 0b0000000000000010)
 				if Value["Slot2"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4598,7 +5354,7 @@ local returns = {
 				end
 			end
 			if Value["Slot3"] ~= nil then
-				bool_23 = bit32.bor(bool_23, 0b0000000000000100)
+				bool_25 = bit32.bor(bool_25, 0b0000000000000100)
 				if Value["Slot3"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4748,7 +5504,7 @@ local returns = {
 				end
 			end
 			if Value["Slot4"] ~= nil then
-				bool_23 = bit32.bor(bool_23, 0b0000000000001000)
+				bool_25 = bit32.bor(bool_25, 0b0000000000001000)
 				if Value["Slot4"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -4898,7 +5654,7 @@ local returns = {
 				end
 			end
 			if Value["Slot5"] ~= nil then
-				bool_23 = bit32.bor(bool_23, 0b0000000000010000)
+				bool_25 = bit32.bor(bool_25, 0b0000000000010000)
 				if Value["Slot5"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -5048,7 +5804,7 @@ local returns = {
 				end
 			end
 			if Value["Slot6"] ~= nil then
-				bool_23 = bit32.bor(bool_23, 0b0000000000100000)
+				bool_25 = bit32.bor(bool_25, 0b0000000000100000)
 				if Value["Slot6"] == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -5197,7 +5953,7 @@ local returns = {
 					error("Invalid enumerator")
 				end
 			end
-			buffer.writeu8(outgoing_buff, bool_23_pos_1, bool_23)
+			buffer.writeu8(outgoing_buff, bool_25_pos_1, bool_25)
 		end,
 	},
 	SaveDeck = {
@@ -5206,155 +5962,155 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 10)
-			local len_40 = #Value["Deck"]
-			assert(len_40 >= 1, "value is less than 1!")
-			assert(len_40 <= 6, "value is more than 6!")
+			local len_43 = #Value["Deck"]
+			assert(len_43 >= 1, "value is less than 1!")
+			assert(len_43 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_40 - 1)
-			for i_14 = 1, len_40 do
-				local val_14 = Value["Deck"][i_14]
-				if val_14 == "Sunflower" then
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_43 - 1)
+			for i_17 = 1, len_43 do
+				local val_17 = Value["Deck"][i_17]
+				if val_17 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
-				elseif val_14 == "Peashooter" then
+				elseif val_17 == "Peashooter" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-				elseif val_14 == "WallNut" then
+				elseif val_17 == "WallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-				elseif val_14 == "PotatoMine" then
+				elseif val_17 == "PotatoMine" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-				elseif val_14 == "PuffShroom" then
+				elseif val_17 == "PuffShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-				elseif val_14 == "SunShroom" then
+				elseif val_17 == "SunShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-				elseif val_14 == "Chomper" then
+				elseif val_17 == "Chomper" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-				elseif val_14 == "SnowPea" then
+				elseif val_17 == "SnowPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
-				elseif val_14 == "Repeater" then
+				elseif val_17 == "Repeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-				elseif val_14 == "FumeShroom" then
+				elseif val_17 == "FumeShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
-				elseif val_14 == "Squash" then
+				elseif val_17 == "Squash" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
-				elseif val_14 == "Garlic" then
+				elseif val_17 == "Garlic" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
-				elseif val_14 == "CherryBomb" then
+				elseif val_17 == "CherryBomb" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-				elseif val_14 == "TallNut" then
+				elseif val_17 == "TallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-				elseif val_14 == "Threepeater" then
+				elseif val_17 == "Threepeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
-				elseif val_14 == "Jalapeno" then
+				elseif val_17 == "Jalapeno" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-				elseif val_14 == "Spikeweed" then
+				elseif val_17 == "Spikeweed" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-				elseif val_14 == "Torchwood" then
+				elseif val_17 == "Torchwood" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
-				elseif val_14 == "CabbagePult" then
+				elseif val_17 == "CabbagePult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
-				elseif val_14 == "Pumpkin" then
+				elseif val_17 == "Pumpkin" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
-				elseif val_14 == "ScaredyShroom" then
+				elseif val_17 == "ScaredyShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
-				elseif val_14 == "HypnoShroom" then
+				elseif val_17 == "HypnoShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
-				elseif val_14 == "SplitPea" then
+				elseif val_17 == "SplitPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-				elseif val_14 == "KernelPult" then
+				elseif val_17 == "KernelPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
-				elseif val_14 == "Starfruit" then
+				elseif val_17 == "Starfruit" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-				elseif val_14 == "Cactus" then
+				elseif val_17 == "Cactus" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-				elseif val_14 == "Blover" then
+				elseif val_17 == "Blover" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
-				elseif val_14 == "SeaShroom" then
+				elseif val_17 == "SeaShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
-				elseif val_14 == "TwinSunflower" then
+				elseif val_17 == "TwinSunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
-				elseif val_14 == "MelonPult" then
+				elseif val_17 == "MelonPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
-				elseif val_14 == "GatlingPea" then
+				elseif val_17 == "GatlingPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
-				elseif val_14 == "GloomShroom" then
+				elseif val_17 == "GloomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
-				elseif val_14 == "Cattail" then
+				elseif val_17 == "Cattail" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
-				elseif val_14 == "WinterMelon" then
+				elseif val_17 == "WinterMelon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
-				elseif val_14 == "IceShroom" then
+				elseif val_17 == "IceShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
-				elseif val_14 == "DoomShroom" then
+				elseif val_17 == "DoomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
-				elseif val_14 == "CobCannon" then
+				elseif val_17 == "CobCannon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
-				elseif val_14 == "Marigold" then
+				elseif val_17 == "Marigold" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
-				elseif val_14 == "GoldMagnet" then
+				elseif val_17 == "GoldMagnet" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
-				elseif val_14 == "Imitater" then
+				elseif val_17 == "Imitater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
-				elseif val_14 == "LilyPad" then
+				elseif val_17 == "LilyPad" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
-				elseif val_14 == "FlowerPot" then
+				elseif val_17 == "FlowerPot" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
-				elseif val_14 == "TangleKelp" then
+				elseif val_17 == "TangleKelp" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
-				elseif val_14 == "GraveBuster" then
+				elseif val_17 == "GraveBuster" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
-				elseif val_14 == "Plantern" then
+				elseif val_17 == "Plantern" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
-				elseif val_14 == "UmbrellaLeaf" then
+				elseif val_17 == "UmbrellaLeaf" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
-				elseif val_14 == "CoffeeBean" then
+				elseif val_17 == "CoffeeBean" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
-				elseif val_14 == "ExplodeONut" then
+				elseif val_17 == "ExplodeONut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
 				else
@@ -6623,6 +7379,236 @@ local returns = {
 			end
 		end,
 	},
+	EquipMutationResponse = {
+		On = function(Callback: (Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["MutationType"]: ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty"),
+			["ErrorCode"]: ((number)?),
+		})) -> ())
+			table.insert(reliable_events[45], Callback)
+			for _, value in reliable_event_queue[45] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[45] = {}
+			return function()
+				table.remove(reliable_events[45], table.find(reliable_events[45], Callback))
+			end
+		end,
+	},
+	EquipMutationRequest = {
+		Fire = function(Value: ({
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["MutationType"]: ("Fire" | "Inferno" | "Ice" | "Frost" | "Electric" | "Tesla" | "Toxic" | "Venomous" | "Shadow" | "Void" | "Solar" | "Radiant" | "Reinforced" | "Fortified" | "Primal" | "Savage" | "Swift" | "Hasty"),
+		}))
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["MutationType"] == "Fire" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["MutationType"] == "Inferno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["MutationType"] == "Ice" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["MutationType"] == "Frost" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["MutationType"] == "Electric" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["MutationType"] == "Tesla" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["MutationType"] == "Toxic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["MutationType"] == "Venomous" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["MutationType"] == "Shadow" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["MutationType"] == "Void" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["MutationType"] == "Solar" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["MutationType"] == "Radiant" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["MutationType"] == "Reinforced" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["MutationType"] == "Fortified" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["MutationType"] == "Primal" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["MutationType"] == "Savage" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["MutationType"] == "Swift" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["MutationType"] == "Hasty" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			else
+				error("Invalid enumerator")
+			end
+		end,
+	},
 	EntityDied = {
 		On = function(Callback: (Value: ({
 			["EntityId"]: (number),
@@ -6675,46 +7661,46 @@ local returns = {
 			["NumberArg"]: ((number)?),
 		}))
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-			local bool_24 = 0
-			local bool_24_pos_1 = alloc(2)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			local bool_26 = 0
+			local bool_26_pos_1 = alloc(2)
 			if Value["Command"] == "GiveCoins" then
-				bool_24 = bit32.bor(bool_24, 0b0000000000000001)
+				bool_26 = bit32.bor(bool_26, 0b0000000000000001)
 			elseif Value["Command"] == "GiveGems" then
-				bool_24 = bit32.bor(bool_24, 0b0000000000000010)
+				bool_26 = bit32.bor(bool_26, 0b0000000000000010)
 			elseif Value["Command"] == "SetLevel" then
-				bool_24 = bit32.bor(bool_24, 0b0000000000000100)
+				bool_26 = bit32.bor(bool_26, 0b0000000000000100)
 			elseif Value["Command"] == "UnlockAllPlants" then
-				bool_24 = bit32.bor(bool_24, 0b0000000000001000)
+				bool_26 = bit32.bor(bool_26, 0b0000000000001000)
 			elseif Value["Command"] == "UnlockPlant" then
-				bool_24 = bit32.bor(bool_24, 0b0000000000010000)
+				bool_26 = bit32.bor(bool_26, 0b0000000000010000)
 			elseif Value["Command"] == "AddMutation" then
-				bool_24 = bit32.bor(bool_24, 0b0000000000100000)
+				bool_26 = bit32.bor(bool_26, 0b0000000000100000)
 			elseif Value["Command"] == "ResetData" then
-				bool_24 = bit32.bor(bool_24, 0b0000000001000000)
+				bool_26 = bit32.bor(bool_26, 0b0000000001000000)
 			elseif Value["Command"] == "GiveXP" then
-				bool_24 = bit32.bor(bool_24, 0b0000000010000000)
+				bool_26 = bit32.bor(bool_26, 0b0000000010000000)
 			elseif Value["Command"] == "MaxResources" then
-				bool_24 = bit32.bor(bool_24, 0b0000000100000000)
+				bool_26 = bit32.bor(bool_26, 0b0000000100000000)
 			else
 				error("Invalid enumerator")
 			end
 			if Value["StringArg"] ~= nil then
-				bool_24 = bit32.bor(bool_24, 0b0000001000000000)
-				local len_41 = #Value["StringArg"]
-				assert(len_41 <= 200, "value is more than 200!")
+				bool_26 = bit32.bor(bool_26, 0b0000001000000000)
+				local len_44 = #Value["StringArg"]
+				assert(len_44 <= 200, "value is more than 200!")
 				assert(utf8.len(Value["StringArg"]) ~= nil, "value is not valid utf-8")
 				alloc(1)
-				buffer.writeu8(outgoing_buff, outgoing_apos, len_41)
-				alloc(len_41)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["StringArg"], len_41)
+				buffer.writeu8(outgoing_buff, outgoing_apos, len_44)
+				alloc(len_44)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["StringArg"], len_44)
 			end
 			if Value["NumberArg"] ~= nil then
-				bool_24 = bit32.bor(bool_24, 0b0000010000000000)
+				bool_26 = bit32.bor(bool_26, 0b0000010000000000)
 				alloc(4)
 				buffer.writei32(outgoing_buff, outgoing_apos, Value["NumberArg"])
 			end
-			buffer.writeu16(outgoing_buff, bool_24_pos_1, bool_24)
+			buffer.writeu16(outgoing_buff, bool_26_pos_1, bool_26)
 		end,
 	},
 	DeckSync = {

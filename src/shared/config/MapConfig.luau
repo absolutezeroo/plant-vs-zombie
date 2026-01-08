@@ -448,6 +448,19 @@ function MapConfig.GetConfig(): MapConfigType
 	return _config
 end
 
+-- Get config only if already initialized (non-blocking, for use in ECS systems)
+function MapConfig.GetConfigIfReady(): MapConfigType?
+	if _isInitialized then
+		return _config
+	end
+	return nil
+end
+
+-- Check if config is initialized
+function MapConfig.IsInitialized(): boolean
+	return _isInitialized
+end
+
 -- Check if using visual config
 function MapConfig.IsUsingVisualConfig(): boolean
 	return _config.UsingVisualConfig
@@ -537,13 +550,6 @@ function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
 	Logger.Info("MapConfig", `  GridY: {_config.GridY}`)
 	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)
 	Logger.Info("MapConfig", `  Cell size: {_config.CellWidth}x{_config.CellDepth}`)
-end
-
---[[
-	Check if config has been initialized
-]]
-function MapConfig.IsInitialized(): boolean
-	return _isInitialized
 end
 
 --[[

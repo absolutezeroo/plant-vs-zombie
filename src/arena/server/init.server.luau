@@ -27,18 +27,20 @@ local EntityPool = require(Shared.utils.EntityPool)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local TeleportData = require(Shared.data.TeleportData)
+local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
 
 -- Import components via index module
 local Components = require(Shared.components)
 local Tags = Components.Tags
-local _GridPositionComponent = Components.GridPositionComponent -- Reserved for future use
-local _HealthComponent = Components.HealthComponent -- Reserved for future use
 
 -- Import server services
 local Server = script
 local PlayerDataService = require(Server.services.PlayerDataService)
 local ProgressionHandler = require(Server.handlers.ProgressionHandler)
 local ArenaService = require(Server.services.ArenaService)
+
+-- Import MutationApplySystem for its API (to load player mutations on join)
+local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
 
 -- Import server systems folder
 -- Note: init.server.luau IS the Server script, so children are direct
@@ -140,96 +142,79 @@ RunService.Heartbeat:Connect(function(deltaTime)
 end)
 
 -- ============================================
--- ARENA: Handle players teleporting from Lobby
+-- ARENA: Initialize TeleportDataHandler (unified sync system)
 -- ============================================
 
--- Storage for player teleport data (stageId, deck)
-local playerTeleportData: { [Player]: TeleportData.ArenaJoinData } = {}
+-- Initialize TeleportDataHandler with Arena dependencies
+-- This handles ALL player join logic: profile waiting, teleport data, mutations, deck sync
+TeleportDataHandler.InitializeArena({
+	PlayerDataService = PlayerDataService,
+	MutationApplySystem = MutationApplySystemModule.API,
+	ArenaService = ArenaService,
+	ProgressionHandler = ProgressionHandler,
+})
 
-local function onPlayerAdded(player: Player)
-	Logger.Info("Server", `Player {player.Name} joined Arena`)
+Logger.Info("Server", "TeleportDataHandler initialized for Arena")
+
+-- Subscribe to OnPlayerReady signal to start battles
+TeleportDataHandler.OnPlayerReady:Connect(function(player: Player, teleportData: TeleportData.ArenaJoinData?)
+	Logger.Info("Server", `Player {player.Name} is ready (profile loaded, teleport data applied)`)
 	
-	-- Get teleport data (if coming from Lobby)
-	local joinData = player:GetJoinData()
-	local teleportData = joinData.TeleportData
+	-- Sync player data and deck to client BEFORE starting battle
+	-- This ensures the client has the correct deck/mutations
+	if ProgressionHandler.SyncPlayerData then
+		ProgressionHandler.SyncPlayerData(player)
+	end
+	if ProgressionHandler.SyncDeck then
+		ProgressionHandler.SyncDeck(player)
+	end
 	
 	if teleportData then
-		local isValid, err = TeleportData.ValidateArenaJoinData(teleportData)
-		if isValid then
-			-- Cast after validation to get proper typing
-			local validData = teleportData :: TeleportData.ArenaJoinData
-			playerTeleportData[player] = validData
-			Logger.Info("Server", `{player.Name} teleported from Lobby`, {
-				stageId = validData.StageId,
-				deckSize = #validData.Deck,
-			})
-			
-			-- Wait for profile to load, then start battle
-			task.spawn(function()
-				-- Wait up to 10 seconds for profile
-				local attempts = 0
-				while attempts < 100 do
-					local profileData = PlayerDataService.GetProfile(player)
-					if profileData then
-						-- Start battle with teleported stage/deck
-						ArenaService.StartBattle(player, validData.StageId, validData.Deck)
-						break
-					end
-					task.wait(0.1)
-					attempts += 1
-				end
-				
-				if attempts >= 100 then
-					Logger.Error("Server", `Profile load timeout for {player.Name}`)
-					-- Could teleport back to Lobby here
-				end
-			end)
-		else
-			Logger.Warn("Server", `Invalid teleport data for {player.Name}: {err}`)
-			-- Teleport back to lobby with error
-			-- TeleportService:Teleport(TeleportData.PlaceIds.Lobby, player)
-		end
+		-- Player came from Lobby with valid teleport data
+		Logger.Info("Server", `Starting battle: World={teleportData.WorldId}, Difficulty={teleportData.Difficulty}, Deck={#teleportData.Deck} plants`)
+		ArenaService.StartBattle(player, teleportData.WorldId, teleportData.Difficulty, teleportData.Deck)
 	else
-		Logger.Info("Server", `{player.Name} joined directly (no teleport data)`)
-		-- Player joined without going through Lobby
-		-- For testing in Studio, start with default world + difficulty
-		task.spawn(function()
-			local attempts = 0
-			while attempts < 100 do
-				local profileData = PlayerDataService.GetProfile(player)
-				if profileData then
-					-- Start with day world, normal difficulty for testing
-					local defaultWorldId = "day"
-					local defaultDifficulty = "normal"
-					local defaultDeck = {"Sunflower", "Peashooter", "WallNut"}
-					Logger.Info("Server", `Starting test battle: World={defaultWorldId}, Difficulty={defaultDifficulty}`)
-					ArenaService.StartBattle(player, defaultWorldId, defaultDifficulty, defaultDeck)
-					break
-				end
-				task.wait(0.1)
-				attempts += 1
-			end
-		end)
+		-- Direct join (Studio testing) - use default values
+		local defaultWorldId = "day"
+		local defaultDifficulty = "normal"
+		local defaultDeck = PlayerDataService.GetDeck(player)
+		Logger.Info("Server", `Starting test battle: World={defaultWorldId}, Difficulty={defaultDifficulty}`)
+		ArenaService.StartBattle(player, defaultWorldId, defaultDifficulty, defaultDeck)
 	end
-end
+end)
 
+-- Clean up when player leaves
 local function onPlayerRemoving(player: Player)
-	playerTeleportData[player] = nil
+	MutationApplySystemModule.API.ClearPlayerMutations(player.UserId)
 	ArenaService.OnPlayerRemoving(player)
 end
 
--- Get player's current match data
-local function getPlayerMatchData(player: Player): TeleportData.ArenaJoinData?
-	return playerTeleportData[player]
-end
+Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 -- Teleport player back to Lobby with results
-local function sendPlayerToLobby(player: Player, victory: boolean, stars: number, coins: number, xp: number)
+local function sendPlayerToLobby(player: Player, victory: boolean, wavesSurvived: number, coins: number, xp: number)
 	local teleportOptions = Instance.new("TeleportOptions")
+	
+	-- Get player's world/difficulty from TeleportDataHandler
+	local matchData = TeleportDataHandler.GetTeleportData(player)
+	local worldId = matchData and matchData.WorldId or "world_1"
+	local difficulty = matchData and matchData.Difficulty or "normal"
+	
+	-- Calculate stars based on waves (simplified)
+	local stars = 0
+	if victory then
+		if wavesSurvived >= 10 then stars = 3
+		elseif wavesSurvived >= 7 then stars = 2
+		elseif wavesSurvived >= 5 then stars = 1
+		end
+	end
+	
 	local returnData = TeleportData.CreateLobbyReturnData(
-		playerTeleportData[player] and playerTeleportData[player].StageId or "unknown",
+		worldId,
+		difficulty,
 		victory,
 		stars,
+		wavesSurvived,
 		coins,
 		xp
 	)
@@ -244,22 +229,12 @@ local function sendPlayerToLobby(player: Player, victory: boolean, stars: number
 	end
 end
 
--- Connect player events
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoving)
-
--- Handle players already in game (Studio testing)
-for _, player in Players:GetPlayers() do
-	task.spawn(onPlayerAdded, player)
-end
-
 -- ============================================
 -- NETWORK HANDLERS
 -- ============================================
 
 -- Import Zap network
-local ServerScriptService = game:GetService("ServerScriptService")
-local Network = require(ServerScriptService.Server.network.generated)
+local Network = require(Shared.network.generated.server)
 
 -- Handle "Ready" button - start waves immediately
 Network.StartWaveRequest.SetCallback(function(player: Player, data: {RequestId: number}): {Success: boolean, ErrorCode: number}
@@ -282,8 +257,7 @@ end)
 Logger.Info("Server", "Network handlers registered")
 
 -- Export functions for other modules
--- Note: In a real implementation, these would be in a separate ArenaService
-_G.ArenaGetPlayerMatchData = getPlayerMatchData
+_G.ArenaGetPlayerMatchData = function(player: Player) return TeleportDataHandler.GetTeleportData(player) end
 _G.ArenaSendPlayerToLobby = sendPlayerToLobby
 
 Logger.Info("Server", "Server bootstrap complete")

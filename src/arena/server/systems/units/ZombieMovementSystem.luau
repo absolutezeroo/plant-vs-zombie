@@ -20,9 +20,11 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/units/)
+-- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
 local BaseHealth = require(Server.modules.BaseHealth)
 
 -- Components (via index module)

@@ -29,7 +29,7 @@ local Logger = require(Shared.utils.Logger)
 local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 assert(Modules, "ProjectileRenderSystem: modules folder not found")
-local Network = require(Client.network.generated)
+local Network = require(Shared.network.generated.client)
 
 -- VFX/Audio services (lazy loaded)
 local _vfxService: any = nil

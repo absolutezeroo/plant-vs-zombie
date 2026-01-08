@@ -44,15 +44,16 @@ local _currentUI: ScreenGui? = nil
 
 -- Reactive state values
 local _playerData = Value(_scope, nil :: any?)
-local _unlockedPlants = Value(_scope, {} :: {string})
 local _currentDeck = Value(_scope, {} :: {string})
-local _plantMutations = Value(_scope, {} :: {[string]: {string}})
+local _ownedMutations = Value(_scope, {} :: {[string]: {string}})
+local _equippedMutations = Value(_scope, {} :: {[string]: {string}})
 
 -- Callbacks (set by init.client.luau)
 local _onPurchasePlant: ((string) -> ())? = nil
 local _onSaveDeck: (({string}) -> ())? = nil
 local _onPurchaseMutation: ((string, string) -> ())? = nil
-local _onRemoveMutation: ((string, string) -> ())? = nil
+local _onEquipMutation: ((string, string) -> ())? = nil
+local _onUnequipMutation: ((string, string) -> ())? = nil
 
 -- ============================================
 -- UI MANAGEMENT
@@ -108,7 +109,7 @@ local function openDeckBuilderView()
     local viewFrame = createDeckBuilderView(_scope, {
         SelectedDeck = _currentDeck,
         PlayerData = _playerData,
-        PlantMutations = _plantMutations,
+        PlantMutations = _equippedMutations, -- Show equipped mutations
         OnBack = closeCurrentUI,
         OnPlay = function()
             closeCurrentUI()
@@ -140,16 +141,22 @@ local function openMutationView()
     
     local viewFrame = createMutationView(_scope, {
         PlayerData = _playerData,
-        PlantMutations = _plantMutations,
+        OwnedMutations = _ownedMutations,
+        EquippedMutations = _equippedMutations,
         OnBack = closeCurrentUI,
         OnPurchaseMutation = function(plantType: string, mutationType: string)
             if _onPurchaseMutation then
                 _onPurchaseMutation(plantType, mutationType)
             end
         end,
-        OnRemoveMutation = function(plantType: string, mutationType: string)
-            if _onRemoveMutation then
-                _onRemoveMutation(plantType, mutationType)
+        OnEquipMutation = function(plantType: string, mutationType: string)
+            if _onEquipMutation then
+                _onEquipMutation(plantType, mutationType)
+            end
+        end,
+        OnUnequipMutation = function(plantType: string, mutationType: string)
+            if _onUnequipMutation then
+                _onUnequipMutation(plantType, mutationType)
             end
         end,
     })
@@ -190,22 +197,30 @@ end
 function ZoneInteractionController.SetPlayerData(data: any)
     _playerData:set(data)
     if data then
-        _unlockedPlants:set(data.UnlockedPlants or {})
         _currentDeck:set(data.Deck or {})
-        _plantMutations:set(data.PlantMutations or {})
     end
-end
-
-function ZoneInteractionController.UpdateUnlockedPlants(plants: {string})
-    _unlockedPlants:set(plants)
 end
 
 function ZoneInteractionController.UpdateDeck(deck: {string})
     _currentDeck:set(deck)
 end
 
-function ZoneInteractionController.UpdatePlantMutations(mutations: {[string]: {string}})
-    _plantMutations:set(mutations)
+function ZoneInteractionController.UpdateOwnedMutations(mutations: {[string]: {string}})
+    -- Create shallow copy to ensure Fusion detects the change
+    local copy = {}
+    for k, v in mutations do
+        copy[k] = v
+    end
+    _ownedMutations:set(copy)
+end
+
+function ZoneInteractionController.UpdateEquippedMutations(mutations: {[string]: {string}})
+    -- Create shallow copy to ensure Fusion detects the change
+    local copy = {}
+    for k, v in mutations do
+        copy[k] = v
+    end
+    _equippedMutations:set(copy)
 end
 
 -- Callback setters
@@ -221,8 +236,12 @@ function ZoneInteractionController.SetOnPurchaseMutation(callback: (string, stri
     _onPurchaseMutation = callback
 end
 
-function ZoneInteractionController.SetOnRemoveMutation(callback: (string, string) -> ())
-    _onRemoveMutation = callback
+function ZoneInteractionController.SetOnEquipMutation(callback: (string, string) -> ())
+    _onEquipMutation = callback
+end
+
+function ZoneInteractionController.SetOnUnequipMutation(callback: (string, string) -> ())
+    _onUnequipMutation = callback
 end
 
 -- Manual UI opening (for testing or keybinds)

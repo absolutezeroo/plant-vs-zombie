@@ -23,9 +23,7 @@ local Modules = Client:FindFirstChild("modules")
 assert(Modules, "VFXAudioSystem: modules folder not found")
 local VFXService = require(Modules.VFXService)
 local AudioService = require(Modules.AudioService)
-local ClientNetwork = Client:FindFirstChild("network")
-assert(ClientNetwork, "VFXAudioSystem: network folder not found")
-local Network = require(ClientNetwork.generated)
+local Network = require(Shared.network.generated.client)
 
 -- Game state for music
 local _isWaveActive = false

@@ -70,6 +70,15 @@ local function getPlayerDeck(player: Player): {string}?
     return nil
 end
 
+-- Get player's equipped mutations
+local function getPlayerEquippedMutations(player: Player): {[string]: {string}}
+    local dataService = getPlayerDataService()
+    if not dataService then return {} end
+    
+    -- Use GetAllEquippedMutations to get all equipped mutations
+    return dataService.GetAllEquippedMutations(player) or {}
+end
+
 -- Move player to spawn (for Studio mode)
 local function movePlayerToSpawn(player: Player)
     local character = player.Character
@@ -95,6 +104,20 @@ end
 -- Teleport a single player to arena
 function TeleportManager:TeleportPlayer(player: Player, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?): TeleportResult
     local deck = getPlayerDeck(player) or DEFAULT_DECK
+    local equippedMutations = getPlayerEquippedMutations(player)
+    
+    -- Log deck and mutations for debugging
+    Logger.Info("TeleportManager", `Teleporting {player.Name}: Deck={table.concat(deck, ", ")}`)
+    local mutationCount = 0
+    for plantType, mutations in pairs(equippedMutations) do
+        if #mutations > 0 then
+            mutationCount = mutationCount + 1
+            Logger.Info("TeleportManager", `  {plantType}: {table.concat(mutations, ", ")}`)
+        end
+    end
+    if mutationCount == 0 then
+        Logger.Info("TeleportManager", "  No mutations equipped")
+    end
     
     if _isStudio then
         -- In Studio, simulate teleport
@@ -116,7 +139,7 @@ function TeleportManager:TeleportPlayer(player: Player, worldId: string, difficu
     
     -- Real teleport
     local teleportOptions = Instance.new("TeleportOptions")
-    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck)
+    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck, equippedMutations)
     teleportOptions:SetTeleportData(arenaData)
     
     local success, err = pcall(function()

@@ -28,8 +28,6 @@ export type RewardResult = {
     GemsEarned: number,
     StarRating: number,
     LevelsGained: number,
-    IsFirstClear: boolean,
-    IsNewBest: boolean,
 }
 
 export type RewardCalculator = {
@@ -42,15 +40,11 @@ export type RewardParams = {
     WaveReached: number,
     SessionStats: SessionStats,
     StarRating: number,
-    -- New World + Difficulty system
     DifficultyConfig: DifficultyData.DifficultyConfig?,
     WorldConfig: any?,
     BaseCoins: number?,
     BaseXP: number?,
     WaveMultiplier: number?,
-    -- Legacy fields (optional for backwards compatibility)
-    IsFirstClear: boolean?,
-    IsNewBest: boolean?,
 }
 
 local RewardCalculator = {}

@@ -19,9 +19,11 @@ local Components = require(Shared.components)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 
--- Network (script.Parent.Parent.Parent = server root, since we're in systems/economy/)
+-- Network
+local Network = require(Shared.network.generated.server)
+
+-- Server modules
 local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
 
 -- Lazy-load WaveManager to check game state
 local _waveManager: any = nil

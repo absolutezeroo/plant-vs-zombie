@@ -321,8 +321,8 @@ function HUDController:Mount()
 					self._preparationPhase:set(false)
 					
 					-- Send request to server
-					local Client = script.Parent.Parent
-					local Network = require(Client.network.generated)
+					local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+					local Network = require(Shared.network.generated.client)
 					Network.StartWaveRequest.Fire({
 						RequestId = math.random(1, 65535),
 					})
@@ -515,6 +515,7 @@ function HUDController:Mount()
 				SunCount = SelectionState.SunCount,
 				Cooldowns = SelectionState.Cooldowns,
 				ShovelMode = SelectionState.ShovelMode,
+				PlayerMutations = PlayerDataClient.GetMutationsValue(),
 				OnSelect = onCardSelect,
 				OnShovelToggle = function()
 					SelectionState.ToggleShovel()

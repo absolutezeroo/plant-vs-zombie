@@ -35,18 +35,11 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
--- Network (lazy loaded to avoid circular dependencies)
+-- Network (from shared module)
 local _network: any = nil
 local function getNetwork()
     if not _network then
-        local ServerFolder = script.Parent.Parent
-        local NetworkFolder = ServerFolder:FindFirstChild("network")
-        if NetworkFolder then
-            local generated = NetworkFolder:FindFirstChild("generated")
-            if generated then
-                _network = require(generated)
-            end
-        end
+        _network = require(Shared.network.generated.server)
     end
     return _network
 end

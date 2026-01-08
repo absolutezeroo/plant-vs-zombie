@@ -12,7 +12,6 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local _Players = game:GetService("Players") -- Reserved for future use
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -23,7 +22,6 @@ local Fusion = require(Packages.Fusion)
 
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "GhostPreviewSystem: Shared folder not found")
-local _GridConfig = require(Shared.config.GridConfig) -- Reserved for future use
 local MapConfig = require(Shared.config.MapConfig)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
@@ -34,7 +32,7 @@ local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 assert(Modules, "GhostPreviewSystem: modules folder not found")
 local SelectionState = require(Modules.SelectionState)
-local Network = require(Client.network.generated)
+local Network = require(Shared.network.generated.client)
 
 -- Assets (optional - game works without visual previews)
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -45,21 +43,8 @@ if not PlantAssets then
 	Logger.Warn("GhostPreview", "Plant assets not found - ghost previews disabled")
 end
 
--- VFX/Audio services (lazy loaded, reserved for future use)
-local _vfxService: any = nil
+-- Audio service (lazy loaded for sound feedback)
 local _audioService: any = nil
-
-local function _getVFXService()
-	if not _vfxService then
-		local success, result = pcall(function()
-			return require(Modules.VFXService)
-		end)
-		if success then
-			_vfxService = result
-		end
-	end
-	return _vfxService
-end
 
 local function getAudioService()
 	if not _audioService then
@@ -97,6 +82,23 @@ local INVALID_COLOR = Color3.fromRGB(255, 100, 100) -- Red
 local SHOVEL_COLOR = Color3.fromRGB(255, 80, 80)    -- Red for shovel target
 local GHOST_TRANSPARENCY = 0.5
 local SHOVEL_TRANSPARENCY = 0.3
+
+-- Cache grid Y to avoid calling MapConfig.GetConfig() every frame (it can yield)
+local _cachedGridY: number? = nil
+local DEFAULT_GRID_Y = 4.5
+local function getCachedGridY(): number
+	if _cachedGridY then
+		return _cachedGridY
+	end
+	-- Try to get from MapConfig if already initialized (non-blocking check)
+	local config = MapConfig.GetConfigIfReady and MapConfig.GetConfigIfReady()
+	if config then
+		_cachedGridY = config.GridY
+		return config.GridY
+	end
+	-- Fallback to default grid Y
+	return DEFAULT_GRID_Y
+end
 
 --[[
 	Apply ghost effect to all parts in a model (transparent + tinted)
@@ -332,7 +334,7 @@ local function getMouseWorldPosition(): Vector3?
 	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
 	
 	-- Raycast to grid plane (Y = actual grid height from MapConfig)
-	local gridY = MapConfig.GetConfig().GridY
+	local gridY = getCachedGridY()
 	if ray.Direction.Y >= 0 then
 		return nil -- Looking up, no intersection
 	end

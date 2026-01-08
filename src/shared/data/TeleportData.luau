@@ -34,6 +34,7 @@ export type ArenaJoinData = {
     WorldId: string,           -- Any valid world from WorldData
     Difficulty: string,        -- Any valid difficulty from DifficultyData
     Deck: { string },          -- Liste des PlantTypes sélectionnés (max 6)
+    EquippedMutations: { [string]: {string} }, -- [PlantType] -> {MutationType, ...}
     Timestamp: number,         -- os.time() pour validation timeout
 }
 
@@ -125,11 +126,17 @@ function TeleportData.ValidateLobbyReturnData(data: any): (boolean, string?)
 end
 
 -- Crée les données de téléportation vers l'Arena
-function TeleportData.CreateArenaJoinData(worldId: string, difficulty: string, deck: { string }): ArenaJoinData
+function TeleportData.CreateArenaJoinData(
+    worldId: string,
+    difficulty: string,
+    deck: { string },
+    equippedMutations: { [string]: {string} }?
+): ArenaJoinData
     return {
         WorldId = worldId,
         Difficulty = difficulty,
         Deck = deck,
+        EquippedMutations = equippedMutations or {},
         Timestamp = os.time(),
     }
 end

@@ -14,8 +14,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
 -- Network
-local Server = script.Parent.Parent
-local Network = require(Server.network.generated)
+local Network = require(Shared.network.generated.server)
 
 -- Configuration
 local Config = {

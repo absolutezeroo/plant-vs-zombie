@@ -20,9 +20,8 @@ local Logger = require(Shared.utils.Logger)
 local WorldData = require(Shared.data.WorldData)
 local DifficultyData = require(Shared.data.DifficultyData)
 
--- Import Zap (navigate from controllers/ to client/ then to network/)
-local LobbyClient = script.Parent.Parent
-local ZapClient = require(LobbyClient:WaitForChild("network"):WaitForChild("generated"))
+-- Network (unified Zap schema in shared/network)
+local ZapClient = require(Shared.network.generated.client)
 
 -- Import UI State Manager
 local UIStateManager = require(script.Parent.UIStateManager)

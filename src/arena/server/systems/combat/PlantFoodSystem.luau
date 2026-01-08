@@ -27,9 +27,11 @@ local Types = require(Shared.Types)
 -- Type alias for world parameter
 type MatterWorld = Types.MatterWorld
 
+-- Network
+local Network = require(Shared.network.generated.server)
+
 -- Server modules
 local Server = script.Parent.Parent.Parent
-local Network = require(Server.network.generated)
 
 -- Components
 local PositionComponent = Components.PositionComponent

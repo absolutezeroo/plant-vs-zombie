@@ -209,8 +209,19 @@ event PurchaseMutationRequest = {
     }
 }
 
--- Client requests to remove a mutation from a plant
-event RemoveMutationRequest = {
+-- Client requests to equip an owned mutation on a plant
+event EquipMutationRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantType: PlantType,
+        MutationType: MutationType,
+    }
+}
+
+-- Client requests to unequip a mutation from a plant
+event UnequipMutationRequest = {
     from: Client,
     type: Reliable,
     call: SingleAsync,
@@ -889,8 +900,34 @@ event PurchaseMutationResponse = {
     }
 }
 
+-- [DEPRECATED] Use UnequipMutationResponse instead - will be removed in next major version
 -- Mutation removal response
 event RemoveMutationResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        PlantType: PlantType,
+        MutationType: MutationType,
+    }
+}
+
+-- Equip mutation response
+event EquipMutationResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        PlantType: PlantType,
+        MutationType: MutationType,
+        ErrorCode: u8?,  -- 0=None, 1=NotOwned, 2=AlreadyEquipped, 3=Incompatible
+    }
+}
+
+-- Unequip mutation response  
+event UnequipMutationResponse = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
@@ -908,7 +945,8 @@ event SyncPlantMutations = {
     call: ManyAsync,
     data: struct {
         PlantType: PlantType,
-        Mutations: MutationType[0..8],
+        OwnedMutations: MutationType[0..8],
+        EquippedMutations: MutationType[0..8],
     }
 }
 
@@ -918,7 +956,11 @@ event SyncAllMutations = {
     type: Reliable,
     call: ManyAsync,
     data: struct {
-        PlantMutations: struct {
+        OwnedMutations: struct {
+            PlantType: PlantType,
+            Mutations: MutationType[0..8],
+        }[0..48],
+        EquippedMutations: struct {
             PlantType: PlantType,
             Mutations: MutationType[0..8],
         }[0..48],

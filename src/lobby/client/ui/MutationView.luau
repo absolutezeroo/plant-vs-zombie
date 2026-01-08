@@ -2,8 +2,9 @@
 --[[
     MutationView.luau - Plant mutation management interface
     
-    Allows players to view and purchase mutations for their plants.
-    Mutations add special abilities (fire damage, freeze, lifesteal, etc.)
+    Two tabs:
+    - Shop (Boutique): Purchase mutations for plants
+    - Equipment (Équipement): Equip/unequip owned mutations on plants
     
     Migrated to ModernTheme for consistent dark UI style.
 ]]
@@ -29,6 +30,12 @@ local Colors = ModernTheme.Colors
 local Fonts = ModernTheme.Fonts
 local Sizing = ModernTheme.Sizing
 
+-- Constants
+local TAB_SHOP = "shop"
+local TAB_EQUIP = "equip"
+local MAX_EQUIPPED_MUTATIONS = 3 -- Maximum mutations per plant
+local DEFAULT_MUTATION_COLOR = Color3.fromRGB(100, 100, 120) -- Fallback color
+
 -- Mutation category icons
 local CATEGORY_ICONS: {[string]: string} = {
     Fire = "🔥",
@@ -39,6 +46,7 @@ local CATEGORY_ICONS: {[string]: string} = {
     Solar = "☀️",
     Reinforced = "🛡️",
     Primal = "💥",
+    Swift = "💨",
 }
 
 -- Mutation category colors (vibrant for dark theme)
@@ -51,6 +59,7 @@ local CATEGORY_COLORS: {[string]: Color3} = {
     Solar = Color3.fromRGB(255, 200, 80),
     Reinforced = Color3.fromRGB(180, 180, 190),
     Primal = Color3.fromRGB(220, 130, 70),
+    Swift = Color3.fromRGB(150, 220, 255),
 }
 
 -- Mapping mutation Ids to their category (base type)
@@ -72,31 +81,74 @@ end
 
 export type MutationViewProps = {
     PlayerData: any, -- Value<PlayerData?>
-    PlantMutations: any, -- Value<{[string]: {string}}>
+    OwnedMutations: any, -- Value<{[string]: {string}}> -- Purchased mutations per plant
+    EquippedMutations: any, -- Value<{[string]: {string}}> -- Equipped mutations per plant
     OnBack: () -> (),
     OnPurchaseMutation: (plantType: string, mutationType: string) -> (),
-    OnRemoveMutation: (plantType: string, mutationType: string) -> (),
+    OnEquipMutation: (plantType: string, mutationType: string) -> (),
+    OnUnequipMutation: (plantType: string, mutationType: string) -> (),
 }
 
--- Mutation badge showing active mutation
+--------------------------------------------------------------------------------
+-- COMMON COMPONENTS
+--------------------------------------------------------------------------------
+
+-- Tab button component
+local function TabButton(scope: any, props: {
+    Text: string,
+    Icon: string,
+    IsActive: any, -- Computed<boolean>
+    OnClick: () -> (),
+}): any
+    return New(scope, "TextButton") {
+        Size = UDim2.new(0.5, -4, 1, 0),
+        BackgroundColor3 = Computed(scope, function(use)
+            return if use(props.IsActive) then (Colors.Gold or Color3.fromRGB(255, 193, 7)) else (Colors.BackgroundLighter or DEFAULT_MUTATION_COLOR)
+        end),
+        Text = "",
+        AutoButtonColor = false,
+        
+        [OnEvent "Activated"] = props.OnClick,
+        
+        [Children] = {
+            New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
+            
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Text = `{props.Icon} {props.Text}`,
+                TextSize = 14,
+                Font = Fonts.Header,
+                TextColor3 = Computed(scope, function(use)
+                    return if use(props.IsActive) then Colors.TextWhite else Colors.TextMuted
+                end),
+            },
+        },
+    }
+end
+
+-- Mutation badge showing a mutation (optionally removable)
 local function MutationBadge(scope: any, props: {
     MutationType: string,
-    OnRemove: () -> (),
+    OnRemove: (() -> ())?,
+    Size: number?,
 }): any
     local mutation = MutationData.Get(props.MutationType)
     if not mutation then return nil end
     
     local category = getMutationCategory(mutation.Id)
     local icon = CATEGORY_ICONS[category] or "✨"
-    local color = CATEGORY_COLORS[category] or Colors.Success
+    local color = CATEGORY_COLORS[category] or Colors.Success or DEFAULT_MUTATION_COLOR
+    local hasRemove = props.OnRemove ~= nil
+    local size = props.Size or 40
     
     return New(scope, "TextButton") {
-        Size = UDim2.fromOffset(40, 40),
-        BackgroundColor3 = color,
+        Size = UDim2.fromOffset(size, size),
+        BackgroundColor3 = color or DEFAULT_MUTATION_COLOR,
         Text = "",
         AutoButtonColor = false,
         
-        [OnEvent "Activated"] = props.OnRemove,
+        [OnEvent "Activated"] = if hasRemove then props.OnRemove else nil,
         
         [Children] = {
             New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
@@ -113,11 +165,11 @@ local function MutationBadge(scope: any, props: {
                 Size = UDim2.new(1, 0, 1, 0),
                 BackgroundTransparency = 1,
                 Text = icon,
-                TextSize = 22,
+                TextSize = math.floor(size * 0.55),
             },
             
-            -- Remove X badge
-            New(scope, "TextLabel") {
+            -- Remove X badge (only if removable)
+            if hasRemove then New(scope, "TextLabel") {
                 Size = UDim2.fromOffset(16, 16),
                 Position = UDim2.new(1, 2, 0, -2),
                 AnchorPoint = Vector2.new(1, 0),
@@ -130,13 +182,17 @@ local function MutationBadge(scope: any, props: {
                 [Children] = {
                     New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
                 },
-            },
+            } else nil,
         },
     }
 end
 
--- Mutation option card in the grid
-local function MutationOption(scope: any, props: {
+--------------------------------------------------------------------------------
+-- SHOP TAB COMPONENTS
+--------------------------------------------------------------------------------
+
+-- Mutation option card for purchasing
+local function ShopMutationCard(scope: any, props: {
     MutationType: string,
     Data: any,
     IsOwned: any, -- Computed<boolean>
@@ -146,24 +202,24 @@ local function MutationOption(scope: any, props: {
     local data = props.Data
     local category = getMutationCategory(data.Id)
     local icon = CATEGORY_ICONS[category] or "✨"
-    local color = CATEGORY_COLORS[category] or Colors.Success
+    local color = CATEGORY_COLORS[category] or Colors.Success or DEFAULT_MUTATION_COLOR
     
     return New(scope, "TextButton") {
-        Size = UDim2.new(0, 130, 0, 80),
+        Size = UDim2.new(0, 150, 0, 100),
         BackgroundColor3 = Computed(scope, function(use)
             if use(props.IsOwned) then
-                return Colors.Success
+                return Colors.BackgroundLighter or DEFAULT_MUTATION_COLOR
             elseif use(props.CanPurchase) then
-                return color
+                return color or DEFAULT_MUTATION_COLOR
             else
-                return Colors.BackgroundLighter
+                return Colors.BackgroundLighter or DEFAULT_MUTATION_COLOR
             end
         end),
         Text = "",
         AutoButtonColor = false,
         
         [OnEvent "Activated"] = function()
-            if peek(props.CanPurchase) then
+            if not peek(props.IsOwned) and peek(props.CanPurchase) then
                 props.OnPurchase()
             end
         end,
@@ -172,22 +228,23 @@ local function MutationOption(scope: any, props: {
             New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
             New(scope, "UIStroke") {
                 Color = Computed(scope, function(use)
-                    if use(props.IsOwned) then return Colors.Success end
-                    if use(props.CanPurchase) then return color end
-                    return Colors.Border
+                    if use(props.IsOwned) then return Colors.Success or DEFAULT_MUTATION_COLOR end
+                    if use(props.CanPurchase) then return color or DEFAULT_MUTATION_COLOR end
+                    return Colors.Border or DEFAULT_MUTATION_COLOR
                 end),
-                Thickness = 2,
-                Transparency = 0.5,
+                Thickness = Computed(scope, function(use)
+                    return if use(props.IsOwned) then 3 else 2
+                end),
+                Transparency = 0.3,
             },
             
-            -- Darken if not available
+            -- Darken overlay
             New(scope, "Frame") {
                 Size = UDim2.new(1, 0, 1, 0),
                 BackgroundColor3 = Color3.new(0, 0, 0),
                 BackgroundTransparency = Computed(scope, function(use)
-                    if use(props.IsOwned) or use(props.CanPurchase) then
-                        return 0.7
-                    end
+                    if use(props.IsOwned) then return 0.5 end
+                    if use(props.CanPurchase) then return 0.7 end
                     return 0.4
                 end),
                 ZIndex = 0,
@@ -199,25 +256,25 @@ local function MutationOption(scope: any, props: {
             
             -- Icon + Name row
             New(scope, "Frame") {
-                Size = UDim2.new(1, 0, 0, 30),
-                Position = UDim2.fromOffset(0, 6),
+                Size = UDim2.new(1, 0, 0, 26),
+                Position = UDim2.fromOffset(0, 4),
                 BackgroundTransparency = 1,
                 
                 [Children] = {
                     New(scope, "TextLabel") {
-                        Size = UDim2.fromOffset(28, 28),
-                        Position = UDim2.fromOffset(8, 0),
+                        Size = UDim2.fromOffset(24, 24),
+                        Position = UDim2.fromOffset(6, 0),
                         BackgroundTransparency = 1,
                         Text = icon,
-                        TextSize = 20,
+                        TextSize = 18,
                     },
                     
                     New(scope, "TextLabel") {
-                        Size = UDim2.new(1, -45, 1, 0),
-                        Position = UDim2.fromOffset(38, 0),
+                        Size = UDim2.new(1, -38, 1, 0),
+                        Position = UDim2.fromOffset(32, 0),
                         BackgroundTransparency = 1,
-                        Text = props.MutationType,
-                        TextSize = 12,
+                        Text = data.Name or props.MutationType,
+                        TextSize = 11,
                         Font = Fonts.Header,
                         TextColor3 = Colors.TextWhite,
                         TextXAlignment = Enum.TextXAlignment.Left,
@@ -226,57 +283,89 @@ local function MutationOption(scope: any, props: {
                 },
             },
             
-            -- Level badge
+            -- Description
             New(scope, "TextLabel") {
-                Size = UDim2.fromOffset(45, 18),
-                Position = UDim2.fromOffset(8, 40),
-                BackgroundColor3 = Colors.BackgroundLighter,
-                Text = `Lv.{data.RequiredLevel}`,
-                TextSize = 10,
+                Size = UDim2.new(1, -12, 0, 28),
+                Position = UDim2.fromOffset(6, 30),
+                BackgroundTransparency = 1,
+                Text = data.Description or "",
+                TextSize = 9,
                 Font = Fonts.Body,
                 TextColor3 = Colors.TextMuted,
-                
-                [Children] = {
-                    New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
-                },
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextYAlignment = Enum.TextYAlignment.Top,
+                TextWrapped = true,
+                TextTruncate = Enum.TextTruncate.AtEnd,
             },
             
-            -- Cost or Owned status
-            New(scope, "TextLabel") {
-                Size = UDim2.new(1, -16, 0, 20),
-                Position = UDim2.new(0, 8, 1, -24),
+            -- Bottom row: Level + Cost/Owned
+            New(scope, "Frame") {
+                Size = UDim2.new(1, -12, 0, 20),
+                Position = UDim2.new(0, 6, 1, -24),
                 BackgroundTransparency = 1,
-                Text = Computed(scope, function(use)
-                    if use(props.IsOwned) then
-                        return "✓ Equipped"
-                    else
-                        return `🪙 {data.Cost}`
-                    end
-                end),
-                TextSize = 12,
-                Font = Fonts.Header,
-                TextColor3 = Computed(scope, function(use)
-                    return if use(props.IsOwned) then Colors.TextWhite else Colors.Coins
-                end),
-                TextXAlignment = Enum.TextXAlignment.Left,
+                
+                [Children] = {
+                    -- Level badge
+                    New(scope, "TextLabel") {
+                        Size = UDim2.fromOffset(38, 18),
+                        BackgroundColor3 = Colors.BackgroundLighter,
+                        Text = `Lv.{data.RequiredLevel}`,
+                        TextSize = 9,
+                        Font = Fonts.Body,
+                        TextColor3 = Colors.TextMuted,
+                        
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                        },
+                    },
+                    
+                    -- Cost or Owned badge
+                    New(scope, "Frame") {
+                        Size = UDim2.fromOffset(70, 18),
+                        Position = UDim2.new(1, 0, 0, 0),
+                        AnchorPoint = Vector2.new(1, 0),
+                        BackgroundColor3 = Computed(scope, function(use)
+                            return if use(props.IsOwned) then (Colors.Success or DEFAULT_MUTATION_COLOR) else (Colors.BackgroundLighter or DEFAULT_MUTATION_COLOR)
+                        end),
+                        
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                            
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 1, 0),
+                                BackgroundTransparency = 1,
+                                Text = Computed(scope, function(use)
+                                    if use(props.IsOwned) then
+                                        return "✓ Possédée"
+                                    else
+                                        return `🪙 {data.Cost}`
+                                    end
+                                end),
+                                TextSize = 10,
+                                Font = Fonts.Header,
+                                TextColor3 = Computed(scope, function(use)
+                                    return if use(props.IsOwned) then Colors.TextWhite else Colors.Coins
+                                end),
+                            },
+                        },
+                    },
+                },
             },
         },
     }
 end
 
--- Plant card with mutations
-local function PlantMutationCard(scope: any, props: {
+-- Plant card for Shop tab
+local function ShopPlantCard(scope: any, props: {
     PlantType: string,
     PlantStats: any,
-    Mutations: any, -- Computed<{string}>
-    PlayerLevel: any, -- Computed<number>
-    PlayerCoins: any, -- Computed<number>
+    OwnedMutations: any, -- Computed<{string}>
+    PlayerLevel: any,
+    PlayerCoins: any,
     OnPurchase: (mutationType: string) -> (),
-    OnRemove: (mutationType: string) -> (),
 }): any
     local isExpanded = Value(scope, false)
     
-    -- Get compatible mutations for this plant
     local compatibleMutations = Computed(scope, function(use)
         local plantStats = props.PlantStats
         local category = plantStats.Category
@@ -288,7 +377,6 @@ local function PlantMutationCard(scope: any, props: {
             end
         end
         
-        -- Sort by required level then name
         table.sort(result, function(a, b)
             if a.Data.RequiredLevel ~= b.Data.RequiredLevel then
                 return a.Data.RequiredLevel < b.Data.RequiredLevel
@@ -297,6 +385,10 @@ local function PlantMutationCard(scope: any, props: {
         end)
         
         return result
+    end)
+    
+    local ownedCount = Computed(scope, function(use)
+        return #use(props.OwnedMutations)
     end)
     
     return New(scope, "Frame") {
@@ -312,7 +404,7 @@ local function PlantMutationCard(scope: any, props: {
             New(scope, "UICorner") { CornerRadius = Sizing.RadiusLarge },
             New(scope, "UIStroke") { Color = Colors.Border, Thickness = 1 },
             
-            -- Header (always visible, clickable)
+            -- Header
             New(scope, "TextButton") {
                 Size = UDim2.new(1, 0, 0, 85),
                 BackgroundTransparency = 1,
@@ -323,11 +415,11 @@ local function PlantMutationCard(scope: any, props: {
                 end,
                 
                 [Children] = {
-                    -- Plant icon circle
+                    -- Plant icon
                     New(scope, "Frame") {
                         Size = UDim2.fromOffset(60, 60),
                         Position = UDim2.fromOffset(12, 12),
-                        BackgroundColor3 = Colors.Success,
+                        BackgroundColor3 = Colors.Success or Color3.fromRGB(76, 175, 80),
                         
                         [Children] = {
                             New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
@@ -338,7 +430,6 @@ local function PlantMutationCard(scope: any, props: {
                                 }),
                                 Rotation = 90,
                             },
-                            
                             New(scope, "TextLabel") {
                                 Size = UDim2.new(1, 0, 1, 0),
                                 BackgroundTransparency = 1,
@@ -360,22 +451,51 @@ local function PlantMutationCard(scope: any, props: {
                         TextXAlignment = Enum.TextXAlignment.Left,
                     },
                     
-                    -- Category badge
-                    New(scope, "TextLabel") {
-                        Size = UDim2.fromOffset(75, 22),
+                    -- Category + owned count
+                    New(scope, "Frame") {
+                        Size = UDim2.new(0, 150, 0, 22),
                         Position = UDim2.fromOffset(85, 46),
-                        BackgroundColor3 = Colors.BackgroundLighter,
-                        Text = props.PlantStats.Category,
-                        TextSize = 11,
-                        Font = Fonts.Body,
-                        TextColor3 = Colors.TextMuted,
+                        BackgroundTransparency = 1,
                         
                         [Children] = {
-                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                            New(scope, "UIListLayout") {
+                                FillDirection = Enum.FillDirection.Horizontal,
+                                Padding = UDim.new(0, 8),
+                            },
+                            
+                            New(scope, "TextLabel") {
+                                Size = UDim2.fromOffset(75, 22),
+                                BackgroundColor3 = Colors.BackgroundLighter,
+                                Text = props.PlantStats.Category,
+                                TextSize = 11,
+                                Font = Fonts.Body,
+                                TextColor3 = Colors.TextMuted,
+                                
+                                [Children] = {
+                                    New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                                },
+                            },
+                            
+                            New(scope, "TextLabel") {
+                                Size = UDim2.fromOffset(60, 22),
+                                BackgroundColor3 = Computed(scope, function(use)
+                                    return if use(ownedCount) > 0 then (Colors.Success or DEFAULT_MUTATION_COLOR) else (Colors.BackgroundLighter or DEFAULT_MUTATION_COLOR)
+                                end),
+                                Text = Computed(scope, function(use)
+                                    return `{use(ownedCount)} achetée(s)`
+                                end),
+                                TextSize = 10,
+                                Font = Fonts.Body,
+                                TextColor3 = Colors.TextWhite,
+                                
+                                [Children] = {
+                                    New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                                },
+                            },
                         },
                     },
                     
-                    -- Active mutations display
+                    -- Owned mutations preview
                     New(scope, "Frame") {
                         Size = UDim2.fromOffset(180, 44),
                         Position = UDim2.new(1, -230, 0.5, 0),
@@ -390,18 +510,16 @@ local function PlantMutationCard(scope: any, props: {
                                 VerticalAlignment = Enum.VerticalAlignment.Center,
                             },
                             
-                            ForPairs(scope, props.Mutations, function(use, scope, index, mutationType)
+                            ForPairs(scope, props.OwnedMutations, function(use, scope, index, mutationType)
                                 return index, MutationBadge(scope, {
                                     MutationType = mutationType,
-                                    OnRemove = function()
-                                        props.OnRemove(mutationType)
-                                    end,
+                                    OnRemove = nil,
                                 })
                             end),
                         },
                     },
                     
-                    -- Expand/collapse indicator
+                    -- Expand indicator
                     New(scope, "Frame") {
                         Size = UDim2.fromOffset(36, 36),
                         Position = UDim2.new(1, -12, 0.5, 0),
@@ -410,7 +528,6 @@ local function PlantMutationCard(scope: any, props: {
                         
                         [Children] = {
                             New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
-                            
                             New(scope, "TextLabel") {
                                 Size = UDim2.new(1, 0, 1, 0),
                                 BackgroundTransparency = 1,
@@ -426,7 +543,7 @@ local function PlantMutationCard(scope: any, props: {
                 },
             },
             
-            -- Expanded mutation selection area
+            -- Expanded content
             New(scope, "ScrollingFrame") {
                 Size = UDim2.new(1, -24, 0, 195),
                 Position = UDim2.fromOffset(12, 95),
@@ -438,13 +555,11 @@ local function PlantMutationCard(scope: any, props: {
                 
                 [Children] = {
                     New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
-                    
                     New(scope, "UIGridLayout") {
-                        CellSize = UDim2.fromOffset(130, 80),
+                        CellSize = UDim2.fromOffset(150, 100),
                         CellPadding = UDim2.fromOffset(8, 8),
                         HorizontalAlignment = Enum.HorizontalAlignment.Center,
                     },
-                    
                     New(scope, "UIPadding") {
                         PaddingTop = UDim.new(0, 8),
                         PaddingBottom = UDim.new(0, 8),
@@ -452,37 +567,25 @@ local function PlantMutationCard(scope: any, props: {
                         PaddingRight = UDim.new(0, 8),
                     },
                     
-                    -- Mutation options
                     ForPairs(scope, compatibleMutations, function(use, scope, index, mutationInfo)
                         local mutationType = mutationInfo.Type
                         local data = mutationInfo.Data
                         
                         local isOwned = Computed(scope, function(use)
-                            local mutations = use(props.Mutations)
-                            return table.find(mutations, mutationType) ~= nil
+                            local owned = use(props.OwnedMutations)
+                            return table.find(owned, mutationType) ~= nil
                         end)
                         
                         local canPurchase = Computed(scope, function(use)
                             if use(isOwned) then return false end
-                            
                             local level = use(props.PlayerLevel)
                             local coins = use(props.PlayerCoins)
-                            
                             if level < data.RequiredLevel then return false end
                             if coins < data.Cost then return false end
-                            
-                            -- Check compatibility with existing mutations
-                            local mutations = use(props.Mutations)
-                            for _, existing in mutations do
-                                if not MutationData.IsCompatibleWith(mutationType, existing) then
-                                    return false
-                                end
-                            end
-                            
                             return true
                         end)
                         
-                        return index, MutationOption(scope, {
+                        return index, ShopMutationCard(scope, {
                             MutationType = mutationType,
                             Data = data,
                             IsOwned = isOwned,
@@ -498,15 +601,422 @@ local function PlantMutationCard(scope: any, props: {
     }
 end
 
+--------------------------------------------------------------------------------
+-- EQUIP TAB COMPONENTS
+--------------------------------------------------------------------------------
+
+-- Mutation slot (empty or filled)
+local function MutationSlot(scope: any, props: {
+    MutationType: string?, -- nil if empty
+    SlotIndex: number,
+    OnRemove: (() -> ())?,
+}): any
+    local isEmpty = props.MutationType == nil
+    
+    if isEmpty then
+        return New(scope, "Frame") {
+            Size = UDim2.fromOffset(50, 50),
+            BackgroundColor3 = Colors.BackgroundLighter,
+            
+            [Children] = {
+                New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
+                New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2, Transparency = 0.5 },
+                
+                New(scope, "TextLabel") {
+                    Size = UDim2.new(1, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                    Text = "+",
+                    TextSize = 24,
+                    Font = Fonts.Title,
+                    TextColor3 = Colors.TextMuted,
+                },
+            },
+        }
+    else
+        return MutationBadge(scope, {
+            MutationType = props.MutationType :: string,
+            OnRemove = props.OnRemove,
+            Size = 50,
+        })
+    end
+end
+
+-- Available mutation to equip (smaller card)
+local function EquipMutationOption(scope: any, props: {
+    MutationType: string,
+    IsEquipped: any, -- Computed<boolean>
+    CanEquip: any, -- Computed<boolean>
+    OnEquip: () -> (),
+}): any
+    local mutation = MutationData.Get(props.MutationType)
+    if not mutation then return nil end
+    
+    local category = getMutationCategory(mutation.Id)
+    local icon = CATEGORY_ICONS[category] or "✨"
+    local color = CATEGORY_COLORS[category] or Colors.Success or DEFAULT_MUTATION_COLOR
+    
+    return New(scope, "TextButton") {
+        Size = UDim2.fromOffset(80, 80),
+        BackgroundColor3 = Computed(scope, function(use)
+            if use(props.IsEquipped) then return Colors.Success or DEFAULT_MUTATION_COLOR end
+            if use(props.CanEquip) then return color or DEFAULT_MUTATION_COLOR end
+            return Colors.BackgroundLighter or DEFAULT_MUTATION_COLOR
+        end),
+        Text = "",
+        AutoButtonColor = false,
+        
+        [OnEvent "Activated"] = function()
+            if not peek(props.IsEquipped) and peek(props.CanEquip) then
+                props.OnEquip()
+            end
+        end,
+        
+        [Children] = {
+            New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
+            New(scope, "UIStroke") {
+                Color = Computed(scope, function(use)
+                    if use(props.IsEquipped) then return Colors.Success or DEFAULT_MUTATION_COLOR end
+                    return color or DEFAULT_MUTATION_COLOR
+                end),
+                Thickness = Computed(scope, function(use)
+                    return if use(props.IsEquipped) then 3 else 2
+                end),
+                Transparency = 0.3,
+            },
+            
+            -- Darken overlay
+            New(scope, "Frame") {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundColor3 = Color3.new(0, 0, 0),
+                BackgroundTransparency = Computed(scope, function(use)
+                    if use(props.IsEquipped) then return 0.3 end
+                    if use(props.CanEquip) then return 0.6 end
+                    return 0.7
+                end),
+                ZIndex = 0,
+                
+                [Children] = {
+                    New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
+                },
+            },
+            
+            -- Icon
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, 0, 0, 40),
+                Position = UDim2.fromOffset(0, 5),
+                BackgroundTransparency = 1,
+                Text = icon,
+                TextSize = 28,
+            },
+            
+            -- Name
+            New(scope, "TextLabel") {
+                Size = UDim2.new(1, -8, 0, 20),
+                Position = UDim2.new(0, 4, 1, -25),
+                BackgroundTransparency = 1,
+                Text = mutation.Name or props.MutationType,
+                TextSize = 10,
+                Font = Fonts.Header,
+                TextColor3 = Colors.TextWhite,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+            },
+            
+            -- Equipped check
+            Computed(scope, function(use)
+                if use(props.IsEquipped) then
+                    return New(scope, "TextLabel") {
+                        Size = UDim2.fromOffset(20, 20),
+                        Position = UDim2.new(1, -4, 0, 4),
+                        AnchorPoint = Vector2.new(1, 0),
+                        BackgroundColor3 = Colors.Success or Color3.fromRGB(76, 175, 80),
+                        Text = "✓",
+                        TextSize = 12,
+                        Font = Fonts.Title,
+                        TextColor3 = Colors.TextWhite,
+                        
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                        },
+                    }
+                end
+                return nil
+            end),
+        },
+    }
+end
+
+-- Plant card for Equip tab
+local function EquipPlantCard(scope: any, props: {
+    PlantType: string,
+    PlantStats: any,
+    OwnedMutations: any, -- Computed<{string}>
+    EquippedMutations: any, -- Computed<{string}>
+    OnEquip: (mutationType: string) -> (),
+    OnUnequip: (mutationType: string) -> (),
+}): any
+    local isExpanded = Value(scope, false)
+    
+    local equippedCount = Computed(scope, function(use)
+        return #use(props.EquippedMutations)
+    end)
+    
+    local ownedCount = Computed(scope, function(use)
+        return #use(props.OwnedMutations)
+    end)
+    
+    return New(scope, "Frame") {
+        Size = Computed(scope, function(use)
+            return if use(isExpanded) 
+                then UDim2.new(1, 0, 0, 240) 
+                else UDim2.new(1, 0, 0, 90)
+        end),
+        BackgroundColor3 = Colors.Card,
+        ClipsDescendants = true,
+        
+        [Children] = {
+            New(scope, "UICorner") { CornerRadius = Sizing.RadiusLarge },
+            New(scope, "UIStroke") { Color = Colors.Border, Thickness = 1 },
+            
+            -- Header
+            New(scope, "TextButton") {
+                Size = UDim2.new(1, 0, 0, 90),
+                BackgroundTransparency = 1,
+                Text = "",
+                
+                [OnEvent "Activated"] = function()
+                    isExpanded:set(not peek(isExpanded))
+                end,
+                
+                [Children] = {
+                    -- Plant icon
+                    New(scope, "Frame") {
+                        Size = UDim2.fromOffset(55, 55),
+                        Position = UDim2.fromOffset(12, 17),
+                        BackgroundColor3 = Colors.Success or Color3.fromRGB(76, 175, 80),
+                        
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                            New(scope, "UIGradient") {
+                                Color = ColorSequence.new({
+                                    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 200, 100)),
+                                    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 140, 60)),
+                                }),
+                                Rotation = 90,
+                            },
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 1, 0),
+                                BackgroundTransparency = 1,
+                                Text = "🌱",
+                                TextSize = 26,
+                            },
+                        },
+                    },
+                    
+                    -- Plant name + stats
+                    New(scope, "Frame") {
+                        Size = UDim2.new(0, 150, 0, 55),
+                        Position = UDim2.fromOffset(80, 17),
+                        BackgroundTransparency = 1,
+                        
+                        [Children] = {
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 0, 22),
+                                BackgroundTransparency = 1,
+                                Text = props.PlantType,
+                                TextSize = 16,
+                                Font = Fonts.Title,
+                                TextColor3 = Colors.TextWhite,
+                                TextXAlignment = Enum.TextXAlignment.Left,
+                            },
+                            
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 0, 18),
+                                Position = UDim2.fromOffset(0, 24),
+                                BackgroundTransparency = 1,
+                                Text = Computed(scope, function(use)
+                                    return `{use(equippedCount)}/{MAX_EQUIPPED_MUTATIONS} équipées • {use(ownedCount)} possédées`
+                                end),
+                                TextSize = 11,
+                                Font = Fonts.Body,
+                                TextColor3 = Colors.TextMuted,
+                                TextXAlignment = Enum.TextXAlignment.Left,
+                            },
+                        },
+                    },
+                    
+                    -- Equipped slots
+                    New(scope, "Frame") {
+                        Size = UDim2.fromOffset(180, 55),
+                        Position = UDim2.new(1, -230, 0.5, 0),
+                        AnchorPoint = Vector2.new(0, 0.5),
+                        BackgroundTransparency = 1,
+                        
+                        [Children] = {
+                            New(scope, "UIListLayout") {
+                                FillDirection = Enum.FillDirection.Horizontal,
+                                Padding = UDim.new(0, 8),
+                                HorizontalAlignment = Enum.HorizontalAlignment.Left,
+                                VerticalAlignment = Enum.VerticalAlignment.Center,
+                            },
+                            
+                            -- Render slots
+                            Computed(scope, function(use)
+                                local equipped = use(props.EquippedMutations)
+                                local slots = {}
+                                
+                                for i = 1, MAX_EQUIPPED_MUTATIONS do
+                                    local mutationType = equipped[i]
+                                    local slotKey = `slot_{i}`
+                                    
+                                    slots[slotKey] = MutationSlot(scope, {
+                                        MutationType = mutationType,
+                                        SlotIndex = i,
+                                        OnRemove = if mutationType then function()
+                                            props.OnUnequip(mutationType)
+                                        end else nil,
+                                    })
+                                end
+                                
+                                return slots
+                            end),
+                        },
+                    },
+                    
+                    -- Expand indicator
+                    New(scope, "Frame") {
+                        Size = UDim2.fromOffset(36, 36),
+                        Position = UDim2.new(1, -12, 0.5, 0),
+                        AnchorPoint = Vector2.new(1, 0.5),
+                        BackgroundColor3 = Colors.BackgroundLighter,
+                        
+                        [Children] = {
+                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, 0, 1, 0),
+                                BackgroundTransparency = 1,
+                                Text = Computed(scope, function(use)
+                                    return if use(isExpanded) then "▲" else "▼"
+                                end),
+                                TextSize = 14,
+                                Font = Fonts.Title,
+                                TextColor3 = Colors.TextMuted,
+                            },
+                        },
+                    },
+                },
+            },
+            
+            -- Expanded: available mutations to equip
+            New(scope, "Frame") {
+                Size = UDim2.new(1, -24, 0, 130),
+                Position = UDim2.fromOffset(12, 100),
+                BackgroundColor3 = Colors.BackgroundLighter,
+                
+                [Children] = {
+                    New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
+                    New(scope, "UIPadding") {
+                        PaddingTop = UDim.new(0, 8),
+                        PaddingBottom = UDim.new(0, 8),
+                        PaddingLeft = UDim.new(0, 8),
+                        PaddingRight = UDim.new(0, 8),
+                    },
+                    
+                    -- Title
+                    New(scope, "TextLabel") {
+                        Size = UDim2.new(1, 0, 0, 20),
+                        BackgroundTransparency = 1,
+                        Text = "Mutations possédées :",
+                        TextSize = 12,
+                        Font = Fonts.Header,
+                        TextColor3 = Colors.TextMuted,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                    },
+                    
+                    -- Mutations grid
+                    New(scope, "ScrollingFrame") {
+                        Size = UDim2.new(1, 0, 1, -28),
+                        Position = UDim2.fromOffset(0, 26),
+                        BackgroundTransparency = 1,
+                        ScrollBarThickness = 4,
+                        ScrollBarImageColor3 = Colors.Border,
+                        CanvasSize = UDim2.new(0, 0, 0, 0),
+                        AutomaticCanvasSize = Enum.AutomaticSize.X,
+                        ScrollingDirection = Enum.ScrollingDirection.X,
+                        
+                        [Children] = {
+                            New(scope, "UIListLayout") {
+                                FillDirection = Enum.FillDirection.Horizontal,
+                                Padding = UDim.new(0, 8),
+                                VerticalAlignment = Enum.VerticalAlignment.Center,
+                            },
+                            
+                            ForPairs(scope, props.OwnedMutations, function(use, scope, index, mutationType)
+                                local isEquipped = Computed(scope, function(use)
+                                    local equipped = use(props.EquippedMutations)
+                                    return table.find(equipped, mutationType) ~= nil
+                                end)
+                                
+                                local canEquip = Computed(scope, function(use)
+                                    if use(isEquipped) then return false end
+                                    local equipped = use(props.EquippedMutations)
+                                    return #equipped < MAX_EQUIPPED_MUTATIONS
+                                end)
+                                
+                                return index, EquipMutationOption(scope, {
+                                    MutationType = mutationType,
+                                    IsEquipped = isEquipped,
+                                    CanEquip = canEquip,
+                                    OnEquip = function()
+                                        props.OnEquip(mutationType)
+                                    end,
+                                })
+                            end),
+                            
+                            -- Empty state
+                            Computed(scope, function(use)
+                                if #use(props.OwnedMutations) == 0 then
+                                    return New(scope, "TextLabel") {
+                                        Size = UDim2.new(0, 200, 1, 0),
+                                        BackgroundTransparency = 1,
+                                        Text = "Aucune mutation achetée\nVisite la Boutique !",
+                                        TextSize = 12,
+                                        Font = Fonts.Body,
+                                        TextColor3 = Colors.TextMuted,
+                                        TextWrapped = true,
+                                    }
+                                end
+                                return nil
+                            end),
+                        },
+                    },
+                },
+            },
+        },
+    }
+end
+
+--------------------------------------------------------------------------------
+-- MAIN VIEW
+--------------------------------------------------------------------------------
+
 return function(scope: any, props: MutationViewProps)
+    local activeTab = Value(scope, TAB_SHOP)
+    
     -- Compute unlocked plants
     local unlockedPlants = Computed(scope, function(use)
         local data = use(props.PlayerData)
         if not data then return {} end
         
+        local unlockedSet: {[string]: boolean} = {}
+        if data.UnlockedPlants then
+            for _, plantType in ipairs(data.UnlockedPlants) do
+                unlockedSet[plantType] = true
+            end
+        end
+        
         local result: {{Type: string, Stats: any}} = {}
         for plantType, stats in PlantData do
-            if data.UnlockedPlants[plantType] then
+            if unlockedSet[plantType] then
                 table.insert(result, {Type = plantType, Stats = stats})
             end
         end
@@ -533,14 +1043,12 @@ return function(scope: any, props: MutationViewProps)
         BackgroundColor3 = Colors.Background,
         
         [Children] = {
-            
-            -- Header (top bar)
+            -- Header
             New(scope, "Frame") {
                 Size = UDim2.new(1, 0, 0, 70),
                 BackgroundColor3 = Color3.fromRGB(30, 30, 42),
                 
                 [Children] = {
-                    
                     -- Title
                     New(scope, "TextLabel") {
                         Size = UDim2.new(0.5, 0, 1, 0),
@@ -562,7 +1070,6 @@ return function(scope: any, props: MutationViewProps)
                         [Children] = {
                             New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
                             New(scope, "UIStroke") { Color = Colors.Coins, Thickness = 2, Transparency = 0.6 },
-                            
                             New(scope, "TextLabel") {
                                 Size = UDim2.new(1, 0, 1, 0),
                                 BackgroundTransparency = 1,
@@ -576,7 +1083,7 @@ return function(scope: any, props: MutationViewProps)
                         },
                     },
                     
-                    -- Close button (RIGHT side)
+                    -- Close button
                     New(scope, "TextButton") {
                         Size = UDim2.fromOffset(44, 44),
                         Position = UDim2.new(1, -15, 0.5, 0),
@@ -596,10 +1103,54 @@ return function(scope: any, props: MutationViewProps)
                 },
             },
             
+            -- Tab bar
+            New(scope, "Frame") {
+                Size = UDim2.new(1, -32, 0, 44),
+                Position = UDim2.fromOffset(16, 80),
+                BackgroundColor3 = Colors.Card,
+                
+                [Children] = {
+                    New(scope, "UICorner") { CornerRadius = Sizing.RadiusMedium },
+                    New(scope, "UIPadding") {
+                        PaddingTop = UDim.new(0, 4),
+                        PaddingBottom = UDim.new(0, 4),
+                        PaddingLeft = UDim.new(0, 4),
+                        PaddingRight = UDim.new(0, 4),
+                    },
+                    
+                    New(scope, "UIListLayout") {
+                        FillDirection = Enum.FillDirection.Horizontal,
+                        Padding = UDim.new(0, 8),
+                    },
+                    
+                    TabButton(scope, {
+                        Text = "Boutique",
+                        Icon = "🛒",
+                        IsActive = Computed(scope, function(use)
+                            return use(activeTab) == TAB_SHOP
+                        end),
+                        OnClick = function()
+                            activeTab:set(TAB_SHOP)
+                        end,
+                    }),
+                    
+                    TabButton(scope, {
+                        Text = "Équipement",
+                        Icon = "⚙️",
+                        IsActive = Computed(scope, function(use)
+                            return use(activeTab) == TAB_EQUIP
+                        end),
+                        OnClick = function()
+                            activeTab:set(TAB_EQUIP)
+                        end,
+                    }),
+                },
+            },
+            
             -- Main content
             New(scope, "ScrollingFrame") {
-                Size = UDim2.new(1, -32, 1, -90),
-                Position = UDim2.fromOffset(16, 80),
+                Size = UDim2.new(1, -32, 1, -145),
+                Position = UDim2.fromOffset(16, 135),
                 BackgroundTransparency = 1,
                 ScrollBarThickness = 4,
                 ScrollBarImageColor3 = Colors.Border,
@@ -612,54 +1163,115 @@ return function(scope: any, props: MutationViewProps)
                         HorizontalAlignment = Enum.HorizontalAlignment.Center,
                     },
                     
-                    -- Plant cards
-                    ForPairs(scope, unlockedPlants, function(use, scope, index, plantInfo)
-                        local plantType = plantInfo.Type
-                        
-                        local plantMutations = Computed(scope, function(use)
-                            local allMutations = use(props.PlantMutations)
-                            return allMutations[plantType] or {}
-                        end)
-                        
-                        return index, PlantMutationCard(scope, {
-                            PlantType = plantType,
-                            PlantStats = plantInfo.Stats,
-                            Mutations = plantMutations,
-                            PlayerLevel = playerLevel,
-                            PlayerCoins = playerCoins,
-                            OnPurchase = function(mutationType)
-                                props.OnPurchaseMutation(plantType, mutationType)
-                            end,
-                            OnRemove = function(mutationType)
-                                props.OnRemoveMutation(plantType, mutationType)
-                            end,
-                        })
-                    end),
-                    
-                    -- Empty state
+                    -- Shop tab content
                     Computed(scope, function(use)
-                        if #use(unlockedPlants) == 0 then
-                            return New(scope, "Frame") {
-                                Size = UDim2.new(1, 0, 0, 150),
-                                BackgroundColor3 = Colors.Card,
-                                
-                                [Children] = {
-                                    New(scope, "UICorner") { CornerRadius = Sizing.RadiusLarge },
+                        if use(activeTab) ~= TAB_SHOP then return {} end
+                        
+                        local plants = use(unlockedPlants)
+                        if #plants == 0 then
+                            return {
+                                EmptyState = New(scope, "Frame") {
+                                    Size = UDim2.new(1, 0, 0, 150),
+                                    BackgroundColor3 = Colors.Card,
                                     
-                                    New(scope, "TextLabel") {
-                                        Size = UDim2.new(1, -40, 1, 0),
-                                        Position = UDim2.fromOffset(20, 0),
-                                        BackgroundTransparency = 1,
-                                        Text = "🌱 No plants unlocked yet!\n\nVisit the Shop to unlock plants,\nthen come back to add mutations.",
-                                        TextSize = 16,
-                                        Font = Fonts.Body,
-                                        TextColor3 = Colors.TextMuted,
-                                        TextWrapped = true,
+                                    [Children] = {
+                                        New(scope, "UICorner") { CornerRadius = Sizing.RadiusLarge },
+                                        New(scope, "TextLabel") {
+                                            Size = UDim2.new(1, -40, 1, 0),
+                                            Position = UDim2.fromOffset(20, 0),
+                                            BackgroundTransparency = 1,
+                                            Text = "🌱 Aucune plante débloquée !\n\nVisite le Shop pour débloquer des plantes,\npuis reviens acheter des mutations.",
+                                            TextSize = 16,
+                                            Font = Fonts.Body,
+                                            TextColor3 = Colors.TextMuted,
+                                            TextWrapped = true,
+                                        },
                                     },
                                 },
                             }
                         end
-                        return nil
+                        
+                        local cards = {}
+                        for _, plantInfo in ipairs(plants) do
+                            local plantType = plantInfo.Type
+                            
+                            local plantOwnedMutations = Computed(scope, function(use)
+                                local allOwned = use(props.OwnedMutations)
+                                return allOwned[plantType] or {}
+                            end)
+                            
+                            cards[plantType] = ShopPlantCard(scope, {
+                                PlantType = plantType,
+                                PlantStats = plantInfo.Stats,
+                                OwnedMutations = plantOwnedMutations,
+                                PlayerLevel = playerLevel,
+                                PlayerCoins = playerCoins,
+                                OnPurchase = function(mutationType)
+                                    props.OnPurchaseMutation(plantType, mutationType)
+                                end,
+                            })
+                        end
+                        
+                        return cards
+                    end),
+                    
+                    -- Equip tab content
+                    Computed(scope, function(use)
+                        if use(activeTab) ~= TAB_EQUIP then return {} end
+                        
+                        local plants = use(unlockedPlants)
+                        if #plants == 0 then
+                            return {
+                                EmptyState = New(scope, "Frame") {
+                                    Size = UDim2.new(1, 0, 0, 150),
+                                    BackgroundColor3 = Colors.Card,
+                                    
+                                    [Children] = {
+                                        New(scope, "UICorner") { CornerRadius = Sizing.RadiusLarge },
+                                        New(scope, "TextLabel") {
+                                            Size = UDim2.new(1, -40, 1, 0),
+                                            Position = UDim2.fromOffset(20, 0),
+                                            BackgroundTransparency = 1,
+                                            Text = "🌱 Aucune plante débloquée !\n\nDébloque d'abord des plantes\npour équiper des mutations.",
+                                            TextSize = 16,
+                                            Font = Fonts.Body,
+                                            TextColor3 = Colors.TextMuted,
+                                            TextWrapped = true,
+                                        },
+                                    },
+                                },
+                            }
+                        end
+                        
+                        local cards = {}
+                        for _, plantInfo in ipairs(plants) do
+                            local plantType = plantInfo.Type
+                            
+                            local plantOwnedMutations = Computed(scope, function(use)
+                                local allOwned = use(props.OwnedMutations)
+                                return allOwned[plantType] or {}
+                            end)
+                            
+                            local plantEquippedMutations = Computed(scope, function(use)
+                                local allEquipped = use(props.EquippedMutations)
+                                return allEquipped[plantType] or {}
+                            end)
+                            
+                            cards[plantType] = EquipPlantCard(scope, {
+                                PlantType = plantType,
+                                PlantStats = plantInfo.Stats,
+                                OwnedMutations = plantOwnedMutations,
+                                EquippedMutations = plantEquippedMutations,
+                                OnEquip = function(mutationType)
+                                    props.OnEquipMutation(plantType, mutationType)
+                                end,
+                                OnUnequip = function(mutationType)
+                                    props.OnUnequipMutation(plantType, mutationType)
+                                end,
+                            })
+                        end
+                        
+                        return cards
                     end),
                 },
             },

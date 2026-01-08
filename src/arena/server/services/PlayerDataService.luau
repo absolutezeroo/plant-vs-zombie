@@ -1,11 +1,16 @@
 --!strict
 --[[
-	PlayerDataService.luau - Persistent player data management
+	PlayerDataService.luau - Persistent player data management (Arena)
 	
 	Uses ProfileStore for cross-session persistence.
 	Manages: Coins, UnlockedPlants, Upgrades, Stats
 	
 	Server-side only. Clients receive replicated data via events.
+	
+	Integrated with:
+	- shared/data/ProfileTemplate (single source of truth)
+	- shared/services/PlayerDataCore (shared utilities)
+	- shared/services/TeleportDataHandler (teleport flow)
 ]]
 
 local Players = game:GetService("Players")
@@ -18,53 +23,11 @@ local ProfileStore = require(Packages:WaitForChild("ProfileStore"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ProgressionData = require(Shared.data.ProgressionData)
 local Logger = require(Shared.utils.Logger)
+local ProfileTemplate = require(Shared.data.ProfileTemplate) :: any
+local PlayerDataCore = require(Shared.services.PlayerDataCore) :: any
 
--- Profile template (default data for new players)
-local PROFILE_TEMPLATE = {
-	Coins = 0,
-	TotalCoinsEarned = 0,
-	Gems = 0,
-	TotalGemsEarned = 0,
-	
-	-- XP and Level system
-	XP = 0,
-	Level = 1,
-	
-	-- Unlocked plants (starter plants are unlocked by default)
-	UnlockedPlants = {
-		Sunflower = true,
-		Peashooter = true,
-		WallNut = true,
-	},
-	
-	-- Plant mutations (replaces old upgrade system)
-	PlantMutations = {} :: {[string]: {string}}, -- [PlantType] = {"Fire", "Swift", ...}
-	
-	-- Plant mastery system (cosmetic XP tracking)
-	PlantMastery = {} :: {[string]: { Rank: number, XP: number }},
-	
-	-- Statistics
-	Stats = {
-		GamesPlayed = 0,
-		GamesWon = 0,
-		ZombiesKilled = 0,
-		PlantsPlaced = 0,
-	},
-	
-	-- Settings (for future use)
-	Settings = {
-		MusicVolume = 1.0,
-		SFXVolume = 1.0,
-	},
-	
-	-- Deck loadout (6 plant slots)
-	Deck = {
-		"Sunflower",
-		"Peashooter",
-		"WallNut",
-		-- Slots 4-6 empty by default
-	},
-}
+-- Use shared profile template (single source of truth)
+local PROFILE_TEMPLATE = ProfileTemplate.PROFILE_TEMPLATE
 
 -- ProfileStore setup
 local STORE_NAME = "PlayerData_v1"
@@ -73,9 +36,11 @@ local PlayerStore = ProfileStore.New(STORE_NAME, PROFILE_TEMPLATE)
 -- Active profiles cache
 local _profiles: {[Player]: any} = {}
 
--- Player data change callbacks
-type DataChangeCallback = (player: Player, data: typeof(PROFILE_TEMPLATE)) -> ()
-local _onDataChangedCallbacks: {DataChangeCallback} = {}
+-- Player data change callbacks (using shared notifier)
+local _dataChangeNotifier = PlayerDataCore.CreateDataChangeNotifier()
+
+-- Profile waiter for WaitForProfile functionality
+local _profileWaiter = PlayerDataCore.CreateProfileWaiter()
 
 local PlayerDataService = {}
 
@@ -389,19 +354,29 @@ function PlayerDataService.IncrementStat(player: Player, statName: string, amoun
 	profile.Data.Stats[statName] = currentValue + (amount or 1)
 end
 
--- Register callback for data changes
-function PlayerDataService.OnDataChanged(callback: DataChangeCallback)
-	table.insert(_onDataChangedCallbacks, callback)
+-- Register callback for data changes (returns unsubscribe function)
+function PlayerDataService.OnDataChanged(callback: (player: Player, data: any) -> ()): () -> ()
+	return _dataChangeNotifier.Subscribe(callback)
 end
 
 -- Notify all callbacks of data change
 function PlayerDataService._notifyDataChanged(player: Player)
 	local data = PlayerDataService.GetProfile(player)
 	if data then
-		for _, callback in _onDataChangedCallbacks do
-			task.spawn(callback, player, data)
-		end
+		_dataChangeNotifier.Notify(player, data)
 	end
+end
+
+--[[
+	Wait for a player's profile to load.
+	Uses signal-based waiting (no polling).
+	
+	@param player The player to wait for
+	@param timeout Maximum seconds to wait (default 10)
+	@return ProfileData or nil if timeout/player left
+]]
+function PlayerDataService.WaitForProfile(player: Player, timeout: number?): any
+	return _profileWaiter.WaitForProfile(player, PlayerDataService.GetProfile, timeout)
 end
 
 -- Load player profile
@@ -429,7 +404,16 @@ local function loadProfile(player: Player)
 		if player.Parent == Players then
 			_profiles[player] = profile
 			Logger.Info("PlayerData", `Profile loaded for {player.Name}: {profile.Data.Coins} coins`)
+			
+			-- Notify data change listeners
 			PlayerDataService._notifyDataChanged(player)
+			
+			-- Fire profile waiter callbacks (for WaitForProfile)
+			_profileWaiter.FireCallbacks(player, profile.Data)
+			
+			-- Notify TeleportDataHandler that profile is ready
+			local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
+			TeleportDataHandler.NotifyProfileLoaded(player, profile.Data)
 		else
 			profile:EndSession()
 		end
@@ -447,6 +431,9 @@ local function unloadProfile(player: Player)
 		_profiles[player] = nil
 		Logger.Info("PlayerData", `Profile saved for {player.Name}`)
 	end
+	
+	-- Cleanup profile waiter
+	_profileWaiter.Cleanup(player)
 end
 
 -- Initialize service

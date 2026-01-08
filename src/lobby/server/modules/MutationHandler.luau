@@ -4,7 +4,8 @@
     
     Handles:
     - PurchaseMutationRequest
-    - RemoveMutationRequest
+    - EquipMutationRequest
+    - UnequipMutationRequest
     - Syncing mutations on player join
 ]]
 
@@ -13,11 +14,12 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local MutationData = require(Shared.data.MutationData)
+
+-- Network (unified Zap schema in shared/network)
+local ZapServer = require(Shared.network.generated.server)
 
 local script_parent = script.Parent.Parent
 local PlayerDataService = require(script_parent.services.PlayerDataService)
-local ZapServer = require(script_parent.network.generated)
 
 local MutationHandler = {}
 
@@ -50,13 +52,25 @@ end
 
 -- Sync all mutations to a player
 function MutationHandler.SyncMutationsToPlayer(player: Player)
-    local allMutations = PlayerDataService.GetAllPlantMutations(player)
+    local allOwned = PlayerDataService.GetAllOwnedMutations(player)
+    local allEquipped = PlayerDataService.GetAllEquippedMutations(player)
     
-    -- Build array of plant-mutation pairs
-    local plantMutationsArray = {}
-    for plantType, mutations in allMutations do
+    -- Build arrays of plant-mutation pairs for owned
+    local ownedArray = {}
+    for plantType, mutations in allOwned do
         if #mutations > 0 then
-            table.insert(plantMutationsArray, {
+            table.insert(ownedArray, {
+                PlantType = plantType,
+                Mutations = mutations,
+            })
+        end
+    end
+    
+    -- Build arrays for equipped
+    local equippedArray = {}
+    for plantType, mutations in allEquipped do
+        if #mutations > 0 then
+            table.insert(equippedArray, {
                 PlantType = plantType,
                 Mutations = mutations,
             })
@@ -64,21 +78,22 @@ function MutationHandler.SyncMutationsToPlayer(player: Player)
     end
     
     -- Send all mutations at once
-    if #plantMutationsArray > 0 then
-        ZapServer.SyncAllMutations.Fire(player, {
-            PlantMutations = plantMutationsArray,
-        })
-        Logger.Info("MutationHandler", `Synced {#plantMutationsArray} plant mutations to {player.Name}`)
-    end
+    ZapServer.SyncAllMutations.Fire(player, {
+        OwnedMutations = ownedArray,
+        EquippedMutations = equippedArray,
+    })
+    Logger.Info("MutationHandler", `Synced mutations to {player.Name}: {#ownedArray} owned, {#equippedArray} equipped`)
 end
 
 -- Sync single plant mutations
 function MutationHandler.SyncPlantMutations(player: Player, plantType: string)
-    local mutations = PlayerDataService.GetPlantMutations(player, plantType)
+    local owned = PlayerDataService.GetOwnedMutations(player, plantType)
+    local equipped = PlayerDataService.GetEquippedMutations(player, plantType)
     
     ZapServer.SyncPlantMutations.Fire(player, {
         PlantType = plantType,
-        Mutations = mutations,
+        OwnedMutations = owned,
+        EquippedMutations = equipped,
     })
 end
 
@@ -108,22 +123,52 @@ function MutationHandler.Initialize()
         end
     end)
     
-    -- Handle remove mutation request
-    ZapServer.RemoveMutationRequest.SetCallback(function(player, data)
+    -- Handle equip mutation request
+    ZapServer.EquipMutationRequest.SetCallback(function(player, data)
         local plantType = data.PlantType
         local mutationType = data.MutationType
         
-        Logger.Info("MutationHandler", `{player.Name} removing {mutationType} from {plantType}`)
+        Logger.Info("MutationHandler", `{player.Name} equipping {mutationType} on {plantType}`)
         
-        local success = PlayerDataService.RemoveMutation(player, plantType, mutationType)
+        local success, errorMsg = PlayerDataService.EquipMutation(player, plantType, mutationType)
         
-        ZapServer.RemoveMutationResponse.Fire(player, {
+        local errorCode = 0
+        if not success and errorMsg then
+            local mapping = {
+                NotOwned = 1,
+                AlreadyEquipped = 2,
+                Incompatible = 3,
+            }
+            errorCode = mapping[errorMsg] or 0
+        end
+        
+        ZapServer.EquipMutationResponse.Fire(player, {
+            Success = success,
+            PlantType = plantType,
+            MutationType = mutationType,
+            ErrorCode = if success then nil else errorCode,
+        })
+        
+        if success then
+            MutationHandler.SyncPlantMutations(player, plantType)
+        end
+    end)
+    
+    -- Handle unequip mutation request
+    ZapServer.UnequipMutationRequest.SetCallback(function(player, data)
+        local plantType = data.PlantType
+        local mutationType = data.MutationType
+        
+        Logger.Info("MutationHandler", `{player.Name} unequipping {mutationType} from {plantType}`)
+        
+        local success = PlayerDataService.UnequipMutation(player, plantType, mutationType)
+        
+        ZapServer.UnequipMutationResponse.Fire(player, {
             Success = success,
             PlantType = plantType,
             MutationType = mutationType,
         })
         
-        -- Sync updated mutations if successful
         if success then
             MutationHandler.SyncPlantMutations(player, plantType)
         end
