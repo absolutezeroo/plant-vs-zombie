@@ -124,7 +124,7 @@ function handlePlayerLeave(player: Player)
     
     -- Teleport player to LeaveRoomPart
     local workspace = game:GetService("Workspace")
-    local lobbyTeleports = workspace:FindFirstChild("Lobby Teleports")
+    local lobbyTeleports = workspace:FindFirstChild("LobbyTeleports")
     local leaveRoomPart = lobbyTeleports and lobbyTeleports:FindFirstChild("LeaveRoomPart", true)
     
     if leaveRoomPart and leaveRoomPart:IsA("BasePart") then
@@ -206,14 +206,14 @@ end
     PRIVATE: Initialization helpers
 ============================================ ]]--
 
--- Scan workspace for teleport pads (Lobby Teleports gates)
+-- Scan workspace for teleport pads (LobbyTeleports gates)
 local function scanForPads()
     local workspace = game:GetService("Workspace")
-    local lobbyTeleports = workspace:FindFirstChild("Lobby Teleports")
+    local lobbyTeleports = workspace:FindFirstChild("LobbyTeleports")
     local teleportPadsFolder = lobbyTeleports and lobbyTeleports:FindFirstChild("Workspace")
     
     if not teleportPadsFolder then
-        Logger.Warn("LobbyService", "No 'Lobby Teleports/Workspace' folder found")
+        Logger.Warn("LobbyService", "No 'LobbyTeleports/Workspace' folder found")
         return
     end
     

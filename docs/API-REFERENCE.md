@@ -50,9 +50,14 @@ This document lists all public functions for each service module to prevent call
 | `IsPlantUnlocked(player, plantType)` | `Player, string` | `boolean` | Check if plant is unlocked |
 | `GetUnlockedPlants(player)` | `Player` | `{string}` | Get list of unlocked plant types |
 | `UnlockPlant(player, plantType)` | `Player, string` | `boolean, string?` | Unlock plant (spends coins) |
-| `GetUpgradeLevel(player, plantType, upgradeType)` | `Player, string, string` | `number` | Get upgrade level |
-| `GetPlantUpgrades(player, plantType)` | `Player, string` | `{Damage, Health, Cooldown}` | Get all upgrades for plant |
-| `PurchaseUpgrade(player, plantType, upgradeType)` | `Player, string, string` | `boolean, string?` | Buy upgrade |
+
+### Plant Mutations
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetPlantMutations(player, plantType)` | `Player, string` | `{string}` | Get mutations for a plant |
+| `HasMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean` | Check if plant has mutation |
+| `PurchaseMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean, string?` | Buy mutation |
+| `RemoveMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean` | Remove mutation |
 
 ### Deck Management
 | Function | Parameters | Returns | Description |

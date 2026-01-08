@@ -30,10 +30,6 @@ local PROFILE_TEMPLATE = {
 	XP = 0,
 	Level = 1,
 	
-	-- Stage progression
-	CurrentStage = "1-1",                    -- Last selected stage
-	CompletedStages = {} :: {[string]: number}, -- StageId -> Stars (1-3)
-	
 	-- Unlocked plants (starter plants are unlocked by default)
 	UnlockedPlants = {
 		Sunflower = true,
@@ -41,10 +37,8 @@ local PROFILE_TEMPLATE = {
 		WallNut = true,
 	},
 	
-	-- Upgrade levels per plant (0 = no upgrade)
-	PlantUpgrades = {
-		-- [PlantType] = { Damage = 0, Health = 0, Cooldown = 0 }
-	},
+	-- Plant mutations (replaces old upgrade system)
+	PlantMutations = {} :: {[string]: {string}}, -- [PlantType] = {"Fire", "Swift", ...}
 	
 	-- Plant mastery system (cosmetic XP tracking)
 	PlantMastery = {} :: {[string]: { Rank: number, XP: number }},
@@ -327,93 +321,6 @@ function PlayerDataService.UnlockPlant(player: Player, plantType: string): (bool
 	return true, nil
 end
 
--- Get upgrade level for a plant
-function PlayerDataService.GetUpgradeLevel(player: Player, plantType: string, upgradeType: string): number
-	local data = PlayerDataService.GetProfile(player)
-	if not data then
-		return 0
-	end
-	
-	local plantUpgrades = data.PlantUpgrades[plantType]
-	if not plantUpgrades then
-		return 0
-	end
-	
-	return plantUpgrades[upgradeType] or 0
-end
-
--- Get all upgrade levels for a plant
-function PlayerDataService.GetPlantUpgrades(player: Player, plantType: string): {Damage: number, Health: number, Cooldown: number}
-	local data = PlayerDataService.GetProfile(player)
-	local default = {Damage = 0, Health = 0, Cooldown = 0}
-	
-	if not data then
-		return default
-	end
-	
-	local plantUpgrades = data.PlantUpgrades[plantType]
-	if not plantUpgrades then
-		return default
-	end
-	
-	return {
-		Damage = plantUpgrades.Damage or 0,
-		Health = plantUpgrades.Health or 0,
-		Cooldown = plantUpgrades.Cooldown or 0,
-	}
-end
-
--- Purchase an upgrade
-function PlayerDataService.PurchaseUpgrade(player: Player, plantType: string, upgradeType: string): (boolean, string?)
-	local profile = _profiles[player]
-	if not profile then
-		return false, "Profile not loaded"
-	end
-	
-	-- Plant must be unlocked
-	if not profile.Data.UnlockedPlants[plantType] then
-		return false, "Plant not unlocked"
-	end
-	
-	-- Get upgrade info
-	local upgradeInfo = ProgressionData.Upgrades[upgradeType]
-	if not upgradeInfo then
-		return false, "Unknown upgrade type"
-	end
-	
-	-- Initialize plant upgrades if needed
-	if not profile.Data.PlantUpgrades[plantType] then
-		profile.Data.PlantUpgrades[plantType] = {Damage = 0, Health = 0, Cooldown = 0}
-	end
-	
-	local currentLevel = profile.Data.PlantUpgrades[plantType][upgradeType] or 0
-	
-	-- Already max?
-	if currentLevel >= upgradeInfo.MaxLevel then
-		return false, "Already max level"
-	end
-	
-	-- Get cost for next level
-	local cost = upgradeInfo.CostPerLevel[currentLevel + 1]
-	if not cost then
-		return false, "Invalid upgrade level"
-	end
-	
-	-- Check coins
-	if profile.Data.Coins < cost then
-		return false, "Not enough coins"
-	end
-	
-	-- Purchase
-	profile.Data.Coins -= cost
-	profile.Data.PlantUpgrades[plantType][upgradeType] = currentLevel + 1
-	
-	Logger.Info("PlayerData", `{player.Name} upgraded {plantType} {upgradeType} to level {currentLevel + 1} for {cost} coins`)
-	PlayerDataService._notifyDataChanged(player)
-	
-	return true, nil
-end
-
 -- ============================================
 -- DECK SYSTEM
 -- ============================================
@@ -465,78 +372,6 @@ function PlayerDataService.SaveDeck(player: Player, deck: {string}): (boolean, s
 	PlayerDataService._notifyDataChanged(player)
 	
 	return true, nil
-end
-
--- ============================================
--- STAGE SYSTEM
--- ============================================
-
--- Get current stage
-function PlayerDataService.GetCurrentStage(player: Player): string
-	local data = PlayerDataService.GetProfile(player)
-	return if data then (data.CurrentStage or "1-1") else "1-1"
-end
-
--- Set current stage
-function PlayerDataService.SetCurrentStage(player: Player, stageId: string): boolean
-	local profile = _profiles[player]
-	if not profile then
-		return false
-	end
-	
-	profile.Data.CurrentStage = stageId
-	Logger.Debug("PlayerData", `{player.Name} selected stage {stageId}`)
-	
-	return true
-end
-
--- Get completed stages
-function PlayerDataService.GetCompletedStages(player: Player): {[string]: number}
-	local data = PlayerDataService.GetProfile(player)
-	return if data then (data.CompletedStages or {}) else {}
-end
-
--- Get stars for a specific stage
-function PlayerDataService.GetStageStars(player: Player, stageId: string): number
-	local data = PlayerDataService.GetProfile(player)
-	if not data or not data.CompletedStages then
-		return 0
-	end
-	return data.CompletedStages[stageId] or 0
-end
-
--- Complete a stage with stars (only updates if better)
-function PlayerDataService.CompleteStage(player: Player, stageId: string, stars: number): (boolean, boolean)
-	local profile = _profiles[player]
-	if not profile then
-		return false, false
-	end
-	
-	if not profile.Data.CompletedStages then
-		profile.Data.CompletedStages = {}
-	end
-	
-	local currentStars = profile.Data.CompletedStages[stageId] or 0
-	local isFirstClear = currentStars == 0
-	local isNewBest = stars > currentStars
-	
-	if isNewBest then
-		profile.Data.CompletedStages[stageId] = stars
-		Logger.Info("PlayerData", `{player.Name} completed {stageId} with {stars} stars (previous: {currentStars})`)
-		PlayerDataService._notifyDataChanged(player)
-	end
-	
-	return isFirstClear, isNewBest
-end
-
--- Get total stars earned across all stages
-function PlayerDataService.GetTotalStars(player: Player): number
-	local completedStages = PlayerDataService.GetCompletedStages(player)
-	local total = 0
-	for _, stars in completedStages do
-		total += stars
-	end
-	return total
 end
 
 -- ============================================

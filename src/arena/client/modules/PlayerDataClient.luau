@@ -30,8 +30,8 @@ local PlayerData = {
 	Level = Value(_scope, 1),
 	LevelProgress = Value(_scope, 0),  -- 0.0 to 1.0
 	UnlockedPlants = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
-	-- Upgrades: [PlantType] = { Damage = level, Health = level, Cooldown = level }
-	PlantUpgrades = Value(_scope, {} :: {[string]: {Damage: number, Health: number, Cooldown: number}}),
+	-- Plant mutations (replaces old upgrade system)
+	PlantMutations = Value(_scope, {} :: {[string]: {string}}),
 	-- Current deck (up to 6 plants)
 	Deck = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
 	
@@ -116,36 +116,16 @@ function PlayerDataClient.IsPlantUnlocked(plantType: string): boolean
 	return table.find(unlocked, plantType) ~= nil
 end
 
--- Get upgrade level for a plant
-function PlayerDataClient.GetUpgradeLevel(plantType: string, upgradeType: string): number
-	local upgrades = Fusion.peek(PlayerData.PlantUpgrades)
-	local plantUpgrades = upgrades[plantType]
-	if not plantUpgrades then
-		return 0
-	end
-	return (plantUpgrades :: any)[upgradeType] or 0
+-- Get mutations for a plant
+function PlayerDataClient.GetPlantMutations(plantType: string): {string}
+	local mutations = Fusion.peek(PlayerData.PlantMutations)
+	return mutations[plantType] or {}
 end
 
--- Get all upgrades for a plant
-function PlayerDataClient.GetPlantUpgrades(plantType: string): {Damage: number, Health: number, Cooldown: number}
-	local upgrades = Fusion.peek(PlayerData.PlantUpgrades)
-	return upgrades[plantType] or {Damage = 0, Health = 0, Cooldown = 0}
-end
-
--- Calculate modified plant stats based on upgrades
-function PlayerDataClient.GetModifiedPlantStats(plantType: string, baseStats: {
-	Damage: number,
-	Health: number,
-	Cooldown: number,
-}): {Damage: number, Health: number, Cooldown: number}
-	local upgrades = PlayerDataClient.GetPlantUpgrades(plantType)
-	local upgradeData = ProgressionData.Upgrades
-	
-	return {
-		Damage = baseStats.Damage * (1 + upgrades.Damage * upgradeData.Damage.Bonus),
-		Health = baseStats.Health * (1 + upgrades.Health * upgradeData.Health.Bonus),
-		Cooldown = baseStats.Cooldown * (1 - upgrades.Cooldown * upgradeData.Cooldown.Bonus),
-	}
+-- Check if plant has a specific mutation
+function PlayerDataClient.HasMutation(plantType: string, mutationType: string): boolean
+	local mutations = PlayerDataClient.GetPlantMutations(plantType)
+	return table.find(mutations, mutationType) ~= nil
 end
 
 -- Register callback for coin gain events (for VFX)
@@ -159,16 +139,6 @@ function PlayerDataClient.RequestUnlockPlant(plantType: string)
 	Network.UnlockPlantRequest.Fire({
 		RequestId = 0, -- Will be properly set by network layer
 		PlantType = plantType :: any,
-	})
-end
-
--- Send upgrade request to server
-function PlayerDataClient.RequestPurchaseUpgrade(plantType: string, upgradeType: string)
-	Logger.Debug("PlayerData", `Requesting {upgradeType} upgrade for {plantType}`)
-	Network.PurchaseUpgradeRequest.Fire({
-		RequestId = 0,
-		PlantType = plantType :: any,
-		UpgradeType = upgradeType :: any,
 	})
 end
 
@@ -290,17 +260,6 @@ function PlayerDataClient.Initialize()
 			table.insert(unlockedList, tostring(plantType))
 		end
 		PlayerData.UnlockedPlants:set(unlockedList)
-		
-		-- Update upgrades
-		local upgrades: {[string]: {Damage: number, Health: number, Cooldown: number}} = {}
-		for i, plantType in data.UpgradePlantTypes do
-			upgrades[tostring(plantType)] = {
-				Damage = data.UpgradeDamage[i] or 0,
-				Health = data.UpgradeHealth[i] or 0,
-				Cooldown = data.UpgradeCooldown[i] or 0,
-			}
-		end
-		PlayerData.PlantUpgrades:set(upgrades)
 	end)
 	
 	-- Handle coin gain events

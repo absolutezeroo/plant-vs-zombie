@@ -448,12 +448,7 @@ function WaveManager.OnZombieDied()
     -- Called by EntityDeathSystem
 end
 
--- Legacy getter (deprecated)
-function WaveManager.GetCurrentStageId(): string
-    return `{_currentWorldId}-{_currentDifficulty}`
-end
-
--- New getters for World + Difficulty system
+-- Getters for World + Difficulty system
 function WaveManager.GetCurrentWorldId(): string
     return _currentWorldId
 end

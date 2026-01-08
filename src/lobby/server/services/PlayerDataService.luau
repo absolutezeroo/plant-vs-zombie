@@ -30,14 +30,12 @@ local PROFILE_TEMPLATE = {
     TotalGemsEarned = 0,
     XP = 0,
     Level = 1,
-    CurrentStage = "1-1",
-    CompletedStages = {} :: {[string]: number},
     UnlockedPlants = {
         Sunflower = true,
         Peashooter = true,
         WallNut = true,
     },
-    PlantUpgrades = {},
+    PlantMutations = {} :: {[string]: {string}}, -- [PlantType] = {"Fire", "Swift", ...}
     PlantMastery = {} :: {[string]: { Rank: number, XP: number }},
     Deck = {"Sunflower", "Peashooter", "WallNut"} :: {string}, -- Default starter deck
     Stats = {
@@ -137,42 +135,6 @@ function PlayerDataService.GetDeck(player: Player): {string}?
     local profile = Profiles[player]
     if not profile then return nil end
     return profile.Data.Deck
-end
-
--- ============================================
--- STAGE COMPLETION (synced from Arena)
--- ============================================
-
--- Complete a stage with stars (only updates if better)
-function PlayerDataService.CompleteStage(player: Player, stageId: string, stars: number): (boolean, boolean)
-    local profile = Profiles[player]
-    if not profile then
-        return false, false
-    end
-    
-    if not profile.Data.CompletedStages then
-        profile.Data.CompletedStages = {}
-    end
-    
-    local currentStars = profile.Data.CompletedStages[stageId] or 0
-    local isFirstClear = currentStars == 0
-    local isNewBest = stars > currentStars
-    
-    if isNewBest then
-        profile.Data.CompletedStages[stageId] = stars
-        Logger.Info("LobbyPlayerData", `{player.Name} completed {stageId} with {stars} stars (previous: {currentStars})`)
-    end
-    
-    return isFirstClear, isNewBest
-end
-
--- Get stars for a specific stage
-function PlayerDataService.GetStageStars(player: Player, stageId: string): number
-    local profile = Profiles[player]
-    if not profile or not profile.Data.CompletedStages then
-        return 0
-    end
-    return profile.Data.CompletedStages[stageId] or 0
 end
 
 -- ============================================
@@ -330,6 +292,120 @@ function PlayerDataService.GetXPForNextLevel(player: Player): number
     local level = profile.Data.Level
     -- Simple formula: 100 XP per level
     return level * 100
+end
+
+-- ============================================
+-- MUTATION SYSTEM
+-- ============================================
+
+local MutationData = require(Shared.data.MutationData)
+local PlantData = require(Shared.data.PlantData)
+
+-- Get mutations for a specific plant
+function PlayerDataService.GetPlantMutations(player: Player, plantType: string): {string}
+    local profile = Profiles[player]
+    if not profile then return {} end
+    return profile.Data.PlantMutations[plantType] or {}
+end
+
+-- Get all plant mutations for a player
+function PlayerDataService.GetAllPlantMutations(player: Player): {[string]: {string}}
+    local profile = Profiles[player]
+    if not profile then return {} end
+    return profile.Data.PlantMutations or {}
+end
+
+-- Check if a plant has a specific mutation
+function PlayerDataService.HasMutation(player: Player, plantType: string, mutationType: string): boolean
+    local mutations = PlayerDataService.GetPlantMutations(player, plantType)
+    for _, mutation in mutations do
+        if mutation == mutationType then
+            return true
+        end
+    end
+    return false
+end
+
+-- Purchase a mutation for a plant
+function PlayerDataService.PurchaseMutation(player: Player, plantType: string, mutationType: string): (boolean, string?, number?)
+    local profile = Profiles[player]
+    if not profile then 
+        return false, "ProfileNotLoaded", nil
+    end
+    
+    -- Check if plant is unlocked
+    if not profile.Data.UnlockedPlants[plantType] then
+        return false, "PlantNotUnlocked", nil
+    end
+    
+    -- Get mutation info
+    local mutationInfo = MutationData.Get(mutationType)
+    if not mutationInfo then
+        return false, "InvalidMutation", nil
+    end
+    
+    -- Check player level requirement
+    if profile.Data.Level < mutationInfo.RequiredLevel then
+        return false, "LevelTooLow", nil
+    end
+    
+    -- Check if already has this mutation
+    if PlayerDataService.HasMutation(player, plantType, mutationType) then
+        return false, "AlreadyHas", nil
+    end
+    
+    -- Check plant category compatibility
+    local plantStats = PlantData.Get(plantType)
+    if plantStats then
+        local category = plantStats.Category
+        if not MutationData.IsCompatibleWith(mutationType, category) then
+            return false, "Incompatible", nil
+        end
+    end
+    
+    -- Check incompatibility with existing mutations
+    local existingMutations = PlayerDataService.GetPlantMutations(player, plantType)
+    for _, existingMutation in existingMutations do
+        if not MutationData.AreCompatible(mutationType, existingMutation) then
+            return false, "Incompatible", nil
+        end
+    end
+    
+    -- Check if enough coins
+    if profile.Data.Coins < mutationInfo.Cost then
+        return false, "NotEnoughCoins", nil
+    end
+    
+    -- Deduct coins
+    profile.Data.Coins -= mutationInfo.Cost
+    
+    -- Add mutation
+    if not profile.Data.PlantMutations[plantType] then
+        profile.Data.PlantMutations[plantType] = {}
+    end
+    table.insert(profile.Data.PlantMutations[plantType], mutationType)
+    
+    Logger.Info("LobbyPlayerData", `🧬 {player.Name} purchased {mutationType} mutation for {plantType} (Cost: {mutationInfo.Cost}, Remaining: {profile.Data.Coins})`)
+    return true, nil, profile.Data.Coins
+end
+
+-- Remove a mutation from a plant
+function PlayerDataService.RemoveMutation(player: Player, plantType: string, mutationType: string): boolean
+    local profile = Profiles[player]
+    if not profile then return false end
+    
+    local mutations = profile.Data.PlantMutations[plantType]
+    if not mutations then return false end
+    
+    for i, mutation in mutations do
+        if mutation == mutationType then
+            table.remove(mutations, i)
+            Logger.Info("LobbyPlayerData", `🧬 {player.Name} removed {mutationType} mutation from {plantType}`)
+            return true
+        end
+    end
+    
+    return false
 end
 
 return PlayerDataService

@@ -188,7 +188,7 @@ local function updatePadState(data: any)
         
         -- Find pad model in workspace
         local workspace = game:GetService("Workspace")
-        local lobbyTeleports = workspace:FindFirstChild("Lobby Teleports")
+        local lobbyTeleports = workspace:FindFirstChild("LobbyTeleports")
         local teleportPadsFolder = lobbyTeleports and lobbyTeleports:FindFirstChild("Workspace")
         
         if teleportPadsFolder then
@@ -219,7 +219,7 @@ local function updatePadState(data: any)
                 Logger.Warn("PadUI", `Could not find pad model: {padId}`)
             end
         else
-            Logger.Warn("PadUI", "Lobby Teleports/Workspace folder not found")
+            Logger.Warn("PadUI", "LobbyTeleports/Workspace folder not found")
         end
     end
     

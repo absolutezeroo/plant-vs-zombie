@@ -95,6 +95,22 @@ local function saveDeck(deck: {string})
     currentDeck:set(deck)
 end
 
+local function purchaseMutation(plantType: string, mutationType: string)
+    Logger.Info("LobbyClient", `Purchasing mutation {mutationType} for {plantType}`)
+    ZapClient.PurchaseMutationRequest.Fire({
+        PlantType = plantType,
+        MutationType = mutationType,
+    })
+end
+
+local function removeMutation(plantType: string, mutationType: string)
+    Logger.Info("LobbyClient", `Removing mutation {mutationType} from {plantType}`)
+    ZapClient.RemoveMutationRequest.Fire({
+        PlantType = plantType,
+        MutationType = mutationType,
+    })
+end
+
 -- ============================================
 -- CHECK RETURN DATA FROM ARENA
 -- ============================================
@@ -122,10 +138,12 @@ end
 PadUIController.Initialize()
 Logger.Info("LobbyClient", "✅ PadUIController initialized")
 
--- Initialize Zone Interaction Controller (Shop, DeckBuilder, Profile)
+-- Initialize Zone Interaction Controller (Shop, DeckBuilder, Profile, Mutations)
 ZoneInteractionController.Initialize()
 ZoneInteractionController.SetOnPurchasePlant(purchasePlant)
 ZoneInteractionController.SetOnSaveDeck(saveDeck)
+ZoneInteractionController.SetOnPurchaseMutation(purchaseMutation)
+ZoneInteractionController.SetOnRemoveMutation(removeMutation)
 Logger.Info("LobbyClient", "✅ ZoneInteractionController initialized")
 
 -- ============================================
@@ -216,6 +234,45 @@ ZapClient.DeckChanged.On(function(data)
     Logger.Info("LobbyClient", `Deck updated: {#data.Deck} plants`)
     currentDeck:set(data.Deck)
     ZoneInteractionController.UpdateDeck(data.Deck)
+end)
+
+-- Listen for mutation purchase response
+ZapClient.PurchaseMutationResponse.On(function(response)
+    if response.Success then
+        Logger.Info("LobbyClient", `✅ Purchased mutation {response.MutationType} for {response.PlantType}! New balance: {response.NewCoins}`)
+        requestPlayerData()
+    else
+        local errorMsg = response.ErrorCode == 1 and "Already owned"
+            or response.ErrorCode == 2 and "Not enough coins"
+            or response.ErrorCode == 3 and "Level too low"
+            or response.ErrorCode == 4 and "Plant not owned"
+            or response.ErrorCode == 5 and "Incompatible mutation"
+            or response.ErrorCode == 6 and "Invalid mutation"
+            or "Unknown error"
+        Logger.Warn("LobbyClient", `❌ Mutation purchase failed: {errorMsg}`)
+    end
+end)
+
+-- Listen for mutation remove response
+ZapClient.RemoveMutationResponse.On(function(response)
+    if response.Success then
+        Logger.Info("LobbyClient", `✅ Removed mutation {response.MutationType} from {response.PlantType}`)
+        requestPlayerData()
+    else
+        Logger.Warn("LobbyClient", `❌ Mutation removal failed`)
+    end
+end)
+
+-- Listen for plant mutations sync
+ZapClient.SyncPlantMutations.On(function(data)
+    Logger.Info("LobbyClient", `Synced mutations for {data.PlantType}: {#data.Mutations}`)
+    ZoneInteractionController.UpdatePlantMutations({[data.PlantType] = data.Mutations})
+end)
+
+-- Listen for all mutations sync
+ZapClient.SyncAllMutations.On(function(data)
+    Logger.Info("LobbyClient", "Synced all plant mutations")
+    ZoneInteractionController.UpdatePlantMutations(data.PlantMutations)
 end)
 
 -- Listen for battle results

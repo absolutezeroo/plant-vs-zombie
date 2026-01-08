@@ -30,6 +30,7 @@ local LobbyService = require(script.services.LobbyService)
 
 -- Import modules
 local ShopHandler = require(script.modules.ShopHandler)
+local MutationHandler = require(script.modules.MutationHandler)
 
 -- Import Zap generated network module
 local ZapServer = require(script.network.generated)
@@ -45,6 +46,10 @@ Logger.Info("Lobby", "LobbyService initialized")
 -- Initialize ShopHandler
 ShopHandler.Initialize()
 Logger.Info("Lobby", "ShopHandler initialized")
+
+-- Initialize MutationHandler
+MutationHandler.Initialize()
+Logger.Info("Lobby", "MutationHandler initialized")
 
 -- Track players in lobby
 local playersInLobby: { [Player]: boolean } = {}

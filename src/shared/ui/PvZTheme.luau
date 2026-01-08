@@ -57,6 +57,7 @@ local Colors = {
     
     -- State colors
     Danger = Color3.fromRGB(220, 20, 60),
+    Error = Color3.fromRGB(220, 20, 60), -- Alias for Danger
     Success = Color3.fromRGB(50, 205, 50),
     Warning = Color3.fromRGB(255, 165, 0),
     Locked = Color3.fromRGB(100, 90, 80),

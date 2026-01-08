@@ -1,16 +1,21 @@
 -- Zap Network Schema
--- IDL definition for Plant vs Zombie network packets
+-- UNIFIED IDL definition for Plant vs Zombie network packets
+-- This single file serves both Arena and Lobby places
 -- Generated code will be type-safe Luau
 
-opt server_output = "../../arena/server/network/generated.luau"
-opt client_output = "../../arena/client/network/generated.luau"
-opt remote_scope = "ARENA"
+-- Output paths (relative to this file)
+opt server_output = "generated/server.luau"
+opt client_output = "generated/client.luau"
 
--- Types for reusability
+-- ==========================
+-- SHARED TYPES
+-- ==========================
+
 type RequestId = u16
 type EntityId = u32
 type Lane = u8(1..5)           -- Lane index 1-5 (ranged integer)
 type Column = u8(1..9)         -- Column index 1-9 (ranged integer)
+
 type PlantType = enum { 
     -- Starters
     Sunflower, Peashooter, WallNut,
@@ -29,12 +34,25 @@ type PlantType = enum {
     -- Utility
     LilyPad, FlowerPot, TangleKelp, GraveBuster, Plantern, UmbrellaLeaf, CoffeeBean, ExplodeONut
 }
+
 type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football, Imp, Flag }
 type GamePhase = enum { Pregame, Wave, Intermission, GameOver }
 
--- ===================
--- CLIENT -> SERVER
--- ===================
+type MutationType = enum {
+    Fire, Inferno,
+    Ice, Frost,
+    Electric, Tesla,
+    Toxic, Venomous,
+    Shadow, Void,
+    Solar, Radiant,
+    Reinforced, Fortified,
+    Primal, Savage,
+    Swift, Hasty
+}
+
+-- ==========================
+-- ARENA: CLIENT -> SERVER
+-- ==========================
 
 -- Player wants to place a plant
 event PlacePlantRequest = {
@@ -81,36 +99,130 @@ event StartWaveRequest = {
     }
 }
 
--- ===================
--- LOBBY EVENTS
--- ===================
+-- Client requests to use Plant Food on a plant
+event PlantFoodRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantEntityId: EntityId,
+    }
+}
 
--- Player requests teleport to Arena (Lobby -> Server)
+-- Client requests to unlock a plant
+event UnlockPlantRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        RequestId: RequestId,
+        PlantType: PlantType,
+    }
+}
+
+-- Client requests to save their deck loadout
+event SaveDeckRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        Slot1: PlantType?,
+        Slot2: PlantType?,
+        Slot3: PlantType?,
+        Slot4: PlantType?,
+        Slot5: PlantType?,
+        Slot6: PlantType?,
+    }
+}
+
+-- Client requests to start a game (Arena)
+event StartGameRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        WorldId: string.utf8,
+        Difficulty: string.utf8,
+    }
+}
+
+-- ==========================
+-- LOBBY: CLIENT -> SERVER
+-- ==========================
+
+-- Player requests teleport to Arena
 event TeleportToArenaRequest = {
     from: Client,
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        WorldId: string.utf8(..20),       -- "day", "night", "pool", etc.
-        Difficulty: string.utf8(..20),    -- "easy", "normal", "hard", "nightmare", "endless"
-        Deck: PlantType[1..6],            -- Max 6 plants in deck
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
+        Deck: PlantType[1..6],
     }
 }
 
--- Server confirms teleport is starting (Server -> Client)
-event TeleportToArenaResponse = {
-    from: Server,
+-- Client requests to leave the current pad
+event LeavePadRequest = {
+    from: Client,
     type: Reliable,
-    call: ManyAsync,
+    call: SingleAsync,
+    data: struct {}
+}
+
+-- Client requests to save new deck (lobby)
+event SaveDeck = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
     data: struct {
-        Success: boolean,
-        ErrorCode: u8?,  -- 0=None, 1=InvalidWorld, 2=InvalidDeck, 3=InvalidDifficulty
+        Deck: PlantType[1..6],
     }
 }
 
--- ===================
--- SERVER -> CLIENT
--- ===================
+-- Client requests to purchase a plant
+event PurchasePlantRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantType: PlantType,
+    }
+}
+
+-- Client requests full player data sync
+event RequestPlayerData = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {}
+}
+
+-- Client requests to purchase a mutation for a plant
+event PurchaseMutationRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantType: PlantType,
+        MutationType: MutationType,
+    }
+}
+
+-- Client requests to remove a mutation from a plant
+event RemoveMutationRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantType: PlantType,
+        MutationType: MutationType,
+    }
+}
+
+-- ==========================
+-- ARENA: SERVER -> CLIENT
+-- ==========================
 
 -- Response to any client request (success/fail)
 event RequestResponse = {
@@ -134,7 +246,7 @@ event PlantSpawned = {
         PlantType: PlantType,
         Lane: Lane,
         Column: Column,
-        OwnerId: f64,  -- Player UserId (f64 for Roblox compatibility)
+        OwnerId: f64,
     }
 }
 
@@ -147,14 +259,14 @@ event ZombieSpawned = {
         EntityId: EntityId,
         ZombieType: ZombieType,
         Lane: Lane,
-        PositionX: f32,  -- X position in world space
+        PositionX: f32,
     }
 }
 
 -- Entity took damage
 event EntityDamaged = {
     from: Server,
-    type: Unreliable,  -- High frequency, can drop
+    type: Unreliable,
     call: ManyAsync,
     data: struct {
         EntityId: EntityId,
@@ -176,13 +288,13 @@ event EntityDied = {
 -- Projectile spawned
 event ProjectileSpawned = {
     from: Server,
-    type: Unreliable,  -- Visual only, can be predicted
+    type: Unreliable,
     call: ManyAsync,
     data: struct {
         EntityId: EntityId,
         Lane: Lane,
         StartX: f32,
-        TargetEntityId: EntityId?,  -- Optional target for homing
+        TargetEntityId: EntityId?,
     }
 }
 
@@ -196,8 +308,8 @@ event SunSpawned = {
         PositionX: f32,
         PositionY: f32,
         PositionZ: f32,
-        Value: u8,  -- Sun value (typically 25 or 50)
-        TargetY: f32, -- Y position to stop falling
+        Value: u8,
+        TargetY: f32,
     }
 }
 
@@ -223,6 +335,18 @@ event SunDespawned = {
     }
 }
 
+-- Sun collected confirmation
+event SunCollected = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        SunEntityId: EntityId,
+        CollectorId: f64,
+        NewTotal: u16,
+    }
+}
+
 -- Base health updated (zombie reached house)
 event BaseHealthUpdated = {
     from: Server,
@@ -243,18 +367,6 @@ event GameOver = {
     data: struct {
         Victory: boolean,
         WaveReached: u8,
-    }
-}
-
--- Sun collected confirmation
-event SunCollected = {
-    from: Server,
-    type: Reliable,
-    call: ManyAsync,
-    data: struct {
-        SunEntityId: EntityId,
-        CollectorId: f64,  -- Player UserId (f64 for Roblox compatibility)
-        NewTotal: u16,     -- Player's new sun total
     }
 }
 
@@ -296,7 +408,7 @@ event ZombiePositionBatch = {
     type: Unreliable,
     call: ManyAsync,
     data: struct {
-        EntityIds: EntityId[..100],  -- Max 100 zombies per batch
+        EntityIds: EntityId[..100],
         PositionsX: f32[..100],
     }
 }
@@ -310,36 +422,6 @@ event FullStateSync = {
         SunCount: u16,
         WaveNumber: u8,
         Phase: GamePhase,
-        -- Detailed entity lists sent as separate events after this
-    }
-}
-
--- ===================
--- PROGRESSION SYSTEM
--- ===================
-
-type UpgradeType = enum { Damage, Health, Cooldown }
-
--- Client requests to unlock a plant
-event UnlockPlantRequest = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        RequestId: RequestId,
-        PlantType: PlantType,
-    }
-}
-
--- Client requests to purchase an upgrade
-event PurchaseUpgradeRequest = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        RequestId: RequestId,
-        PlantType: PlantType,
-        UpgradeType: UpgradeType,
     }
 }
 
@@ -355,11 +437,6 @@ event PlayerDataSync = {
         Level: u8,
         LevelProgress: f32,
         UnlockedPlants: PlantType[..10],
-        -- Upgrades sent as parallel arrays (PlantType, Damage, Health, Cooldown)
-        UpgradePlantTypes: PlantType[..10],
-        UpgradeDamage: u8[..10],
-        UpgradeHealth: u8[..10],
-        UpgradeCooldown: u8[..10],
     }
 }
 
@@ -371,7 +448,7 @@ event CoinGained = {
     data: struct {
         Amount: u16,
         TotalCoins: u32,
-        SourceX: f32?,  -- World position for floating text (optional)
+        SourceX: f32?,
         SourceZ: f32?,
     }
 }
@@ -387,11 +464,11 @@ event GameEndRewards = {
         ZombiesKilled: u16,
         WavesCompleted: u8,
         BonusCoins: u16,
-        StarRating: u8,  -- 1-3 stars based on base damage taken
-        XPEarned: u16,   -- Total XP earned this game
-        GemsEarned: u8,  -- Gems earned (3-star bonus, level ups)
-        NewLevel: u8,    -- Player's new level (if leveled up)
-        LevelsGained: u8, -- Number of levels gained this game
+        StarRating: u8,
+        XPEarned: u16,
+        GemsEarned: u8,
+        NewLevel: u8,
+        LevelsGained: u8,
     }
 }
 
@@ -408,59 +485,41 @@ event ExplosionVFX = {
     }
 }
 
--- ===================
--- PLANT FOOD SYSTEM
--- ===================
-
--- Client requests to use Plant Food on a plant
-event PlantFoodRequest = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        PlantEntityId: EntityId,  -- Target plant to power up
-    }
-}
-
--- Server notifies Plant Food charge collected
+-- Plant Food charge collected
 event PlantFoodCollected = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
     data: struct {
-        CollectorId: f64,         -- Player who collected it
-        NewChargeCount: u8,       -- Updated charge count (0-3)
-        ZombieEntityId: EntityId, -- Zombie that dropped it
+        CollectorId: f64,
+        NewChargeCount: u8,
+        ZombieEntityId: EntityId,
     }
 }
 
--- Server notifies Plant Food activated on a plant
+-- Plant Food activated on a plant
 event PlantFoodActivated = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
     data: struct {
-        PlantEntityId: EntityId,  -- Plant that was powered up
-        PlantType: PlantType,     -- For ability VFX
-        OwnerId: f64,             -- Player who activated it
+        PlantEntityId: EntityId,
+        PlantType: PlantType,
+        OwnerId: f64,
     }
 }
 
--- Server updates player's Plant Food charges
+-- Plant Food charges update
 event PlantFoodChargeUpdate = {
     from: Server,
     type: Reliable,
     call: SingleAsync,
     data: struct {
-        ChargeCount: u8,  -- Current charges (0-3)
+        ChargeCount: u8,
     }
 }
 
--- ===================
--- XP / LEVEL SYSTEM
--- ===================
-
--- Server notifies player of XP gain
+-- XP gain notification
 event XPGained = {
     from: Server,
     type: Reliable,
@@ -469,11 +528,11 @@ event XPGained = {
         Amount: u16,
         TotalXP: u32,
         CurrentLevel: u8,
-        LevelProgress: f32,  -- 0.0 to 1.0 progress to next level
+        LevelProgress: f32,
     }
 }
 
--- Server notifies player of level up
+-- Level up notification
 event LevelUp = {
     from: Server,
     type: Reliable,
@@ -486,11 +545,7 @@ event LevelUp = {
     }
 }
 
--- ===================
--- GEMS SYSTEM
--- ===================
-
--- Server notifies player of gems earned
+-- Gems earned notification
 event GemsEarned = {
     from: Server,
     type: Reliable,
@@ -502,26 +557,7 @@ event GemsEarned = {
     }
 }
 
--- ===================
--- DECK SYSTEM
--- ===================
-
--- Client requests to save their deck loadout
-event SaveDeckRequest = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        Slot1: PlantType?,
-        Slot2: PlantType?,
-        Slot3: PlantType?,
-        Slot4: PlantType?,
-        Slot5: PlantType?,
-        Slot6: PlantType?,
-    }
-}
-
--- Server confirms deck saved
+-- Deck saved confirmation
 event DeckSaved = {
     from: Server,
     type: Reliable,
@@ -532,7 +568,7 @@ event DeckSaved = {
     }
 }
 
--- Server sends player's current deck (on join or after save)
+-- Deck sync (on join or after save)
 event DeckSync = {
     from: Server,
     type: Reliable,
@@ -547,22 +583,7 @@ event DeckSync = {
     }
 }
 
--- ===================
--- GAME SYSTEM (World + Difficulty)
--- ===================
-
--- Client requests to start a game (Arena)
-event StartGameRequest = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        WorldId: string.utf8,
-        Difficulty: string.utf8,
-    }
-}
-
--- Server confirms game started (sent to all players in game)
+-- Game started confirmation
 event GameStarted = {
     from: Server,
     type: Reliable,
@@ -574,7 +595,7 @@ event GameStarted = {
     }
 }
 
--- Server notifies game completion with rewards
+-- Game completion with rewards
 event GameComplete = {
     from: Server,
     type: Reliable,
@@ -589,17 +610,17 @@ event GameComplete = {
     }
 }
 
--- Server notifies teleport countdown
+-- Teleport countdown
 event TeleportCountdown = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
     data: struct {
-        TimeRemaining: u8,  -- Seconds until teleport
+        TimeRemaining: u8,
     }
 }
 
--- Server syncs progression data (on join)
+-- Progression data sync
 event ProgressionSync = {
     from: Server,
     type: Reliable,
@@ -611,5 +632,255 @@ event ProgressionSync = {
         Gems: u32,
         UnlockedPlants: string.utf8[],
         OwnedSkins: string.utf8[],
+    }
+}
+
+-- ==========================
+-- MAP LOADING EVENTS
+-- ==========================
+
+-- Server sends map configuration to client
+event MapConfigSync = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
+        GridCornerAX: f32,
+        GridCornerAY: f32,
+        GridCornerAZ: f32,
+        GridCornerBX: f32,
+        GridCornerBY: f32,
+        GridCornerBZ: f32,
+        GridY: f32,
+        CellWidth: f32,
+        CellDepth: f32,
+        BasePositionX: f32,
+        BasePositionY: f32,
+        BasePositionZ: f32,
+        ZombieDirectionX: f32,
+        ZombieDirectionZ: f32,
+    }
+}
+
+-- Server notifies map loading started
+event MapLoadingStarted = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
+        TotalAssets: u16,
+    }
+}
+
+-- Map loading progress
+event MapLoadingProgress = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        LoadedAssets: u16,
+        TotalAssets: u16,
+        AssetName: string.utf8(..64),
+    }
+}
+
+-- Map loading complete
+event MapLoadingComplete = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
+        Success: boolean,
+    }
+}
+
+-- ==========================
+-- LOBBY: SERVER -> CLIENT
+-- ==========================
+
+-- Teleport to arena response
+event TeleportToArenaResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        ErrorCode: u8?,  -- 0=None, 1=InvalidWorld, 2=InvalidDeck, 3=InvalidDifficulty
+        ErrorMessage: string.utf8(..100)?,
+    }
+}
+
+-- Sync player data to client (coins, unlocked plants, etc.)
+event SyncPlayerData = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Coins: u32,
+        Gems: u32,
+        Level: u8,
+        XP: u32,
+    }
+}
+
+-- Show battle results after returning from Arena
+event ShowResults = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
+        Victory: boolean,
+        Stars: u8,
+        CoinsEarned: u32,
+        XPEarned: u32,
+    }
+}
+
+-- Update pad state (server broadcasts to all clients)
+event PadStateUpdate = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PadId: string.utf8(..100),
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
+        PlayersCount: u8,
+        MaxPlayers: u8,
+        CountdownRemaining: u8?,
+        PlayerNames: string.utf8(..200)?,
+    }
+}
+
+-- Server tells client they joined a pad
+event JoinedPad = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PadId: string.utf8(..100),
+        WorldId: string.utf8(..50),
+        Difficulty: string.utf8(..20),
+        Position: Vector3,
+    }
+}
+
+-- Server tells client they left a pad
+event LeftPad = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {}
+}
+
+-- Deck changed notification
+event DeckChanged = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Deck: PlantType[1..6],
+    }
+}
+
+-- Purchase plant response
+event PurchasePlantResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        PlantType: PlantType,
+        ErrorCode: u8?,  -- 0=None, 1=AlreadyOwned, 2=NotEnoughCoins, 3=InvalidPlant
+        NewCoins: u32?,
+    }
+}
+
+-- Sync unlocked plants to client
+event SyncUnlockedPlants = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        UnlockedPlants: PlantType[0..48],
+    }
+}
+
+-- Full player data sync (extended)
+event FullPlayerDataSync = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Coins: u32,
+        Gems: u32,
+        Level: u8,
+        XP: u32,
+        TotalXPForNextLevel: u32,
+        GamesPlayed: u32,
+        GamesWon: u32,
+        ZombiesKilled: u32,
+        PlantsPlaced: u32,
+        UnlockedPlants: PlantType[0..48],
+        Deck: PlantType[0..6],
+    }
+}
+
+-- ==========================
+-- MUTATION SYSTEM (LOBBY)
+-- ==========================
+
+-- Mutation purchase response
+event PurchaseMutationResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        PlantType: PlantType,
+        MutationType: MutationType,
+        ErrorCode: u8?,  -- 0=None, 1=AlreadyHas, 2=NotEnoughCoins, 3=InvalidMutation, 4=Incompatible, 5=LevelTooLow, 6=PlantNotUnlocked
+        NewCoins: u32?,
+    }
+}
+
+-- Mutation removal response
+event RemoveMutationResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        PlantType: PlantType,
+        MutationType: MutationType,
+    }
+}
+
+-- Sync plant mutations to client (individual plant)
+event SyncPlantMutations = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PlantType: PlantType,
+        Mutations: MutationType[0..8],
+    }
+}
+
+-- Sync all mutations for all plants at once
+event SyncAllMutations = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PlantMutations: struct {
+            PlantType: PlantType,
+            Mutations: MutationType[0..8],
+        }[0..48],
     }
 }

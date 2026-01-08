@@ -24,6 +24,7 @@ local Combat = Components.combat
 local Units = Components.units
 local Economy = Components.economy
 local Events = Components.events
+local Mutations = Components.mutations
 
 return {
 	-- Core components
@@ -61,4 +62,18 @@ return {
 	DamageEvent = require(Events.DamageEvent),
 	DeathEvent = require(Events.DeathEvent),
 	SpawnEvent = require(Events.SpawnEvent),
+	
+	-- Mutation components
+	BurnEffectComponent = require(Mutations.BurnEffectComponent),
+	BurningComponent = require(Mutations.BurningComponent),
+	FreezeEffectComponent = require(Mutations.FreezeEffectComponent),
+	FrozenComponent = require(Mutations.FrozenComponent),
+	ChainLightningComponent = require(Mutations.ChainLightningComponent),
+	PoisonCloudComponent = require(Mutations.PoisonCloudComponent),
+	PoisonedComponent = require(Mutations.PoisonedComponent),
+	LifestealComponent = require(Mutations.LifestealComponent),
+	SunOnKillComponent = require(Mutations.SunOnKillComponent),
+	DamageReductionComponent = require(Mutations.DamageReductionComponent),
+	SplashDamageComponent = require(Mutations.SplashDamageComponent),
+	MutationsComponent = require(Mutations.MutationsComponent),
 }

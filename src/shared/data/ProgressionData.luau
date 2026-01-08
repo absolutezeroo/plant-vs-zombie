@@ -2,20 +2,16 @@
 --[[
 	ProgressionData.luau - Progression system configuration
 	
-	Defines unlock costs, upgrade costs, and coin rewards.
+	Defines unlock costs and coin rewards.
 	Used by PlayerDataService and Shop UI.
+	
+	Note: Upgrades have been replaced by the Mutation system (see MutationData.luau)
 ]]
 
 export type PlantUnlockInfo = {
 	Cost: number,           -- Coins to unlock
 	StarterPlant: boolean,  -- Free from start?
 	Order: number,          -- Display order in shop
-}
-
-export type UpgradeInfo = {
-	MaxLevel: number,
-	CostPerLevel: {number}, -- Cost for each level [1, 2, 3]
-	Bonus: number,          -- Percentage bonus per level
 }
 
 -- Plants unlock configuration (ALL 48 plants)
@@ -293,25 +289,6 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 	},
 }
 
--- Upgrade configurations
-local Upgrades: {[string]: UpgradeInfo} = {
-	Damage = {
-		MaxLevel = 3,
-		CostPerLevel = {150, 300, 500},
-		Bonus = 0.15, -- +15% per level
-	},
-	Health = {
-		MaxLevel = 3,
-		CostPerLevel = {100, 200, 400},
-		Bonus = 0.25, -- +25% per level
-	},
-	Cooldown = {
-		MaxLevel = 3,
-		CostPerLevel = {200, 400, 750},
-		Bonus = 0.20, -- -20% per level (reduction)
-	},
-}
-
 -- Coin rewards per zombie type
 local ZombieCoinRewards: {[string]: number} = {
 	Basic = 5,
@@ -434,13 +411,11 @@ local LevelRewards: {[number]: {Coins: number?, Gems: number?, UnlockPlant: stri
 
 -- Freeze tables
 table.freeze(PlantUnlocks)
-table.freeze(Upgrades)
 table.freeze(ZombieCoinRewards)
 table.freeze(LevelRewards)
 
 return {
 	PlantUnlocks = PlantUnlocks,
-	Upgrades = Upgrades,
 	ZombieCoinRewards = ZombieCoinRewards,
 	LevelRewards = LevelRewards,
 	VICTORY_BONUS_PER_WAVE = VICTORY_BONUS_PER_WAVE,
