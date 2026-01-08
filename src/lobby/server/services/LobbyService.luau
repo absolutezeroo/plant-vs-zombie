@@ -87,9 +87,9 @@ local function handlePlayerJoin(player: Player, padModel: Model)
         return
     end
     
-    -- Lock player on pad center
-    local centerPos = config.Platform.Position + Vector3.new(0, 3, 0)
-    _playerLockManager:LockPlayer(player, centerPos)
+    -- Lock player in the zone (SpawnPosition)
+    local spawnPos = config.SpawnPosition
+    _playerLockManager:LockPlayer(player, spawnPos)
     
     -- Notify client
     if ZapServer then
@@ -97,7 +97,7 @@ local function handlePlayerJoin(player: Player, padModel: Model)
             PadId = padId,
             WorldId = config.WorldId,
             Difficulty = config.Difficulty,
-            Position = centerPos,
+            Position = spawnPos,
         })
     end
     
@@ -121,6 +121,22 @@ function handlePlayerLeave(player: Player)
     
     -- Unlock player
     _playerLockManager:UnlockPlayer(player)
+    
+    -- Teleport player to LeaveRoomPart
+    local workspace = game:GetService("Workspace")
+    local lobbyTeleports = workspace:FindFirstChild("Lobby Teleports")
+    local leaveRoomPart = lobbyTeleports and lobbyTeleports:FindFirstChild("LeaveRoomPart", true)
+    
+    if leaveRoomPart and leaveRoomPart:IsA("BasePart") then
+        local character = player.Character
+        if character then
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if humanoidRootPart then
+                humanoidRootPart.CFrame = CFrame.new(leaveRoomPart.Position + Vector3.new(0, 3, 0))
+                Logger.Info("LobbyService", `Teleported {player.Name} to LeaveRoomPart`)
+            end
+        end
+    end
     
     -- Notify client
     if ZapServer then
@@ -190,13 +206,14 @@ end
     PRIVATE: Initialization helpers
 ============================================ ]]--
 
--- Scan workspace for teleport pads
+-- Scan workspace for teleport pads (Lobby Teleports gates)
 local function scanForPads()
     local workspace = game:GetService("Workspace")
-    local teleportPadsFolder = workspace:FindFirstChild("TeleportPads")
+    local lobbyTeleports = workspace:FindFirstChild("Lobby Teleports")
+    local teleportPadsFolder = lobbyTeleports and lobbyTeleports:FindFirstChild("Workspace")
     
     if not teleportPadsFolder then
-        Logger.Warn("LobbyService", "No TeleportPads folder found in Workspace")
+        Logger.Warn("LobbyService", "No 'Lobby Teleports/Workspace' folder found")
         return
     end
     
@@ -207,8 +224,8 @@ local function scanForPads()
                 local padId = PadManager.GetPadId(child)
                 _padConfigs[padId] = config
                 
-                -- Setup touch detection
-                _touchHandler:SetupPadTouch(child, config.Platform, function(player, padModel)
+                -- Setup touch detection on Gate trigger part
+                _touchHandler:SetupPadTouch(child, config.TriggerPart, function(player, padModel)
                     handlePlayerJoin(player, padModel)
                 end)
             end

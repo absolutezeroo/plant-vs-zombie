@@ -19,9 +19,8 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
-local New = Fusion.New
-local Value = Fusion.Value
-local Computed = Fusion.Computed
+-- UI Components
+local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
 
 -- Active floating texts
 type FloatingText = {
@@ -176,7 +175,7 @@ end
 
 -- Show coin gain
 function FloatingTextUI.ShowCoinGain(position: Vector3, amount: number)
-	local text = `+{amount}🪙`
+	local text = `+{amount} {PvZTheme.Icons.Coin}`
 	local ft = createFloatingText(position, text, CONFIG.COIN_COLOR, false)
 	table.insert(_floatingTexts, ft)
 end

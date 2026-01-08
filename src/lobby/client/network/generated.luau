@@ -138,6 +138,9 @@ if not RunService:IsRunning() then
 		TeleportToArenaRequest = table.freeze({
 			Fire = noop
 		}),
+		SyncUnlockedPlants = table.freeze({
+			On = noop
+		}),
 		SyncPlayerData = table.freeze({
 			On = noop
 		}),
@@ -145,6 +148,15 @@ if not RunService:IsRunning() then
 			On = noop
 		}),
 		SaveDeck = table.freeze({
+			Fire = noop
+		}),
+		RequestPlayerData = table.freeze({
+			Fire = noop
+		}),
+		PurchasePlantResponse = table.freeze({
+			On = noop
+		}),
+		PurchasePlantRequest = table.freeze({
 			Fire = noop
 		}),
 		PadStateUpdate = table.freeze({
@@ -157,6 +169,9 @@ if not RunService:IsRunning() then
 			Fire = noop
 		}),
 		JoinedPad = table.freeze({
+			On = noop
+		}),
+		FullPlayerDataSync = table.freeze({
 			On = noop
 		}),
 		DeckChanged = table.freeze({
@@ -187,20 +202,26 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(7)
-local reliable_event_queue: { [number]: { any } } = table.create(7)
+local reliable_events = table.create(10)
+local reliable_event_queue: { [number]: { any } } = table.create(10)
 reliable_events[0] = {}
 reliable_event_queue[0] = {}
+reliable_events[8] = {}
+reliable_event_queue[8] = {}
 reliable_events[1] = {}
 reliable_event_queue[1] = {}
 reliable_events[2] = {}
 reliable_event_queue[2] = {}
+reliable_events[7] = {}
+reliable_event_queue[7] = {}
 reliable_events[3] = {}
 reliable_event_queue[3] = {}
 reliable_events[5] = {}
 reliable_event_queue[5] = {}
 reliable_events[4] = {}
 reliable_event_queue[4] = {}
+reliable_events[9] = {}
+reliable_event_queue[9] = {}
 reliable_events[6] = {}
 reliable_event_queue[6] = {}
 reliable.OnClientEvent:Connect(function(buff, inst)
@@ -239,126 +260,14 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 					warn(`[ZAP] {#reliable_event_queue[0]} events in queue for TeleportToArenaResponse. Did you forget to attach a listener?`)
 				end
 			end
-		elseif id == 1 then -- SyncPlayerData
+		elseif id == 8 then -- SyncUnlockedPlants
 			local value
-			value = {  }
-			value["Coins"] = buffer.readu32(incoming_buff, read(4))
-			value["Gems"] = buffer.readu32(incoming_buff, read(4))
-			value["Level"] = buffer.readu8(incoming_buff, read(1))
-			value["XP"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[1][1] then
-				for _, cb in reliable_events[1] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[1], value)
-				if #reliable_event_queue[1] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[1]} events in queue for SyncPlayerData. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 2 then -- ShowResults
-			local value
-			local bool_2 = buffer.readu8(incoming_buff, read(1))
 			value = {  }
 			local len_2 = buffer.readu8(incoming_buff, read(1))
-			assert(len_2 <= 200, "value is more than 200!")
-			value["StageId"] = buffer.readstring(incoming_buff, read(len_2), len_2)
-			assert(utf8.len(value["StageId"]) ~= nil, "value is not valid utf-8")
-			value["Victory"] = bit32.btest(bool_2, 0b0000000000000001)
-			value["Stars"] = buffer.readu8(incoming_buff, read(1))
-			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
-			value["XPEarned"] = buffer.readu32(incoming_buff, read(4))
-			if reliable_events[2][1] then
-				for _, cb in reliable_events[2] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[2], value)
-				if #reliable_event_queue[2] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[2]} events in queue for ShowResults. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 3 then -- PadStateUpdate
-			local value
-			local bool_3 = buffer.readu8(incoming_buff, read(1))
-			value = {  }
-			local len_3 = buffer.readu16(incoming_buff, read(2))
-			assert(len_3 <= 400, "value is more than 400!")
-			value["PadId"] = buffer.readstring(incoming_buff, read(len_3), len_3)
-			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
-			local len_4 = buffer.readu8(incoming_buff, read(1))
-			assert(len_4 <= 200, "value is more than 200!")
-			value["StageId"] = buffer.readstring(incoming_buff, read(len_4), len_4)
-			assert(utf8.len(value["StageId"]) ~= nil, "value is not valid utf-8")
-			value["PlayersCount"] = buffer.readu8(incoming_buff, read(1))
-			value["MaxPlayers"] = buffer.readu8(incoming_buff, read(1))
-			if bit32.btest(bool_3, 0b0000000000000001) then
-				value["CountdownRemaining"] = buffer.readu8(incoming_buff, read(1))
-			else
-				value["CountdownRemaining"] = nil
-			end
-			value["IsLocked"] = bit32.btest(bool_3, 0b0000000000000010)
-			if bit32.btest(bool_3, 0b0000000000000100) then
-				local len_5 = buffer.readu16(incoming_buff, read(2))
-				assert(len_5 <= 800, "value is more than 800!")
-				value["PlayerNames"] = buffer.readstring(incoming_buff, read(len_5), len_5)
-				assert(utf8.len(value["PlayerNames"]) ~= nil, "value is not valid utf-8")
-			else
-				value["PlayerNames"] = nil
-			end
-			if reliable_events[3][1] then
-				for _, cb in reliable_events[3] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[3], value)
-				if #reliable_event_queue[3] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[3]} events in queue for PadStateUpdate. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 5 then -- LeftPad
-			local value
-			value = {  }
-			if reliable_events[5][1] then
-				for _, cb in reliable_events[5] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[5], value)
-				if #reliable_event_queue[5] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[5]} events in queue for LeftPad. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 4 then -- JoinedPad
-			local value
-			value = {  }
-			local len_6 = buffer.readu16(incoming_buff, read(2))
-			assert(len_6 <= 400, "value is more than 400!")
-			value["PadId"] = buffer.readstring(incoming_buff, read(len_6), len_6)
-			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
-			local len_7 = buffer.readu8(incoming_buff, read(1))
-			assert(len_7 <= 200, "value is more than 200!")
-			value["StageId"] = buffer.readstring(incoming_buff, read(len_7), len_7)
-			assert(utf8.len(value["StageId"]) ~= nil, "value is not valid utf-8")
-			value["Position"] = Vector3.new(buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)))
-			if reliable_events[4][1] then
-				for _, cb in reliable_events[4] do
-					task.spawn(cb, value)
-				end
-			else
-				table.insert(reliable_event_queue[4], value)
-				if #reliable_event_queue[4] > 64 then
-					warn(`[ZAP] {#reliable_event_queue[4]} events in queue for JoinedPad. Did you forget to attach a listener?`)
-				end
-			end
-		elseif id == 6 then -- DeckChanged
-			local value
-			value = {  }
-			local len_8 = buffer.readu8(incoming_buff, read(1)) + 1
-			assert(len_8 >= 1, "value is less than 1!")
-			assert(len_8 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_8)
-			for i_1 = 1, len_8 do
+			assert(len_2 >= 0, "value is less than 0!")
+			assert(len_2 <= 48, "value is more than 48!")
+			value["UnlockedPlants"] = table.create(len_2)
+			for i_1 = 1, len_2 do
 				local val_1
 				local variant_1 = buffer.readu8(incoming_buff, read(1))
 				if variant_1 == 0 then
@@ -458,7 +367,606 @@ reliable.OnClientEvent:Connect(function(buff, inst)
 				elseif variant_1 == 47 then
 					val_1 = "ExplodeONut"
 				end
-				value["Deck"][i_1] = val_1
+				value["UnlockedPlants"][i_1] = val_1
+			end
+			if reliable_events[8][1] then
+				for _, cb in reliable_events[8] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[8], value)
+				if #reliable_event_queue[8] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[8]} events in queue for SyncUnlockedPlants. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 1 then -- SyncPlayerData
+			local value
+			value = {  }
+			value["Coins"] = buffer.readu32(incoming_buff, read(4))
+			value["Gems"] = buffer.readu32(incoming_buff, read(4))
+			value["Level"] = buffer.readu8(incoming_buff, read(1))
+			value["XP"] = buffer.readu32(incoming_buff, read(4))
+			if reliable_events[1][1] then
+				for _, cb in reliable_events[1] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[1], value)
+				if #reliable_event_queue[1] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[1]} events in queue for SyncPlayerData. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 2 then -- ShowResults
+			local value
+			local bool_2 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			local len_3 = buffer.readu8(incoming_buff, read(1))
+			assert(len_3 <= 200, "value is more than 200!")
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_3), len_3)
+			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
+			local len_4 = buffer.readu8(incoming_buff, read(1))
+			assert(len_4 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_4), len_4)
+			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			value["Victory"] = bit32.btest(bool_2, 0b0000000000000001)
+			value["Stars"] = buffer.readu8(incoming_buff, read(1))
+			value["CoinsEarned"] = buffer.readu32(incoming_buff, read(4))
+			value["XPEarned"] = buffer.readu32(incoming_buff, read(4))
+			if reliable_events[2][1] then
+				for _, cb in reliable_events[2] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[2], value)
+				if #reliable_event_queue[2] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[2]} events in queue for ShowResults. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 7 then -- PurchasePlantResponse
+			local value
+			local bool_3 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			value["Success"] = bit32.btest(bool_3, 0b0000000000000001)
+			local variant_2 = buffer.readu8(incoming_buff, read(1))
+			if variant_2 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_2 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_2 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_2 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_2 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_2 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_2 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_2 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_2 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_2 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_2 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_2 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_2 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_2 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_2 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_2 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_2 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_2 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_2 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_2 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_2 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_2 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_2 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_2 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_2 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_2 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_2 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_2 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_2 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_2 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_2 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_2 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_2 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_2 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_2 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_2 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_2 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_2 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_2 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_2 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_2 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_2 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_2 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_2 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_2 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_2 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_2 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_2 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
+			if bit32.btest(bool_3, 0b0000000000000010) then
+				value["ErrorCode"] = buffer.readu8(incoming_buff, read(1))
+			else
+				value["ErrorCode"] = nil
+			end
+			if bit32.btest(bool_3, 0b0000000000000100) then
+				value["NewCoins"] = buffer.readu32(incoming_buff, read(4))
+			else
+				value["NewCoins"] = nil
+			end
+			if reliable_events[7][1] then
+				for _, cb in reliable_events[7] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[7], value)
+				if #reliable_event_queue[7] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[7]} events in queue for PurchasePlantResponse. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 3 then -- PadStateUpdate
+			local value
+			local bool_4 = buffer.readu8(incoming_buff, read(1))
+			value = {  }
+			local len_5 = buffer.readu16(incoming_buff, read(2))
+			assert(len_5 <= 400, "value is more than 400!")
+			value["PadId"] = buffer.readstring(incoming_buff, read(len_5), len_5)
+			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
+			local len_6 = buffer.readu8(incoming_buff, read(1))
+			assert(len_6 <= 200, "value is more than 200!")
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_6), len_6)
+			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
+			local len_7 = buffer.readu8(incoming_buff, read(1))
+			assert(len_7 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_7), len_7)
+			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			value["PlayersCount"] = buffer.readu8(incoming_buff, read(1))
+			value["MaxPlayers"] = buffer.readu8(incoming_buff, read(1))
+			if bit32.btest(bool_4, 0b0000000000000001) then
+				value["CountdownRemaining"] = buffer.readu8(incoming_buff, read(1))
+			else
+				value["CountdownRemaining"] = nil
+			end
+			if bit32.btest(bool_4, 0b0000000000000010) then
+				local len_8 = buffer.readu16(incoming_buff, read(2))
+				assert(len_8 <= 800, "value is more than 800!")
+				value["PlayerNames"] = buffer.readstring(incoming_buff, read(len_8), len_8)
+				assert(utf8.len(value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+			else
+				value["PlayerNames"] = nil
+			end
+			if reliable_events[3][1] then
+				for _, cb in reliable_events[3] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[3], value)
+				if #reliable_event_queue[3] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[3]} events in queue for PadStateUpdate. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 5 then -- LeftPad
+			local value
+			value = {  }
+			if reliable_events[5][1] then
+				for _, cb in reliable_events[5] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[5], value)
+				if #reliable_event_queue[5] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[5]} events in queue for LeftPad. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 4 then -- JoinedPad
+			local value
+			value = {  }
+			local len_9 = buffer.readu16(incoming_buff, read(2))
+			assert(len_9 <= 400, "value is more than 400!")
+			value["PadId"] = buffer.readstring(incoming_buff, read(len_9), len_9)
+			assert(utf8.len(value["PadId"]) ~= nil, "value is not valid utf-8")
+			local len_10 = buffer.readu8(incoming_buff, read(1))
+			assert(len_10 <= 200, "value is more than 200!")
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_10), len_10)
+			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
+			local len_11 = buffer.readu8(incoming_buff, read(1))
+			assert(len_11 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_11), len_11)
+			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			value["Position"] = Vector3.new(buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)), buffer.readf32(incoming_buff, read(4)))
+			if reliable_events[4][1] then
+				for _, cb in reliable_events[4] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[4], value)
+				if #reliable_event_queue[4] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[4]} events in queue for JoinedPad. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 9 then -- FullPlayerDataSync
+			local value
+			value = {  }
+			value["Coins"] = buffer.readu32(incoming_buff, read(4))
+			value["Gems"] = buffer.readu32(incoming_buff, read(4))
+			value["Level"] = buffer.readu8(incoming_buff, read(1))
+			value["XP"] = buffer.readu32(incoming_buff, read(4))
+			value["TotalXPForNextLevel"] = buffer.readu32(incoming_buff, read(4))
+			value["GamesPlayed"] = buffer.readu32(incoming_buff, read(4))
+			value["GamesWon"] = buffer.readu32(incoming_buff, read(4))
+			value["ZombiesKilled"] = buffer.readu32(incoming_buff, read(4))
+			value["PlantsPlaced"] = buffer.readu32(incoming_buff, read(4))
+			local len_12 = buffer.readu8(incoming_buff, read(1))
+			assert(len_12 >= 0, "value is less than 0!")
+			assert(len_12 <= 48, "value is more than 48!")
+			value["UnlockedPlants"] = table.create(len_12)
+			for i_2 = 1, len_12 do
+				local val_2
+				local variant_3 = buffer.readu8(incoming_buff, read(1))
+				if variant_3 == 0 then
+					val_2 = "Sunflower"
+				elseif variant_3 == 1 then
+					val_2 = "Peashooter"
+				elseif variant_3 == 2 then
+					val_2 = "WallNut"
+				elseif variant_3 == 3 then
+					val_2 = "PotatoMine"
+				elseif variant_3 == 4 then
+					val_2 = "PuffShroom"
+				elseif variant_3 == 5 then
+					val_2 = "SunShroom"
+				elseif variant_3 == 6 then
+					val_2 = "Chomper"
+				elseif variant_3 == 7 then
+					val_2 = "SnowPea"
+				elseif variant_3 == 8 then
+					val_2 = "Repeater"
+				elseif variant_3 == 9 then
+					val_2 = "FumeShroom"
+				elseif variant_3 == 10 then
+					val_2 = "Squash"
+				elseif variant_3 == 11 then
+					val_2 = "Garlic"
+				elseif variant_3 == 12 then
+					val_2 = "CherryBomb"
+				elseif variant_3 == 13 then
+					val_2 = "TallNut"
+				elseif variant_3 == 14 then
+					val_2 = "Threepeater"
+				elseif variant_3 == 15 then
+					val_2 = "Jalapeno"
+				elseif variant_3 == 16 then
+					val_2 = "Spikeweed"
+				elseif variant_3 == 17 then
+					val_2 = "Torchwood"
+				elseif variant_3 == 18 then
+					val_2 = "CabbagePult"
+				elseif variant_3 == 19 then
+					val_2 = "Pumpkin"
+				elseif variant_3 == 20 then
+					val_2 = "ScaredyShroom"
+				elseif variant_3 == 21 then
+					val_2 = "HypnoShroom"
+				elseif variant_3 == 22 then
+					val_2 = "SplitPea"
+				elseif variant_3 == 23 then
+					val_2 = "KernelPult"
+				elseif variant_3 == 24 then
+					val_2 = "Starfruit"
+				elseif variant_3 == 25 then
+					val_2 = "Cactus"
+				elseif variant_3 == 26 then
+					val_2 = "Blover"
+				elseif variant_3 == 27 then
+					val_2 = "SeaShroom"
+				elseif variant_3 == 28 then
+					val_2 = "TwinSunflower"
+				elseif variant_3 == 29 then
+					val_2 = "MelonPult"
+				elseif variant_3 == 30 then
+					val_2 = "GatlingPea"
+				elseif variant_3 == 31 then
+					val_2 = "GloomShroom"
+				elseif variant_3 == 32 then
+					val_2 = "Cattail"
+				elseif variant_3 == 33 then
+					val_2 = "WinterMelon"
+				elseif variant_3 == 34 then
+					val_2 = "IceShroom"
+				elseif variant_3 == 35 then
+					val_2 = "DoomShroom"
+				elseif variant_3 == 36 then
+					val_2 = "CobCannon"
+				elseif variant_3 == 37 then
+					val_2 = "Marigold"
+				elseif variant_3 == 38 then
+					val_2 = "GoldMagnet"
+				elseif variant_3 == 39 then
+					val_2 = "Imitater"
+				elseif variant_3 == 40 then
+					val_2 = "LilyPad"
+				elseif variant_3 == 41 then
+					val_2 = "FlowerPot"
+				elseif variant_3 == 42 then
+					val_2 = "TangleKelp"
+				elseif variant_3 == 43 then
+					val_2 = "GraveBuster"
+				elseif variant_3 == 44 then
+					val_2 = "Plantern"
+				elseif variant_3 == 45 then
+					val_2 = "UmbrellaLeaf"
+				elseif variant_3 == 46 then
+					val_2 = "CoffeeBean"
+				elseif variant_3 == 47 then
+					val_2 = "ExplodeONut"
+				end
+				value["UnlockedPlants"][i_2] = val_2
+			end
+			local len_13 = buffer.readu8(incoming_buff, read(1))
+			assert(len_13 >= 0, "value is less than 0!")
+			assert(len_13 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_13)
+			for i_3 = 1, len_13 do
+				local val_3
+				local variant_4 = buffer.readu8(incoming_buff, read(1))
+				if variant_4 == 0 then
+					val_3 = "Sunflower"
+				elseif variant_4 == 1 then
+					val_3 = "Peashooter"
+				elseif variant_4 == 2 then
+					val_3 = "WallNut"
+				elseif variant_4 == 3 then
+					val_3 = "PotatoMine"
+				elseif variant_4 == 4 then
+					val_3 = "PuffShroom"
+				elseif variant_4 == 5 then
+					val_3 = "SunShroom"
+				elseif variant_4 == 6 then
+					val_3 = "Chomper"
+				elseif variant_4 == 7 then
+					val_3 = "SnowPea"
+				elseif variant_4 == 8 then
+					val_3 = "Repeater"
+				elseif variant_4 == 9 then
+					val_3 = "FumeShroom"
+				elseif variant_4 == 10 then
+					val_3 = "Squash"
+				elseif variant_4 == 11 then
+					val_3 = "Garlic"
+				elseif variant_4 == 12 then
+					val_3 = "CherryBomb"
+				elseif variant_4 == 13 then
+					val_3 = "TallNut"
+				elseif variant_4 == 14 then
+					val_3 = "Threepeater"
+				elseif variant_4 == 15 then
+					val_3 = "Jalapeno"
+				elseif variant_4 == 16 then
+					val_3 = "Spikeweed"
+				elseif variant_4 == 17 then
+					val_3 = "Torchwood"
+				elseif variant_4 == 18 then
+					val_3 = "CabbagePult"
+				elseif variant_4 == 19 then
+					val_3 = "Pumpkin"
+				elseif variant_4 == 20 then
+					val_3 = "ScaredyShroom"
+				elseif variant_4 == 21 then
+					val_3 = "HypnoShroom"
+				elseif variant_4 == 22 then
+					val_3 = "SplitPea"
+				elseif variant_4 == 23 then
+					val_3 = "KernelPult"
+				elseif variant_4 == 24 then
+					val_3 = "Starfruit"
+				elseif variant_4 == 25 then
+					val_3 = "Cactus"
+				elseif variant_4 == 26 then
+					val_3 = "Blover"
+				elseif variant_4 == 27 then
+					val_3 = "SeaShroom"
+				elseif variant_4 == 28 then
+					val_3 = "TwinSunflower"
+				elseif variant_4 == 29 then
+					val_3 = "MelonPult"
+				elseif variant_4 == 30 then
+					val_3 = "GatlingPea"
+				elseif variant_4 == 31 then
+					val_3 = "GloomShroom"
+				elseif variant_4 == 32 then
+					val_3 = "Cattail"
+				elseif variant_4 == 33 then
+					val_3 = "WinterMelon"
+				elseif variant_4 == 34 then
+					val_3 = "IceShroom"
+				elseif variant_4 == 35 then
+					val_3 = "DoomShroom"
+				elseif variant_4 == 36 then
+					val_3 = "CobCannon"
+				elseif variant_4 == 37 then
+					val_3 = "Marigold"
+				elseif variant_4 == 38 then
+					val_3 = "GoldMagnet"
+				elseif variant_4 == 39 then
+					val_3 = "Imitater"
+				elseif variant_4 == 40 then
+					val_3 = "LilyPad"
+				elseif variant_4 == 41 then
+					val_3 = "FlowerPot"
+				elseif variant_4 == 42 then
+					val_3 = "TangleKelp"
+				elseif variant_4 == 43 then
+					val_3 = "GraveBuster"
+				elseif variant_4 == 44 then
+					val_3 = "Plantern"
+				elseif variant_4 == 45 then
+					val_3 = "UmbrellaLeaf"
+				elseif variant_4 == 46 then
+					val_3 = "CoffeeBean"
+				elseif variant_4 == 47 then
+					val_3 = "ExplodeONut"
+				end
+				value["Deck"][i_3] = val_3
+			end
+			if reliable_events[9][1] then
+				for _, cb in reliable_events[9] do
+					task.spawn(cb, value)
+				end
+			else
+				table.insert(reliable_event_queue[9], value)
+				if #reliable_event_queue[9] > 64 then
+					warn(`[ZAP] {#reliable_event_queue[9]} events in queue for FullPlayerDataSync. Did you forget to attach a listener?`)
+				end
+			end
+		elseif id == 6 then -- DeckChanged
+			local value
+			value = {  }
+			local len_14 = buffer.readu8(incoming_buff, read(1)) + 1
+			assert(len_14 >= 1, "value is less than 1!")
+			assert(len_14 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_14)
+			for i_4 = 1, len_14 do
+				local val_4
+				local variant_5 = buffer.readu8(incoming_buff, read(1))
+				if variant_5 == 0 then
+					val_4 = "Sunflower"
+				elseif variant_5 == 1 then
+					val_4 = "Peashooter"
+				elseif variant_5 == 2 then
+					val_4 = "WallNut"
+				elseif variant_5 == 3 then
+					val_4 = "PotatoMine"
+				elseif variant_5 == 4 then
+					val_4 = "PuffShroom"
+				elseif variant_5 == 5 then
+					val_4 = "SunShroom"
+				elseif variant_5 == 6 then
+					val_4 = "Chomper"
+				elseif variant_5 == 7 then
+					val_4 = "SnowPea"
+				elseif variant_5 == 8 then
+					val_4 = "Repeater"
+				elseif variant_5 == 9 then
+					val_4 = "FumeShroom"
+				elseif variant_5 == 10 then
+					val_4 = "Squash"
+				elseif variant_5 == 11 then
+					val_4 = "Garlic"
+				elseif variant_5 == 12 then
+					val_4 = "CherryBomb"
+				elseif variant_5 == 13 then
+					val_4 = "TallNut"
+				elseif variant_5 == 14 then
+					val_4 = "Threepeater"
+				elseif variant_5 == 15 then
+					val_4 = "Jalapeno"
+				elseif variant_5 == 16 then
+					val_4 = "Spikeweed"
+				elseif variant_5 == 17 then
+					val_4 = "Torchwood"
+				elseif variant_5 == 18 then
+					val_4 = "CabbagePult"
+				elseif variant_5 == 19 then
+					val_4 = "Pumpkin"
+				elseif variant_5 == 20 then
+					val_4 = "ScaredyShroom"
+				elseif variant_5 == 21 then
+					val_4 = "HypnoShroom"
+				elseif variant_5 == 22 then
+					val_4 = "SplitPea"
+				elseif variant_5 == 23 then
+					val_4 = "KernelPult"
+				elseif variant_5 == 24 then
+					val_4 = "Starfruit"
+				elseif variant_5 == 25 then
+					val_4 = "Cactus"
+				elseif variant_5 == 26 then
+					val_4 = "Blover"
+				elseif variant_5 == 27 then
+					val_4 = "SeaShroom"
+				elseif variant_5 == 28 then
+					val_4 = "TwinSunflower"
+				elseif variant_5 == 29 then
+					val_4 = "MelonPult"
+				elseif variant_5 == 30 then
+					val_4 = "GatlingPea"
+				elseif variant_5 == 31 then
+					val_4 = "GloomShroom"
+				elseif variant_5 == 32 then
+					val_4 = "Cattail"
+				elseif variant_5 == 33 then
+					val_4 = "WinterMelon"
+				elseif variant_5 == 34 then
+					val_4 = "IceShroom"
+				elseif variant_5 == 35 then
+					val_4 = "DoomShroom"
+				elseif variant_5 == 36 then
+					val_4 = "CobCannon"
+				elseif variant_5 == 37 then
+					val_4 = "Marigold"
+				elseif variant_5 == 38 then
+					val_4 = "GoldMagnet"
+				elseif variant_5 == 39 then
+					val_4 = "Imitater"
+				elseif variant_5 == 40 then
+					val_4 = "LilyPad"
+				elseif variant_5 == 41 then
+					val_4 = "FlowerPot"
+				elseif variant_5 == 42 then
+					val_4 = "TangleKelp"
+				elseif variant_5 == 43 then
+					val_4 = "GraveBuster"
+				elseif variant_5 == 44 then
+					val_4 = "Plantern"
+				elseif variant_5 == 45 then
+					val_4 = "UmbrellaLeaf"
+				elseif variant_5 == 46 then
+					val_4 = "CoffeeBean"
+				elseif variant_5 == 47 then
+					val_4 = "ExplodeONut"
+				end
+				value["Deck"][i_4] = val_4
 			end
 			if reliable_events[6][1] then
 				for _, cb in reliable_events[6] do
@@ -498,172 +1006,194 @@ local returns = {
 	},
 	TeleportToArenaRequest = {
 		Fire = function(Value: ({
-			["StageId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 0)
-			local len_9 = #Value["StageId"]
-			assert(len_9 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			local len_15 = #Value["WorldId"]
+			assert(len_15 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_9)
-			alloc(len_9)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_9)
-			local len_10 = #Value["Deck"]
-			assert(len_10 >= 1, "value is less than 1!")
-			assert(len_10 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_15)
+			alloc(len_15)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_15)
+			local len_16 = #Value["Difficulty"]
+			assert(len_16 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_10 - 1)
-			for i_2 = 1, len_10 do
-				local val_2 = Value["Deck"][i_2]
-				if val_2 == "Sunflower" then
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_16)
+			alloc(len_16)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_16)
+			local len_17 = #Value["Deck"]
+			assert(len_17 >= 1, "value is less than 1!")
+			assert(len_17 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_17 - 1)
+			for i_5 = 1, len_17 do
+				local val_5 = Value["Deck"][i_5]
+				if val_5 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
-				elseif val_2 == "Peashooter" then
+				elseif val_5 == "Peashooter" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-				elseif val_2 == "WallNut" then
+				elseif val_5 == "WallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-				elseif val_2 == "PotatoMine" then
+				elseif val_5 == "PotatoMine" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-				elseif val_2 == "PuffShroom" then
+				elseif val_5 == "PuffShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-				elseif val_2 == "SunShroom" then
+				elseif val_5 == "SunShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-				elseif val_2 == "Chomper" then
+				elseif val_5 == "Chomper" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-				elseif val_2 == "SnowPea" then
+				elseif val_5 == "SnowPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
-				elseif val_2 == "Repeater" then
+				elseif val_5 == "Repeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-				elseif val_2 == "FumeShroom" then
+				elseif val_5 == "FumeShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
-				elseif val_2 == "Squash" then
+				elseif val_5 == "Squash" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
-				elseif val_2 == "Garlic" then
+				elseif val_5 == "Garlic" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
-				elseif val_2 == "CherryBomb" then
+				elseif val_5 == "CherryBomb" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-				elseif val_2 == "TallNut" then
+				elseif val_5 == "TallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-				elseif val_2 == "Threepeater" then
+				elseif val_5 == "Threepeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
-				elseif val_2 == "Jalapeno" then
+				elseif val_5 == "Jalapeno" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-				elseif val_2 == "Spikeweed" then
+				elseif val_5 == "Spikeweed" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-				elseif val_2 == "Torchwood" then
+				elseif val_5 == "Torchwood" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
-				elseif val_2 == "CabbagePult" then
+				elseif val_5 == "CabbagePult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
-				elseif val_2 == "Pumpkin" then
+				elseif val_5 == "Pumpkin" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
-				elseif val_2 == "ScaredyShroom" then
+				elseif val_5 == "ScaredyShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
-				elseif val_2 == "HypnoShroom" then
+				elseif val_5 == "HypnoShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
-				elseif val_2 == "SplitPea" then
+				elseif val_5 == "SplitPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-				elseif val_2 == "KernelPult" then
+				elseif val_5 == "KernelPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
-				elseif val_2 == "Starfruit" then
+				elseif val_5 == "Starfruit" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-				elseif val_2 == "Cactus" then
+				elseif val_5 == "Cactus" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-				elseif val_2 == "Blover" then
+				elseif val_5 == "Blover" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
-				elseif val_2 == "SeaShroom" then
+				elseif val_5 == "SeaShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
-				elseif val_2 == "TwinSunflower" then
+				elseif val_5 == "TwinSunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
-				elseif val_2 == "MelonPult" then
+				elseif val_5 == "MelonPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
-				elseif val_2 == "GatlingPea" then
+				elseif val_5 == "GatlingPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
-				elseif val_2 == "GloomShroom" then
+				elseif val_5 == "GloomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
-				elseif val_2 == "Cattail" then
+				elseif val_5 == "Cattail" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
-				elseif val_2 == "WinterMelon" then
+				elseif val_5 == "WinterMelon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
-				elseif val_2 == "IceShroom" then
+				elseif val_5 == "IceShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
-				elseif val_2 == "DoomShroom" then
+				elseif val_5 == "DoomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
-				elseif val_2 == "CobCannon" then
+				elseif val_5 == "CobCannon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
-				elseif val_2 == "Marigold" then
+				elseif val_5 == "Marigold" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
-				elseif val_2 == "GoldMagnet" then
+				elseif val_5 == "GoldMagnet" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
-				elseif val_2 == "Imitater" then
+				elseif val_5 == "Imitater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
-				elseif val_2 == "LilyPad" then
+				elseif val_5 == "LilyPad" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
-				elseif val_2 == "FlowerPot" then
+				elseif val_5 == "FlowerPot" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
-				elseif val_2 == "TangleKelp" then
+				elseif val_5 == "TangleKelp" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
-				elseif val_2 == "GraveBuster" then
+				elseif val_5 == "GraveBuster" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
-				elseif val_2 == "Plantern" then
+				elseif val_5 == "Plantern" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
-				elseif val_2 == "UmbrellaLeaf" then
+				elseif val_5 == "UmbrellaLeaf" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
-				elseif val_2 == "CoffeeBean" then
+				elseif val_5 == "CoffeeBean" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
-				elseif val_2 == "ExplodeONut" then
+				elseif val_5 == "ExplodeONut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
 				else
 					error("Invalid enumerator")
 				end
+			end
+		end,
+	},
+	SyncUnlockedPlants = {
+		On = function(Callback: (Value: ({
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		})) -> ())
+			table.insert(reliable_events[8], Callback)
+			for _, value in reliable_event_queue[8] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[8] = {}
+			return function()
+				table.remove(reliable_events[8], table.find(reliable_events[8], Callback))
 			end
 		end,
 	},
@@ -686,7 +1216,8 @@ local returns = {
 	},
 	ShowResults = {
 		On = function(Callback: (Value: ({
-			["StageId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
 			["Victory"]: (boolean),
 			["Stars"]: (number),
 			["CoinsEarned"]: (number),
@@ -708,155 +1239,155 @@ local returns = {
 		}))
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-			local len_11 = #Value["Deck"]
-			assert(len_11 >= 1, "value is less than 1!")
-			assert(len_11 <= 6, "value is more than 6!")
+			local len_18 = #Value["Deck"]
+			assert(len_18 >= 1, "value is less than 1!")
+			assert(len_18 <= 6, "value is more than 6!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_11 - 1)
-			for i_3 = 1, len_11 do
-				local val_3 = Value["Deck"][i_3]
-				if val_3 == "Sunflower" then
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_18 - 1)
+			for i_6 = 1, len_18 do
+				local val_6 = Value["Deck"][i_6]
+				if val_6 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
-				elseif val_3 == "Peashooter" then
+				elseif val_6 == "Peashooter" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-				elseif val_3 == "WallNut" then
+				elseif val_6 == "WallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-				elseif val_3 == "PotatoMine" then
+				elseif val_6 == "PotatoMine" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-				elseif val_3 == "PuffShroom" then
+				elseif val_6 == "PuffShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-				elseif val_3 == "SunShroom" then
+				elseif val_6 == "SunShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-				elseif val_3 == "Chomper" then
+				elseif val_6 == "Chomper" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-				elseif val_3 == "SnowPea" then
+				elseif val_6 == "SnowPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
-				elseif val_3 == "Repeater" then
+				elseif val_6 == "Repeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
-				elseif val_3 == "FumeShroom" then
+				elseif val_6 == "FumeShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
-				elseif val_3 == "Squash" then
+				elseif val_6 == "Squash" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
-				elseif val_3 == "Garlic" then
+				elseif val_6 == "Garlic" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
-				elseif val_3 == "CherryBomb" then
+				elseif val_6 == "CherryBomb" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
-				elseif val_3 == "TallNut" then
+				elseif val_6 == "TallNut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
-				elseif val_3 == "Threepeater" then
+				elseif val_6 == "Threepeater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
-				elseif val_3 == "Jalapeno" then
+				elseif val_6 == "Jalapeno" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
-				elseif val_3 == "Spikeweed" then
+				elseif val_6 == "Spikeweed" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
-				elseif val_3 == "Torchwood" then
+				elseif val_6 == "Torchwood" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
-				elseif val_3 == "CabbagePult" then
+				elseif val_6 == "CabbagePult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
-				elseif val_3 == "Pumpkin" then
+				elseif val_6 == "Pumpkin" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
-				elseif val_3 == "ScaredyShroom" then
+				elseif val_6 == "ScaredyShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
-				elseif val_3 == "HypnoShroom" then
+				elseif val_6 == "HypnoShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
-				elseif val_3 == "SplitPea" then
+				elseif val_6 == "SplitPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
-				elseif val_3 == "KernelPult" then
+				elseif val_6 == "KernelPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
-				elseif val_3 == "Starfruit" then
+				elseif val_6 == "Starfruit" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
-				elseif val_3 == "Cactus" then
+				elseif val_6 == "Cactus" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
-				elseif val_3 == "Blover" then
+				elseif val_6 == "Blover" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
-				elseif val_3 == "SeaShroom" then
+				elseif val_6 == "SeaShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
-				elseif val_3 == "TwinSunflower" then
+				elseif val_6 == "TwinSunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
-				elseif val_3 == "MelonPult" then
+				elseif val_6 == "MelonPult" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
-				elseif val_3 == "GatlingPea" then
+				elseif val_6 == "GatlingPea" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
-				elseif val_3 == "GloomShroom" then
+				elseif val_6 == "GloomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
-				elseif val_3 == "Cattail" then
+				elseif val_6 == "Cattail" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
-				elseif val_3 == "WinterMelon" then
+				elseif val_6 == "WinterMelon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
-				elseif val_3 == "IceShroom" then
+				elseif val_6 == "IceShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
-				elseif val_3 == "DoomShroom" then
+				elseif val_6 == "DoomShroom" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
-				elseif val_3 == "CobCannon" then
+				elseif val_6 == "CobCannon" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
-				elseif val_3 == "Marigold" then
+				elseif val_6 == "Marigold" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
-				elseif val_3 == "GoldMagnet" then
+				elseif val_6 == "GoldMagnet" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
-				elseif val_3 == "Imitater" then
+				elseif val_6 == "Imitater" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
-				elseif val_3 == "LilyPad" then
+				elseif val_6 == "LilyPad" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
-				elseif val_3 == "FlowerPot" then
+				elseif val_6 == "FlowerPot" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
-				elseif val_3 == "TangleKelp" then
+				elseif val_6 == "TangleKelp" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
-				elseif val_3 == "GraveBuster" then
+				elseif val_6 == "GraveBuster" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
-				elseif val_3 == "Plantern" then
+				elseif val_6 == "Plantern" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
-				elseif val_3 == "UmbrellaLeaf" then
+				elseif val_6 == "UmbrellaLeaf" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
-				elseif val_3 == "CoffeeBean" then
+				elseif val_6 == "CoffeeBean" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
-				elseif val_3 == "ExplodeONut" then
+				elseif val_6 == "ExplodeONut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
 				else
@@ -865,14 +1396,193 @@ local returns = {
 			end
 		end,
 	},
+	RequestPlayerData = {
+		Fire = function(Value: ({
+		}))
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+		end,
+	},
+	PurchasePlantResponse = {
+		On = function(Callback: (Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["ErrorCode"]: ((number)?),
+			["NewCoins"]: ((number)?),
+		})) -> ())
+			table.insert(reliable_events[7], Callback)
+			for _, value in reliable_event_queue[7] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[7] = {}
+			return function()
+				table.remove(reliable_events[7], table.find(reliable_events[7], Callback))
+			end
+		end,
+	},
+	PurchasePlantRequest = {
+		Fire = function(Value: ({
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+		}))
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+		end,
+	},
 	PadStateUpdate = {
 		On = function(Callback: (Value: ({
 			["PadId"]: (string),
-			["StageId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
 			["PlayersCount"]: (number),
 			["MaxPlayers"]: (number),
 			["CountdownRemaining"]: ((number)?),
-			["IsLocked"]: (boolean),
 			["PlayerNames"]: ((string)?),
 		})) -> ())
 			table.insert(reliable_events[3], Callback)
@@ -908,7 +1618,8 @@ local returns = {
 	JoinedPad = {
 		On = function(Callback: (Value: ({
 			["PadId"]: (string),
-			["StageId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
 			["Position"]: (Vector3),
 		})) -> ())
 			table.insert(reliable_events[4], Callback)
@@ -918,6 +1629,30 @@ local returns = {
 			reliable_event_queue[4] = {}
 			return function()
 				table.remove(reliable_events[4], table.find(reliable_events[4], Callback))
+			end
+		end,
+	},
+	FullPlayerDataSync = {
+		On = function(Callback: (Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+			["TotalXPForNextLevel"]: (number),
+			["GamesPlayed"]: (number),
+			["GamesWon"]: (number),
+			["ZombiesKilled"]: (number),
+			["PlantsPlaced"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		})) -> ())
+			table.insert(reliable_events[9], Callback)
+			for _, value in reliable_event_queue[9] do
+				task.spawn(Callback, value)
+			end
+			reliable_event_queue[9] = {}
+			return function()
+				table.remove(reliable_events[9], table.find(reliable_events[9], Callback))
 			end
 		end,
 	},

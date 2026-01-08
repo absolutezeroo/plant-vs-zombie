@@ -16,7 +16,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 -- Import theme
-local PvZTheme = require(script.Parent.PvZTheme)
+local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
 
 local LoaderUI = {}
 LoaderUI.__index = LoaderUI

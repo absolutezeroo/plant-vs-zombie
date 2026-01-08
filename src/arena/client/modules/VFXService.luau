@@ -253,7 +253,7 @@ function VFXService.PlaySunCollect(position: Vector3)
 end
 
 --[[
-	🪙 COIN COLLECTION - When coin is gained
+	💴 COIN COLLECTION - When coin is gained
 ]]
 function VFXService.PlayCoinCollect(position: Vector3)
 	local part = createVFXPart(position)

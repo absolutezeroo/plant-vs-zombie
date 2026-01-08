@@ -28,7 +28,9 @@ local LobbyConfig = require(Shared.config.LobbyConfig)
 
 export type PadConfig = {
     Model: Model,
-    Platform: BasePart,
+    TriggerPart: BasePart,      -- Gate part (touch detection to enter)
+    Platform: BasePart,          -- Platform in Zone (where player is teleported)
+    SpawnPosition: Vector3,      -- Position to teleport player to
     BillboardAttachment: Attachment?,
     WorldId: string,
     Difficulty: string,
@@ -46,7 +48,9 @@ local PadManager = {}
 function PadManager.ReadPadConfig(padModel: Model): PadConfig?
     local config: PadConfig = {
         Model = padModel,
+        TriggerPart = nil :: any,
         Platform = nil :: any,
+        SpawnPosition = Vector3.zero,
         BillboardAttachment = nil,
         WorldId = "",
         Difficulty = "normal",
@@ -58,16 +62,41 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
         IsValid = false,
     }
     
-    -- Find Platform part
-    local platform = padModel:FindFirstChild("Platform")
+    -- Find Gate part (trigger for entering) - look for "Gate" Part inside Gate/Gate2/Gate3 model
+    local gateModel = padModel:FindFirstChild("Gate", true)
+    if gateModel and gateModel:IsA("Model") then
+        local gatePart = gateModel:FindFirstChild("Gate")
+        if gatePart and gatePart:IsA("BasePart") then
+            config.TriggerPart = gatePart
+        end
+    elseif gateModel and gateModel:IsA("BasePart") then
+        config.TriggerPart = gateModel
+    end
+    
+    if not config.TriggerPart then
+        Logger.Warn("PadManager", `Pad {padModel.Name} missing Gate trigger part`)
+        return nil
+    end
+    
+    -- Find Platform part in Zone (where player is teleported)
+    local platform = padModel:FindFirstChild("Platform", true)
     if not platform or not platform:IsA("BasePart") then
         Logger.Warn("PadManager", `Pad {padModel.Name} missing Platform part`)
         return nil
     end
     config.Platform = platform
     
-    -- Find optional Billboard attachment point
-    local billboardPart = padModel:FindFirstChild("Billboard")
+    -- Find Spawn position (where to teleport player in the zone)
+    local spawnPart = padModel:FindFirstChild("Spawn", true) or padModel:FindFirstChild("spawn", true)
+    if spawnPart and spawnPart:IsA("BasePart") then
+        config.SpawnPosition = spawnPart.Position + Vector3.new(0, 3, 0)
+    else
+        -- Use platform center as fallback
+        config.SpawnPosition = platform.Position + Vector3.new(0, 3, 0)
+    end
+    
+    -- Find optional Billboard attachment point (search recursively)
+    local billboardPart = padModel:FindFirstChild("Billboard", true)
     if billboardPart and billboardPart:IsA("BasePart") then
         local attachment = billboardPart:FindFirstChildOfClass("Attachment")
         if not attachment then
@@ -156,9 +185,9 @@ function PadManager.ReadPadConfig(padModel: Model): PadConfig?
     return config
 end
 
--- Get pad ID (unique identifier)
+-- Get pad ID (unique identifier - just the model name)
 function PadManager.GetPadId(padModel: Model): string
-    return padModel:GetFullName()
+    return padModel.Name
 end
 
 return PadManager

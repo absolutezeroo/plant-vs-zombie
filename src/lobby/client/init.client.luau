@@ -2,23 +2,28 @@
 --[[
     Lobby Client Bootstrap
     
-    Initializes the Lobby UI:
-    - Mounts LobbyScreen with Fusion
-    - Handles stage selection, deck building
-    - Sends teleport requests to server
+    Initializes the interactive 3D Lobby:
+    - HUD minimal (coins, level, deck)
+    - PadUIController for teleport pads (BillboardGui + leave button)
+    - ZoneInteractionController for Shop/DeckBuilder/Profile zones
+    - Network event handling
     
-    Note: No ECS loop needed in Lobby - it's purely UI-driven
+    The lobby is a 3D interactive world, NOT a full-screen menu.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+
+-- Disable default Roblox UI elements
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 
 -- Wait for packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
-
--- Fusion imports
-local Children = Fusion.Children
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -28,109 +33,212 @@ local TeleportData = require(Shared.data.TeleportData)
 -- Import Zap generated network module
 local ZapClient = require(script:WaitForChild("network"):WaitForChild("generated"))
 
--- Import UI components - ui is a child of the init script's container
-local LobbyScreen = require(script:WaitForChild("ui"):WaitForChild("LobbyScreen"))
+-- Import UI components
+local LobbyHUD = require(script:WaitForChild("ui"):WaitForChild("LobbyHUD"))
 
 -- Import controllers
 local PadUIController = require(script:WaitForChild("controllers"):WaitForChild("PadUIController"))
-local DeckBuilderController = require(script:WaitForChild("controllers"):WaitForChild("DeckBuilderController"))
+local ZoneInteractionController = require(script:WaitForChild("controllers"):WaitForChild("ZoneInteractionController"))
+local UIStateManager = require(script:WaitForChild("controllers"):WaitForChild("UIStateManager"))
 
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-Logger.Info("LobbyClient", `Initializing lobby for {LocalPlayer.Name}`)
+Logger.Info("LobbyClient", `Initializing 3D lobby for {LocalPlayer.Name}`)
 
--- Initialize controllers for 3D lobby
-PadUIController.Initialize()
-DeckBuilderController.Initialize()
-
-Logger.Info("LobbyClient", "3D Lobby controllers initialized")
-
--- Create a scope for Fusion cleanup (pass Fusion to get New, Value, etc.)
+-- Create a scope for Fusion cleanup
 local scope = Fusion.scoped(Fusion)
 
--- Reactive state for lobby (kept for optional GUI features)
-local lobbyState = {
-	SelectedStage = scope:Value(nil :: string?),
-	SelectedDeck = scope:Value({} :: { string }),
-	IsLoading = scope:Value(false),
-	ReturnData = scope:Value(nil :: TeleportData.LobbyReturnData?),
+-- ============================================
+-- REACTIVE STATE
+-- ============================================
+
+type PlayerData = {
+    Coins: number,
+    Gems: number,
+    Level: number,
+    XP: number,
+    TotalXPForNextLevel: number,
+    GamesPlayed: number,
+    GamesWon: number,
+    ZombiesKilled: number,
+    PlantsPlaced: number,
+    UnlockedPlants: {string},
+    Deck: {string},
 }
 
--- Check if player returned from Arena with results
-local function checkReturnData()
-	local joinData = LocalPlayer:GetJoinData()
-	if joinData.TeleportData then
-		local data = joinData.TeleportData
-		local isValid = TeleportData.ValidateLobbyReturnData(data)
-		if isValid then
-			Logger.Info("LobbyClient", "Returned from Arena with results", {
-				victory = data.Victory,
-				stars = data.Stars,
-			})
-			lobbyState.ReturnData:set(data :: TeleportData.LobbyReturnData)
-		end
-	end
+local playerData = scope:Value(nil :: PlayerData?)
+local currentDeck = scope:Value({} :: {string})
+
+-- ============================================
+-- NETWORK FUNCTIONS
+-- ============================================
+
+local function requestPlayerData()
+    Logger.Info("LobbyClient", "Requesting player data from server...")
+    ZapClient.RequestPlayerData.Fire({})
 end
 
+local function purchasePlant(plantType: string)
+    Logger.Info("LobbyClient", `Purchasing plant: {plantType}`)
+    ZapClient.PurchasePlantRequest.Fire({
+        PlantType = plantType,
+    })
+end
+
+local function saveDeck(deck: {string})
+    Logger.Info("LobbyClient", `Saving deck with {#deck} plants`)
+    ZapClient.SaveDeck.Fire({
+        Deck = deck,
+    })
+    currentDeck:set(deck)
+end
+
+-- ============================================
+-- CHECK RETURN DATA FROM ARENA
+-- ============================================
+
+local function checkReturnData()
+    local joinData = LocalPlayer:GetJoinData()
+    if joinData.TeleportData then
+        local data = joinData.TeleportData
+        local isValid = TeleportData.ValidateLobbyReturnData(data)
+        if isValid then
+            Logger.Info("LobbyClient", "Returned from Arena with results", {
+                victory = data.Victory,
+                stars = data.Stars,
+            })
+            -- Could show a results popup here
+        end
+    end
+end
+
+-- ============================================
+-- INITIALIZE CONTROLLERS
+-- ============================================
+
+-- Initialize Pad UI Controller (BillboardGui on pads + leave button)
+PadUIController.Initialize()
+Logger.Info("LobbyClient", "✅ PadUIController initialized")
+
+-- Initialize Zone Interaction Controller (Shop, DeckBuilder, Profile)
+ZoneInteractionController.Initialize()
+ZoneInteractionController.SetOnPurchasePlant(purchasePlant)
+ZoneInteractionController.SetOnSaveDeck(saveDeck)
+Logger.Info("LobbyClient", "✅ ZoneInteractionController initialized")
+
+-- ============================================
+-- MOUNT HUD
+-- ============================================
+
+local hudGui = LobbyHUD(scope, {
+    PlayerData = playerData,
+    CurrentDeck = currentDeck,
+})
+hudGui.Parent = PlayerGui
+
+-- Register HUD with UIStateManager (will be hidden when in queue)
+UIStateManager.Register("LobbyHUD", hudGui)
+
+Logger.Info("LobbyClient", "✅ LobbyHUD mounted")
+
+-- ============================================
+-- NETWORK EVENT LISTENERS
+-- ============================================
+
+-- Listen for teleport response
+ZapClient.TeleportToArenaResponse.On(function(response)
+    if response.Success then
+        Logger.Info("LobbyClient", "Teleport initiated successfully!")
+    else
+        Logger.Warn("LobbyClient", `Teleport failed: {response.ErrorMessage or "Unknown error"}`)
+    end
+end)
+
+-- Listen for full player data sync
+ZapClient.FullPlayerDataSync.On(function(data)
+    Logger.Info("LobbyClient", `Received player data: Level={data.Level}, Coins={data.Coins}`)
+    
+    local newData: PlayerData = {
+        Coins = data.Coins,
+        Gems = data.Gems,
+        Level = data.Level,
+        XP = data.XP,
+        TotalXPForNextLevel = data.TotalXPForNextLevel,
+        GamesPlayed = data.GamesPlayed,
+        GamesWon = data.GamesWon,
+        ZombiesKilled = data.ZombiesKilled,
+        PlantsPlaced = data.PlantsPlaced,
+        UnlockedPlants = data.UnlockedPlants,
+        Deck = data.Deck,
+    }
+    
+    playerData:set(newData)
+    currentDeck:set(data.Deck or {})
+    
+    -- Update ZoneInteractionController
+    ZoneInteractionController.SetPlayerData(newData)
+end)
+
+-- Listen for purchase response
+ZapClient.PurchasePlantResponse.On(function(response)
+    if response.Success then
+        Logger.Info("LobbyClient", `✅ Purchased {response.PlantType}! New balance: {response.NewCoins}`)
+        -- Request updated player data
+        requestPlayerData()
+    else
+        local errorMsg = response.ErrorCode == 1 and "Already owned"
+            or response.ErrorCode == 2 and "Not enough coins"
+            or response.ErrorCode == 3 and "Invalid plant"
+            or "Unknown error"
+        Logger.Warn("LobbyClient", `❌ Purchase failed: {errorMsg}`)
+    end
+end)
+
+-- Listen for unlocked plants sync
+ZapClient.SyncUnlockedPlants.On(function(data)
+    Logger.Info("LobbyClient", `Synced {#data.UnlockedPlants} unlocked plants`)
+    
+    -- Update player data
+    local current = Fusion.peek(playerData)
+    if current then
+        current.UnlockedPlants = data.UnlockedPlants
+        playerData:set(current)
+    end
+    
+    -- Update ZoneInteractionController
+    ZoneInteractionController.UpdateUnlockedPlants(data.UnlockedPlants)
+end)
+
+-- Listen for deck changes
+ZapClient.DeckChanged.On(function(data)
+    Logger.Info("LobbyClient", `Deck updated: {#data.Deck} plants`)
+    currentDeck:set(data.Deck)
+    ZoneInteractionController.UpdateDeck(data.Deck)
+end)
+
+-- Listen for battle results
+ZapClient.ShowResults.On(function(results)
+    Logger.Info("LobbyClient", "Battle results received", {
+        victory = results.Victory,
+        stars = results.Stars,
+        coins = results.CoinsEarned,
+        xp = results.XPEarned,
+    })
+    
+    -- Refresh player data after battle
+    requestPlayerData()
+end)
+
+-- ============================================
+-- STARTUP
+-- ============================================
+
+-- Check for return data from arena
 checkReturnData()
 
--- Optional: Mount lobby screen for GUI-based features (Shop, Profile, Results)
--- For now, we skip auto-mounting since it's a 3D lobby
--- Uncomment if you want GUI fallback:
---[[
-local screenGui = scope:New "ScreenGui" {
-	Name = "LobbyUI",
-	Parent = PlayerGui,
-	ResetOnSpawn = false,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-	IgnoreGuiInset = true,
-	
-	[Children] = {
-		LobbyScreen({
-			SelectedStage = lobbyState.SelectedStage,
-			SelectedDeck = lobbyState.SelectedDeck,
-			IsLoading = lobbyState.IsLoading,
-			ReturnData = lobbyState.ReturnData,
-			
-			OnPlayClicked = function(stageId: string, deck: { string })
-				-- Disabled in 3D lobby mode
-			end,
-		}),
-	},
-}
-]]--
+-- Request initial player data
+task.defer(requestPlayerData)
 
-Logger.Info("LobbyClient", "Lobby UI ready (3D mode)")
-
--- Listen for teleport response from server
-ZapClient.TeleportToArenaResponse.On(function(response)
-	if response.Success then
-		Logger.Info("LobbyClient", "Teleport initiated successfully!")
-		-- Keep loading state - we're teleporting
-	else
-		Logger.Warn("LobbyClient", `Teleport failed: {response.ErrorMessage or "Unknown error"}`)
-		lobbyState.IsLoading:set(false)
-		-- TODO: Show error popup to user
-	end
-end)
-
--- Listen for battle results from server (after returning from Arena)
-ZapClient.ShowResults.On(function(results)
-	Logger.Info("LobbyClient", "Battle results received from server", {
-		victory = results.Victory,
-		stars = results.Stars,
-		coins = results.CoinsEarned,
-		xp = results.XPEarned,
-	})
-	
-	-- Update ReturnData state to show ResultsPopup
-	lobbyState.ReturnData:set({
-		StageId = results.StageId,
-		Victory = results.Victory,
-		Stars = results.Stars,
-		CoinsEarned = results.CoinsEarned,
-		XPEarned = results.XPEarned,
-	} :: TeleportData.LobbyReturnData)
-end)
+Logger.Info("LobbyClient", "✅ 3D Lobby client fully initialized")

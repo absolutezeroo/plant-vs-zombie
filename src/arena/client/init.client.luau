@@ -13,6 +13,13 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+
+-- Disable default Roblox UI elements
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 
 -- Wait for packages to be available
 local Packages = ReplicatedStorage:WaitForChild("Packages")

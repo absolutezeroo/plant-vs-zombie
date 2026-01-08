@@ -21,7 +21,7 @@ local Client = script.Parent.Parent
 local PlayerDataClient = require(Client.modules.PlayerDataClient)
 
 -- Theme
-local PvZTheme = require(script.Parent.PvZTheme)
+local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
 
 -- Fusion primitives
 local New = Fusion.New

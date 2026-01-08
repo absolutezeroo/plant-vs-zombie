@@ -28,6 +28,9 @@ local PlantData = require(Shared.data.PlantData)
 local PlayerDataService = require(script.services.PlayerDataService)
 local LobbyService = require(script.services.LobbyService)
 
+-- Import modules
+local ShopHandler = require(script.modules.ShopHandler)
+
 -- Import Zap generated network module
 local ZapServer = require(script.network.generated)
 
@@ -38,6 +41,10 @@ Logger.Info("Lobby", "PlayerDataService initialized")
 -- Initialize LobbyService (teleport pads)
 LobbyService.Initialize(ZapServer)
 Logger.Info("Lobby", "LobbyService initialized")
+
+-- Initialize ShopHandler
+ShopHandler.Initialize()
+Logger.Info("Lobby", "ShopHandler initialized")
 
 -- Track players in lobby
 local playersInLobby: { [Player]: boolean } = {}

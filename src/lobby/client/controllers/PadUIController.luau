@@ -24,6 +24,9 @@ local DifficultyData = require(Shared.data.DifficultyData)
 local LobbyClient = script.Parent.Parent
 local ZapClient = require(LobbyClient:WaitForChild("network"):WaitForChild("generated"))
 
+-- Import UI State Manager
+local UIStateManager = require(script.Parent.UIStateManager)
+
 local New = Fusion.New
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -39,6 +42,7 @@ type PadUIState = {
     PlayersCount: Fusion.Value<number>,
     MaxPlayers: Fusion.Value<number>,
     CountdownRemaining: Fusion.Value<number?>,
+    IsLocked: Fusion.Value<boolean>,
     BillboardGui: BillboardGui?,
 }
 
@@ -57,109 +61,102 @@ local _leaveButtonUI: ScreenGui? = nil
 
 local PadUIController = {}
 
--- Create BillboardGui for a pad
+-- Create BillboardGui for a pad (identical to existing BillBoardGui in workspace)
 local function createPadUI(scope, state: PadUIState): BillboardGui
-    local worldConfig = WorldData.GetWorld(Fusion.peek(state.WorldId))
-    local diffConfig = DifficultyData.GetDifficulty(Fusion.peek(state.Difficulty))
-    local displayName = if worldConfig and diffConfig 
-        then `{worldConfig.Name} ({diffConfig.Name})`
-        else `{Fusion.peek(state.WorldId)} - {Fusion.peek(state.Difficulty)}`
-    
     return New(scope, "BillboardGui") {
         Name = "PadUI",
-        Size = UDim2.new(0, 200, 0, 120), -- Fixed pixel size (not studs)
-        StudsOffset = Vector3.new(0, 5, 0),
-        AlwaysOnTop = true,
-        MaxDistance = 50, -- Only visible within 50 studs
+        Size = UDim2.new(8, 0, 8, 0), -- 8x8 studs like original
+        StudsOffset = Vector3.new(0, 0, 0),
+        AlwaysOnTop = false,
+        MaxDistance = math.huge,
         
         [Children] = {
-            -- Background frame
+            -- Frame container
             New(scope, "Frame") {
+                Name = "Frame",
                 Size = UDim2.new(1, 0, 1, 0),
-                BackgroundColor3 = Color3.fromRGB(139, 90, 43), -- Wood brown
+                BackgroundColor3 = Color3.new(0, 0, 0),
+                BackgroundTransparency = 1,
                 BorderSizePixel = 0,
                 
                 [Children] = {
-                    New(scope, "UICorner") {
-                        CornerRadius = UDim.new(0, 12),
+                    New(scope, "UIPadding") {
+                        PaddingTop = UDim.new(0.1, 0),
+                        PaddingBottom = UDim.new(0.1, 0),
+                        PaddingLeft = UDim.new(0.1, 0),
+                        PaddingRight = UDim.new(0.1, 0),
                     },
                     
-                    New(scope, "UIStroke") {
-                        Color = Color3.fromRGB(101, 67, 33),
-                        Thickness = 3,
-                    },
-                    
-                    -- World + Difficulty name
+                    -- Players label
                     New(scope, "TextLabel") {
-                        Size = UDim2.new(1, -16, 0, 32),
-                        Position = UDim2.new(0, 8, 0, 8),
-                        BackgroundTransparency = 1,
-                        Text = displayName,
-                        TextSize = 18,
-                        TextScaled = false,
-                        Font = Enum.Font.GothamBlack,
-                        TextColor3 = Color3.fromRGB(255, 215, 0), -- Gold
-                        TextXAlignment = Enum.TextXAlignment.Center,
-                    },
-                    
-                    -- Player count
-                    New(scope, "TextLabel") {
-                        Size = UDim2.new(1, -16, 0, 28),
-                        Position = UDim2.new(0, 8, 0, 42),
+                        Name = "players",
+                        Position = UDim2.new(0, 0, 0, 0),
+                        Size = UDim2.new(1, 0, 0.333, 0),
                         BackgroundTransparency = 1,
                         Text = Computed(scope, function(use)
-                            return `{use(state.PlayersCount)}/{use(state.MaxPlayers)} Players`
+                            return `Players: {use(state.PlayersCount)}/{use(state.MaxPlayers)}`
                         end),
-                        TextSize = 16,
-                        TextScaled = false,
-                        Font = Enum.Font.GothamBold,
-                        TextColor3 = Color3.fromRGB(255, 255, 255),
+                        TextColor3 = Color3.new(1, 1, 1),
+                        TextScaled = true,
+                        Font = Enum.Font.SourceSansBold,
+                        TextSize = 100,
                         TextXAlignment = Enum.TextXAlignment.Center,
+                        TextYAlignment = Enum.TextYAlignment.Center,
                     },
                     
-                    -- Status / Countdown
+                    -- Time label
                     New(scope, "TextLabel") {
-                        Size = UDim2.new(1, -16, 0, 28),
-                        Position = UDim2.new(0, 8, 0, 76),
+                        Name = "time",
+                        Position = UDim2.new(0, 0, 0.333, 0),
+                        Size = UDim2.new(1, 0, 0.333, 0),
                         BackgroundTransparency = 1,
                         Text = Computed(scope, function(use)
-                            local countdown = use(state.CountdownRemaining)
-                            local isLocked = use(state.IsLocked)
+                            local countdown = use(state.CountdownRemaining) or 0
+                            return `Time: {math.ceil(countdown)}`
+                        end),
+                        TextColor3 = Color3.new(1, 1, 1),
+                        TextScaled = true,
+                        Font = Enum.Font.SourceSansBold,
+                        TextSize = 100,
+                        TextXAlignment = Enum.TextXAlignment.Center,
+                        TextYAlignment = Enum.TextYAlignment.Center,
+                    },
+                    
+                    -- Status label
+                    New(scope, "TextLabel") {
+                        Name = "Status",
+                        Position = UDim2.new(0, 0, 0.666, 0),
+                        Size = UDim2.new(1, 0, 0.333, 0),
+                        BackgroundTransparency = 1,
+                        Text = Computed(scope, function(use)
+                            local countdown = use(state.CountdownRemaining) or 0
                             local playerCount = use(state.PlayersCount)
-                            local maxPlayers = use(state.MaxPlayers)
                             
-                            if isLocked then
-                                return "🔒 LOCKED"
-                            elseif countdown and countdown > 0 then
-                                return `Teleporting in {math.ceil(countdown)} seconds`
-                            elseif playerCount >= maxPlayers then
-                                return "🚀 Ready to teleport!"
+                            if countdown > 0 then
+                                return "TELEPORTING..."
                             elseif playerCount > 0 then
-                                return "Waiting for players..."
+                                return "WAITING"
                             else
-                                return "Step on to join!"
+                                return "READY"
                             end
                         end),
-                        TextSize = 14,
-                        TextScaled = false,
-                        Font = Enum.Font.Gotham,
                         TextColor3 = Computed(scope, function(use)
-                            local isLocked = use(state.IsLocked)
-                            local countdown = use(state.CountdownRemaining)
+                            local countdown = use(state.CountdownRemaining) or 0
                             local playerCount = use(state.PlayersCount)
-                            local maxPlayers = use(state.MaxPlayers)
                             
-                            if isLocked then
-                                return Color3.fromRGB(200, 50, 50)
-                            elseif countdown and countdown > 0 then
-                                return Color3.fromRGB(255, 200, 50) -- Yellow during countdown
-                            elseif playerCount >= maxPlayers then
-                                return Color3.fromRGB(50, 255, 150) -- Bright green when ready
+                            if countdown > 0 then
+                                return Color3.fromRGB(255, 200, 50) -- Yellow
+                            elseif playerCount > 0 then
+                                return Color3.fromRGB(255, 165, 0) -- Orange
                             else
-                                return Color3.fromRGB(50, 205, 50)
+                                return Color3.fromRGB(85, 255, 0) -- Green
                             end
                         end),
+                        TextScaled = true,
+                        Font = Enum.Font.SourceSansBold,
+                        TextSize = 100,
                         TextXAlignment = Enum.TextXAlignment.Center,
+                        TextYAlignment = Enum.TextYAlignment.Center,
                     },
                 },
             },
@@ -177,72 +174,96 @@ local function updatePadState(data: any)
         local scope = Fusion.scoped(Fusion)
         state = {
             PadId = padId,
-            Scope = scope, -- Store scope to prevent GC
+            Scope = scope,
             WorldId = Value(scope, data.WorldId),
             Difficulty = Value(scope, data.Difficulty),
             PlayersCount = Value(scope, data.PlayersCount),
             MaxPlayers = Value(scope, data.MaxPlayers),
             CountdownRemaining = Value(scope, data.CountdownRemaining),
+            IsLocked = Value(scope, false),
             BillboardGui = nil,
+            ExistingGui = nil, -- Reference to existing BillBoardGui in workspace
         }
         _padStates[padId] = state
         
         -- Find pad model in workspace
-        -- PadId format: "Workspace.TeleportPads.Day_Normal"
         local workspace = game:GetService("Workspace")
-        local teleportPadsFolder = workspace:FindFirstChild("TeleportPads")
+        local lobbyTeleports = workspace:FindFirstChild("Lobby Teleports")
+        local teleportPadsFolder = lobbyTeleports and lobbyTeleports:FindFirstChild("Workspace")
         
         if teleportPadsFolder then
-            -- Extract the model name (last part of path)
-            local modelName = padId:match("[^.]+$") -- Get last segment
-            local padModel = teleportPadsFolder:FindFirstChild(modelName)
+            local padModel = teleportPadsFolder:FindFirstChild(padId)
             
             if padModel and padModel:IsA("Model") then
-                -- Find attachment point
-                local attachPart = padModel:FindFirstChild("Billboard")
-                if not attachPart or not attachPart:IsA("BasePart") then
-                    attachPart = padModel:FindFirstChild("Platform")
-                end
-                
-                if attachPart and attachPart:IsA("BasePart") then
-                    local attachPoint = attachPart:FindFirstChildOfClass("Attachment")
-                    if not attachPoint then
-                        attachPoint = Instance.new("Attachment")
-                        attachPoint.Position = Vector3.new(0, 5, 0)
-                        attachPoint.Parent = attachPart
+                -- Look for existing BillBoardGui in the gate
+                local existingGui = padModel:FindFirstChild("BillBoardGui", true)
+                if existingGui and existingGui:IsA("BillboardGui") then
+                    state.ExistingGui = existingGui
+                    Logger.Info("PadUI", `Using existing BillBoardGui for pad {padId}`)
+                else
+                    -- No existing GUI, create one
+                    local attachPart = padModel:FindFirstChild("Billboard", true)
+                    if not attachPart or not attachPart:IsA("BasePart") then
+                        attachPart = padModel:FindFirstChild("Platform", true)
                     end
                     
-                    -- Create UI
-                    local gui = createPadUI(scope, state)
-                    gui.Adornee = attachPart
-                    gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-                    state.BillboardGui = gui
-                    
-                    Logger.Info("PadUI", `Created UI for pad {modelName}`)
-                else
-                    Logger.Warn("PadUI", `Could not find Platform for pad {modelName}`)
+                    if attachPart and attachPart:IsA("BasePart") then
+                        local gui = createPadUI(scope, state)
+                        gui.Adornee = attachPart
+                        gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+                        state.BillboardGui = gui
+                        Logger.Info("PadUI", `Created UI for pad {padId}`)
+                    end
                 end
             else
-                Logger.Warn("PadUI", `Could not find pad model: {modelName}`)
+                Logger.Warn("PadUI", `Could not find pad model: {padId}`)
             end
         else
-            Logger.Warn("PadUI", "TeleportPads folder not found in Workspace")
+            Logger.Warn("PadUI", "Lobby Teleports/Workspace folder not found")
         end
-    else
-        -- Update existing state
-        print(`[PadUI] Update received: {data.PlayersCount}/{data.MaxPlayers} players`) -- Debug visible
-        state.WorldId:set(data.WorldId)
-        state.Difficulty:set(data.Difficulty)
-        state.PlayersCount:set(data.PlayersCount)
-        state.MaxPlayers:set(data.MaxPlayers)
-        state.CountdownRemaining:set(data.CountdownRemaining)
-        
-        -- Also update current pad info if this is the pad we're on
-        if Fusion.peek(_isOnPad) and data.PadId == Fusion.peek(_currentPadId) then
-            _currentCountdown:set(data.CountdownRemaining)
-            _currentPlayerCount:set(data.PlayersCount)
-            _currentMaxPlayers:set(data.MaxPlayers)
+    end
+    
+    -- Update state values
+    state.WorldId:set(data.WorldId)
+    state.Difficulty:set(data.Difficulty)
+    state.PlayersCount:set(data.PlayersCount)
+    state.MaxPlayers:set(data.MaxPlayers)
+    state.CountdownRemaining:set(data.CountdownRemaining)
+    
+    -- Update existing GUI labels if present
+    if state.ExistingGui then
+        local frame = state.ExistingGui:FindFirstChild("Frame")
+        if frame then
+            local playersLabel = frame:FindFirstChild("players")
+            local timeLabel = frame:FindFirstChild("time")
+            local statusLabel = frame:FindFirstChild("Status")
+            
+            if playersLabel then
+                playersLabel.Text = `Players: {data.PlayersCount}/{data.MaxPlayers}`
+            end
+            if timeLabel then
+                timeLabel.Text = `Time: {math.ceil(data.CountdownRemaining or 0)}`
+            end
+            if statusLabel then
+                if data.CountdownRemaining and data.CountdownRemaining > 0 then
+                    statusLabel.Text = "TELEPORTING..."
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+                elseif data.PlayersCount > 0 then
+                    statusLabel.Text = "WAITING"
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+                else
+                    statusLabel.Text = "READY"
+                    statusLabel.TextColor3 = Color3.fromRGB(85, 255, 0)
+                end
+            end
         end
+    end
+    
+    -- Also update current pad info if this is the pad we're on
+    if Fusion.peek(_isOnPad) and data.PadId == Fusion.peek(_currentPadId) then
+        _currentCountdown:set(data.CountdownRemaining)
+        _currentPlayerCount:set(data.PlayersCount)
+        _currentMaxPlayers:set(data.MaxPlayers)
     end
 end
 
@@ -373,6 +394,9 @@ local function onJoinedPad(data: any)
     _currentWorldId:set(data.WorldId)
     _currentDifficulty:set(data.Difficulty)
     _isOnPad:set(true)
+    
+    -- Hide other GUIs when in queue
+    UIStateManager.SetQueueMode(true)
 end
 
 -- Handle LeftPad event
@@ -385,6 +409,9 @@ local function onLeftPad(_data: any)
     _currentCountdown:set(nil)
     _currentPlayerCount:set(0)
     _currentMaxPlayers:set(1)
+    
+    -- Show other GUIs when leaving queue
+    UIStateManager.SetQueueMode(false)
 end
 
 -- Initialize

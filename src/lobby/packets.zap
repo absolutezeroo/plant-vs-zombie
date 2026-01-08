@@ -153,3 +153,68 @@ event SaveDeck = {
         Deck: PlantType[1..6],
     }
 }
+
+-- ===================
+-- SHOP SYSTEM
+-- ===================
+
+-- Client requests to purchase a plant
+event PurchasePlantRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        PlantType: PlantType,
+    }
+}
+
+-- Server responds to purchase request
+event PurchasePlantResponse = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Success: boolean,
+        PlantType: PlantType,
+        ErrorCode: u8?,  -- 0=None, 1=AlreadyOwned, 2=NotEnoughCoins, 3=InvalidPlant
+        NewCoins: u32?,  -- New coin balance after purchase
+    }
+}
+
+-- Sync unlocked plants to client
+event SyncUnlockedPlants = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        UnlockedPlants: PlantType[0..48],
+    }
+}
+
+-- Client requests full player data sync
+event RequestPlayerData = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {}
+}
+
+-- Full player data sync (extended)
+event FullPlayerDataSync = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        Coins: u32,
+        Gems: u32,
+        Level: u8,
+        XP: u32,
+        TotalXPForNextLevel: u32,
+        GamesPlayed: u32,
+        GamesWon: u32,
+        ZombiesKilled: u32,
+        PlantsPlaced: u32,
+        UnlockedPlants: PlantType[0..48],
+        Deck: PlantType[0..6],
+    }
+}

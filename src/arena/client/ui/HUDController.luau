@@ -23,7 +23,7 @@ local PlantData = require(Shared.data.PlantData)
 
 -- UI Components
 local CardDeck = require(script.Parent.CardDeck)
-local PvZTheme = require(script.Parent.PvZTheme)
+local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
 
 -- Client modules
 local Client = script.Parent.Parent

@@ -239,4 +239,97 @@ function PlayerDataService.GetXP(player: Player): number
     return if profile then profile.Data.XP else 0
 end
 
+-- ============================================
+-- PLANT UNLOCK SYSTEM
+-- ============================================
+
+-- Check if player has unlocked a specific plant
+function PlayerDataService.HasPlant(player: Player, plantType: string): boolean
+    local profile = Profiles[player]
+    if not profile then return false end
+    return profile.Data.UnlockedPlants[plantType] == true
+end
+
+-- Get all unlocked plants for a player
+function PlayerDataService.GetUnlockedPlants(player: Player): {string}
+    local profile = Profiles[player]
+    if not profile then return {"Sunflower", "Peashooter", "WallNut"} end
+    
+    local plants = {}
+    for plantType, isUnlocked in pairs(profile.Data.UnlockedPlants) do
+        if isUnlocked then
+            table.insert(plants, plantType)
+        end
+    end
+    return plants
+end
+
+-- Unlock a plant for a player (free unlock, e.g., from level reward)
+function PlayerDataService.UnlockPlant(player: Player, plantType: string): boolean
+    local profile = Profiles[player]
+    if not profile then return false end
+    
+    if profile.Data.UnlockedPlants[plantType] then
+        Logger.Warn("LobbyPlayerData", `{player.Name} already has {plantType}`)
+        return false
+    end
+    
+    profile.Data.UnlockedPlants[plantType] = true
+    Logger.Info("LobbyPlayerData", `🌱 {player.Name} unlocked {plantType}!`)
+    return true
+end
+
+-- Purchase a plant with coins
+function PlayerDataService.PurchasePlant(player: Player, plantType: string, cost: number): (boolean, string?)
+    local profile = Profiles[player]
+    if not profile then 
+        return false, "ProfileNotLoaded"
+    end
+    
+    -- Check if already owned
+    if profile.Data.UnlockedPlants[plantType] then
+        return false, "AlreadyOwned"
+    end
+    
+    -- Check if enough coins
+    if profile.Data.Coins < cost then
+        return false, "NotEnoughCoins"
+    end
+    
+    -- Deduct coins and unlock
+    profile.Data.Coins -= cost
+    profile.Data.UnlockedPlants[plantType] = true
+    
+    Logger.Info("LobbyPlayerData", `💰 {player.Name} purchased {plantType} for {cost} coins (Remaining: {profile.Data.Coins})`)
+    return true, nil
+end
+
+-- ============================================
+-- STATS SYSTEM
+-- ============================================
+
+-- Get player stats
+function PlayerDataService.GetStats(player: Player): {GamesPlayed: number, GamesWon: number, ZombiesKilled: number, PlantsPlaced: number}
+    local profile = Profiles[player]
+    if not profile then 
+        return {GamesPlayed = 0, GamesWon = 0, ZombiesKilled = 0, PlantsPlaced = 0}
+    end
+    return profile.Data.Stats
+end
+
+-- Get gems
+function PlayerDataService.GetGems(player: Player): number
+    local profile = Profiles[player]
+    return if profile then profile.Data.Gems else 0
+end
+
+-- Get total XP needed for next level
+function PlayerDataService.GetXPForNextLevel(player: Player): number
+    local profile = Profiles[player]
+    if not profile then return 100 end
+    local level = profile.Data.Level
+    -- Simple formula: 100 XP per level
+    return level * 100
+end
+
 return PlayerDataService

@@ -144,6 +144,13 @@ if not RunService:IsRunning() then
 		TeleportToArenaRequest = table.freeze({
 			SetCallback = noop
 		}),
+		SyncUnlockedPlants = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
 		SyncPlayerData = table.freeze({
 			Fire = noop,
 			FireAll = noop,
@@ -159,6 +166,19 @@ if not RunService:IsRunning() then
 			FireSet = noop
 		}),
 		SaveDeck = table.freeze({
+			SetCallback = noop
+		}),
+		RequestPlayerData = table.freeze({
+			SetCallback = noop
+		}),
+		PurchasePlantResponse = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		PurchasePlantRequest = table.freeze({
 			SetCallback = noop
 		}),
 		PadStateUpdate = table.freeze({
@@ -179,6 +199,13 @@ if not RunService:IsRunning() then
 			SetCallback = noop
 		}),
 		JoinedPad = table.freeze({
+			Fire = noop,
+			FireAll = noop,
+			FireExcept = noop,
+			FireList = noop,
+			FireSet = noop
+		}),
+		FullPlayerDataSync = table.freeze({
 			Fire = noop,
 			FireAll = noop,
 			FireExcept = noop,
@@ -242,7 +269,7 @@ end
 
 RunService.Heartbeat:Connect(SendEvents)
 
-local reliable_events = table.create(3)
+local reliable_events = table.create(5)
 reliable.OnServerEvent:Connect(function(player, buff, inst)
 	incoming_buff = buff
 	incoming_inst = inst
@@ -256,13 +283,17 @@ reliable.OnServerEvent:Connect(function(player, buff, inst)
 			value = {  }
 			local len_1 = buffer.readu8(incoming_buff, read(1))
 			assert(len_1 <= 200, "value is more than 200!")
-			value["StageId"] = buffer.readstring(incoming_buff, read(len_1), len_1)
-			assert(utf8.len(value["StageId"]) ~= nil, "value is not valid utf-8")
-			local len_2 = buffer.readu8(incoming_buff, read(1)) + 1
-			assert(len_2 >= 1, "value is less than 1!")
-			assert(len_2 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_2)
-			for i_1 = 1, len_2 do
+			value["WorldId"] = buffer.readstring(incoming_buff, read(len_1), len_1)
+			assert(utf8.len(value["WorldId"]) ~= nil, "value is not valid utf-8")
+			local len_2 = buffer.readu8(incoming_buff, read(1))
+			assert(len_2 <= 80, "value is more than 80!")
+			value["Difficulty"] = buffer.readstring(incoming_buff, read(len_2), len_2)
+			assert(utf8.len(value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			local len_3 = buffer.readu8(incoming_buff, read(1)) + 1
+			assert(len_3 >= 1, "value is less than 1!")
+			assert(len_3 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_3)
+			for i_1 = 1, len_3 do
 				local val_1
 				local variant_1 = buffer.readu8(incoming_buff, read(1))
 				if variant_1 == 0 then
@@ -370,11 +401,11 @@ reliable.OnServerEvent:Connect(function(player, buff, inst)
 		elseif id == 2 then -- SaveDeck
 			local value
 			value = {  }
-			local len_3 = buffer.readu8(incoming_buff, read(1)) + 1
-			assert(len_3 >= 1, "value is less than 1!")
-			assert(len_3 <= 6, "value is more than 6!")
-			value["Deck"] = table.create(len_3)
-			for i_2 = 1, len_3 do
+			local len_4 = buffer.readu8(incoming_buff, read(1)) + 1
+			assert(len_4 >= 1, "value is less than 1!")
+			assert(len_4 <= 6, "value is more than 6!")
+			value["Deck"] = table.create(len_4)
+			for i_2 = 1, len_4 do
 				local val_2
 				local variant_2 = buffer.readu8(incoming_buff, read(1))
 				if variant_2 == 0 then
@@ -479,6 +510,116 @@ reliable.OnServerEvent:Connect(function(player, buff, inst)
 			if reliable_events[2] then
 				task.spawn(reliable_events[2], player, value)
 			end
+		elseif id == 4 then -- RequestPlayerData
+			local value
+			value = {  }
+			if reliable_events[4] then
+				task.spawn(reliable_events[4], player, value)
+			end
+		elseif id == 3 then -- PurchasePlantRequest
+			local value
+			value = {  }
+			local variant_3 = buffer.readu8(incoming_buff, read(1))
+			if variant_3 == 0 then
+				value["PlantType"] = "Sunflower"
+			elseif variant_3 == 1 then
+				value["PlantType"] = "Peashooter"
+			elseif variant_3 == 2 then
+				value["PlantType"] = "WallNut"
+			elseif variant_3 == 3 then
+				value["PlantType"] = "PotatoMine"
+			elseif variant_3 == 4 then
+				value["PlantType"] = "PuffShroom"
+			elseif variant_3 == 5 then
+				value["PlantType"] = "SunShroom"
+			elseif variant_3 == 6 then
+				value["PlantType"] = "Chomper"
+			elseif variant_3 == 7 then
+				value["PlantType"] = "SnowPea"
+			elseif variant_3 == 8 then
+				value["PlantType"] = "Repeater"
+			elseif variant_3 == 9 then
+				value["PlantType"] = "FumeShroom"
+			elseif variant_3 == 10 then
+				value["PlantType"] = "Squash"
+			elseif variant_3 == 11 then
+				value["PlantType"] = "Garlic"
+			elseif variant_3 == 12 then
+				value["PlantType"] = "CherryBomb"
+			elseif variant_3 == 13 then
+				value["PlantType"] = "TallNut"
+			elseif variant_3 == 14 then
+				value["PlantType"] = "Threepeater"
+			elseif variant_3 == 15 then
+				value["PlantType"] = "Jalapeno"
+			elseif variant_3 == 16 then
+				value["PlantType"] = "Spikeweed"
+			elseif variant_3 == 17 then
+				value["PlantType"] = "Torchwood"
+			elseif variant_3 == 18 then
+				value["PlantType"] = "CabbagePult"
+			elseif variant_3 == 19 then
+				value["PlantType"] = "Pumpkin"
+			elseif variant_3 == 20 then
+				value["PlantType"] = "ScaredyShroom"
+			elseif variant_3 == 21 then
+				value["PlantType"] = "HypnoShroom"
+			elseif variant_3 == 22 then
+				value["PlantType"] = "SplitPea"
+			elseif variant_3 == 23 then
+				value["PlantType"] = "KernelPult"
+			elseif variant_3 == 24 then
+				value["PlantType"] = "Starfruit"
+			elseif variant_3 == 25 then
+				value["PlantType"] = "Cactus"
+			elseif variant_3 == 26 then
+				value["PlantType"] = "Blover"
+			elseif variant_3 == 27 then
+				value["PlantType"] = "SeaShroom"
+			elseif variant_3 == 28 then
+				value["PlantType"] = "TwinSunflower"
+			elseif variant_3 == 29 then
+				value["PlantType"] = "MelonPult"
+			elseif variant_3 == 30 then
+				value["PlantType"] = "GatlingPea"
+			elseif variant_3 == 31 then
+				value["PlantType"] = "GloomShroom"
+			elseif variant_3 == 32 then
+				value["PlantType"] = "Cattail"
+			elseif variant_3 == 33 then
+				value["PlantType"] = "WinterMelon"
+			elseif variant_3 == 34 then
+				value["PlantType"] = "IceShroom"
+			elseif variant_3 == 35 then
+				value["PlantType"] = "DoomShroom"
+			elseif variant_3 == 36 then
+				value["PlantType"] = "CobCannon"
+			elseif variant_3 == 37 then
+				value["PlantType"] = "Marigold"
+			elseif variant_3 == 38 then
+				value["PlantType"] = "GoldMagnet"
+			elseif variant_3 == 39 then
+				value["PlantType"] = "Imitater"
+			elseif variant_3 == 40 then
+				value["PlantType"] = "LilyPad"
+			elseif variant_3 == 41 then
+				value["PlantType"] = "FlowerPot"
+			elseif variant_3 == 42 then
+				value["PlantType"] = "TangleKelp"
+			elseif variant_3 == 43 then
+				value["PlantType"] = "GraveBuster"
+			elseif variant_3 == 44 then
+				value["PlantType"] = "Plantern"
+			elseif variant_3 == 45 then
+				value["PlantType"] = "UmbrellaLeaf"
+			elseif variant_3 == 46 then
+				value["PlantType"] = "CoffeeBean"
+			elseif variant_3 == 47 then
+				value["PlantType"] = "ExplodeONut"
+			end
+			if reliable_events[3] then
+				task.spawn(reliable_events[3], player, value)
+			end
 		elseif id == 1 then -- LeavePadRequest
 			local value
 			value = {  }
@@ -516,13 +657,13 @@ local returns = {
 			end
 			if Value["ErrorMessage"] ~= nil then
 				bool_1 = bit32.bor(bool_1, 0b0000000000000100)
-				local len_4 = #Value["ErrorMessage"]
-				assert(len_4 <= 400, "value is more than 400!")
+				local len_5 = #Value["ErrorMessage"]
+				assert(len_5 <= 400, "value is more than 400!")
 				assert(utf8.len(Value["ErrorMessage"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_4)
-				alloc(len_4)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_4)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_5)
+				alloc(len_5)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_5)
 			end
 			buffer.writeu8(outgoing_buff, bool_1_pos_1, bool_1)
 			player_map[Player] = save()
@@ -547,13 +688,13 @@ local returns = {
 			end
 			if Value["ErrorMessage"] ~= nil then
 				bool_2 = bit32.bor(bool_2, 0b0000000000000100)
-				local len_5 = #Value["ErrorMessage"]
-				assert(len_5 <= 400, "value is more than 400!")
+				local len_6 = #Value["ErrorMessage"]
+				assert(len_6 <= 400, "value is more than 400!")
 				assert(utf8.len(Value["ErrorMessage"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_5)
-				alloc(len_5)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_5)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_6)
+				alloc(len_6)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_6)
 			end
 			buffer.writeu8(outgoing_buff, bool_2_pos_1, bool_2)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -585,13 +726,13 @@ local returns = {
 			end
 			if Value["ErrorMessage"] ~= nil then
 				bool_3 = bit32.bor(bool_3, 0b0000000000000100)
-				local len_6 = #Value["ErrorMessage"]
-				assert(len_6 <= 400, "value is more than 400!")
+				local len_7 = #Value["ErrorMessage"]
+				assert(len_7 <= 400, "value is more than 400!")
 				assert(utf8.len(Value["ErrorMessage"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_6)
-				alloc(len_6)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_6)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_7)
+				alloc(len_7)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_7)
 			end
 			buffer.writeu8(outgoing_buff, bool_3_pos_1, bool_3)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -605,7 +746,7 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [any]: Player }, Value: ({
+		FireList = function(List: { [unknown]: Player }, Value: ({
 			["Success"]: (boolean),
 			["ErrorCode"]: ((number)?),
 			["ErrorMessage"]: ((string)?),
@@ -625,13 +766,13 @@ local returns = {
 			end
 			if Value["ErrorMessage"] ~= nil then
 				bool_4 = bit32.bor(bool_4, 0b0000000000000100)
-				local len_7 = #Value["ErrorMessage"]
-				assert(len_7 <= 400, "value is more than 400!")
+				local len_8 = #Value["ErrorMessage"]
+				assert(len_8 <= 400, "value is more than 400!")
 				assert(utf8.len(Value["ErrorMessage"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_7)
-				alloc(len_7)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_7)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_8)
+				alloc(len_8)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_8)
 			end
 			buffer.writeu8(outgoing_buff, bool_4_pos_1, bool_4)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -663,13 +804,13 @@ local returns = {
 			end
 			if Value["ErrorMessage"] ~= nil then
 				bool_5 = bit32.bor(bool_5, 0b0000000000000100)
-				local len_8 = #Value["ErrorMessage"]
-				assert(len_8 <= 400, "value is more than 400!")
+				local len_9 = #Value["ErrorMessage"]
+				assert(len_9 <= 400, "value is more than 400!")
 				assert(utf8.len(Value["ErrorMessage"]) ~= nil, "value is not valid utf-8")
 				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_8)
-				alloc(len_8)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_8)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_9)
+				alloc(len_9)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["ErrorMessage"], len_9)
 			end
 			buffer.writeu8(outgoing_buff, bool_5_pos_1, bool_5)
 			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
@@ -684,7 +825,8 @@ local returns = {
 	},
 	TeleportToArenaRequest = {
 		SetCallback = function(Callback: (Player: Player, Value: ({
-			["StageId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
 			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		})) -> ()): () -> ()
 			reliable_events[0] = Callback
@@ -693,899 +835,20 @@ local returns = {
 			end
 		end,
 	},
-	SyncPlayerData = {
+	SyncUnlockedPlants = {
 		Fire = function(Player: Player, Value: ({
-			["Coins"]: (number),
-			["Gems"]: (number),
-			["Level"]: (number),
-			["XP"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			load_player(Player)
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
-			player_map[Player] = save()
-		end,
-		FireAll = function(Value: ({
-			["Coins"]: (number),
-			["Gems"]: (number),
-			["Level"]: (number),
-			["XP"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireExcept = function(Except: Player, Value: ({
-			["Coins"]: (number),
-			["Gems"]: (number),
-			["Level"]: (number),
-			["XP"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				if player ~= Except then
-					load_player(player)
-					alloc(used)
-					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-					player_map[player] = save()
-				end
-			end
-		end,
-		FireList = function(List: { [any]: Player }, Value: ({
-			["Coins"]: (number),
-			["Gems"]: (number),
-			["Level"]: (number),
-			["XP"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in List do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireSet = function(Set: { [Player]: any }, Value: ({
-			["Coins"]: (number),
-			["Gems"]: (number),
-			["Level"]: (number),
-			["XP"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for player in Set do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-	},
-	ShowResults = {
-		Fire = function(Player: Player, Value: ({
-			["StageId"]: (string),
-			["Victory"]: (boolean),
-			["Stars"]: (number),
-			["CoinsEarned"]: (number),
-			["XPEarned"]: (number),
-		}))
-			load_player(Player)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-			local bool_6 = 0
-			local bool_6_pos_1 = alloc(1)
-			local len_9 = #Value["StageId"]
-			assert(len_9 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_9)
-			alloc(len_9)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_9)
-			if Value["Victory"] then
-				bool_6 = bit32.bor(bool_6, 0b0000000000000001)
-			end
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
-			buffer.writeu8(outgoing_buff, bool_6_pos_1, bool_6)
-			player_map[Player] = save()
-		end,
-		FireAll = function(Value: ({
-			["StageId"]: (string),
-			["Victory"]: (boolean),
-			["Stars"]: (number),
-			["CoinsEarned"]: (number),
-			["XPEarned"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-			local bool_7 = 0
-			local bool_7_pos_1 = alloc(1)
-			local len_10 = #Value["StageId"]
-			assert(len_10 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			local len_10 = #Value["UnlockedPlants"]
+			assert(len_10 >= 0, "value is less than 0!")
+			assert(len_10 <= 48, "value is more than 48!")
 			alloc(1)
 			buffer.writeu8(outgoing_buff, outgoing_apos, len_10)
-			alloc(len_10)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_10)
-			if Value["Victory"] then
-				bool_7 = bit32.bor(bool_7, 0b0000000000000001)
-			end
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
-			buffer.writeu8(outgoing_buff, bool_7_pos_1, bool_7)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireExcept = function(Except: Player, Value: ({
-			["StageId"]: (string),
-			["Victory"]: (boolean),
-			["Stars"]: (number),
-			["CoinsEarned"]: (number),
-			["XPEarned"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-			local bool_8 = 0
-			local bool_8_pos_1 = alloc(1)
-			local len_11 = #Value["StageId"]
-			assert(len_11 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_11)
-			alloc(len_11)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_11)
-			if Value["Victory"] then
-				bool_8 = bit32.bor(bool_8, 0b0000000000000001)
-			end
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
-			buffer.writeu8(outgoing_buff, bool_8_pos_1, bool_8)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				if player ~= Except then
-					load_player(player)
-					alloc(used)
-					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-					player_map[player] = save()
-				end
-			end
-		end,
-		FireList = function(List: { [any]: Player }, Value: ({
-			["StageId"]: (string),
-			["Victory"]: (boolean),
-			["Stars"]: (number),
-			["CoinsEarned"]: (number),
-			["XPEarned"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-			local bool_9 = 0
-			local bool_9_pos_1 = alloc(1)
-			local len_12 = #Value["StageId"]
-			assert(len_12 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_12)
-			alloc(len_12)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_12)
-			if Value["Victory"] then
-				bool_9 = bit32.bor(bool_9, 0b0000000000000001)
-			end
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
-			buffer.writeu8(outgoing_buff, bool_9_pos_1, bool_9)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in List do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireSet = function(Set: { [Player]: any }, Value: ({
-			["StageId"]: (string),
-			["Victory"]: (boolean),
-			["Stars"]: (number),
-			["CoinsEarned"]: (number),
-			["XPEarned"]: (number),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
-			local bool_10 = 0
-			local bool_10_pos_1 = alloc(1)
-			local len_13 = #Value["StageId"]
-			assert(len_13 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_13)
-			alloc(len_13)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_13)
-			if Value["Victory"] then
-				bool_10 = bit32.bor(bool_10, 0b0000000000000001)
-			end
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
-			alloc(4)
-			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
-			buffer.writeu8(outgoing_buff, bool_10_pos_1, bool_10)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for player in Set do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-	},
-	SaveDeck = {
-		SetCallback = function(Callback: (Player: Player, Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
-		})) -> ()): () -> ()
-			reliable_events[2] = Callback
-			return function()
-				reliable_events[2] = nil
-			end
-		end,
-	},
-	PadStateUpdate = {
-		Fire = function(Player: Player, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["PlayersCount"]: (number),
-			["MaxPlayers"]: (number),
-			["CountdownRemaining"]: ((number)?),
-			["IsLocked"]: (boolean),
-			["PlayerNames"]: ((string)?),
-		}))
-			load_player(Player)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-			local bool_11 = 0
-			local bool_11_pos_1 = alloc(1)
-			local len_14 = #Value["PadId"]
-			assert(len_14 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_14)
-			alloc(len_14)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_14)
-			local len_15 = #Value["StageId"]
-			assert(len_15 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_15)
-			alloc(len_15)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_15)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
-			if Value["CountdownRemaining"] ~= nil then
-				bool_11 = bit32.bor(bool_11, 0b0000000000000001)
-				alloc(1)
-				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
-			end
-			if Value["IsLocked"] then
-				bool_11 = bit32.bor(bool_11, 0b0000000000000010)
-			end
-			if Value["PlayerNames"] ~= nil then
-				bool_11 = bit32.bor(bool_11, 0b0000000000000100)
-				local len_16 = #Value["PlayerNames"]
-				assert(len_16 <= 800, "value is more than 800!")
-				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
-				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_16)
-				alloc(len_16)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_16)
-			end
-			buffer.writeu8(outgoing_buff, bool_11_pos_1, bool_11)
-			player_map[Player] = save()
-		end,
-		FireAll = function(Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["PlayersCount"]: (number),
-			["MaxPlayers"]: (number),
-			["CountdownRemaining"]: ((number)?),
-			["IsLocked"]: (boolean),
-			["PlayerNames"]: ((string)?),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-			local bool_12 = 0
-			local bool_12_pos_1 = alloc(1)
-			local len_17 = #Value["PadId"]
-			assert(len_17 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_17)
-			alloc(len_17)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_17)
-			local len_18 = #Value["StageId"]
-			assert(len_18 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_18)
-			alloc(len_18)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_18)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
-			if Value["CountdownRemaining"] ~= nil then
-				bool_12 = bit32.bor(bool_12, 0b0000000000000001)
-				alloc(1)
-				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
-			end
-			if Value["IsLocked"] then
-				bool_12 = bit32.bor(bool_12, 0b0000000000000010)
-			end
-			if Value["PlayerNames"] ~= nil then
-				bool_12 = bit32.bor(bool_12, 0b0000000000000100)
-				local len_19 = #Value["PlayerNames"]
-				assert(len_19 <= 800, "value is more than 800!")
-				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
-				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_19)
-				alloc(len_19)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_19)
-			end
-			buffer.writeu8(outgoing_buff, bool_12_pos_1, bool_12)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireExcept = function(Except: Player, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["PlayersCount"]: (number),
-			["MaxPlayers"]: (number),
-			["CountdownRemaining"]: ((number)?),
-			["IsLocked"]: (boolean),
-			["PlayerNames"]: ((string)?),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-			local bool_13 = 0
-			local bool_13_pos_1 = alloc(1)
-			local len_20 = #Value["PadId"]
-			assert(len_20 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_20)
-			alloc(len_20)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_20)
-			local len_21 = #Value["StageId"]
-			assert(len_21 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_21)
-			alloc(len_21)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_21)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
-			if Value["CountdownRemaining"] ~= nil then
-				bool_13 = bit32.bor(bool_13, 0b0000000000000001)
-				alloc(1)
-				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
-			end
-			if Value["IsLocked"] then
-				bool_13 = bit32.bor(bool_13, 0b0000000000000010)
-			end
-			if Value["PlayerNames"] ~= nil then
-				bool_13 = bit32.bor(bool_13, 0b0000000000000100)
-				local len_22 = #Value["PlayerNames"]
-				assert(len_22 <= 800, "value is more than 800!")
-				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
-				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_22)
-				alloc(len_22)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_22)
-			end
-			buffer.writeu8(outgoing_buff, bool_13_pos_1, bool_13)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				if player ~= Except then
-					load_player(player)
-					alloc(used)
-					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-					player_map[player] = save()
-				end
-			end
-		end,
-		FireList = function(List: { [any]: Player }, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["PlayersCount"]: (number),
-			["MaxPlayers"]: (number),
-			["CountdownRemaining"]: ((number)?),
-			["IsLocked"]: (boolean),
-			["PlayerNames"]: ((string)?),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-			local bool_14 = 0
-			local bool_14_pos_1 = alloc(1)
-			local len_23 = #Value["PadId"]
-			assert(len_23 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_23)
-			alloc(len_23)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_23)
-			local len_24 = #Value["StageId"]
-			assert(len_24 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_24)
-			alloc(len_24)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_24)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
-			if Value["CountdownRemaining"] ~= nil then
-				bool_14 = bit32.bor(bool_14, 0b0000000000000001)
-				alloc(1)
-				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
-			end
-			if Value["IsLocked"] then
-				bool_14 = bit32.bor(bool_14, 0b0000000000000010)
-			end
-			if Value["PlayerNames"] ~= nil then
-				bool_14 = bit32.bor(bool_14, 0b0000000000000100)
-				local len_25 = #Value["PlayerNames"]
-				assert(len_25 <= 800, "value is more than 800!")
-				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
-				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_25)
-				alloc(len_25)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_25)
-			end
-			buffer.writeu8(outgoing_buff, bool_14_pos_1, bool_14)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in List do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireSet = function(Set: { [Player]: any }, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["PlayersCount"]: (number),
-			["MaxPlayers"]: (number),
-			["CountdownRemaining"]: ((number)?),
-			["IsLocked"]: (boolean),
-			["PlayerNames"]: ((string)?),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
-			local bool_15 = 0
-			local bool_15_pos_1 = alloc(1)
-			local len_26 = #Value["PadId"]
-			assert(len_26 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_26)
-			alloc(len_26)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_26)
-			local len_27 = #Value["StageId"]
-			assert(len_27 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_27)
-			alloc(len_27)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_27)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
-			if Value["CountdownRemaining"] ~= nil then
-				bool_15 = bit32.bor(bool_15, 0b0000000000000001)
-				alloc(1)
-				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
-			end
-			if Value["IsLocked"] then
-				bool_15 = bit32.bor(bool_15, 0b0000000000000010)
-			end
-			if Value["PlayerNames"] ~= nil then
-				bool_15 = bit32.bor(bool_15, 0b0000000000000100)
-				local len_28 = #Value["PlayerNames"]
-				assert(len_28 <= 800, "value is more than 800!")
-				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
-				alloc(2)
-				buffer.writeu16(outgoing_buff, outgoing_apos, len_28)
-				alloc(len_28)
-				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_28)
-			end
-			buffer.writeu8(outgoing_buff, bool_15_pos_1, bool_15)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for player in Set do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-	},
-	LeftPad = {
-		Fire = function(Player: Player, Value: ({
-		}))
-			load_player(Player)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-			player_map[Player] = save()
-		end,
-		FireAll = function(Value: ({
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireExcept = function(Except: Player, Value: ({
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				if player ~= Except then
-					load_player(player)
-					alloc(used)
-					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-					player_map[player] = save()
-				end
-			end
-		end,
-		FireList = function(List: { [any]: Player }, Value: ({
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in List do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireSet = function(Set: { [Player]: any }, Value: ({
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for player in Set do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-	},
-	LeavePadRequest = {
-		SetCallback = function(Callback: (Player: Player, Value: ({
-		})) -> ()): () -> ()
-			reliable_events[1] = Callback
-			return function()
-				reliable_events[1] = nil
-			end
-		end,
-	},
-	JoinedPad = {
-		Fire = function(Player: Player, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["Position"]: (Vector3),
-		}))
-			load_player(Player)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_29 = #Value["PadId"]
-			assert(len_29 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_29)
-			alloc(len_29)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_29)
-			local len_30 = #Value["StageId"]
-			assert(len_30 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_30)
-			alloc(len_30)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_30)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
-			player_map[Player] = save()
-		end,
-		FireAll = function(Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["Position"]: (Vector3),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_31 = #Value["PadId"]
-			assert(len_31 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_31)
-			alloc(len_31)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_31)
-			local len_32 = #Value["StageId"]
-			assert(len_32 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_32)
-			alloc(len_32)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_32)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireExcept = function(Except: Player, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["Position"]: (Vector3),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_33 = #Value["PadId"]
-			assert(len_33 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_33)
-			alloc(len_33)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_33)
-			local len_34 = #Value["StageId"]
-			assert(len_34 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_34)
-			alloc(len_34)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_34)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in Players:GetPlayers() do
-				if player ~= Except then
-					load_player(player)
-					alloc(used)
-					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-					player_map[player] = save()
-				end
-			end
-		end,
-		FireList = function(List: { [any]: Player }, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["Position"]: (Vector3),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_35 = #Value["PadId"]
-			assert(len_35 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_35)
-			alloc(len_35)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_35)
-			local len_36 = #Value["StageId"]
-			assert(len_36 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_36)
-			alloc(len_36)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_36)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for _, player in List do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-		FireSet = function(Set: { [Player]: any }, Value: ({
-			["PadId"]: (string),
-			["StageId"]: (string),
-			["Position"]: (Vector3),
-		}))
-			load_empty()
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
-			local len_37 = #Value["PadId"]
-			assert(len_37 <= 400, "value is more than 400!")
-			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
-			alloc(2)
-			buffer.writeu16(outgoing_buff, outgoing_apos, len_37)
-			alloc(len_37)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_37)
-			local len_38 = #Value["StageId"]
-			assert(len_38 <= 200, "value is more than 200!")
-			assert(utf8.len(Value["StageId"]) ~= nil, "value is not valid utf-8")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_38)
-			alloc(len_38)
-			buffer.writestring(outgoing_buff, outgoing_apos, Value["StageId"], len_38)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
-			alloc(4)
-			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
-			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
-			for player in Set do
-				load_player(player)
-				alloc(used)
-				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
-				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
-				player_map[player] = save()
-			end
-		end,
-	},
-	DeckChanged = {
-		Fire = function(Player: Player, Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
-		}))
-			load_player(Player)
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local len_39 = #Value["Deck"]
-			assert(len_39 >= 1, "value is less than 1!")
-			assert(len_39 <= 6, "value is more than 6!")
-			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_39 - 1)
-			for i_3 = 1, len_39 do
-				local val_3 = Value["Deck"][i_3]
+			for i_3 = 1, len_10 do
+				local val_3 = Value["UnlockedPlants"][i_3]
 				if val_3 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -1737,18 +1000,18 @@ local returns = {
 			player_map[Player] = save()
 		end,
 		FireAll = function(Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local len_40 = #Value["Deck"]
-			assert(len_40 >= 1, "value is less than 1!")
-			assert(len_40 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			local len_11 = #Value["UnlockedPlants"]
+			assert(len_11 >= 0, "value is less than 0!")
+			assert(len_11 <= 48, "value is more than 48!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_40 - 1)
-			for i_4 = 1, len_40 do
-				local val_4 = Value["Deck"][i_4]
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_11)
+			for i_4 = 1, len_11 do
+				local val_4 = Value["UnlockedPlants"][i_4]
 				if val_4 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -1907,18 +1170,18 @@ local returns = {
 			end
 		end,
 		FireExcept = function(Except: Player, Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local len_41 = #Value["Deck"]
-			assert(len_41 >= 1, "value is less than 1!")
-			assert(len_41 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			local len_12 = #Value["UnlockedPlants"]
+			assert(len_12 >= 0, "value is less than 0!")
+			assert(len_12 <= 48, "value is more than 48!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_41 - 1)
-			for i_5 = 1, len_41 do
-				local val_5 = Value["Deck"][i_5]
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_12)
+			for i_5 = 1, len_12 do
+				local val_5 = Value["UnlockedPlants"][i_5]
 				if val_5 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -2078,19 +1341,19 @@ local returns = {
 				end
 			end
 		end,
-		FireList = function(List: { [any]: Player }, Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local len_42 = #Value["Deck"]
-			assert(len_42 >= 1, "value is less than 1!")
-			assert(len_42 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			local len_13 = #Value["UnlockedPlants"]
+			assert(len_13 >= 0, "value is less than 0!")
+			assert(len_13 <= 48, "value is more than 48!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_42 - 1)
-			for i_6 = 1, len_42 do
-				local val_6 = Value["Deck"][i_6]
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_13)
+			for i_6 = 1, len_13 do
+				local val_6 = Value["UnlockedPlants"][i_6]
 				if val_6 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -2249,18 +1512,18 @@ local returns = {
 			end
 		end,
 		FireSet = function(Set: { [Player]: any }, Value: ({
-			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
 		}))
 			load_empty()
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
-			local len_43 = #Value["Deck"]
-			assert(len_43 >= 1, "value is less than 1!")
-			assert(len_43 <= 6, "value is more than 6!")
+			buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			local len_14 = #Value["UnlockedPlants"]
+			assert(len_14 >= 0, "value is less than 0!")
+			assert(len_14 <= 48, "value is more than 48!")
 			alloc(1)
-			buffer.writeu8(outgoing_buff, outgoing_apos, len_43 - 1)
-			for i_7 = 1, len_43 do
-				local val_7 = Value["Deck"][i_7]
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_14)
+			for i_7 = 1, len_14 do
+				local val_7 = Value["UnlockedPlants"][i_7]
 				if val_7 == "Sunflower" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
@@ -2403,6 +1666,4515 @@ local returns = {
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
 				elseif val_7 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	SyncPlayerData = {
+		Fire = function(Player: Player, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	ShowResults = {
+		Fire = function(Player: Player, Value: ({
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Victory"]: (boolean),
+			["Stars"]: (number),
+			["CoinsEarned"]: (number),
+			["XPEarned"]: (number),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			local bool_6 = 0
+			local bool_6_pos_1 = alloc(1)
+			local len_15 = #Value["WorldId"]
+			assert(len_15 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_15)
+			alloc(len_15)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_15)
+			local len_16 = #Value["Difficulty"]
+			assert(len_16 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_16)
+			alloc(len_16)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_16)
+			if Value["Victory"] then
+				bool_6 = bit32.bor(bool_6, 0b0000000000000001)
+			end
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
+			buffer.writeu8(outgoing_buff, bool_6_pos_1, bool_6)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Victory"]: (boolean),
+			["Stars"]: (number),
+			["CoinsEarned"]: (number),
+			["XPEarned"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			local bool_7 = 0
+			local bool_7_pos_1 = alloc(1)
+			local len_17 = #Value["WorldId"]
+			assert(len_17 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_17)
+			alloc(len_17)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_17)
+			local len_18 = #Value["Difficulty"]
+			assert(len_18 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_18)
+			alloc(len_18)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_18)
+			if Value["Victory"] then
+				bool_7 = bit32.bor(bool_7, 0b0000000000000001)
+			end
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
+			buffer.writeu8(outgoing_buff, bool_7_pos_1, bool_7)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Victory"]: (boolean),
+			["Stars"]: (number),
+			["CoinsEarned"]: (number),
+			["XPEarned"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			local bool_8 = 0
+			local bool_8_pos_1 = alloc(1)
+			local len_19 = #Value["WorldId"]
+			assert(len_19 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_19)
+			alloc(len_19)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_19)
+			local len_20 = #Value["Difficulty"]
+			assert(len_20 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_20)
+			alloc(len_20)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_20)
+			if Value["Victory"] then
+				bool_8 = bit32.bor(bool_8, 0b0000000000000001)
+			end
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
+			buffer.writeu8(outgoing_buff, bool_8_pos_1, bool_8)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Victory"]: (boolean),
+			["Stars"]: (number),
+			["CoinsEarned"]: (number),
+			["XPEarned"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			local bool_9 = 0
+			local bool_9_pos_1 = alloc(1)
+			local len_21 = #Value["WorldId"]
+			assert(len_21 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_21)
+			alloc(len_21)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_21)
+			local len_22 = #Value["Difficulty"]
+			assert(len_22 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_22)
+			alloc(len_22)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_22)
+			if Value["Victory"] then
+				bool_9 = bit32.bor(bool_9, 0b0000000000000001)
+			end
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
+			buffer.writeu8(outgoing_buff, bool_9_pos_1, bool_9)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Victory"]: (boolean),
+			["Stars"]: (number),
+			["CoinsEarned"]: (number),
+			["XPEarned"]: (number),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			local bool_10 = 0
+			local bool_10_pos_1 = alloc(1)
+			local len_23 = #Value["WorldId"]
+			assert(len_23 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_23)
+			alloc(len_23)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_23)
+			local len_24 = #Value["Difficulty"]
+			assert(len_24 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_24)
+			alloc(len_24)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_24)
+			if Value["Victory"] then
+				bool_10 = bit32.bor(bool_10, 0b0000000000000001)
+			end
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Stars"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["CoinsEarned"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XPEarned"])
+			buffer.writeu8(outgoing_buff, bool_10_pos_1, bool_10)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	SaveDeck = {
+		SetCallback = function(Callback: (Player: Player, Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		})) -> ()): () -> ()
+			reliable_events[2] = Callback
+			return function()
+				reliable_events[2] = nil
+			end
+		end,
+	},
+	RequestPlayerData = {
+		SetCallback = function(Callback: (Player: Player, Value: ({
+		})) -> ()): () -> ()
+			reliable_events[4] = Callback
+			return function()
+				reliable_events[4] = nil
+			end
+		end,
+	},
+	PurchasePlantResponse = {
+		Fire = function(Player: Player, Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["ErrorCode"]: ((number)?),
+			["NewCoins"]: ((number)?),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			local bool_11 = 0
+			local bool_11_pos_1 = alloc(1)
+			if Value["Success"] then
+				bool_11 = bit32.bor(bool_11, 0b0000000000000001)
+			end
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["ErrorCode"] ~= nil then
+				bool_11 = bit32.bor(bool_11, 0b0000000000000010)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["ErrorCode"])
+			end
+			if Value["NewCoins"] ~= nil then
+				bool_11 = bit32.bor(bool_11, 0b0000000000000100)
+				alloc(4)
+				buffer.writeu32(outgoing_buff, outgoing_apos, Value["NewCoins"])
+			end
+			buffer.writeu8(outgoing_buff, bool_11_pos_1, bool_11)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["ErrorCode"]: ((number)?),
+			["NewCoins"]: ((number)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			local bool_12 = 0
+			local bool_12_pos_1 = alloc(1)
+			if Value["Success"] then
+				bool_12 = bit32.bor(bool_12, 0b0000000000000001)
+			end
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["ErrorCode"] ~= nil then
+				bool_12 = bit32.bor(bool_12, 0b0000000000000010)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["ErrorCode"])
+			end
+			if Value["NewCoins"] ~= nil then
+				bool_12 = bit32.bor(bool_12, 0b0000000000000100)
+				alloc(4)
+				buffer.writeu32(outgoing_buff, outgoing_apos, Value["NewCoins"])
+			end
+			buffer.writeu8(outgoing_buff, bool_12_pos_1, bool_12)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["ErrorCode"]: ((number)?),
+			["NewCoins"]: ((number)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			local bool_13 = 0
+			local bool_13_pos_1 = alloc(1)
+			if Value["Success"] then
+				bool_13 = bit32.bor(bool_13, 0b0000000000000001)
+			end
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["ErrorCode"] ~= nil then
+				bool_13 = bit32.bor(bool_13, 0b0000000000000010)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["ErrorCode"])
+			end
+			if Value["NewCoins"] ~= nil then
+				bool_13 = bit32.bor(bool_13, 0b0000000000000100)
+				alloc(4)
+				buffer.writeu32(outgoing_buff, outgoing_apos, Value["NewCoins"])
+			end
+			buffer.writeu8(outgoing_buff, bool_13_pos_1, bool_13)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["ErrorCode"]: ((number)?),
+			["NewCoins"]: ((number)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			local bool_14 = 0
+			local bool_14_pos_1 = alloc(1)
+			if Value["Success"] then
+				bool_14 = bit32.bor(bool_14, 0b0000000000000001)
+			end
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["ErrorCode"] ~= nil then
+				bool_14 = bit32.bor(bool_14, 0b0000000000000010)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["ErrorCode"])
+			end
+			if Value["NewCoins"] ~= nil then
+				bool_14 = bit32.bor(bool_14, 0b0000000000000100)
+				alloc(4)
+				buffer.writeu32(outgoing_buff, outgoing_apos, Value["NewCoins"])
+			end
+			buffer.writeu8(outgoing_buff, bool_14_pos_1, bool_14)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["Success"]: (boolean),
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+			["ErrorCode"]: ((number)?),
+			["NewCoins"]: ((number)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			local bool_15 = 0
+			local bool_15_pos_1 = alloc(1)
+			if Value["Success"] then
+				bool_15 = bit32.bor(bool_15, 0b0000000000000001)
+			end
+			if Value["PlantType"] == "Sunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+			elseif Value["PlantType"] == "Peashooter" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+			elseif Value["PlantType"] == "WallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+			elseif Value["PlantType"] == "PotatoMine" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			elseif Value["PlantType"] == "PuffShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			elseif Value["PlantType"] == "SunShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			elseif Value["PlantType"] == "Chomper" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			elseif Value["PlantType"] == "SnowPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+			elseif Value["PlantType"] == "Repeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+			elseif Value["PlantType"] == "FumeShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			elseif Value["PlantType"] == "Squash" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+			elseif Value["PlantType"] == "Garlic" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+			elseif Value["PlantType"] == "CherryBomb" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+			elseif Value["PlantType"] == "TallNut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+			elseif Value["PlantType"] == "Threepeater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+			elseif Value["PlantType"] == "Jalapeno" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+			elseif Value["PlantType"] == "Spikeweed" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+			elseif Value["PlantType"] == "Torchwood" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+			elseif Value["PlantType"] == "CabbagePult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+			elseif Value["PlantType"] == "Pumpkin" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+			elseif Value["PlantType"] == "ScaredyShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+			elseif Value["PlantType"] == "HypnoShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+			elseif Value["PlantType"] == "SplitPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+			elseif Value["PlantType"] == "KernelPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+			elseif Value["PlantType"] == "Starfruit" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+			elseif Value["PlantType"] == "Cactus" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+			elseif Value["PlantType"] == "Blover" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+			elseif Value["PlantType"] == "SeaShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+			elseif Value["PlantType"] == "TwinSunflower" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+			elseif Value["PlantType"] == "MelonPult" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+			elseif Value["PlantType"] == "GatlingPea" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+			elseif Value["PlantType"] == "GloomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+			elseif Value["PlantType"] == "Cattail" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+			elseif Value["PlantType"] == "WinterMelon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+			elseif Value["PlantType"] == "IceShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+			elseif Value["PlantType"] == "DoomShroom" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+			elseif Value["PlantType"] == "CobCannon" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+			elseif Value["PlantType"] == "Marigold" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+			elseif Value["PlantType"] == "GoldMagnet" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+			elseif Value["PlantType"] == "Imitater" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+			elseif Value["PlantType"] == "LilyPad" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+			elseif Value["PlantType"] == "FlowerPot" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+			elseif Value["PlantType"] == "TangleKelp" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+			elseif Value["PlantType"] == "GraveBuster" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+			elseif Value["PlantType"] == "Plantern" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+			elseif Value["PlantType"] == "UmbrellaLeaf" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+			elseif Value["PlantType"] == "CoffeeBean" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+			elseif Value["PlantType"] == "ExplodeONut" then
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+			else
+				error("Invalid enumerator")
+			end
+			if Value["ErrorCode"] ~= nil then
+				bool_15 = bit32.bor(bool_15, 0b0000000000000010)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["ErrorCode"])
+			end
+			if Value["NewCoins"] ~= nil then
+				bool_15 = bit32.bor(bool_15, 0b0000000000000100)
+				alloc(4)
+				buffer.writeu32(outgoing_buff, outgoing_apos, Value["NewCoins"])
+			end
+			buffer.writeu8(outgoing_buff, bool_15_pos_1, bool_15)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	PurchasePlantRequest = {
+		SetCallback = function(Callback: (Player: Player, Value: ({
+			["PlantType"]: ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut"),
+		})) -> ()): () -> ()
+			reliable_events[3] = Callback
+			return function()
+				reliable_events[3] = nil
+			end
+		end,
+	},
+	PadStateUpdate = {
+		Fire = function(Player: Player, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["PlayersCount"]: (number),
+			["MaxPlayers"]: (number),
+			["CountdownRemaining"]: ((number)?),
+			["PlayerNames"]: ((string)?),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			local bool_16 = 0
+			local bool_16_pos_1 = alloc(1)
+			local len_25 = #Value["PadId"]
+			assert(len_25 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_25)
+			alloc(len_25)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_25)
+			local len_26 = #Value["WorldId"]
+			assert(len_26 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_26)
+			alloc(len_26)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_26)
+			local len_27 = #Value["Difficulty"]
+			assert(len_27 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_27)
+			alloc(len_27)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_27)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
+			if Value["CountdownRemaining"] ~= nil then
+				bool_16 = bit32.bor(bool_16, 0b0000000000000001)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_16 = bit32.bor(bool_16, 0b0000000000000010)
+				local len_28 = #Value["PlayerNames"]
+				assert(len_28 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_28)
+				alloc(len_28)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_28)
+			end
+			buffer.writeu8(outgoing_buff, bool_16_pos_1, bool_16)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["PlayersCount"]: (number),
+			["MaxPlayers"]: (number),
+			["CountdownRemaining"]: ((number)?),
+			["PlayerNames"]: ((string)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			local bool_17 = 0
+			local bool_17_pos_1 = alloc(1)
+			local len_29 = #Value["PadId"]
+			assert(len_29 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_29)
+			alloc(len_29)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_29)
+			local len_30 = #Value["WorldId"]
+			assert(len_30 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_30)
+			alloc(len_30)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_30)
+			local len_31 = #Value["Difficulty"]
+			assert(len_31 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_31)
+			alloc(len_31)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_31)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
+			if Value["CountdownRemaining"] ~= nil then
+				bool_17 = bit32.bor(bool_17, 0b0000000000000001)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_17 = bit32.bor(bool_17, 0b0000000000000010)
+				local len_32 = #Value["PlayerNames"]
+				assert(len_32 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_32)
+				alloc(len_32)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_32)
+			end
+			buffer.writeu8(outgoing_buff, bool_17_pos_1, bool_17)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["PlayersCount"]: (number),
+			["MaxPlayers"]: (number),
+			["CountdownRemaining"]: ((number)?),
+			["PlayerNames"]: ((string)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			local bool_18 = 0
+			local bool_18_pos_1 = alloc(1)
+			local len_33 = #Value["PadId"]
+			assert(len_33 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_33)
+			alloc(len_33)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_33)
+			local len_34 = #Value["WorldId"]
+			assert(len_34 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_34)
+			alloc(len_34)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_34)
+			local len_35 = #Value["Difficulty"]
+			assert(len_35 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_35)
+			alloc(len_35)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_35)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
+			if Value["CountdownRemaining"] ~= nil then
+				bool_18 = bit32.bor(bool_18, 0b0000000000000001)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_18 = bit32.bor(bool_18, 0b0000000000000010)
+				local len_36 = #Value["PlayerNames"]
+				assert(len_36 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_36)
+				alloc(len_36)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_36)
+			end
+			buffer.writeu8(outgoing_buff, bool_18_pos_1, bool_18)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["PlayersCount"]: (number),
+			["MaxPlayers"]: (number),
+			["CountdownRemaining"]: ((number)?),
+			["PlayerNames"]: ((string)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			local bool_19 = 0
+			local bool_19_pos_1 = alloc(1)
+			local len_37 = #Value["PadId"]
+			assert(len_37 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_37)
+			alloc(len_37)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_37)
+			local len_38 = #Value["WorldId"]
+			assert(len_38 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_38)
+			alloc(len_38)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_38)
+			local len_39 = #Value["Difficulty"]
+			assert(len_39 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_39)
+			alloc(len_39)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_39)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
+			if Value["CountdownRemaining"] ~= nil then
+				bool_19 = bit32.bor(bool_19, 0b0000000000000001)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_19 = bit32.bor(bool_19, 0b0000000000000010)
+				local len_40 = #Value["PlayerNames"]
+				assert(len_40 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_40)
+				alloc(len_40)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_40)
+			end
+			buffer.writeu8(outgoing_buff, bool_19_pos_1, bool_19)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["PlayersCount"]: (number),
+			["MaxPlayers"]: (number),
+			["CountdownRemaining"]: ((number)?),
+			["PlayerNames"]: ((string)?),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+			local bool_20 = 0
+			local bool_20_pos_1 = alloc(1)
+			local len_41 = #Value["PadId"]
+			assert(len_41 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_41)
+			alloc(len_41)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_41)
+			local len_42 = #Value["WorldId"]
+			assert(len_42 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_42)
+			alloc(len_42)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_42)
+			local len_43 = #Value["Difficulty"]
+			assert(len_43 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_43)
+			alloc(len_43)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_43)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["PlayersCount"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["MaxPlayers"])
+			if Value["CountdownRemaining"] ~= nil then
+				bool_20 = bit32.bor(bool_20, 0b0000000000000001)
+				alloc(1)
+				buffer.writeu8(outgoing_buff, outgoing_apos, Value["CountdownRemaining"])
+			end
+			if Value["PlayerNames"] ~= nil then
+				bool_20 = bit32.bor(bool_20, 0b0000000000000010)
+				local len_44 = #Value["PlayerNames"]
+				assert(len_44 <= 800, "value is more than 800!")
+				assert(utf8.len(Value["PlayerNames"]) ~= nil, "value is not valid utf-8")
+				alloc(2)
+				buffer.writeu16(outgoing_buff, outgoing_apos, len_44)
+				alloc(len_44)
+				buffer.writestring(outgoing_buff, outgoing_apos, Value["PlayerNames"], len_44)
+			end
+			buffer.writeu8(outgoing_buff, bool_20_pos_1, bool_20)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	LeftPad = {
+		Fire = function(Player: Player, Value: ({
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	LeavePadRequest = {
+		SetCallback = function(Callback: (Player: Player, Value: ({
+		})) -> ()): () -> ()
+			reliable_events[1] = Callback
+			return function()
+				reliable_events[1] = nil
+			end
+		end,
+	},
+	JoinedPad = {
+		Fire = function(Player: Player, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_45 = #Value["PadId"]
+			assert(len_45 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_45)
+			alloc(len_45)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_45)
+			local len_46 = #Value["WorldId"]
+			assert(len_46 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_46)
+			alloc(len_46)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_46)
+			local len_47 = #Value["Difficulty"]
+			assert(len_47 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_47)
+			alloc(len_47)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_47)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_48 = #Value["PadId"]
+			assert(len_48 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_48)
+			alloc(len_48)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_48)
+			local len_49 = #Value["WorldId"]
+			assert(len_49 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_49)
+			alloc(len_49)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_49)
+			local len_50 = #Value["Difficulty"]
+			assert(len_50 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_50)
+			alloc(len_50)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_50)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_51 = #Value["PadId"]
+			assert(len_51 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_51)
+			alloc(len_51)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_51)
+			local len_52 = #Value["WorldId"]
+			assert(len_52 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_52)
+			alloc(len_52)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_52)
+			local len_53 = #Value["Difficulty"]
+			assert(len_53 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_53)
+			alloc(len_53)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_53)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_54 = #Value["PadId"]
+			assert(len_54 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_54)
+			alloc(len_54)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_54)
+			local len_55 = #Value["WorldId"]
+			assert(len_55 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_55)
+			alloc(len_55)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_55)
+			local len_56 = #Value["Difficulty"]
+			assert(len_56 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_56)
+			alloc(len_56)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_56)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["PadId"]: (string),
+			["WorldId"]: (string),
+			["Difficulty"]: (string),
+			["Position"]: (Vector3),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+			local len_57 = #Value["PadId"]
+			assert(len_57 <= 400, "value is more than 400!")
+			assert(utf8.len(Value["PadId"]) ~= nil, "value is not valid utf-8")
+			alloc(2)
+			buffer.writeu16(outgoing_buff, outgoing_apos, len_57)
+			alloc(len_57)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["PadId"], len_57)
+			local len_58 = #Value["WorldId"]
+			assert(len_58 <= 200, "value is more than 200!")
+			assert(utf8.len(Value["WorldId"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_58)
+			alloc(len_58)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["WorldId"], len_58)
+			local len_59 = #Value["Difficulty"]
+			assert(len_59 <= 80, "value is more than 80!")
+			assert(utf8.len(Value["Difficulty"]) ~= nil, "value is not valid utf-8")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_59)
+			alloc(len_59)
+			buffer.writestring(outgoing_buff, outgoing_apos, Value["Difficulty"], len_59)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].X)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Y)
+			alloc(4)
+			buffer.writef32(outgoing_buff, outgoing_apos, Value["Position"].Z)
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	FullPlayerDataSync = {
+		Fire = function(Player: Player, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+			["TotalXPForNextLevel"]: (number),
+			["GamesPlayed"]: (number),
+			["GamesWon"]: (number),
+			["ZombiesKilled"]: (number),
+			["PlantsPlaced"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalXPForNextLevel"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesPlayed"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesWon"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["ZombiesKilled"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["PlantsPlaced"])
+			local len_60 = #Value["UnlockedPlants"]
+			assert(len_60 >= 0, "value is less than 0!")
+			assert(len_60 <= 48, "value is more than 48!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_60)
+			for i_8 = 1, len_60 do
+				local val_8 = Value["UnlockedPlants"][i_8]
+				if val_8 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_8 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_8 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_8 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_8 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_8 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_8 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_8 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_8 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_8 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_8 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_8 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_8 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_8 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_8 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_8 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_8 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_8 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_8 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_8 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_8 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_8 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_8 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_8 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_8 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_8 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_8 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_8 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_8 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_8 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_8 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_8 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_8 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_8 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_8 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_8 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_8 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_8 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_8 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_8 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_8 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_8 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_8 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_8 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_8 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_8 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_8 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_8 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local len_61 = #Value["Deck"]
+			assert(len_61 >= 0, "value is less than 0!")
+			assert(len_61 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_61)
+			for i_9 = 1, len_61 do
+				local val_9 = Value["Deck"][i_9]
+				if val_9 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_9 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_9 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_9 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_9 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_9 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_9 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_9 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_9 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_9 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_9 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_9 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_9 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_9 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_9 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_9 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_9 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_9 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_9 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_9 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_9 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_9 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_9 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_9 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_9 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_9 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_9 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_9 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_9 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_9 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_9 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_9 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_9 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_9 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_9 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_9 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_9 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_9 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_9 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_9 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_9 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_9 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_9 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_9 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_9 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_9 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_9 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_9 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+			["TotalXPForNextLevel"]: (number),
+			["GamesPlayed"]: (number),
+			["GamesWon"]: (number),
+			["ZombiesKilled"]: (number),
+			["PlantsPlaced"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalXPForNextLevel"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesPlayed"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesWon"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["ZombiesKilled"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["PlantsPlaced"])
+			local len_62 = #Value["UnlockedPlants"]
+			assert(len_62 >= 0, "value is less than 0!")
+			assert(len_62 <= 48, "value is more than 48!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_62)
+			for i_10 = 1, len_62 do
+				local val_10 = Value["UnlockedPlants"][i_10]
+				if val_10 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_10 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_10 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_10 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_10 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_10 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_10 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_10 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_10 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_10 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_10 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_10 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_10 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_10 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_10 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_10 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_10 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_10 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_10 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_10 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_10 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_10 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_10 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_10 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_10 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_10 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_10 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_10 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_10 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_10 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_10 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_10 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_10 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_10 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_10 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_10 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_10 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_10 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_10 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_10 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_10 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_10 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_10 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_10 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_10 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_10 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_10 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_10 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local len_63 = #Value["Deck"]
+			assert(len_63 >= 0, "value is less than 0!")
+			assert(len_63 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_63)
+			for i_11 = 1, len_63 do
+				local val_11 = Value["Deck"][i_11]
+				if val_11 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_11 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_11 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_11 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_11 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_11 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_11 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_11 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_11 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_11 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_11 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_11 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_11 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_11 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_11 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_11 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_11 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_11 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_11 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_11 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_11 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_11 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_11 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_11 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_11 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_11 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_11 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_11 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_11 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_11 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_11 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_11 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_11 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_11 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_11 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_11 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_11 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_11 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_11 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_11 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_11 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_11 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_11 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_11 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_11 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_11 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_11 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_11 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+			["TotalXPForNextLevel"]: (number),
+			["GamesPlayed"]: (number),
+			["GamesWon"]: (number),
+			["ZombiesKilled"]: (number),
+			["PlantsPlaced"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalXPForNextLevel"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesPlayed"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesWon"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["ZombiesKilled"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["PlantsPlaced"])
+			local len_64 = #Value["UnlockedPlants"]
+			assert(len_64 >= 0, "value is less than 0!")
+			assert(len_64 <= 48, "value is more than 48!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_64)
+			for i_12 = 1, len_64 do
+				local val_12 = Value["UnlockedPlants"][i_12]
+				if val_12 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_12 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_12 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_12 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_12 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_12 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_12 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_12 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_12 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_12 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_12 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_12 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_12 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_12 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_12 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_12 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_12 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_12 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_12 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_12 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_12 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_12 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_12 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_12 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_12 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_12 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_12 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_12 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_12 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_12 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_12 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_12 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_12 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_12 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_12 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_12 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_12 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_12 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_12 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_12 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_12 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_12 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_12 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_12 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_12 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_12 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_12 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_12 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local len_65 = #Value["Deck"]
+			assert(len_65 >= 0, "value is less than 0!")
+			assert(len_65 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_65)
+			for i_13 = 1, len_65 do
+				local val_13 = Value["Deck"][i_13]
+				if val_13 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_13 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_13 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_13 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_13 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_13 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_13 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_13 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_13 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_13 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_13 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_13 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_13 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_13 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_13 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_13 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_13 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_13 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_13 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_13 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_13 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_13 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_13 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_13 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_13 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_13 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_13 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_13 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_13 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_13 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_13 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_13 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_13 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_13 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_13 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_13 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_13 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_13 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_13 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_13 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_13 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_13 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_13 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_13 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_13 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_13 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_13 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_13 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+			["TotalXPForNextLevel"]: (number),
+			["GamesPlayed"]: (number),
+			["GamesWon"]: (number),
+			["ZombiesKilled"]: (number),
+			["PlantsPlaced"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalXPForNextLevel"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesPlayed"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesWon"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["ZombiesKilled"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["PlantsPlaced"])
+			local len_66 = #Value["UnlockedPlants"]
+			assert(len_66 >= 0, "value is less than 0!")
+			assert(len_66 <= 48, "value is more than 48!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_66)
+			for i_14 = 1, len_66 do
+				local val_14 = Value["UnlockedPlants"][i_14]
+				if val_14 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_14 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_14 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_14 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_14 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_14 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_14 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_14 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_14 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_14 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_14 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_14 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_14 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_14 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_14 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_14 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_14 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_14 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_14 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_14 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_14 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_14 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_14 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_14 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_14 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_14 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_14 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_14 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_14 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_14 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_14 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_14 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_14 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_14 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_14 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_14 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_14 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_14 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_14 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_14 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_14 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_14 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_14 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_14 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_14 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_14 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_14 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_14 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local len_67 = #Value["Deck"]
+			assert(len_67 >= 0, "value is less than 0!")
+			assert(len_67 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_67)
+			for i_15 = 1, len_67 do
+				local val_15 = Value["Deck"][i_15]
+				if val_15 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_15 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_15 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_15 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_15 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_15 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_15 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_15 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_15 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_15 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_15 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_15 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_15 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_15 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_15 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_15 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_15 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_15 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_15 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_15 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_15 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_15 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_15 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_15 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_15 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_15 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_15 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_15 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_15 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_15 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_15 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_15 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_15 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_15 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_15 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_15 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_15 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_15 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_15 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_15 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_15 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_15 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_15 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_15 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_15 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_15 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_15 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_15 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["Coins"]: (number),
+			["Gems"]: (number),
+			["Level"]: (number),
+			["XP"]: (number),
+			["TotalXPForNextLevel"]: (number),
+			["GamesPlayed"]: (number),
+			["GamesWon"]: (number),
+			["ZombiesKilled"]: (number),
+			["PlantsPlaced"]: (number),
+			["UnlockedPlants"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Coins"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["Gems"])
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, Value["Level"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["XP"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["TotalXPForNextLevel"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesPlayed"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["GamesWon"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["ZombiesKilled"])
+			alloc(4)
+			buffer.writeu32(outgoing_buff, outgoing_apos, Value["PlantsPlaced"])
+			local len_68 = #Value["UnlockedPlants"]
+			assert(len_68 >= 0, "value is less than 0!")
+			assert(len_68 <= 48, "value is more than 48!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_68)
+			for i_16 = 1, len_68 do
+				local val_16 = Value["UnlockedPlants"][i_16]
+				if val_16 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_16 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_16 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_16 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_16 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_16 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_16 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_16 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_16 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_16 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_16 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_16 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_16 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_16 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_16 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_16 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_16 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_16 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_16 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_16 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_16 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_16 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_16 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_16 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_16 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_16 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_16 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_16 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_16 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_16 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_16 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_16 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_16 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_16 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_16 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_16 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_16 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_16 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_16 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_16 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_16 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_16 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_16 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_16 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_16 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_16 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_16 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_16 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local len_69 = #Value["Deck"]
+			assert(len_69 >= 0, "value is less than 0!")
+			assert(len_69 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_69)
+			for i_17 = 1, len_69 do
+				local val_17 = Value["Deck"][i_17]
+				if val_17 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_17 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_17 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_17 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_17 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_17 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_17 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_17 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_17 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_17 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_17 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_17 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_17 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_17 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_17 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_17 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_17 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_17 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_17 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_17 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_17 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_17 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_17 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_17 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_17 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_17 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_17 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_17 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_17 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_17 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_17 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_17 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_17 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_17 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_17 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_17 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_17 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_17 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_17 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_17 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_17 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_17 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_17 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_17 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_17 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_17 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_17 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_17 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for player in Set do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+	},
+	DeckChanged = {
+		Fire = function(Player: Player, Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_player(Player)
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_70 = #Value["Deck"]
+			assert(len_70 >= 1, "value is less than 1!")
+			assert(len_70 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_70 - 1)
+			for i_18 = 1, len_70 do
+				local val_18 = Value["Deck"][i_18]
+				if val_18 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_18 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_18 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_18 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_18 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_18 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_18 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_18 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_18 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_18 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_18 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_18 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_18 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_18 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_18 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_18 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_18 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_18 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_18 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_18 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_18 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_18 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_18 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_18 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_18 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_18 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_18 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_18 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_18 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_18 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_18 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_18 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_18 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_18 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_18 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_18 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_18 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_18 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_18 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_18 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_18 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_18 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_18 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_18 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_18 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_18 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_18 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_18 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			player_map[Player] = save()
+		end,
+		FireAll = function(Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_71 = #Value["Deck"]
+			assert(len_71 >= 1, "value is less than 1!")
+			assert(len_71 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_71 - 1)
+			for i_19 = 1, len_71 do
+				local val_19 = Value["Deck"][i_19]
+				if val_19 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_19 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_19 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_19 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_19 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_19 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_19 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_19 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_19 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_19 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_19 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_19 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_19 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_19 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_19 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_19 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_19 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_19 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_19 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_19 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_19 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_19 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_19 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_19 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_19 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_19 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_19 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_19 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_19 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_19 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_19 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_19 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_19 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_19 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_19 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_19 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_19 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_19 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_19 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_19 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_19 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_19 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_19 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_19 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_19 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_19 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_19 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_19 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_72 = #Value["Deck"]
+			assert(len_72 >= 1, "value is less than 1!")
+			assert(len_72 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_72 - 1)
+			for i_20 = 1, len_72 do
+				local val_20 = Value["Deck"][i_20]
+				if val_20 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_20 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_20 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_20 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_20 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_20 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_20 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_20 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_20 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_20 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_20 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_20 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_20 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_20 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_20 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_20 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_20 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_20 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_20 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_20 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_20 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_20 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_20 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_20 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_20 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_20 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_20 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_20 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_20 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_20 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_20 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_20 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_20 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_20 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_20 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_20 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_20 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_20 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_20 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_20 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_20 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_20 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_20 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_20 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_20 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_20 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_20 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_20 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in Players:GetPlayers() do
+				if player ~= Except then
+					load_player(player)
+					alloc(used)
+					buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+					table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+					player_map[player] = save()
+				end
+			end
+		end,
+		FireList = function(List: { [unknown]: Player }, Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_73 = #Value["Deck"]
+			assert(len_73 >= 1, "value is less than 1!")
+			assert(len_73 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_73 - 1)
+			for i_21 = 1, len_73 do
+				local val_21 = Value["Deck"][i_21]
+				if val_21 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_21 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_21 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_21 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_21 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_21 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_21 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_21 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_21 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_21 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_21 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_21 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_21 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_21 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_21 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_21 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_21 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_21 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_21 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_21 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_21 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_21 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_21 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_21 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_21 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_21 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_21 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_21 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_21 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_21 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_21 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_21 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_21 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_21 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_21 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_21 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_21 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_21 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_21 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_21 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_21 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_21 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_21 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_21 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_21 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_21 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_21 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_21 == "ExplodeONut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
+				else
+					error("Invalid enumerator")
+				end
+			end
+			local buff, used, inst = outgoing_buff, outgoing_used, outgoing_inst
+			for _, player in List do
+				load_player(player)
+				alloc(used)
+				buffer.copy(outgoing_buff, outgoing_apos, buff, 0, used)
+				table.move(inst, 1, #inst, #outgoing_inst + 1, outgoing_inst)
+				player_map[player] = save()
+			end
+		end,
+		FireSet = function(Set: { [Player]: any }, Value: ({
+			["Deck"]: ({ ("Sunflower" | "Peashooter" | "WallNut" | "PotatoMine" | "PuffShroom" | "SunShroom" | "Chomper" | "SnowPea" | "Repeater" | "FumeShroom" | "Squash" | "Garlic" | "CherryBomb" | "TallNut" | "Threepeater" | "Jalapeno" | "Spikeweed" | "Torchwood" | "CabbagePult" | "Pumpkin" | "ScaredyShroom" | "HypnoShroom" | "SplitPea" | "KernelPult" | "Starfruit" | "Cactus" | "Blover" | "SeaShroom" | "TwinSunflower" | "MelonPult" | "GatlingPea" | "GloomShroom" | "Cattail" | "WinterMelon" | "IceShroom" | "DoomShroom" | "CobCannon" | "Marigold" | "GoldMagnet" | "Imitater" | "LilyPad" | "FlowerPot" | "TangleKelp" | "GraveBuster" | "Plantern" | "UmbrellaLeaf" | "CoffeeBean" | "ExplodeONut") }),
+		}))
+			load_empty()
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+			local len_74 = #Value["Deck"]
+			assert(len_74 >= 1, "value is less than 1!")
+			assert(len_74 <= 6, "value is more than 6!")
+			alloc(1)
+			buffer.writeu8(outgoing_buff, outgoing_apos, len_74 - 1)
+			for i_22 = 1, len_74 do
+				local val_22 = Value["Deck"][i_22]
+				if val_22 == "Sunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 0)
+				elseif val_22 == "Peashooter" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 1)
+				elseif val_22 == "WallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 2)
+				elseif val_22 == "PotatoMine" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 3)
+				elseif val_22 == "PuffShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 4)
+				elseif val_22 == "SunShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 5)
+				elseif val_22 == "Chomper" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 6)
+				elseif val_22 == "SnowPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 7)
+				elseif val_22 == "Repeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 8)
+				elseif val_22 == "FumeShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 9)
+				elseif val_22 == "Squash" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 10)
+				elseif val_22 == "Garlic" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 11)
+				elseif val_22 == "CherryBomb" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 12)
+				elseif val_22 == "TallNut" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 13)
+				elseif val_22 == "Threepeater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 14)
+				elseif val_22 == "Jalapeno" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 15)
+				elseif val_22 == "Spikeweed" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 16)
+				elseif val_22 == "Torchwood" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 17)
+				elseif val_22 == "CabbagePult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 18)
+				elseif val_22 == "Pumpkin" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 19)
+				elseif val_22 == "ScaredyShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 20)
+				elseif val_22 == "HypnoShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 21)
+				elseif val_22 == "SplitPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 22)
+				elseif val_22 == "KernelPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 23)
+				elseif val_22 == "Starfruit" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 24)
+				elseif val_22 == "Cactus" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 25)
+				elseif val_22 == "Blover" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 26)
+				elseif val_22 == "SeaShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 27)
+				elseif val_22 == "TwinSunflower" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 28)
+				elseif val_22 == "MelonPult" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 29)
+				elseif val_22 == "GatlingPea" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 30)
+				elseif val_22 == "GloomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 31)
+				elseif val_22 == "Cattail" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 32)
+				elseif val_22 == "WinterMelon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 33)
+				elseif val_22 == "IceShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 34)
+				elseif val_22 == "DoomShroom" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 35)
+				elseif val_22 == "CobCannon" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 36)
+				elseif val_22 == "Marigold" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 37)
+				elseif val_22 == "GoldMagnet" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 38)
+				elseif val_22 == "Imitater" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 39)
+				elseif val_22 == "LilyPad" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 40)
+				elseif val_22 == "FlowerPot" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 41)
+				elseif val_22 == "TangleKelp" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 42)
+				elseif val_22 == "GraveBuster" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 43)
+				elseif val_22 == "Plantern" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 44)
+				elseif val_22 == "UmbrellaLeaf" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 45)
+				elseif val_22 == "CoffeeBean" then
+					alloc(1)
+					buffer.writeu8(outgoing_buff, outgoing_apos, 46)
+				elseif val_22 == "ExplodeONut" then
 					alloc(1)
 					buffer.writeu8(outgoing_buff, outgoing_apos, 47)
 				else

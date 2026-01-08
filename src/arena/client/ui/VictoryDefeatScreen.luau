@@ -22,7 +22,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
 -- UI Components
-local PvZTheme = require(script.Parent.PvZTheme)
+local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
 
 -- Fusion primitives
 local New = Fusion.New
@@ -498,13 +498,13 @@ function VictoryDefeatScreen:Mount()
 							}),
 							
 							-- Zombies killed
-							self:_createRewardRow(self._scope, "💀", "Zombies Killed", self._displayZombies, PvZTheme.Colors.TextWhite, 1, ""),
+							self:_createRewardRow(self._scope, `{PvZTheme.Icons.Skull}`, "Zombies Killed", self._displayZombies, PvZTheme.Colors.TextWhite, 1, ""),
 							
 							-- Coins earned
-							self:_createRewardRow(self._scope, "🪙", "Coins", self._displayCoins, PvZTheme.Colors.CoinGold, 2, "+"),
+							self:_createRewardRow(self._scope, `{PvZTheme.Icons.Coin}`, "Coins", self._displayCoins, PvZTheme.Colors.CoinGold, 2, "+"),
 							
 							-- XP earned
-							self:_createRewardRow(self._scope, "⭐", "XP", self._displayXP, PvZTheme.Colors.XPPurple, 3, "+"),
+							self:_createRewardRow(self._scope, `{PvZTheme.Icons.Star}`, "XP", self._displayXP, PvZTheme.Colors.XPPurple, 3, "+"),
 							
 							-- Gems earned (visible only if > 0)
 							New(self._scope, "Frame")({
