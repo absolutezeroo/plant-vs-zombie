@@ -14,6 +14,7 @@ local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -26,6 +27,9 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local DeckBuilderController = {}
+
+-- Trove for connection cleanup
+local _trove = Trove.new()
 
 -- Current deck state (reactive)
 local currentDeck = Fusion.Value({} :: {string})
@@ -77,7 +81,7 @@ function DeckBuilderController.Initialize()
         -- Find ProximityPrompt
         local prompt = deckZone:FindFirstChildOfClass("ProximityPrompt", true)
         if prompt then
-            prompt.Triggered:Connect(function(player)
+            _trove:Connect(prompt.Triggered, function(player)
                 if player == LocalPlayer then
                     openDeckBuilder()
                 end

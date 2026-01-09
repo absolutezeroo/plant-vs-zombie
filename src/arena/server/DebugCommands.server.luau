@@ -20,7 +20,12 @@ if not RunService:IsStudio() then
 end
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
 local Logger = require(Shared.utils.Logger)
+
+-- Trove for connection cleanup
+local _trove = Trove.new()
 
 Logger.Info("DebugCommands", "=== STUDIO DEBUG MODE ===")
 Logger.Info("DebugCommands", "Chat commands: /loadmap, /spawn, /skip")
@@ -103,12 +108,12 @@ end
 
 -- Connect chat for all players
 local function onPlayerAdded(player: Player)
-	player.Chatted:Connect(function(message)
+	_trove:Connect(player.Chatted, function(message)
 		onPlayerChatted(player, message)
 	end)
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
+_trove:Connect(Players.PlayerAdded, onPlayerAdded)
 for _, player in Players:GetPlayers() do
 	onPlayerAdded(player)
 end

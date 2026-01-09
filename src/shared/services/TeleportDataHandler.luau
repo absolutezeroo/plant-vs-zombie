@@ -7,10 +7,11 @@
     - Lobby: Processes returning players from Arena
     
     Key features:
-    - Signal-based coordination (no polling)
+    - Signal-based coordination (using Signal library, not BindableEvents)
     - Waits for profile before processing teleport data
     - Atomic deck/mutation application
     - Single point of synchronization
+    - Proper cleanup via Trove
     
     Usage in Arena:
     ```lua
@@ -45,6 +46,10 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Signal = require(Packages:WaitForChild("Signal"))
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TeleportData = require(Shared.data.TeleportData)
 local PlayerDataCore = require(Shared.services.PlayerDataCore)
@@ -52,13 +57,18 @@ local Logger = require(Shared.utils.Logger)
 
 local TeleportDataHandler = {}
 
--- Signals (BindableEvents for cross-module communication)
-local _onPlayerReadyEvent = Instance.new("BindableEvent")
-local _onPlayerReturnedEvent = Instance.new("BindableEvent")
+-- Trove for cleanup
+local _trove = Trove.new()
 
--- Public signals
-TeleportDataHandler.OnPlayerReady = _onPlayerReadyEvent.Event -- (player, teleportData: ArenaJoinData)
-TeleportDataHandler.OnPlayerReturned = _onPlayerReturnedEvent.Event -- (player, returnData: LobbyReturnData)
+-- Signals (using Signal library for proper lifecycle management)
+local _onPlayerReadySignal = Signal.new()
+local _onPlayerReturnedSignal = Signal.new()
+_trove:Add(_onPlayerReadySignal)
+_trove:Add(_onPlayerReturnedSignal)
+
+-- Public signals (expose the Signal directly - same API as RBXScriptSignal)
+TeleportDataHandler.OnPlayerReady = _onPlayerReadySignal -- (player, teleportData: ArenaJoinData)
+TeleportDataHandler.OnPlayerReturned = _onPlayerReturnedSignal -- (player, returnData: LobbyReturnData)
 
 -- Cache for teleport data (by userId for persistence across quick reconnects)
 local _playerTeleportData: { [number]: TeleportData.ArenaJoinData } = {}
@@ -113,7 +123,7 @@ function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
     _dependencies.ProgressionHandler = deps.ProgressionHandler
     
     -- Connect to PlayerAdded (single handler for all teleport logic)
-    Players.PlayerAdded:Connect(function(player)
+    _trove:Connect(Players.PlayerAdded, function(player)
         task.spawn(function()
             TeleportDataHandler._handleArenaPlayerJoin(player)
         end)
@@ -127,7 +137,7 @@ function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
     end
     
     -- Cleanup on player leave
-    Players.PlayerRemoving:Connect(function(player)
+    _trove:Connect(Players.PlayerRemoving, function(player)
         _profileWaiter.Cleanup(player)
         _playerTeleportData[player.UserId] = nil
     end)
@@ -182,7 +192,7 @@ function TeleportDataHandler._handleArenaPlayerJoin(player: Player)
     end
     
     -- Step 4: Fire OnPlayerReady signal (other systems can react)
-    _onPlayerReadyEvent:Fire(player, teleportData)
+    _onPlayerReadySignal:Fire(player, teleportData)
 end
 
 -- Internal: Apply teleport data to player profile
@@ -253,7 +263,7 @@ function TeleportDataHandler.InitializeLobby(deps: LobbyDependencies)
     _dependencies.PlayerDataService = deps.PlayerDataService
     
     -- Connect to PlayerAdded
-    Players.PlayerAdded:Connect(function(player)
+    _trove:Connect(Players.PlayerAdded, function(player)
         task.spawn(function()
             TeleportDataHandler._handleLobbyPlayerJoin(player)
         end)
@@ -267,7 +277,7 @@ function TeleportDataHandler.InitializeLobby(deps: LobbyDependencies)
     end
     
     -- Cleanup on player leave
-    Players.PlayerRemoving:Connect(function(player)
+    _trove:Connect(Players.PlayerRemoving, function(player)
         _profileWaiter.Cleanup(player)
         _playerReturnData[player.UserId] = nil
     end)
@@ -316,7 +326,7 @@ function TeleportDataHandler._handleLobbyPlayerJoin(player: Player)
     
     -- Step 4: Fire OnPlayerReturned signal
     if returnData then
-        _onPlayerReturnedEvent:Fire(player, returnData)
+        _onPlayerReturnedSignal:Fire(player, returnData)
     end
 end
 
@@ -352,6 +362,22 @@ end
 -- Call this when a profile loads (from PlayerDataService.LoadProfile)
 function TeleportDataHandler.NotifyProfileLoaded(player: Player, profileData: PlayerDataCore.ProfileData)
     _profileWaiter.FireCallbacks(player, profileData)
+end
+
+--------------------------------------------------------------------------------
+-- Lifecycle: Dispose
+--------------------------------------------------------------------------------
+
+--[[
+    Clean up all connections and signals.
+    Call this when the place is shutting down (optional, as Roblox handles cleanup on close).
+]]
+function TeleportDataHandler.Dispose()
+    Logger.Info("TeleportDataHandler", "Disposing...")
+    _trove:Clean()
+    table.clear(_playerTeleportData)
+    table.clear(_playerReturnData)
+    table.clear(_dependencies)
 end
 
 return TeleportDataHandler

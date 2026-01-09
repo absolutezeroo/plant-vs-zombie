@@ -19,6 +19,8 @@ local Players = game:GetService("Players")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local ProfileStore = require(Packages:WaitForChild("ProfileStore"))
 local Promise = require(Packages:WaitForChild("Promise"))
+local Trove = require(Packages:WaitForChild("Trove"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -38,14 +40,17 @@ local Profiles: { [Player]: any } = {}
 local _dataChangeNotifier = PlayerDataCore.CreateDataChangeNotifier()
 local _profileWaiter = PlayerDataCore.CreateProfileWaiter()
 
+-- Trove for connection cleanup
+local _trove = Trove.new()
+
 function PlayerDataService.Initialize()
     Logger.Info("LobbyPlayerData", "Initializing PlayerDataService for Lobby")
     
-    Players.PlayerAdded:Connect(function(player)
+    _trove:Connect(Players.PlayerAdded, function(player)
         PlayerDataService.LoadProfile(player)
     end)
     
-    Players.PlayerRemoving:Connect(function(player)
+    _trove:Connect(Players.PlayerRemoving, function(player)
         PlayerDataService.ReleaseProfile(player)
     end)
     
@@ -377,7 +382,7 @@ function PlayerDataService.GetUnlockedPlants(player: Player): {string}
     local plants = {}
     for plantType, isUnlocked in pairs(profile.Data.UnlockedPlants) do
         if isUnlocked then
-            table.insert(plants, plantType)
+            plants = Sift.Array.push(plants, plantType)
         end
     end
     return plants
@@ -550,7 +555,7 @@ function PlayerDataService.PurchaseMutation(player: Player, plantType: string, m
     if not profile.Data.PlantOwnedMutations[plantType] then
         profile.Data.PlantOwnedMutations[plantType] = {}
     end
-    table.insert(profile.Data.PlantOwnedMutations[plantType], mutationType)
+    profile.Data.PlantOwnedMutations[plantType] = Sift.Array.push(profile.Data.PlantOwnedMutations[plantType], mutationType)
     
     Logger.Info("LobbyPlayerData", `🧬 {player.Name} purchased {mutationType} for {plantType} (Cost: {mutationInfo.Cost}, Remaining: {profile.Data.Coins})`)
     return true, nil, profile.Data.Coins
@@ -585,7 +590,7 @@ function PlayerDataService.EquipMutation(player: Player, plantType: string, muta
     if not profile.Data.PlantEquippedMutations[plantType] then
         profile.Data.PlantEquippedMutations[plantType] = {}
     end
-    table.insert(profile.Data.PlantEquippedMutations[plantType], mutationType)
+    profile.Data.PlantEquippedMutations[plantType] = Sift.Array.push(profile.Data.PlantEquippedMutations[plantType], mutationType)
     
     Logger.Info("LobbyPlayerData", `🧬 {player.Name} equipped {mutationType} on {plantType}`)
     return true, nil
@@ -601,12 +606,18 @@ function PlayerDataService.UnequipMutation(player: Player, plantType: string, mu
     
     local index = table.find(mutations, mutationType)
     if index then
-        table.remove(mutations, index)
+        profile.Data.PlantEquippedMutations[plantType] = Sift.Array.removeIndex(mutations, index)
         Logger.Info("LobbyPlayerData", `🧬 {player.Name} unequipped {mutationType} from {plantType}`)
         return true
     end
     
     return false
+end
+
+-- Dispose: Clean up connections (called on server shutdown)
+function PlayerDataService.Dispose()
+    Logger.Info("LobbyPlayerData", "Disposing PlayerDataService...")
+    _trove:Clean()
 end
 
 return PlayerDataService

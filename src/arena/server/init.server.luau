@@ -21,6 +21,10 @@ local TeleportService = game:GetService("TeleportService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 local Promise = require(Packages:WaitForChild("Promise"))
+local Trove = require(Packages:WaitForChild("Trove"))
+
+-- Trove for server-level connection cleanup
+local _serverTrove = Trove.new()
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -113,7 +117,7 @@ Logger.Info("Server", `ECS loop started at {NetworkConfig.TICK_RATE} Hz`)
 local frameCount = 0
 local lastMonitorTime = tick()
 
-RunService.Heartbeat:Connect(function(deltaTime)
+_serverTrove:Connect(RunService.Heartbeat, function(deltaTime)
 	frameCount = frameCount + 1
 	
 	-- Throttled performance logging (every 10 seconds)
@@ -163,7 +167,7 @@ TeleportDataHandler.InitializeArena({
 Logger.Info("Server", "TeleportDataHandler initialized for Arena")
 
 -- Subscribe to OnPlayerReady signal to start battles
-TeleportDataHandler.OnPlayerReady:Connect(function(player: Player, teleportData: TeleportData.ArenaJoinData?)
+_serverTrove:Connect(TeleportDataHandler.OnPlayerReady, function(player: Player, teleportData: TeleportData.ArenaJoinData?)
 	Logger.Info("Server", `Player {player.Name} is ready (profile loaded, teleport data applied)`)
 	
 	-- Sync player data and deck to client BEFORE starting battle
@@ -198,7 +202,7 @@ local function onPlayerRemoving(player: Player)
 	ArenaService.OnPlayerRemoving(player)
 end
 
-Players.PlayerRemoving:Connect(onPlayerRemoving)
+_serverTrove:Connect(Players.PlayerRemoving, onPlayerRemoving)
 
 -- Teleport configuration
 local TELEPORT_MAX_RETRIES = 3
@@ -287,6 +291,8 @@ _G.ArenaSendPlayerToLobby = sendPlayerToLobby
 -- Cleanup when server shuts down
 game:BindToClose(function()
 	Logger.Info("Server", "Server shutting down - disposing all systems")
+	_serverTrove:Clean() -- Clean up all server-level connections
+	TeleportDataHandler.Dispose() -- Clean up TeleportDataHandler
 	SystemManager.DisposeAll()
 end)
 

@@ -27,6 +27,7 @@ StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -39,6 +40,9 @@ local SystemManager = require(Shared.utils.SystemManager)
 
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
+
+-- Trove for connection cleanup
+local _clientTrove = Trove.new()
 
 -- ============================================
 -- DEFERRED MODULE REFERENCES
@@ -200,7 +204,7 @@ end
 -- ============================================
 
 local function startCountdownLoop()
-    RunService.RenderStepped:Connect(function()
+    _clientTrove:Connect(RunService.RenderStepped, function()
         local currentWave = hud._waveNumber and Fusion.peek(hud._waveNumber) or 0
         local inPreparation = hud._preparationPhase and Fusion.peek(hud._preparationPhase) or false
         local intermissionTime = hud._intermissionTime and Fusion.peek(hud._intermissionTime) or 0
@@ -246,7 +250,7 @@ local function startPerformanceMonitor()
     local frameCount = 0
     local lastMonitorTime = tick()
     
-    RunService.RenderStepped:Connect(function()
+    _clientTrove:Connect(RunService.RenderStepped, function()
         frameCount = frameCount + 1
         
         local now = tick()

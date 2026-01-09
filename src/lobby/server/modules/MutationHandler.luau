@@ -12,6 +12,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
@@ -22,6 +25,9 @@ local script_parent = script.Parent.Parent
 local PlayerDataService = require(script_parent.services.PlayerDataService)
 
 local MutationHandler = {}
+
+-- Trove for connection cleanup
+local _trove = Trove.new()
 
 -- Error codes for responses
 local ErrorCodes = {
@@ -175,7 +181,7 @@ function MutationHandler.Initialize()
     end)
     
     -- Sync mutations when player data loads
-    Players.PlayerAdded:Connect(function(player)
+    _trove:Connect(Players.PlayerAdded, function(player)
         -- Wait a bit for profile to load
         task.delay(1, function()
             if player.Parent then

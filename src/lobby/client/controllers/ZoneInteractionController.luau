@@ -18,6 +18,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -28,6 +29,9 @@ local createShopView = require(script.Parent.Parent.ui.ShopView)
 local createDeckBuilderView = require(script.Parent.Parent.ui.DeckBuilderView)
 local createProfileView = require(script.Parent.Parent.ui.ProfileView)
 local createMutationView = require(script.Parent.Parent.ui.MutationView)
+
+-- Trove for connection cleanup
+local _trove = Trove.new()
 
 local New = Fusion.New
 local Value = Fusion.Value
@@ -190,7 +194,12 @@ end
 
 function ZoneInteractionController.Initialize()
     Logger.Info("ZoneInteraction", "Initializing ZoneInteractionController")
-    ProximityPromptService.PromptTriggered:Connect(onPromptTriggered)
+    _trove:Connect(ProximityPromptService.PromptTriggered, onPromptTriggered)
+end
+
+-- Cleanup
+function ZoneInteractionController.Dispose()
+    _trove:Destroy()
 end
 
 -- State setters (called by init.client.luau)

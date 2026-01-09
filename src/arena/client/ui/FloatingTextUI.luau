@@ -15,6 +15,8 @@ local Workspace = game:GetService("Workspace")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Trove = require(Packages:WaitForChild("Trove"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -34,6 +36,7 @@ type FloatingText = {
 
 local _floatingTexts: {FloatingText} = {}
 local _scope = Fusion.scoped({})
+local _trove = Trove.new()
 
 local FloatingTextUI = {}
 
@@ -53,7 +56,7 @@ local CONFIG = {
 
 function FloatingTextUI.Initialize()
 	-- Update loop for animating floating texts
-	RunService.RenderStepped:Connect(function(dt)
+	_trove:Connect(RunService.RenderStepped, function(dt)
 		FloatingTextUI._Update(dt)
 	end)
 	Logger.Info("FloatingTextUI", "Initialized")
@@ -61,14 +64,14 @@ end
 
 function FloatingTextUI._Update(dt: number)
 	local currentTime = tick()
-	local toRemove = {}
+	local toRemove: {number} = {}
 	
 	for i, ft in _floatingTexts do
 		local elapsed = currentTime - ft.StartTime
 		local progress = elapsed / ft.Duration
 		
 		if progress >= 1 then
-			table.insert(toRemove, i)
+			toRemove = Sift.Array.push(toRemove, i)
 			ft.Gui:Destroy()
 		else
 			-- Animate
@@ -94,7 +97,7 @@ function FloatingTextUI._Update(dt: number)
 	
 	-- Remove completed texts (reverse order to maintain indices)
 	for i = #toRemove, 1, -1 do
-		table.remove(_floatingTexts, toRemove[i])
+		_floatingTexts = Sift.Array.removeIndex(_floatingTexts, toRemove[i])
 	end
 end
 
@@ -163,34 +166,46 @@ function FloatingTextUI.ShowDamage(position: Vector3, damage: number)
 	local text = tostring(math.floor(damage))
 	
 	local ft = createFloatingText(position, text, color, isCrit)
-	table.insert(_floatingTexts, ft)
+	_floatingTexts = Sift.Array.push(_floatingTexts, ft)
 end
 
 -- Show sun collection
 function FloatingTextUI.ShowSunCollect(position: Vector3, amount: number)
 	local text = `+{amount}`
 	local ft = createFloatingText(position, text, CONFIG.SUN_COLOR, false)
-	table.insert(_floatingTexts, ft)
+	_floatingTexts = Sift.Array.push(_floatingTexts, ft)
 end
 
 -- Show coin gain
 function FloatingTextUI.ShowCoinGain(position: Vector3, amount: number)
 	local text = `+{amount} {PvZTheme.Icons.Coin}`
 	local ft = createFloatingText(position, text, CONFIG.COIN_COLOR, false)
-	table.insert(_floatingTexts, ft)
+	_floatingTexts = Sift.Array.push(_floatingTexts, ft)
 end
 
 -- Show heal amount
 function FloatingTextUI.ShowHeal(position: Vector3, amount: number)
 	local text = `+{amount}`
 	local ft = createFloatingText(position, text, CONFIG.HEAL_COLOR, false)
-	table.insert(_floatingTexts, ft)
+	_floatingTexts = Sift.Array.push(_floatingTexts, ft)
 end
 
 -- Show custom text
 function FloatingTextUI.ShowText(position: Vector3, text: string, color: Color3)
 	local ft = createFloatingText(position, text, color, false)
-	table.insert(_floatingTexts, ft)
+	_floatingTexts = Sift.Array.push(_floatingTexts, ft)
+end
+
+-- Dispose: Clean up connections and floating texts
+function FloatingTextUI.Dispose()
+	Logger.Info("FloatingTextUI", "Disposing...")
+	_trove:Clean()
+	
+	-- Destroy all remaining floating texts
+	for _, ft in _floatingTexts do
+		ft.Gui:Destroy()
+	end
+	_floatingTexts = {}
 end
 
 return FloatingTextUI

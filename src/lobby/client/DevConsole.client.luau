@@ -28,7 +28,12 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Network (unified Zap schema in shared/network)
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
 local ZapClient = require(Shared.network.generated.client)
+
+-- Trove for connection cleanup
+local _trove = Trove.new()
 
 -- State
 local isVisible = false
@@ -224,7 +229,7 @@ local function createConsoleUI()
     headerCorner.Parent = header
     
     -- Drag functionality
-    header.InputBegan:Connect(function(input)
+    _trove:Connect(header.InputBegan, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isDragging = true
             dragStart = input.Position
@@ -232,13 +237,13 @@ local function createConsoleUI()
         end
     end)
     
-    header.InputEnded:Connect(function(input)
+    _trove:Connect(header.InputEnded, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isDragging = false
         end
     end)
     
-    UserInputService.InputChanged:Connect(function(input)
+    _trove:Connect(UserInputService.InputChanged, function(input)
         if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             consolePanel.Position = UDim2.new(
@@ -297,7 +302,7 @@ local function createConsoleUI()
     inputPadding.Parent = inputBox
     
     -- Handle Enter key
-    inputBox.FocusLost:Connect(function(enterPressed)
+    _trove:Connect(inputBox.FocusLost, function(enterPressed)
         if enterPressed then
             local text = string.gsub(inputBox.Text, "^%s+", "")
             text = string.gsub(text, "%s+$", "")
@@ -316,7 +321,7 @@ local function createConsoleUI()
     end)
     
     -- History navigation
-    inputBox.InputBegan:Connect(function(input)
+    _trove:Connect(inputBox.InputBegan, function(input)
         if input.KeyCode == Enum.KeyCode.Up then
             -- Previous command
             if historyIndex > 1 then
@@ -357,7 +362,7 @@ local function initialize()
     createConsoleUI()
     
     -- Toggle console with ` or F9
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    _trove:Connect(UserInputService.InputBegan, function(input, gameProcessed)
         if gameProcessed then return end
         
         if input.KeyCode == Enum.KeyCode.Backquote or input.KeyCode == Enum.KeyCode.F9 then

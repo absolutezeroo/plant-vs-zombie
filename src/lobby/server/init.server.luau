@@ -15,6 +15,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Wait for packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Promise = require(Packages:WaitForChild("Promise"))
+local Trove = require(Packages:WaitForChild("Trove"))
+
+-- Trove for server-level connection cleanup
+local _serverTrove = Trove.new()
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -65,7 +69,7 @@ TeleportDataHandler.InitializeLobby({
 Logger.Info("Lobby", "TeleportDataHandler initialized")
 
 -- Subscribe to OnPlayerReturned to show results UI
-TeleportDataHandler.OnPlayerReturned:Connect(function(player: Player, returnData: TeleportData.LobbyReturnData)
+_serverTrove:Connect(TeleportDataHandler.OnPlayerReturned, function(player: Player, returnData: TeleportData.LobbyReturnData)
     Logger.Info("Lobby", `{player.Name} returned from Arena: Victory={returnData.Victory}, Stars={returnData.Stars}`)
     
     -- Send results to client for display
@@ -188,8 +192,8 @@ local function onPlayerRemoving(player: Player)
 end
 
 -- Connect player events
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoving)
+_serverTrove:Connect(Players.PlayerAdded, onPlayerAdded)
+_serverTrove:Connect(Players.PlayerRemoving, onPlayerRemoving)
 
 -- Handle players already in game (Studio testing)
 for _, player in Players:GetPlayers() do

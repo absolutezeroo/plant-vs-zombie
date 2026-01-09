@@ -18,6 +18,10 @@ local Players = game:GetService("Players")
 local _RunService = game:GetService("RunService") -- Reserved for future use
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Packages
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 -- Shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -42,6 +46,9 @@ local LobbyService = {}
 local _initialized = false
 local _padConfigs: {[string]: PadConfig} = {} -- padId -> config
 local _lastBroadcastTime: {[string]: number} = {} -- padId -> last broadcast time
+
+-- Trove for connection cleanup
+local _trove = Trove.new()
 
 -- Zap server reference
 local ZapServer: any = nil
@@ -277,13 +284,13 @@ function LobbyService.Initialize(zapServer: any)
     task.defer(broadcastAllPadStates)
     
     -- Handle new players - send them all pad states
-    Players.PlayerAdded:Connect(function(player)
+    _trove:Connect(Players.PlayerAdded, function(player)
         task.wait(1)
         broadcastAllPadStates()
     end)
     
     -- Handle player leaving game
-    Players.PlayerRemoving:Connect(function(player)
+    _trove:Connect(Players.PlayerRemoving, function(player)
         handlePlayerLeave(player)
         _playerLockManager:Cleanup(player)
         _touchHandler:Cleanup(player)

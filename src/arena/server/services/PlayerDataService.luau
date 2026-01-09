@@ -20,6 +20,7 @@ local RunService = game:GetService("RunService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local ProfileStore = require(Packages:WaitForChild("ProfileStore"))
 local Promise = require(Packages:WaitForChild("Promise"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ProgressionData = require(Shared.data.ProgressionData)
@@ -36,6 +37,9 @@ local PlayerStore = ProfileStore.New(STORE_NAME, PROFILE_TEMPLATE)
 
 -- Active profiles cache
 local _profiles: {[Player]: any} = {}
+
+-- Trove for cleanup
+local _trove = Trove.new()
 
 -- Player data change callbacks (using shared notifier)
 local _dataChangeNotifier = PlayerDataCore.CreateDataChangeNotifier()
@@ -457,11 +461,12 @@ function PlayerDataService.Initialize()
 	end
 	
 	-- Handle new players
-	Players.PlayerAdded:Connect(loadProfile)
-	Players.PlayerRemoving:Connect(unloadProfile)
+	_trove:Connect(Players.PlayerAdded, loadProfile)
+	_trove:Connect(Players.PlayerRemoving, unloadProfile)
 	
 	-- Ensure profiles are saved on shutdown
 	game:BindToClose(function()
+		_trove:Destroy()
 		for player, profile in _profiles do
 			profile:EndSession()
 		end
