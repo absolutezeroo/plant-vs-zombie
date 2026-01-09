@@ -34,14 +34,15 @@ wally.lock
 # Rojo
 # ================================
 sourcemap.json
+sourcemap-*.json
 rojo.json
 
 # ================================
 # Zap (Network Codegen)
 # ================================
 # Generated files - regenerate with: zap src/shared/network/packets.zap
-src/server/network/generated.luau
-src/client/network/generated.luau
+src/shared/network/generated/client.luau
+src/shared/network/generated/server.luau
 
 # ================================
 # OS & System Files
