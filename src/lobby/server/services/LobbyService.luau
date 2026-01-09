@@ -189,10 +189,13 @@ function teleportPadGroup(padId: string, config: PadConfig)
     
     Logger.Info("LobbyService", `Teleporting {#players} players from pad {padId}`)
     
-    -- Set cooldowns and teleport each player
+    -- Set cooldowns and teleport each player using Promise
     for _, player in ipairs(players) do
         _touchHandler:SetCooldown(player)
-        _teleportManager:TeleportPlayer(player, config.WorldId, config.Difficulty)
+        _teleportManager:TeleportPlayerAsync(player, config.WorldId, config.Difficulty)
+            :catch(function(err)
+                Logger.Warn("LobbyService", `Teleport failed for {player.Name}: {err}`)
+            end)
     end
     
     -- Clear the queue

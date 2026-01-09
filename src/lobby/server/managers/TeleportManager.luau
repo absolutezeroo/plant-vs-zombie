@@ -3,12 +3,16 @@
     TeleportManager.luau - Handles teleportation logic for arena
     
     Single Responsibility: Teleport players to arena with proper data
+    Uses Promise.retry for reliable teleportation with automatic retries.
 ]]
 
 local _Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Promise = require(Packages:WaitForChild("Promise"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -27,8 +31,8 @@ export type TeleportResult = {
 }
 
 export type TeleportManager = {
-    TeleportPlayer: (self: TeleportManager, player: Player, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?) -> TeleportResult,
-    TeleportGroup: (self: TeleportManager, players: {Player}, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?) -> {[Player]: TeleportResult},
+    TeleportPlayerAsync: (self: TeleportManager, player: Player, worldId: string, difficulty: string) -> any, -- Promise<TeleportResult>
+    TeleportGroupAsync: (self: TeleportManager, players: {Player}, worldId: string, difficulty: string) -> any, -- Promise<{TeleportResult}>
     IsStudioMode: (self: TeleportManager) -> boolean,
 }
 
@@ -101,8 +105,12 @@ function TeleportManager:IsStudioMode(): boolean
     return _isStudio
 end
 
--- Teleport a single player to arena
-function TeleportManager:TeleportPlayer(player: Player, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?): TeleportResult
+-- Teleport configuration
+local TELEPORT_MAX_RETRIES = 3
+local TELEPORT_RETRY_DELAY = 2  -- seconds between retries
+
+-- Teleport a single player to arena (returns Promise)
+function TeleportManager:TeleportPlayerAsync(player: Player, worldId: string, difficulty: string): any
     local deck = getPlayerDeck(player) or DEFAULT_DECK
     local equippedMutations = getPlayerEquippedMutations(player)
     
@@ -121,71 +129,69 @@ function TeleportManager:TeleportPlayer(player: Player, worldId: string, difficu
     
     if _isStudio then
         -- In Studio, simulate teleport
-        Logger.Info("TeleportManager", `[STUDIO] Would teleport {player.Name} to Arena (World={worldId}, Difficulty={difficulty})`)
-        movePlayerToSpawn(player)
-        
-        -- Unlock player
-        PlayerLockManager.GetInstance():UnlockPlayer(player)
-        
-        if onComplete then
-            onComplete(player)
-        end
-        
-        return {
-            Success = true,
-            IsStudioMode = true,
-        }
+        return Promise.resolve():andThen(function()
+            Logger.Info("TeleportManager", `[STUDIO] Would teleport {player.Name} to Arena (World={worldId}, Difficulty={difficulty})`)
+            movePlayerToSpawn(player)
+            PlayerLockManager.GetInstance():UnlockPlayer(player)
+            
+            return {
+                Success = true,
+                IsStudioMode = true,
+            }
+        end)
     end
     
-    -- Real teleport
+    -- Real teleport with retry
     local teleportOptions = Instance.new("TeleportOptions")
     local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck, equippedMutations)
     teleportOptions:SetTeleportData(arenaData)
     
-    local success, err = pcall(function()
-        TeleportService:TeleportAsync(
-            TeleportData.PlaceIds.Arena,
-            {player},
-            teleportOptions
-        )
-    end)
-    
-    if not success then
-        Logger.Error("TeleportManager", `Teleport failed for {player.Name}: {err}`)
+    return Promise.retry(function()
+        return Promise.new(function(resolve, reject)
+            -- Check if player is still in game
+            if player.Parent ~= _Players then
+                reject("Player left the game")
+                return
+            end
+            
+            TeleportService:TeleportAsync(
+                TeleportData.PlaceIds.Arena,
+                {player},
+                teleportOptions
+            )
+            
+            resolve()
+        end)
+    end, TELEPORT_MAX_RETRIES, function(attempt)
+        -- Exponential backoff between retries
+        Logger.Warn("TeleportManager", `Teleport attempt {attempt} failed for {player.Name}, retrying in {TELEPORT_RETRY_DELAY}s...`)
+        return TELEPORT_RETRY_DELAY * attempt
+    end):andThen(function()
+        Logger.Info("TeleportManager", `{player.Name} teleported to Arena (World={worldId}, Difficulty={difficulty})`)
+        return {
+            Success = true,
+            IsStudioMode = false,
+        }
+    end):catch(function(err)
+        Logger.Error("TeleportManager", `Teleport failed for {player.Name} after {TELEPORT_MAX_RETRIES} attempts: {err}`)
         PlayerLockManager.GetInstance():UnlockPlayer(player)
-        
-        if onComplete then
-            onComplete(player)
-        end
-        
         return {
             Success = false,
             Error = tostring(err),
             IsStudioMode = false,
         }
-    end
-    
-    Logger.Info("TeleportManager", `{player.Name} teleported to Arena (World={worldId}, Difficulty={difficulty})`)
-    
-    if onComplete then
-        onComplete(player)
-    end
-    
-    return {
-        Success = true,
-        IsStudioMode = false,
-    }
+    end)
 end
 
--- Teleport a group of players
-function TeleportManager:TeleportGroup(players: {Player}, worldId: string, difficulty: string, onComplete: ((player: Player) -> ())?): {[Player]: TeleportResult}
-    local results: {[Player]: TeleportResult} = {}
+-- Teleport a group of players (returns Promise.all)
+function TeleportManager:TeleportGroupAsync(players: {Player}, worldId: string, difficulty: string): any
+    local promises = {}
     
     for _, player in ipairs(players) do
-        results[player] = self:TeleportPlayer(player, worldId, difficulty, onComplete)
+        table.insert(promises, self:TeleportPlayerAsync(player, worldId, difficulty))
     end
     
-    return results
+    return Promise.all(promises)
 end
 
 -- Singleton instance

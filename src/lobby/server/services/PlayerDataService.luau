@@ -18,6 +18,7 @@ local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local ProfileStore = require(Packages:WaitForChild("ProfileStore"))
+local Promise = require(Packages:WaitForChild("Promise"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
@@ -61,16 +62,25 @@ function PlayerDataService.Initialize()
     end)
 end
 
+--[[
+    Load player profile with Promise-based async handling.
+    Returns Promise<ProfileData> that resolves when profile is ready.
+]]
 function PlayerDataService.LoadProfile(player: Player)
     Logger.Info("LobbyPlayerData", `Loading profile for {player.Name}`)
     
-    local profile = Store:StartSessionAsync(`Player_{player.UserId}`, {
-        Cancel = function()
-            return player.Parent ~= Players
-        end,
-    })
-    
-    if profile then
+    return Promise.new(function(resolve, reject)
+        local profile = Store:StartSessionAsync(`Player_{player.UserId}`, {
+            Cancel = function()
+                return player.Parent ~= Players
+            end,
+        })
+        
+        if not profile then
+            reject(`Failed to load profile for {player.Name}`)
+            return
+        end
+        
         profile:AddUserId(player.UserId)
         profile:Reconcile()
         
@@ -81,25 +91,32 @@ function PlayerDataService.LoadProfile(player: Player)
             end
         end)
         
-        if player.Parent == Players then
-            Profiles[player] = profile
-            Logger.Info("LobbyPlayerData", `Profile loaded for {player.Name}`)
-            
-            -- Notify data change listeners
-            _dataChangeNotifier.Notify(player, profile.Data)
-            
-            -- Fire profile waiter callbacks (for WaitForProfile)
-            _profileWaiter.FireCallbacks(player, profile.Data)
-            
-            -- Notify TeleportDataHandler that profile is ready
-            local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
-            TeleportDataHandler.NotifyProfileLoaded(player, profile.Data)
-        else
+        if player.Parent ~= Players then
             profile:EndSession()
+            reject("Player left during profile load")
+            return
         end
-    else
-        player:Kick("Failed to load profile")
-    end
+        
+        Profiles[player] = profile
+        Logger.Info("LobbyPlayerData", `Profile loaded for {player.Name}`)
+        
+        -- Notify data change listeners
+        _dataChangeNotifier.Notify(player, profile.Data)
+        
+        -- Fire profile waiter callbacks (for WaitForProfile)
+        _profileWaiter.FireCallbacks(player, profile.Data)
+        
+        -- Notify TeleportDataHandler that profile is ready
+        local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
+        TeleportDataHandler.NotifyProfileLoaded(player, profile.Data)
+        
+        resolve(profile.Data)
+    end):catch(function(err)
+        Logger.Error("LobbyPlayerData", `Profile load failed for {player.Name}: {err}`)
+        if player.Parent == Players then
+            player:Kick("Failed to load profile")
+        end
+    end)
 end
 
 function PlayerDataService.ReleaseProfile(player: Player)
