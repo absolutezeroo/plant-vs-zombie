@@ -4,12 +4,11 @@
 	
 	Priority: 375 (After kill detection)
 	
-	Plants with SunOnKillComponent spawn sun when they kill a zombie.
-	Works with projectile kills and direct damage kills.
+	Queries ProjectileHitEvent (WasKill=true) + SunOnKillComponent to spawn sun.
 	
 	LIFECYCLE:
 	- Init(): No init needed
-	- system(): No per-frame logic, API-driven
+	- system(): Main loop - processes kill events for sun spawning
 	- Dispose(): No cleanup needed
 ]]
 
@@ -27,44 +26,43 @@ local SunOnKillComponent = Components.SunOnKillComponent
 local PositionComponent = Components.PositionComponent
 local SunComponent = Components.SunComponent
 local OwnerComponent = Components.OwnerComponent
+local ProjectileHitEvent = Components.ProjectileHitEvent
 
--- Module API
-local API = {}
-
--- Called when a plant's attack kills a zombie
-function API.OnPlantKillsZombie(world, plantEntityId: number, zombiePosition: {X: number, Y: number, Z: number})
-	if not world:contains(plantEntityId) then return end
-	
-	local sunOnKill = world:get(plantEntityId, SunOnKillComponent)
-	if not sunOnKill then return end
-	
-	local owner = world:get(plantEntityId, OwnerComponent)
-	if not owner then return end
-	
-	-- Spawn sun at zombie death location
-	local sunAmount = sunOnKill.SunAmount
-	
-	world:spawn(
-		PositionComponent({
-			X = zombiePosition.X,
-			Y = zombiePosition.Y + 3, -- Above ground
-			Z = zombiePosition.Z,
-		}),
-		SunComponent({
-			Value = sunAmount,
-			OwnerId = owner.PlayerId,
-			SpawnTime = os.clock(),
-			AutoCollect = true, -- Auto-collect after delay
-		})
-	)
-	
-	Logger.Debug("SunOnKillSystem", `Spawned {sunAmount} sun from kill by plant {plantEntityId}`)
-end
-
--- System function (no per-frame logic, API-driven)
+-- System function
 local function SunOnKillSystem(world)
-	-- Sun spawning is triggered via API.OnPlantKillsZombie
-	-- No per-frame processing needed
+	-- Process ProjectileHitEvents: spawn sun on kills from plants with SunOnKillComponent
+	for _, hitEvent in world:query(ProjectileHitEvent) do
+		-- Only process kills
+		if not hitEvent.WasKill then continue end
+		
+		local sourcePlant = hitEvent.SourcePlant
+		if not world:contains(sourcePlant) then continue end
+		
+		local sunOnKill = world:get(sourcePlant, SunOnKillComponent)
+		if not sunOnKill then continue end
+		
+		local owner = world:get(sourcePlant, OwnerComponent)
+		if not owner then continue end
+		
+		-- Spawn sun at zombie death location
+		local sunAmount = sunOnKill.SunAmount
+		
+		world:spawn(
+			PositionComponent({
+				X = hitEvent.PositionX,
+				Y = hitEvent.PositionY + 3, -- Above ground
+				Z = hitEvent.PositionZ,
+			}),
+			SunComponent({
+				Value = sunAmount,
+				OwnerId = owner.PlayerId,
+				SpawnTime = os.clock(),
+				AutoCollect = true, -- Auto-collect after delay
+			})
+		)
+		
+		Logger.Debug("SunOnKillSystem", `Spawned {sunAmount} sun from kill by plant {sourcePlant}`)
+	end
 end
 
 local function Init(_world)
@@ -81,5 +79,4 @@ return {
 	system = SunOnKillSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
 }

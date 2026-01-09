@@ -28,9 +28,14 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+local GameSignals = require(Shared.signals.GameSignals)
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
 
 -- VFX container
 local _vfxFolder: Folder = nil
+local _trove: any = nil
 
 local VFXService = {}
 
@@ -39,7 +44,24 @@ function VFXService.Initialize()
 	_vfxFolder = Instance.new("Folder")
 	_vfxFolder.Name = "VFX"
 	_vfxFolder.Parent = Workspace
-	Logger.Info("VFX", "VFXService initialized")
+	
+	-- Create Trove for signal connections
+	_trove = Trove.new()
+	
+	-- Connect to combat signals (observer pattern)
+	_trove:Connect(GameSignals.OnZombieDeath, function(data)
+		VFXService.PlayZombieDeath(data.Position)
+	end)
+	
+	_trove:Connect(GameSignals.OnProjectileImpact, function(data)
+		VFXService.PlayPeaImpact(data.Position, data.IsFrozen)
+	end)
+	
+	_trove:Connect(GameSignals.OnSunCollected, function(data)
+		VFXService.PlaySunCollect(data.Position)
+	end)
+	
+	Logger.Info("VFX", "VFXService initialized with signal listeners")
 end
 
 -- Helper: Create a simple particle emitter

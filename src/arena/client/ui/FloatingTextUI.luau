@@ -20,6 +20,7 @@ local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- UI Components
 local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
@@ -59,7 +60,13 @@ function FloatingTextUI.Initialize()
 	_trove:Connect(RunService.RenderStepped, function(dt)
 		FloatingTextUI._Update(dt)
 	end)
-	Logger.Info("FloatingTextUI", "Initialized")
+	
+	-- Connect to combat signals (observer pattern)
+	_trove:Connect(GameSignals.OnDamageDealt, function(data)
+		FloatingTextUI.ShowDamage(data.Position, data.Amount)
+	end)
+	
+	Logger.Info("FloatingTextUI", "Initialized with signal listeners")
 end
 
 function FloatingTextUI._Update(dt: number)

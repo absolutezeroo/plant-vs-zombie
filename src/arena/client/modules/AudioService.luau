@@ -16,6 +16,10 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local GameSignals = require(Shared.signals.GameSignals)
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
 
 -- Sound asset IDs (using Roblox library sounds)
 local SOUNDS = {
@@ -56,6 +60,7 @@ local _cachedSounds: { [string]: Sound } = {}
 local _currentMusic: Sound? = nil
 local _musicVolume: number = 0.3
 local _sfxVolume: number = 0.5
+local _trove: any = nil
 
 local AudioService = {}
 
@@ -72,7 +77,29 @@ function AudioService.Initialize()
 	AudioService._PreloadSound("ZombieDeath")
 	AudioService._PreloadSound("PlantPlaced")
 	
-	Logger.Info("Audio", "AudioService initialized")
+	-- Create Trove for signal connections
+	_trove = Trove.new()
+	
+	-- Connect to combat signals (observer pattern)
+	_trove:Connect(GameSignals.OnZombieDeath, function(data)
+		AudioService.PlayZombieDeath(data.Position)
+	end)
+	
+	_trove:Connect(GameSignals.OnProjectileImpact, function(data)
+		AudioService.PlayPeaImpact(data.Position)
+	end)
+	
+	_trove:Connect(GameSignals.OnSunCollected, function(data)
+		AudioService.PlaySunCollect()
+	end)
+	
+	-- Note: OnExplosion is handled via Network.ExplosionVFX -> VFXAudioSystem
+	
+	_trove:Connect(GameSignals.OnCoinGained, function(data)
+		AudioService.PlayCoinCollect()
+	end)
+	
+	Logger.Info("Audio", "AudioService initialized with signal listeners")
 end
 
 -- Preload a sound for faster playback

@@ -17,9 +17,11 @@ local TweenService = game:GetService("TweenService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- UI Components
 local PvZTheme = require(ReplicatedStorage.Shared.ui.PvZTheme)
@@ -69,6 +71,7 @@ function VictoryDefeatScreen.new()
 	local self = setmetatable({}, VictoryDefeatScreen)
 	
 	self._scope = Fusion.scoped({})
+	self._trove = Trove.new()
 	
 	-- Animation state
 	self._visible = Value(self._scope, false)
@@ -678,7 +681,36 @@ function VictoryDefeatScreen:Mount()
 		},
 	})
 	
+	-- Connect to GameSignals (observer pattern)
+	self:_setupSignalListeners()
+	
 	Logger.Info("VictoryScreen", "Mounted")
+end
+
+-- Private: Setup signal listeners for decoupled communication
+function VictoryDefeatScreen:_setupSignalListeners()
+	-- Battle ended (victory or defeat)
+	self._trove:Connect(GameSignals.OnBattleEnded, function(data)
+		self:Show({
+			Victory = data.Victory,
+			WaveReached = data.WaveReached,
+			StarRating = data.StarRating,
+			CoinsEarned = data.CoinsEarned,
+			XPEarned = data.XPEarned,
+			GemsEarned = data.GemsEarned,
+			ZombiesKilled = data.ZombiesKilled,
+			BonusCoins = data.BonusCoins,
+			NewLevel = data.NewLevel,
+			LevelsGained = data.LevelsGained,
+		})
+	end)
+	
+	-- Teleport countdown
+	self._trove:Connect(GameSignals.OnTeleportCountdown, function(data)
+		self:SetTeleportCountdown(data.TimeRemaining)
+	end)
+	
+	Logger.Debug("VictoryScreen", "Signal listeners connected")
 end
 
 -- Cleanup
@@ -687,6 +719,7 @@ function VictoryDefeatScreen:Unmount()
 		self._gui:Destroy()
 		self._gui = nil
 	end
+	self._trove:Destroy()
 	Fusion.doCleanup(self._scope)
 end
 

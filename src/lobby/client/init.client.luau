@@ -30,6 +30,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local TeleportData = require(Shared.data.TeleportData)
 local ServiceLoader = require(Shared.utils.ServiceLoader)
+local LobbySignals = require(Shared.signals.LobbySignals)
 
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
@@ -187,8 +188,8 @@ local function setupNetworkListeners()
         playerData:set(newData)
         currentDeck:set(data.Deck or {})
         
-        -- Update ZoneInteractionController
-        ZoneInteractionController.SetPlayerData(newData)
+        -- Fire signal for controllers to react
+        LobbySignals.OnPlayerDataSync:Fire(newData)
     end)
 
     -- Listen for purchase response
@@ -220,7 +221,9 @@ local function setupNetworkListeners()
     ZapClient.DeckChanged.On(function(data)
         Logger.Info("LobbyClient", `Deck updated: {#data.Deck} plants`)
         currentDeck:set(data.Deck)
-        ZoneInteractionController.UpdateDeck(data.Deck)
+        
+        -- Fire signal for controllers to react
+        LobbySignals.OnDeckUpdated:Fire({ Deck = data.Deck })
     end)
 
     -- Listen for mutation purchase response
@@ -284,9 +287,11 @@ local function setupNetworkListeners()
         newEquipped[data.PlantType] = data.EquippedMutations
         equippedMutations:set(newEquipped)
         
-        -- Update ZoneInteractionController
-        ZoneInteractionController.UpdateOwnedMutations(newOwned)
-        ZoneInteractionController.UpdateEquippedMutations(newEquipped)
+        -- Fire signal for controllers to react
+        LobbySignals.OnMutationsSync:Fire({
+            OwnedMutations = newOwned,
+            EquippedMutations = newEquipped,
+        })
     end)
 
     -- Listen for all mutations sync (owned + equipped)
@@ -307,9 +312,11 @@ local function setupNetworkListeners()
         end
         equippedMutations:set(equippedDict)
         
-        -- Update ZoneInteractionController
-        ZoneInteractionController.UpdateOwnedMutations(ownedDict)
-        ZoneInteractionController.UpdateEquippedMutations(equippedDict)
+        -- Fire signal for controllers to react
+        LobbySignals.OnMutationsSync:Fire({
+            OwnedMutations = ownedDict,
+            EquippedMutations = equippedDict,
+        })
     end)
 
     -- Listen for battle results

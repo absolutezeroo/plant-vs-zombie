@@ -36,34 +36,7 @@ local Modules = Client:FindFirstChild("modules")
 assert(Modules, "SunRenderSystem: modules folder not found")
 local SelectionState = require(Modules.SelectionState)
 local Network = require(Shared.network.generated.client)
-
--- VFX/Audio services (lazy loaded to avoid circular deps)
-local _vfxService: any = nil
-local _audioService: any = nil
-
-local function getVFXService()
-	if not _vfxService then
-		local success, result = pcall(function()
-			return require(Modules.VFXService)
-		end)
-		if success then
-			_vfxService = result
-		end
-	end
-	return _vfxService
-end
-
-local function getAudioService()
-	if not _audioService then
-		local success, result = pcall(function()
-			return require(Modules.AudioService)
-		end)
-		if success then
-			_audioService = result
-		end
-	end
-	return _audioService
-end
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- Sun data cache: entityId -> sun data
 type SunData = {
@@ -122,10 +95,11 @@ local function collectSun(entityId: number, sunData: SunData)
 	local part = sunData.Part
 	
 	-- Play collection effects
-	local vfx = getVFXService()
-	local audio = getAudioService()
-	if vfx then vfx.PlaySunCollect(part.Position) end
-	if audio then audio.PlaySunCollect() end
+	-- Fire signal for VFX/Audio (position + amount)
+	GameSignals.OnSunCollected:Fire({
+		Position = part.Position,
+		Amount = sunData.Value,
+	})
 	
 	-- Animate collection (tween up and fade)
 	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)

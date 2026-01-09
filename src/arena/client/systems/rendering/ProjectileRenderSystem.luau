@@ -34,40 +34,11 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 local Logger = require(Shared.utils.Logger)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:FindFirstChild("modules")
-assert(Modules, "ProjectileRenderSystem: modules folder not found")
 local Network = require(Shared.network.generated.client)
-
--- VFX/Audio services (lazy loaded)
-local _vfxService: any = nil
-local _audioService: any = nil
-
-local function getVFXService()
-	if not _vfxService then
-		local success, result = pcall(function()
-			return require(Modules.VFXService)
-		end)
-		if success then
-			_vfxService = result
-		end
-	end
-	return _vfxService
-end
-
-local function getAudioService()
-	if not _audioService then
-		local success, result = pcall(function()
-			return require(Modules.AudioService)
-		end)
-		if success then
-			_audioService = result
-		end
-	end
-	return _audioService
-end
 
 -- Projectile visual cache
 type ProjectileVisual = {
@@ -180,11 +151,12 @@ local function setupNetworkListeners()
 			local visual = _projectileVisuals[data.EntityId]
 			local pos = visual.Part.Position
 			
-			-- Play impact VFX and audio
-			local vfx = getVFXService()
-			local audio = getAudioService()
-			if vfx then vfx.PlayPeaImpact(pos, false) end
-			if audio then audio.PlayPeaImpact(pos) end
+			-- Fire signal for VFX/Audio (decoupled)
+			GameSignals.OnProjectileImpact:Fire({
+				Position = pos,
+				ProjectileType = "Pea",
+				IsFrozen = false,
+			})
 			
 			-- Hit animation (quick scale down)
 			local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)

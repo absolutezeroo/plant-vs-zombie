@@ -1,14 +1,14 @@
 --!strict
 --[[
-	SplashDamageSystem.luau - Handles splash/area damage from plants
+	SplashDamageSystem.luau - Handles splash/area damage from mutations
 	
 	Priority: 345 (Before individual damage processing)
 	
-	Plants with SplashDamageComponent deal damage in an area on hit.
+	Queries ProjectileHitEvent + SplashDamageComponent to apply AoE damage.
 	
 	LIFECYCLE:
 	- Init(): No init needed
-	- system(): No per-frame logic, API-driven
+	- system(): Main loop - processes hit events for splash damage
 	- Dispose(): No cleanup needed
 ]]
 
@@ -28,12 +28,10 @@ local PositionComponent = Components.PositionComponent
 local HealthComponent = Components.HealthComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local DamageEvent = Components.DamageEvent
-
--- Module API
-local API = {}
+local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- Apply splash damage at a position
-function API.ApplySplashDamage(
+local function applySplashDamage(
 	world, 
 	impactPosition: {X: number, Y: number, Z: number},
 	baseDamage: number,
@@ -70,10 +68,11 @@ function API.ApplySplashDamage(
 					Current = math.max(0, health.Current - finalDamage),
 				}))
 				
-				world:insert(entityId, DamageEvent({
+				world:spawn(DamageEvent({
+					Target = entityId,
 					Amount = finalDamage,
 					DamageType = "Splash",
-					SourceEntityId = sourceEntityId,
+					Source = sourceEntityId or 0,
 				}))
 				
 				hitCount += 1
@@ -86,10 +85,26 @@ function API.ApplySplashDamage(
 	end
 end
 
--- System function (no per-frame logic, API-driven)
+-- System function
 local function SplashDamageSystem(world)
-	-- Splash damage is triggered via API.ApplySplashDamage when projectiles hit
-	-- No per-frame processing needed
+	-- Process ProjectileHitEvents: apply splash damage from plants with SplashDamageComponent
+	for _, hitEvent in world:query(ProjectileHitEvent) do
+		local sourcePlant = hitEvent.SourcePlant
+		if not world:contains(sourcePlant) then continue end
+		
+		local splashDamage = world:get(sourcePlant, SplashDamageComponent)
+		if splashDamage then
+			applySplashDamage(
+				world,
+				{X = hitEvent.PositionX, Y = hitEvent.PositionY, Z = hitEvent.PositionZ},
+				hitEvent.Damage,
+				splashDamage.Radius,
+				splashDamage.Percent,
+				sourcePlant,
+				hitEvent.TargetZombie -- Exclude primary target
+			)
+		end
+	end
 end
 
 local function Init(_world)
@@ -106,5 +121,4 @@ return {
 	system = SplashDamageSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
 }

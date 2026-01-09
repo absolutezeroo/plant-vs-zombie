@@ -37,6 +37,7 @@ local NetworkConfig = require(Shared.config.NetworkConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ServiceLoader = require(Shared.utils.ServiceLoader)
 local SystemManager = require(Shared.utils.SystemManager)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
@@ -126,22 +127,30 @@ end
 local function setupNetworkListeners()
     -- Wave started event
     Network.WaveStarted.On(function(data)
-        hud:SetWaveNumber(data.WaveNumber)
+        -- Fire signal for HUD to react
+        GameSignals.OnWaveChanged:Fire({
+            WaveNumber = data.WaveNumber,
+            IsPreparation = data.WaveNumber == 0,
+        })
         
         if data.WaveNumber == 0 then
             Logger.Info("ArenaClient", "Preparation phase started")
-            hud:StartPreparation()
         else
             -- Reset intermission when new wave starts
             intermissionStartTime = 0
-            hud:SetIntermissionTime(0)
             Logger.Info("ArenaClient", `Wave {data.WaveNumber} started`)
         end
     end)
 
     -- Base health updated event
     Network.BaseHealthUpdated.On(function(data)
-        hud:SetBaseHealth(data.CurrentHealth, data.MaxHealth)
+        -- Fire signal for HUD to react
+        GameSignals.OnBaseHealthChanged:Fire({
+            CurrentHealth = data.CurrentHealth,
+            MaxHealth = data.MaxHealth,
+            DamageAmount = data.DamageAmount,
+        })
+        
         if data.DamageAmount > 0 then
             Logger.Warn("ArenaClient", `Base took {data.DamageAmount} damage! ({data.CurrentHealth}/{data.MaxHealth})`)
         end
@@ -157,7 +166,8 @@ local function setupNetworkListeners()
         Logger.Info("ArenaClient", `GameEndRewards: {if data.Victory then "Victory" else "Defeat"}`)
         Logger.Info("ArenaClient", `  Coins: {data.CoinsEarned}, XP: {data.XPEarned}, Gems: {data.GemsEarned}`)
         
-        victoryScreen:Show({
+        -- Fire signal for VictoryDefeatScreen to react
+        GameSignals.OnBattleEnded:Fire({
             Victory = data.Victory,
             WaveReached = data.WavesCompleted,
             StarRating = data.StarRating,
@@ -175,18 +185,22 @@ local function setupNetworkListeners()
     Network.WaveCompleted.On(function(data)
         Logger.Info("ArenaClient", `Wave {data.WaveNumber} completed!`)
         intermissionStartTime = tick()
-        hud:SetIntermissionTime(intermissionDuration)
+        
+        -- Fire signal for HUD intermission
+        GameSignals.OnWaveCompleted:Fire({
+            WaveNumber = data.WaveNumber,
+            IntermissionDuration = intermissionDuration,
+        })
     end)
 
     -- Teleport countdown event
     Network.TeleportCountdown.On(function(data)
         Logger.Info("ArenaClient", `Teleporting in {data.TimeRemaining}s`)
-        if hud then
-            hud:SetTeleportCountdown(data.TimeRemaining)
-        end
-        if victoryScreen then
-            victoryScreen:SetTeleportCountdown(data.TimeRemaining)
-        end
+        
+        -- Fire signal for HUD and VictoryScreen to react
+        GameSignals.OnTeleportCountdown:Fire({
+            TimeRemaining = data.TimeRemaining,
+        })
     end)
 
     -- Request response
@@ -353,9 +367,13 @@ loader:AddStep("UI", function()
     -- Setup network listeners AFTER UI is ready
     setupNetworkListeners()
     
-    -- Connect coin gains to HUD
+    -- Connect coin gains to signal (HUD listens to OnCoinGained)
     PlayerDataClient.OnCoinGained(function(event)
-        hud:ShowCoinGain(event.Amount, event.PositionX, event.PositionZ)
+        GameSignals.OnCoinGained:Fire({
+            Amount = event.Amount,
+            PositionX = event.PositionX,
+            PositionZ = event.PositionZ,
+        })
     end)
     
     -- Start countdown loop

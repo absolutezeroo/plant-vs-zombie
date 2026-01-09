@@ -1,0 +1,23 @@
+{
+  "name": "PROJECT_ANALYSIS_ONLY",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": { "$path": "src/shared" },
+      "Packages": { "$path": "Packages" },
+      
+      "_ANALYSIS_LOBBY_CLIENT": { "$path": "src/lobby/client" },
+      "_ANALYSIS_ARENA_CLIENT": { "$path": "src/arena/client" }
+    },
+    "ServerScriptService": {
+      "_ANALYSIS_LOBBY_SERVER": { "$path": "src/lobby/server" },
+      "_ANALYSIS_ARENA_SERVER": { "$path": "src/arena/server" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LobbyLoader": { "$path": "src/lobby/client" },
+        "ArenaLoader": { "$path": "src/arena/client" }
+      }
+    }
+  }
+}

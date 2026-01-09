@@ -31,11 +31,11 @@ local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local GridUtils = require(Shared.utils.GridUtils)
 local Logger = require(Shared.utils.Logger)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
-assert(Modules, "PlantRenderSystem: modules folder not found")
 local Network = require(Shared.network.generated.client)
 
 -- Assets folder (optional - fallback to cubes if missing)
@@ -46,28 +46,29 @@ if not PlantAssets then
 	Logger.Warn("PlantRender", "Plant assets not found - using fallback cubes")
 end
 
--- Services (lazy loaded)
-local _vfxService: any = nil
+-- Services (lazy loaded - AnimService and VFXService needed for model-based operations)
 local _animService: any = nil
-
-local function getVFXService()
-	if not _vfxService then
-		local success, result = pcall(function()
-			return require(Modules.VFXService)
-		end)
-		if success then _vfxService = result end
-	end
-	return _vfxService
-end
+local _vfxService: any = nil
 
 local function getAnimService()
-	if not _animService then
+	if not _animService and Modules then
 		local success, result = pcall(function()
 			return require(Modules.AnimationService)
 		end)
 		if success then _animService = result end
 	end
 	return _animService
+end
+
+-- VFXService needed for AttachIdleVFX/DetachIdleVFX (requires Model reference)
+local function getVFXService()
+	if not _vfxService and Modules then
+		local success, result = pcall(function()
+			return require(Modules.VFXService)
+		end)
+		if success then _vfxService = result end
+	end
+	return _vfxService
 end
 
 -- Plant visual cache: entityId -> visual data

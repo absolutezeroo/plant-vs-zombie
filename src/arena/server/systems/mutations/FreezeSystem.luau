@@ -2,13 +2,11 @@
 --[[
 	FreezeSystem.luau - Handles freeze effects on zombies
 	
-	Priority: 355 (Combat processing)
+	Priority: 355 (Combat processing - after CombatSystem)
 	
-	Handles:
-	- Frozen zombies (completely stopped)
-	- Removing freeze when duration expires
-	
-	FreezeEffect on plants/projectiles is processed when hitting zombies.
+	Two responsibilities:
+	1. Query ProjectileHitEvent + FreezeEffectComponent to apply freezes
+	2. Process zombies with FrozenComponent (expiration)
 	
 	LIFECYCLE:
 	- Init(): No init needed
@@ -28,33 +26,13 @@ local Logger = require(Shared.utils.Logger)
 
 -- Components
 local FrozenComponent = Components.FrozenComponent
+local FreezeEffectComponent = Components.FreezeEffectComponent
 local SlowComponent = Components.SlowComponent
-local MovementComponent = Components.MovementComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
+local ProjectileHitEvent = Components.ProjectileHitEvent
 
--- System function
-local function FreezeSystem(world)
-	local currentTime = os.clock()
-	
-	-- Process all frozen zombies
-	for entityId, frozen, zombie in world:query(FrozenComponent, ZombieTypeComponent) do
-		local elapsed = currentTime - frozen.AppliedAt
-		
-		if elapsed >= frozen.RemainingDuration then
-			-- Freeze expired, remove component
-			world:remove(entityId, FrozenComponent)
-			Logger.Debug("FreezeSystem", `Freeze expired on entity {entityId}`)
-		end
-		-- While frozen, movement is handled by ZombieMovementSystem checking for FrozenComponent
-	end
-end
-
--- Module API
-local API = {}
-
--- Attempt to freeze a zombie (with chance roll)
-function API.TryFreeze(world, zombieEntityId: number, freezeChance: number, freezeDuration: number, enhancedSlow: number?): boolean
-	-- Check if zombie exists
+-- Helper: Try to freeze a zombie (with chance roll)
+local function tryFreeze(world, zombieEntityId: number, freezeChance: number, freezeDuration: number, enhancedSlow: number?): boolean
 	if not world:contains(zombieEntityId) then return false end
 	
 	-- Check if already frozen
@@ -99,15 +77,38 @@ function API.TryFreeze(world, zombieEntityId: number, freezeChance: number, free
 	end
 end
 
--- Directly freeze a zombie (no chance roll)
-function API.ApplyFreeze(world, zombieEntityId: number, duration: number)
-	if not world:contains(zombieEntityId) then return end
+-- System function
+local function FreezeSystem(world)
+	local currentTime = os.clock()
 	
-	world:insert(zombieEntityId, FrozenComponent({
-		RemainingDuration = duration,
-		AppliedAt = os.clock(),
-	}))
-	Logger.Debug("FreezeSystem", `Applied freeze to entity {zombieEntityId} for {duration}s`)
+	-- 1. Process ProjectileHitEvents: apply freezes from plants with FreezeEffectComponent
+	for _, hitEvent in world:query(ProjectileHitEvent) do
+		local sourcePlant = hitEvent.SourcePlant
+		if not world:contains(sourcePlant) then continue end
+		
+		local freezeEffect = world:get(sourcePlant, FreezeEffectComponent)
+		if freezeEffect then
+			tryFreeze(
+				world,
+				hitEvent.TargetZombie,
+				freezeEffect.FreezeChance,
+				freezeEffect.FreezeDuration,
+				freezeEffect.EnhancedSlow
+			)
+		end
+	end
+	
+	-- 2. Process all frozen zombies (expiration)
+	for entityId, frozen, zombie in world:query(FrozenComponent, ZombieTypeComponent) do
+		local elapsed = currentTime - frozen.AppliedAt
+		
+		if elapsed >= frozen.RemainingDuration then
+			-- Freeze expired, remove component
+			world:remove(entityId, FrozenComponent)
+			Logger.Debug("FreezeSystem", `Freeze expired on entity {entityId}`)
+		end
+		-- While frozen, movement is handled by ZombieMovementSystem checking for FrozenComponent
+	end
 end
 
 local function Init(_world)
@@ -124,5 +125,4 @@ return {
 	system = FreezeSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
 }

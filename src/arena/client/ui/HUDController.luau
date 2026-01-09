@@ -16,10 +16,12 @@ local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local PlantData = require(Shared.data.PlantData)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- UI Components
 local CardDeck = require(script.Parent.CardDeck)
@@ -30,20 +32,6 @@ local Client = script.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
 local PlayerDataClient = require(Modules.PlayerDataClient)
-
--- VFX/Audio (lazy loaded)
-local _audioService: any = nil
-local function getAudioService()
-	if not _audioService then
-		local success, result = pcall(function()
-			return require(Modules.AudioService)
-		end)
-		if success then
-			_audioService = result
-		end
-	end
-	return _audioService
-end
 
 -- Fusion primitives
 local New = Fusion.New
@@ -60,6 +48,7 @@ function HUDController.new()
 	
 	-- Use shared selection state
 	self._scope = Fusion.scoped({})
+	self._trove = Trove.new()
 	self._waveNumber = Value(self._scope, 0)
 	self._baseHealth = Value(self._scope, 1000)
 	self._baseMaxHealth = Value(self._scope, 1000)
@@ -525,6 +514,9 @@ function HUDController:Mount()
 		},
 	})
 	
+	-- Connect to GameSignals (observer pattern)
+	self:_setupSignalListeners()
+	
 	self._mounted = true
 	Logger.Info("HUDController", "HUD mounted with CardDeck")
 end
@@ -534,9 +526,43 @@ function HUDController:Unmount()
 		return
 	end
 	
+	self._trove:Destroy()
 	Fusion.doCleanup(self._scope)
 	self._mounted = false
 	Logger.Info("HUDController", "HUD unmounted")
+end
+
+-- Private: Setup signal listeners for decoupled communication
+function HUDController:_setupSignalListeners()
+	-- Wave changed (from network or game state)
+	self._trove:Connect(GameSignals.OnWaveChanged, function(data)
+		self:SetWaveNumber(data.WaveNumber)
+		if data.IsPreparation then
+			self:StartPreparation()
+		end
+	end)
+	
+	-- Wave completed (triggers intermission)
+	self._trove:Connect(GameSignals.OnWaveCompleted, function(data)
+		self:SetIntermissionTime(data.IntermissionDuration or 30)
+	end)
+	
+	-- Base health changed
+	self._trove:Connect(GameSignals.OnBaseHealthChanged, function(data)
+		self:SetBaseHealth(data.CurrentHealth, data.MaxHealth)
+	end)
+	
+	-- Teleport countdown
+	self._trove:Connect(GameSignals.OnTeleportCountdown, function(data)
+		self:SetTeleportCountdown(data.TimeRemaining)
+	end)
+	
+	-- Coin gained (show floating text)
+	self._trove:Connect(GameSignals.OnCoinGained, function(data)
+		self:ShowCoinGain(data.Amount, data.PositionX, data.PositionZ)
+	end)
+	
+	Logger.Debug("HUDController", "Signal listeners connected")
 end
 
 function HUDController:SetWaveNumber(wave: number)
@@ -576,9 +602,7 @@ function HUDController:ShowCoinGain(amount: number, worldX: number?, worldZ: num
 		return
 	end
 	
-	-- Play coin collect sound
-	local audio = getAudioService()
-	if audio then audio.PlayCoinCollect() end
+	-- Note: Audio is handled by AudioService via GameSignals.OnCoinGained
 	
 	-- Create floating text at coin counter location with stroke
 	local floatingText = New(self._scope, "TextLabel")({

@@ -21,6 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DamageEvent = require(Shared.components.events.DamageEvent)
 local DeathEvent = require(Shared.components.events.DeathEvent)
 local SpawnEvent = require(Shared.components.events.SpawnEvent)
+local ProjectileHitEvent = require(Shared.components.events.ProjectileHitEvent)
 
 local function EventCleanupSystem(world)
 	-- Query for all event entities and despawn them
@@ -38,6 +39,11 @@ local function EventCleanupSystem(world)
 	
 	-- Clean SpawnEvents
 	for entityId in world:query(SpawnEvent) do
+		world:despawn(entityId)
+	end
+	
+	-- Clean ProjectileHitEvents
+	for entityId in world:query(ProjectileHitEvent) do
 		world:despawn(entityId)
 	end
 end

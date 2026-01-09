@@ -2,14 +2,13 @@
 --[[
 	ChainLightningSystem.luau - Handles chain lightning damage propagation
 	
-	Priority: 360 (Combat processing)
+	Priority: 360 (Combat processing - after CombatSystem)
 	
-	When a projectile with ChainLightning hits a zombie, damage chains
-	to nearby zombies within range.
+	Queries ProjectileHitEvent + ChainLightningComponent to apply chain damage.
 	
 	LIFECYCLE:
 	- Init(): No init needed
-	- system(): No per-frame logic, API-driven
+	- system(): Main loop - processes hit events for chain lightning
 	- Dispose(): No cleanup needed
 ]]
 
@@ -27,10 +26,9 @@ local Logger = require(Shared.utils.Logger)
 local PositionComponent = Components.PositionComponent
 local HealthComponent = Components.HealthComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
+local ChainLightningComponent = Components.ChainLightningComponent
 local DamageEvent = Components.DamageEvent
-
--- Module API
-local API = {}
+local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- Find nearby zombies within range (excluding already hit ones)
 local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: number}, range: number, excludeIds: {number}): {number}
@@ -73,7 +71,7 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 end
 
 -- Apply chain lightning damage from a source
-function API.ApplyChainLightning(
+local function applyChainLightning(
 	world, 
 	sourceZombieId: number,
 	baseDamage: number, 
@@ -111,10 +109,11 @@ function API.ApplyChainLightning(
 			}))
 			
 			-- Emit damage event
-			world:insert(nextTarget, DamageEvent({
+			world:spawn(DamageEvent({
+				Target = nextTarget,
 				Amount = currentDamage,
 				DamageType = "Lightning",
-				SourceEntityId = sourceZombieId,
+				Source = sourceZombieId,
 			}))
 			
 			Logger.Debug("ChainLightningSystem", `Chain {i}: {currentDamage} damage to entity {nextTarget}`)
@@ -124,13 +123,31 @@ function API.ApplyChainLightning(
 		local nextPos = world:get(nextTarget, PositionComponent)
 		if not nextPos then break end
 		currentPos = {X = nextPos.X, Y = nextPos.Y, Z = nextPos.Z}
-		
-		-- Optionally reduce damage per chain
-		-- currentDamage = currentDamage * 0.8
 	end
 	
 	if #hitZombies > 1 then
 		Logger.Debug("ChainLightningSystem", `Chain lightning hit {#hitZombies - 1} additional zombies`)
+	end
+end
+
+-- System function
+local function ChainLightningSystem(world)
+	-- Process ProjectileHitEvents: apply chain lightning from plants with ChainLightningComponent
+	for _, hitEvent in world:query(ProjectileHitEvent) do
+		local sourcePlant = hitEvent.SourcePlant
+		if not world:contains(sourcePlant) then continue end
+		
+		local chainLightning = world:get(sourcePlant, ChainLightningComponent)
+		if chainLightning then
+			applyChainLightning(
+				world,
+				hitEvent.TargetZombie,
+				hitEvent.Damage,
+				chainLightning.ChainCount,
+				chainLightning.ChainDamage,
+				chainLightning.ChainRange
+			)
+		end
 	end
 end
 
@@ -145,8 +162,7 @@ end
 return {
 	_name = "ChainLightningSystem",
 	priority = 360,
-	system = function(_world) end, -- No per-frame logic, API-driven
+	system = ChainLightningSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
 }

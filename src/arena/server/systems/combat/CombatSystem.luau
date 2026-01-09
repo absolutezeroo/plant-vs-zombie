@@ -11,6 +11,7 @@
 	- Shield piercing (Fume-shroom)
 	- Zombie eating plants
 	- Damage application
+	- Spawns ProjectileHitEvent for mutation systems to process
 	
 	LIFECYCLE:
 	- Init(): No init needed
@@ -51,6 +52,9 @@ local SlowComponent = Components.SlowComponent
 local SplashComponent = Components.SplashComponent
 local StunComponent = Components.StunComponent
 local EnhancedProjectileComponent = Components.EnhancedProjectileComponent
+
+-- Event component for mutation systems
+local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- Combat config
 local CombatConfig = {
@@ -262,6 +266,19 @@ local function CombatSystem(world: MatterWorld)
 				
 				-- Apply damage
 				local killed = applyDamage(world, zombieId, damage, proj.PiercesShields)
+				
+				-- Spawn ProjectileHitEvent for mutation systems to process
+				if proj.SourceEntity then
+					world:spawn(ProjectileHitEvent({
+						SourcePlant = proj.SourceEntity,
+						TargetZombie = zombieId,
+						Damage = damage,
+						PositionX = zombiePos.X,
+						PositionY = zombiePos.Y,
+						PositionZ = zombiePos.Z,
+						WasKill = killed,
+					}))
+				end
 				
 				-- Apply slow effect if frozen projectile (and not fire pea)
 				if proj.IsFrozen and not killed and proj.SlowPercent and proj.SlowDuration then

@@ -22,6 +22,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+local LobbySignals = require(Shared.signals.LobbySignals)
 
 -- Import View modules (SRP: each view handles its own UI)
 -- Views are functions: (scope, props) -> Frame
@@ -195,6 +196,22 @@ end
 function ZoneInteractionController.Initialize()
     Logger.Info("ZoneInteraction", "Initializing ZoneInteractionController")
     _trove:Connect(ProximityPromptService.PromptTriggered, onPromptTriggered)
+    
+    -- Connect to LobbySignals (observer pattern)
+    _trove:Connect(LobbySignals.OnPlayerDataSync, function(data)
+        ZoneInteractionController.SetPlayerData(data)
+    end)
+    
+    _trove:Connect(LobbySignals.OnDeckUpdated, function(data)
+        ZoneInteractionController.UpdateDeck(data.Deck)
+    end)
+    
+    _trove:Connect(LobbySignals.OnMutationsSync, function(data)
+        ZoneInteractionController.UpdateOwnedMutations(data.OwnedMutations)
+        ZoneInteractionController.UpdateEquippedMutations(data.EquippedMutations)
+    end)
+    
+    Logger.Debug("ZoneInteraction", "Signal listeners connected")
 end
 
 -- Cleanup

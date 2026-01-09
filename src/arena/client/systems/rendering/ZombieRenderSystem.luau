@@ -30,55 +30,11 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
+local GameSignals = require(Shared.signals.GameSignals)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
-local Modules = Client:FindFirstChild("modules")
-assert(Modules, "ZombieRenderSystem: modules folder not found")
-local UI = Client:FindFirstChild("ui")
-assert(UI, "ZombieRenderSystem: ui folder not found")
 local Network = require(Shared.network.generated.client)
-
--- VFX/Audio services (lazy loaded)
-local _vfxService: any = nil
-local _audioService: any = nil
-local _floatingTextUI: any = nil
-
-local function getVFXService()
-	if not _vfxService then
-		local success, result = pcall(function()
-			return require(Modules.VFXService)
-		end)
-		if success then
-			_vfxService = result
-		end
-	end
-	return _vfxService
-end
-
-local function getAudioService()
-	if not _audioService then
-		local success, result = pcall(function()
-			return require(Modules.AudioService)
-		end)
-		if success then
-			_audioService = result
-		end
-	end
-	return _audioService
-end
-
-local function getFloatingTextUI()
-	if not _floatingTextUI then
-		local success, result = pcall(function()
-			return require(UI.FloatingTextUI)
-		end)
-		if success then
-			_floatingTextUI = result
-		end
-	end
-	return _floatingTextUI
-end
 
 -- Zombie visual cache: entityId -> visual data
 type ZombieVisual = {
@@ -202,12 +158,12 @@ local function setupNetworkListeners()
 			-- Keep reference to part for animation
 			local part = visual.Part
 			
-			-- Play death VFX and audio
+			-- Fire signal for VFX/Audio (decoupled)
 			local pos = part.Position
-			local vfx = getVFXService()
-			local audio = getAudioService()
-			if vfx then vfx.PlayZombieDeath(pos) end
-			if audio then audio.PlayZombieDeath(pos) end
+			GameSignals.OnZombieDeath:Fire({
+				Position = pos,
+				ZombieType = visual.ZombieType,
+			})
 			
 			-- Death animation
 			local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -242,15 +198,17 @@ local function setupNetworkListeners()
 				end
 			end)
 			
-			-- Show floating damage number
-			local floatingText = getFloatingTextUI()
-			if floatingText and data.DamageAmount > 0 then
+			-- Show floating damage number via signal
+			if data.DamageAmount > 0 then
 				local pos = visual.Part.Position + Vector3.new(
 					(math.random() - 0.5) * 2, -- Random X offset
 					1, -- Above zombie
 					0
 				)
-				floatingText.ShowDamage(pos, data.DamageAmount)
+				GameSignals.OnDamageDealt:Fire({
+					Position = pos,
+					Amount = data.DamageAmount,
+				})
 			end
 		end
 	end))
