@@ -48,6 +48,7 @@ local ChewingComponent = Components.ChewingComponent
 local JumpingComponent = Components.JumpingComponent
 local SlowComponent = Components.SlowComponent
 local MovementComponent = Components.MovementComponent
+local SpawnEvent = Components.SpawnEvent
 
 -- Config defaults (used when PlantData doesn't specify)
 local SpecialDefaults = {
@@ -273,6 +274,40 @@ end
 
 local function SpecialPlantSystem(world)
 	local currentTime = os.clock()
+	
+	-- React to SpawnEvent for new special plants (replaces OnPlantPlaced API call)
+	for _, event in world:query(SpawnEvent) do
+		if event.EntityType ~= "Plant" then continue end
+		
+		local entityId = event.Target
+		if not world:contains(entityId) then continue end
+		
+		local plant = world:get(entityId, PlantTypeComponent)
+		if not plant then continue end
+		
+		local stats = PlantData[plant.PlantType]
+		if not stats then continue end
+		
+		-- Initialize special plant behaviors
+		if stats.ExplodesOnPlace then
+			-- CherryBomb/DoomShroom/IceShroom/Jalapeno: Start fuse timer
+			local fuseTime = stats.FuseTime or SpecialDefaults.FUSE_TIME
+			_fusePlants[entityId] = {
+				explodeTime = currentTime + fuseTime,
+				plantType = plant.PlantType,
+			}
+			Logger.Debug("SpecialPlant", `{plant.PlantType} {entityId} fuse started ({fuseTime}s)`)
+		elseif stats.NeedsArming then
+			-- PotatoMine: Add ArmedComponent (starts unarmed)
+			local armDuration = stats.ArmDuration or SpecialDefaults.ARM_DURATION
+			world:insert(entityId, ArmedComponent({
+				IsArmed = false,
+				ArmTime = currentTime,
+				ArmDuration = armDuration,
+			}))
+			Logger.Debug("SpecialPlant", `{plant.PlantType} {entityId} placed, arming in {armDuration}s`)
+		end
+	end
 	
 	-- Process fuse plants (CherryBomb, DoomShroom, IceShroom, Jalapeno)
 	for entityId, fuseData in _fusePlants do

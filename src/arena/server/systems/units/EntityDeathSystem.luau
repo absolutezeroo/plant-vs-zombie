@@ -41,6 +41,8 @@ local HealthComponent = Components.HealthComponent
 local PlantTypeComponent = Components.PlantTypeComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local PositionComponent = Components.PositionComponent
+local DeathEvent = Components.DeathEvent
+local CoinDropEvent = Components.CoinDropEvent
 
 -- Player data service (lazy load to avoid circular deps)
 local _playerDataService: any = nil
@@ -103,7 +105,17 @@ local function EntityDeathSystem(world)
 				-- Get zombie position for coin spawn location
 				local pos = world:get(id, PositionComponent)
 				local posX = if pos then pos.X else 0
+				local posY = if pos then pos.Y else 0
 				local posZ = if pos then pos.Z else 0
+				
+				-- Spawn CoinDropEvent for VFX/Audio systems
+				world:spawn(CoinDropEvent({
+					Amount = coinValue,
+					PositionX = posX,
+					PositionY = posY,
+					PositionZ = posZ,
+					SourceEntityId = id,
+				}))
 				
 				-- Award coins to all players (multiplayer fairness)
 				-- In a competitive mode, we'd track who dealt damage
@@ -131,6 +143,16 @@ local function EntityDeathSystem(world)
 			Network.EntityDied.FireAll({
 				EntityId = id,
 			})
+			
+			-- Spawn DeathEvent for other systems to react (VFX, Audio, etc.)
+			local entityType = if plant then "Plant" elseif zombie then "Zombie" else "Unknown"
+			world:spawn(DeathEvent({
+				Target = id,
+				EntityType = entityType,
+				PositionX = if pos then pos.X else 0,
+				PositionY = if pos then pos.Y else 0,
+				PositionZ = if pos then pos.Z else 0,
+			}))
 			
 			-- Despawn the entity
 			world:despawn(id)

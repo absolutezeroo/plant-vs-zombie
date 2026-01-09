@@ -27,6 +27,7 @@ local HealthComponent = Components.HealthComponent
 local MovementComponent = Components.MovementComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local PlantFoodComponent = Components.PlantFoodComponent
+local SpawnEvent = Components.SpawnEvent
 
 -- Types
 export type SpawnPhase = "Trickle" | "Assault" | "Flag"
@@ -326,6 +327,15 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
         Lane = lane :: any,
         PositionX = spawnPos.X,
     })
+    
+    -- Fire SpawnEvent for VFX/Audio systems (e.g., spawn particles)
+    world:spawn(SpawnEvent({
+        Target = entityId,
+        EntityType = "Zombie",
+        PositionX = spawnPos.X,
+        PositionY = spawnPos.Y,
+        PositionZ = spawnPos.Z,
+    }))
     
     Logger.Debug("WaveSpawner", `Spawned {zombieType} in lane {lane}`)
     

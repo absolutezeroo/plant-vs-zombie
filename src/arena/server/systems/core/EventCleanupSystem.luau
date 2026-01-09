@@ -22,6 +22,9 @@ local DamageEvent = require(Shared.components.events.DamageEvent)
 local DeathEvent = require(Shared.components.events.DeathEvent)
 local SpawnEvent = require(Shared.components.events.SpawnEvent)
 local ProjectileHitEvent = require(Shared.components.events.ProjectileHitEvent)
+local WaveStateEvent = require(Shared.components.events.WaveStateEvent)
+local CoinDropEvent = require(Shared.components.events.CoinDropEvent)
+local PlantActionEvent = require(Shared.components.events.PlantActionEvent)
 
 local function EventCleanupSystem(world)
 	-- Query for all event entities and despawn them
@@ -44,6 +47,21 @@ local function EventCleanupSystem(world)
 	
 	-- Clean ProjectileHitEvents
 	for entityId in world:query(ProjectileHitEvent) do
+		world:despawn(entityId)
+	end
+	
+	-- Clean WaveStateEvents
+	for entityId in world:query(WaveStateEvent) do
+		world:despawn(entityId)
+	end
+	
+	-- Clean CoinDropEvents
+	for entityId in world:query(CoinDropEvent) do
+		world:despawn(entityId)
+	end
+	
+	-- Clean PlantActionEvents
+	for entityId in world:query(PlantActionEvent) do
 		world:despawn(entityId)
 	end
 end

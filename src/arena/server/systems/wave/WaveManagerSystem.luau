@@ -51,6 +51,7 @@ local BaseHealth = require(Server.modules.BaseHealth)
 
 -- Components
 local ZombieTypeComponent = Components.ZombieTypeComponent
+local WaveStateEvent = Components.WaveStateEvent
 
 -- Types
 type GameState = GameStateManager.GameState
@@ -146,11 +147,25 @@ local function advancePhase(world: any)
         _phaseSpent = 0
         _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Assault")
         Logger.Debug("WaveManager", `Phase: Assault (budget: {math.floor(_phaseBudget)})`)
+        
+        -- Fire phase change event
+        world:spawn(WaveStateEvent({
+            StateType = "Phase",
+            WaveNumber = _currentWave,
+            Phase = "Assault",
+        }))
     elseif _currentPhase == "Assault" then
         _currentPhase = "Flag"
         _phaseSpent = 0
         _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Flag")
         Logger.Debug("WaveManager", `Phase: Flag (budget: {math.floor(_phaseBudget)})`)
+        
+        -- Fire phase change event
+        world:spawn(WaveStateEvent({
+            StateType = "Phase",
+            WaveNumber = _currentWave,
+            Phase = "Flag",
+        }))
         
         -- Spawn Flag zombie
         local lane = math.random(1, GridConfig.GRID_LANES)
@@ -168,6 +183,15 @@ local function startWave(waveNumber: number, world: any?)
     _zombiesSpawnedThisWave = 0
     _lastSpawnTime = os.clock()
     _waveStartTime = os.clock()
+    
+    -- Fire WaveStateEvent for UI/Audio systems
+    if world then
+        world:spawn(WaveStateEvent({
+            StateType = "Start",
+            WaveNumber = waveNumber,
+            TotalWaves = _totalWaves,
+        }))
+    end
     
     -- Reset Plant Food tracking
     local PlantFoodSystemAPI = getPlantFoodSystem().API
@@ -557,6 +581,13 @@ local function WaveManagerSystem(world)
     
     if waveComplete then
         Logger.Info("WaveManager", `=== WAVE {_currentWave} COMPLETE ===`)
+        
+        -- Fire WaveStateEvent End for UI/Audio systems
+        world:spawn(WaveStateEvent({
+            StateType = "End",
+            WaveNumber = _currentWave,
+            TotalWaves = _totalWaves,
+        }))
         
         _broadcaster:BroadcastWaveCompleted(_currentWave, true)
         

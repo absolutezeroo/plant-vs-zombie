@@ -40,6 +40,8 @@ local PlantTypeComponent = Components.PlantTypeComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local SleepingComponent = Components.SleepingComponent
 local HidingComponent = Components.HidingComponent
+local SpawnEvent = Components.SpawnEvent
+local PlantActionEvent = Components.PlantActionEvent
 
 -- Config
 local MushroomConfig = {
@@ -127,6 +129,59 @@ end
 
 local function MushroomSystem(world)
 	local currentTime = os.clock()
+	
+	-- React to SpawnEvent for new mushroom plants
+	for _, event in world:query(SpawnEvent) do
+		if event.EntityType ~= "Plant" then continue end
+		
+		local entityId = event.Target
+		if not world:contains(entityId) then continue end
+		
+		local plant = world:get(entityId, PlantTypeComponent)
+		if not plant then continue end
+		
+		local stats = PlantData[plant.PlantType]
+		if not stats or not stats.IsMushroom then continue end
+		
+		-- Initialize mushroom (replaces OnMushroomPlaced API call)
+		if stats.SleepsDuringDay and MushroomAPI.IsDay() then
+			world:insert(entityId, SleepingComponent({
+				IsSleeping = true,
+				WokeAt = nil,
+			}))
+			Logger.Debug("Mushroom", `{plant.PlantType} {entityId} is sleeping (day time)`)
+		end
+		
+		if stats.GrowsOverTime then
+			_sunShroomPlanted[entityId] = os.clock()
+			Logger.Debug("Mushroom", `SunShroom {entityId} planted, will grow over time`)
+		end
+		
+		if stats.HidesWhenNear then
+			local hideRadius = stats.HideRadius or MushroomConfig.DEFAULT_HIDE_RADIUS
+			world:insert(entityId, HidingComponent({
+				IsHiding = false,
+				HideRadius = hideRadius,
+			}))
+		end
+	end
+	
+	-- React to PlantActionEvent for Coffee Bean waking mushrooms
+	for _, actionEvent in world:query(PlantActionEvent) do
+		if actionEvent.ActionType ~= "WakeMushroom" then continue end
+		
+		local targetId = actionEvent.TargetEntity
+		if not world:contains(targetId) then continue end
+		
+		local sleeping = world:get(targetId, SleepingComponent)
+		if sleeping and sleeping.IsSleeping then
+			world:insert(targetId, SleepingComponent({
+				IsSleeping = false,
+				WokeAt = os.clock(),
+			}))
+			Logger.Info("Mushroom", `Mushroom {targetId} woke up!`)
+		end
+	end
 	
 	-- Process Scaredy-shroom hiding behavior
 	for plantId, pos, plant, hiding in world:query(PositionComponent, PlantTypeComponent, HidingComponent) do

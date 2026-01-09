@@ -63,6 +63,9 @@ return {
 	DeathEvent = require(Events.DeathEvent),
 	SpawnEvent = require(Events.SpawnEvent),
 	ProjectileHitEvent = require(Events.ProjectileHitEvent),
+	WaveStateEvent = require(Events.WaveStateEvent),
+	CoinDropEvent = require(Events.CoinDropEvent),
+	PlantActionEvent = require(Events.PlantActionEvent),
 	
 	-- Mutation components
 	BurnEffectComponent = require(Mutations.BurnEffectComponent),

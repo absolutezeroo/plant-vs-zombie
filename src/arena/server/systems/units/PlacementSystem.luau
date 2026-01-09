@@ -36,6 +36,8 @@ local PositionComponent = Components.PositionComponent
 local HealthComponent = Components.HealthComponent
 local PlantTypeComponent = Components.PlantTypeComponent
 local OwnerComponent = Components.OwnerComponent
+local SpawnEvent = Components.SpawnEvent
+local PlantActionEvent = Components.PlantActionEvent
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -179,12 +181,18 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	-- Check for special stacking cases
 	local existingEntityId = GridService.GetEntity(column, lane)
 
-	-- Handle Coffee Bean- wakes mushroom and disappears
+	-- Handle Coffee Bean - wakes mushroom and disappears
 	if stats.CanStackOnMushroom and stats.WakesMushrooms then
 		if existingEntityId and world:contains(existingEntityId) then
-			local Systems = script.Parent.Parent
-			local MushroomSystem = require(Systems.units.MushroomSystem)
-			MushroomSystem.API.WakeMushroom(world, existingEntityId)
+			-- Fire PlantActionEvent instead of direct API call
+			-- MushroomSystem will react to this event
+			world:spawn(PlantActionEvent({
+				ActionType = "WakeMushroom",
+				TargetEntity = existingEntityId,
+				PositionX = worldPos.X,
+				PositionY = worldPos.Y,
+				PositionZ = worldPos.Z,
+			}))
 			
 			-- Coffee Bean is consumed - don't spawn entity
 			-- Deduct sun and start cooldown
@@ -251,20 +259,16 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		OwnerId = player.UserId,
 	})
 	
-	-- Notify special systems based on plant type (data-driven)
-	local Systems = script.Parent.Parent
-	
-	-- Explosive plants
-	if stats.IsExplosive or stats.NeedsArming then
-		local SpecialPlantSystem = require(Systems.combat.SpecialPlantSystem)
-		SpecialPlantSystem.API.OnPlantPlaced(world, entityId, plantType)
-	end
-	
-	-- Mushroom plants
-	if stats.IsMushroom then
-		local MushroomSystem = require(Systems.units.MushroomSystem)
-		MushroomSystem.API.OnMushroomPlaced(world, entityId, plantType)
-	end
+	-- Spawn SpawnEvent for presentation systems (VFX, Audio)
+	-- MushroomSystem and SpecialPlantSystem will also react to this event
+	-- to initialize mushroom sleeping state or arm explosives
+	world:spawn(SpawnEvent({
+		Target = entityId,
+		EntityType = "Plant",
+		PositionX = worldPos.X,
+		PositionY = worldPos.Y + 2,
+		PositionZ = worldPos.Z,
+	}))
 	
 	return entityId
 end
