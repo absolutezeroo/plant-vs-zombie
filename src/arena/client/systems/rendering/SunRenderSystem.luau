@@ -24,6 +24,7 @@ local RunService = game:GetService("RunService")
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Packages = ReplicatedStorage:FindFirstChild("Packages")
 assert(Packages, "SunRenderSystem: Packages folder not found")
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "SunRenderSystem: Shared folder not found")
@@ -73,8 +74,8 @@ type SunData = {
 }
 local _sunData: {[number]: SunData} = {}
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 -- Sun visual config
 local SUN_SIZE = Vector3.new(2.5, 2.5, 2.5)
@@ -195,9 +196,9 @@ end
 	Setup network event listeners & input handlers (called during Init phase)
 ]]
 local function setupListeners()
-	table.insert(_connections, UserInputService.InputBegan:Connect(handleInput))
+	_trove:Connect(UserInputService.InputBegan, handleInput)
 	
-	table.insert(_connections, Network.SunSpawned.On(function(data)
+	_trove:Add(Network.SunSpawned.On(function(data)
 		local entityId = data.EntityId
 		local position = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
 		
@@ -211,7 +212,7 @@ local function setupListeners()
 		end
 	end))
 	
-	table.insert(_connections, Network.SunDespawned.On(function(data)
+	_trove:Add(Network.SunDespawned.On(function(data)
 		local entityId = data.EntityId
 		local sunData = _sunData[entityId]
 		
@@ -222,7 +223,7 @@ local function setupListeners()
 		end
 	end))
 	
-	table.insert(_connections, Network.SunPositionUpdate.On(function(data)
+	_trove:Add(Network.SunPositionUpdate.On(function(data)
 		local sunData = _sunData[data.EntityId]
 		if sunData then
 			sunData.Falling = data.Falling
@@ -236,7 +237,7 @@ local function setupListeners()
 		end
 	end))
 	
-	table.insert(_connections, Network.SunCollected.On(function(data)
+	_trove:Add(Network.SunCollected.On(function(data)
 		-- Another player collected the sun, remove visual
 		local sunData = _sunData[data.SunEntityId]
 		if sunData then
@@ -301,10 +302,7 @@ end
 ]]
 local function Dispose()
 	-- Disconnect all events
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	
 	-- Destroy all sun visuals
 	for entityId in _sunData do

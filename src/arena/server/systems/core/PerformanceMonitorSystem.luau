@@ -17,6 +17,10 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
@@ -30,14 +34,14 @@ local SPIKE_THRESHOLD = PerformanceConfig.FRAME_BUDGET_TOTAL * 1.5 -- 22.5ms is 
 local LOG_INTERVAL = 60 -- Log summary every 60 seconds
 local lastLogTime = 0
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 local function setupListeners()
 	-- Hook into frame start to measure time
-	table.insert(_connections, RunService.Heartbeat:Connect(function()
+	_trove:Connect(RunService.Heartbeat, function()
 		frameStartTime = tick()
-	end))
+	end)
 end
 
 local function PerformanceMonitorSystem(world)
@@ -86,10 +90,7 @@ local function Init(_world)
 end
 
 local function Dispose()
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	frameStartTime = 0
 	spikeCount = 0
 	frameCount = 0

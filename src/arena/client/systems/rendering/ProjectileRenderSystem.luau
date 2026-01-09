@@ -25,6 +25,11 @@ local TweenService = game:GetService("TweenService")
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "ProjectileRenderSystem: Shared folder not found")
+
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(Packages, "ProjectileRenderSystem: Packages folder not found")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
@@ -72,8 +77,8 @@ type ProjectileVisual = {
 }
 local _projectileVisuals: {[number]: ProjectileVisual} = {}
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 -- Visual config
 local PEA_SIZE = Vector3.new(1, 1, 1)
@@ -157,7 +162,7 @@ end
 	Setup network event listeners (called during Init phase)
 ]]
 local function setupNetworkListeners()
-	table.insert(_connections, Network.ProjectileSpawned.On(function(data)
+	_trove:Add(Network.ProjectileSpawned.On(function(data)
 		local entityId = data.EntityId
 		local lane = data.Lane
 		local startX = data.StartX
@@ -169,7 +174,7 @@ local function setupNetworkListeners()
 	end))
 	
 	-- Clean up on EntityDied (for any entity)
-	table.insert(_connections, Network.EntityDied.On(function(data)
+	_trove:Add(Network.EntityDied.On(function(data)
 		-- Check if this was a projectile we're tracking
 		if _projectileVisuals[data.EntityId] then
 			local visual = _projectileVisuals[data.EntityId]
@@ -230,10 +235,7 @@ end
 ]]
 local function Dispose()
 	-- Disconnect all events
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	
 	-- Destroy all projectile visuals
 	for entityId in _projectileVisuals do

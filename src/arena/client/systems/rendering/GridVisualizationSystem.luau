@@ -21,6 +21,10 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "GridVisualizationSystem: Shared folder not found - ensure init.client.luau loads first")
 
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(Packages, "GridVisualizationSystem: Packages folder not found")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
@@ -34,7 +38,7 @@ local GRID_LINE_HEIGHT = 0.05 -- Slightly above ground
 
 -- State
 local _gridFolder: Folder? = nil
-local _connections: {any} = {}
+local _trove = Trove.new()
 
 local function createLine(from: Vector3, to: Vector3, parent: Instance): Part
 	local distance = (to - from).Magnitude
@@ -131,7 +135,7 @@ end
 --------------------------------------------------------------------------------
 local function Init(_world: any)
 	-- Listen for MapConfigSync from server (event-driven, not polling!)
-	table.insert(_connections, Network.MapConfigSync.On(function(data)
+	_trove:Add(Network.MapConfigSync.On(function(data)
 		Logger.Info("GridVisualization", `MapConfigSync received, creating grid`)
 		-- MapConfig.ApplyFromServer is called by init.client.luau
 		-- We just need to wait a frame for it to be applied
@@ -167,15 +171,7 @@ local function Dispose(_player: Player?)
 	end
 	
 	-- Disconnect all listeners
-	for _, conn in _connections do
-		if typeof(conn) == "function" then
-			-- Zap returns disconnect function
-			conn()
-		elseif typeof(conn) == "RBXScriptConnection" then
-			conn:Disconnect()
-		end
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	
 	-- Full cleanup
 	destroyGrid()

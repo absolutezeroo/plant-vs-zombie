@@ -23,6 +23,7 @@ local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -42,8 +43,8 @@ local ZombieTypeComponent = Components.ZombieTypeComponent
 local SunComponent = Components.SunComponent
 local HealthComponent = Components.HealthComponent
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 -- Track players pending sync
 local _pendingSync: {[Player]: boolean} = {}
@@ -117,8 +118,8 @@ local function onPlayerRemoving(player: Player)
 end
 
 local function setupListeners()
-	table.insert(_connections, Players.PlayerAdded:Connect(onPlayerAdded))
-	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+	_trove:Connect(Players.PlayerAdded, onPlayerAdded)
+	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
 end
 
 -- System runs each frame to process pending syncs
@@ -146,10 +147,7 @@ local function Init(_world)
 end
 
 local function Dispose()
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	table.clear(_pendingSync)
 	Logger.Debug("FullStateSyncSystem", "Disposed")
 end

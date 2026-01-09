@@ -21,6 +21,11 @@ local TweenService = game:GetService("TweenService")
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "ZombieRenderSystem: Shared folder not found")
+
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(Packages, "ZombieRenderSystem: Packages folder not found")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
@@ -84,8 +89,8 @@ type ZombieVisual = {
 }
 local _zombieVisuals: {[number]: ZombieVisual} = {}
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 -- Visual config
 local ZOMBIE_SIZE = Vector3.new(3, 5, 3)
@@ -159,7 +164,7 @@ end
 	Setup network event listeners (called during Init phase)
 ]]
 local function setupNetworkListeners()
-	table.insert(_connections, Network.ZombieSpawned.On(function(data)
+	_trove:Add(Network.ZombieSpawned.On(function(data)
 		local entityId = data.EntityId
 		local zombieType = tostring(data.ZombieType) -- Convert enum to string
 		local lane = data.Lane
@@ -174,7 +179,7 @@ local function setupNetworkListeners()
 		end
 	end))
 	
-	table.insert(_connections, Network.ZombiePositionBatch.On(function(data)
+	_trove:Add(Network.ZombiePositionBatch.On(function(data)
 		local entityIds = data.EntityIds
 		local positionsX = data.PositionsX
 		
@@ -186,7 +191,7 @@ local function setupNetworkListeners()
 		end
 	end))
 	
-	table.insert(_connections, Network.EntityDied.On(function(data)
+	_trove:Add(Network.EntityDied.On(function(data)
 		local entityId = data.EntityId
 		local visual = _zombieVisuals[entityId]
 		
@@ -225,7 +230,7 @@ local function setupNetworkListeners()
 	end))
 	
 	-- Show floating damage numbers
-	table.insert(_connections, Network.EntityDamaged.On(function(data)
+	_trove:Add(Network.EntityDamaged.On(function(data)
 		local visual = _zombieVisuals[data.EntityId]
 		if visual then
 			-- Flash red
@@ -295,10 +300,7 @@ end
 ]]
 local function Dispose()
 	-- Disconnect all events
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	
 	-- Destroy all zombie visuals
 	for entityId in _zombieVisuals do

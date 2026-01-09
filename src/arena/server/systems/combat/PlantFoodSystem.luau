@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 local Sift = require(Packages:WaitForChild("Sift"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -61,8 +62,8 @@ local _playerCharges: {[number]: number} = {}  -- UserId -> charge count
 -- Track glowing zombies spawned this wave (for guaranteed spawns)
 local _glowingSpawnedThisWave = 0
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 -- Module API for external access
 local PlantFoodSystem = {}
@@ -350,8 +351,8 @@ local function onPlayerRemoving(player: Player)
 end
 
 local function setupListeners()
-	table.insert(_connections, Players.PlayerAdded:Connect(onPlayerAdded))
-	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+	_trove:Connect(Players.PlayerAdded, onPlayerAdded)
+	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
 end
 
 local function Init(_world)
@@ -360,10 +361,7 @@ local function Init(_world)
 end
 
 local function Dispose()
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Clean()
 	table.clear(_playerCharges)
 	table.clear(_pendingRequests)
 	_glowingSpawnedThisWave = 0
