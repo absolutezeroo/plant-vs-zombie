@@ -24,7 +24,11 @@ For every implementation, refer to these specific API docs:
 
 5.  **Async Logic: Promise**
     * **Doc:** https://eryn.io/roblox-lua-promise/api/Promise
-    * **Rule:** Use Promises for all async operations (Data loading, Teleports). Avoid generic `pcall` loops; use `Promise.retry` if necessary.
+    * **Rule:** Use Promises for ALL async operations (Data loading, Teleports, HTTP). 
+    * **Pattern:** `Promise.new() :andThen() :catch()` for chaining.
+    * **Retry:** Use `Promise.retry(fn, maxAttempts, delay)` instead of pcall loops.
+    * **Parallel:** Use `Promise.all({promise1, promise2})` for concurrent operations.
+    * **NEVER** use `wait()` or `task.wait()` in ECS systems.
 
 6.  **Networking: Zap**
     * **Doc:** https://zap.redblox.dev/usage/generated-api.html
@@ -32,11 +36,15 @@ For every implementation, refer to these specific API docs:
 
 7.  **Cleanup: Trove**
     * **Doc:** https://sleitnick.github.io/RbxUtil/api/Trove/
-    * **Rule:** Use Trove inside generic Classes or Controllers to clean up connections/instances on destroy.
+    * **Rule:** Use Trove for ALL `:Connect()` calls in Services/Controllers.
+    * **Pattern:** `local _trove = Trove.new()` then `_trove:Connect(event, callback)`.
+    * **Cleanup:** Call `_trove:Destroy()` in `Dispose()` or `BindToClose`.
+    * **Exceptions:** One-shot connections (`tween.Completed`, `sound.Ended`), generated Zap code, ProfileStore API.
 
 8.  **Events: Signal**
     * **Doc:** https://sleitnick.github.io/RbxUtil/api/Signal/
-    * **Rule:** Use Signal for communication between UI Controllers and non-ECS Managers.
+    * **Rule:** Use Signal instead of BindableEvent for internal communication.
+    * **Cleanup:** Always wrap Signal connections with `_trove:Connect()`.
 
 ## 🏗️ Architecture Context
 - **Src Structure:** `src/shared` (Common), `src/lobby` (Place 1), `src/arena` (Place 2).

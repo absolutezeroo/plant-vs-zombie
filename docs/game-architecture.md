@@ -19,7 +19,7 @@ brief: '_bmad-output/planning-artifacts/game-brief-plant-vs-zombie-2026-01-05.md
 
 ## Executive Summary
 
-**Roblox PvZ: Ultimate Warfare (ECS)** architecture is designed for Roblox targeting PC, Mobile-First, and Console platforms. The architecture delivers 100+ entities at 60 FPS through a pure Entity Component System powered by Matter 0.8.0+, with Zap 0.5.0+ networking, Fusion 0.2.0+ reactive UI, and ProfileStore 1.0.0+ persistence.
+**Roblox PvZ: Ultimate Warfare (ECS)** architecture is designed for Roblox targeting PC, Mobile-First, and Console platforms. The architecture delivers 100+ entities at 60 FPS through a pure Entity Component System powered by Matter 0.8.0+, with Zap 0.5.0+ networking, Fusion 0.3.0+ reactive UI, ProfileStore 1.0.0+ persistence, Promise 4.0.0+ async handling, Trove 1.8.0+ cleanup management, and Sift 0.0.11+ immutable table utilities.
 
 **Key Architectural Decisions:**
 
@@ -201,11 +201,7 @@ MEMORY_LIMIT = 600     -- MB, emergency protocols at thresholds
   - Repository: [Elttob/Fusion](https://github.com/Elttob/Fusion)
   - Use Case: All menus, HUD elements, reactive card selection
   
-- **ProfileStore** - Session-locked DataStore wrapper
-  - Repository: [MadStudioRoblox/ProfileStore](https://github.com/MadStudioRoblox/ProfileStore)
-  - Use Case: Player profiles (prevents duplication exploits, safe for trading V2)
-
-**Development Toolchain:**
+- **ProfileStore** - Session-locked DataStore wrapper\n  - Repository: [MadStudioRoblox/ProfileStore](https://github.com/MadStudioRoblox/ProfileStore)\n  - Use Case: Player profiles (prevents duplication exploits, safe for trading V2)\n\n- **Promise** - Async/await for Luau\n  - Repository: [evaera/roblox-lua-promise](https://github.com/evaera/roblox-lua-promise)\n  - Use Case: Data loading, teleports, HTTP requests, retry logic\n\n- **Trove** - Connection/instance cleanup manager\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: All :Connect() calls in Services/Controllers (prevents memory leaks)\n\n- **Sift** - Immutable table utilities\n  - Repository: [csqrl/sift](https://github.com/csqrl/sift)\n  - Use Case: Component updates in Matter (immutability required)\n\n- **Signal** - Custom event emitter\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: UI Controller ↔ Manager communication (replaces BindableEvent)\n\n**Development Toolchain:**
 - **Rojo** - Filesystem-to-Roblox sync (enables VS Code workflow)
 - **Wally** - Package manager (Rust-like dependency management)
 - **GitHub Actions** - CI/CD pipeline (StyLua, Luau type checking, Rojo build validation)

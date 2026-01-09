@@ -16,9 +16,13 @@ A mobile-first tower defense game built on Roblox using Matter ECS architecture.
 | Tool | Version | Purpose |
 |------|---------|---------|
 | **Matter** | 0.8.4 | ECS framework |
-| **Fusion** | 0.3.0 | Reactive UI |
+| **Fusion** | 0.3.0 | Reactive UI (Value, Computed, Scope) |
 | **Zap** | 0.6.28 | Type-safe networking |
 | **ProfileStore** | 1.0.9 | Data persistence |
+| **Promise** | 4.0.0 | Async/await for Luau |
+| **Trove** | 1.8.0 | Connection cleanup |
+| **Sift** | 0.0.11 | Immutable table utilities |
+| **Signal** | 2.0.3 | Custom event emitter |
 | **Rojo** | 7.6.1 | File sync |
 | **Wally** | 0.3.2 | Package manager |
 

@@ -21,8 +21,12 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 **Core Framework Stack:**
 - **Matter** v0.8.0+ — ECS framework (archetype-based component storage)
 - **Zap** v0.5.0+ — Type-safe networking with IDL schema
-- **Fusion** v0.2.0+ — Reactive UI framework (VDOM-like)
+- **Fusion** v0.3.0+ — Reactive UI framework (Value, Computed, Scope pattern)
 - **ProfileStore** v1.0.0+ — Session-locked DataStore wrapper
+- **Promise** v4.0.0+ — Async/await for Luau (data loading, teleports)
+- **Trove** v1.8.0+ — Connection/instance cleanup manager
+- **Sift** v0.0.11+ — Immutable table utilities (required by Matter)
+- **Signal** v2.0.3+ — Custom event emitter (UI/Manager communication)
 
 **Development Toolchain:**
 - **Rojo** v7.4.0+ — Filesystem-to-Studio sync
@@ -147,7 +151,151 @@ RECONCILE_BUFFER = 0.1      -- Seconds of input buffer for rollback
 
 ---
 
-## Performance & Optimization Rules
+## Async & Cleanup Rules (Promise + Trove)
+
+### Promise Usage Rules (MANDATORY for Async)
+
+**Doc:** https://eryn.io/roblox-lua-promise/api/Promise
+
+- Use `Promise` for ALL async operations: data loading, teleports, HTTP requests
+- NEVER use raw `pcall` loops — use `Promise.retry(callback, maxAttempts, delay)` instead
+- NEVER use `wait()` or `task.wait()` in ECS systems — systems must be synchronous
+- Use `Promise:andThen()` for chaining, `Promise:catch()` for error handling
+- Use `Promise.all({...})` for parallel async operations
+
+```lua
+-- ✅ CORRECT: Promise for data loading
+local function loadPlayerData(player: Player)
+    return Promise.new(function(resolve, reject)
+        local profile = PlayerStore:StartSessionAsync(`Player_{player.UserId}`)
+        if profile then
+            resolve(profile)
+        else
+            reject("Failed to load profile")
+        end
+    end)
+end
+
+loadPlayerData(player)
+    :andThen(function(profile)
+        -- Profile loaded successfully
+    end)
+    :catch(function(err)
+        Logger.Error("PlayerData", `Failed: {err}`)
+    end)
+
+-- ✅ CORRECT: Promise.retry for network operations
+Promise.retry(function()
+    return TeleportService:TeleportAsync(placeId, {player})
+end, 3, 2) -- 3 attempts, 2 second delay
+
+-- ❌ WRONG: Raw pcall loop
+for i = 1, 3 do
+    local success = pcall(function()
+        TeleportService:TeleportAsync(placeId, {player})
+    end)
+    if success then break end
+    task.wait(2)
+end
+```
+
+### Trove Usage Rules (MANDATORY for Connections)
+
+**Doc:** https://sleitnick.github.io/RbxUtil/api/Trove/
+
+- Use `Trove` for ALL `:Connect()` calls in Services, Controllers, and Managers
+- NEVER use raw `:Connect()` without Trove (causes memory leaks)
+- One `_trove` per module/class, call `_trove:Destroy()` in cleanup
+- Use `_trove:Connect(signal, callback)` instead of `signal:Connect(callback)`
+- Use `_trove:Add(instance)` for instances that need cleanup
+
+```lua
+-- ✅ CORRECT: Trove pattern in Services
+local Trove = require(Packages:WaitForChild("Trove"))
+
+local _trove = Trove.new()
+
+function MyService.Initialize()
+    _trove:Connect(Players.PlayerAdded, onPlayerAdded)
+    _trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
+    _trove:Connect(RunService.Heartbeat, onHeartbeat)
+end
+
+function MyService.Dispose()
+    _trove:Destroy()
+end
+
+-- In BindToClose or cleanup
+game:BindToClose(function()
+    _trove:Destroy()
+    -- Other cleanup...
+end)
+
+-- ❌ WRONG: Raw :Connect without cleanup
+Players.PlayerAdded:Connect(onPlayerAdded) -- Memory leak!
+```
+
+### Exceptions (No Trove Required)
+
+- **One-shot connections:** `tween.Completed:Connect()`, `sound.Ended:Connect()` (auto-disconnect)
+- **Generated code:** `src/shared/network/generated/*.luau` (Zap manages these)
+- **ProfileStore API:** `profile.OnSessionEnd:Connect()` (library-managed)
+- **Trove:Add pattern:** When storing connection in variable first, use `_trove:Add(conn)`
+
+### Sift for Immutability (Matter Requirement)
+
+**Doc:** https://cxmeel.github.io/sift/api/Sift
+
+- Use Sift for ALL table manipulations in ECS contexts
+- Matter requires immutable component updates — NEVER mutate tables directly
+- Use `Sift.Array.push()` instead of `table.insert()`
+- Use `Sift.Array.removeIndex()` instead of `table.remove()`
+- Use `Sift.Dictionary.merge()` for component updates
+
+```lua
+-- ✅ CORRECT: Immutable array operations
+local Sift = require(Packages.Sift)
+
+local items = {"a", "b", "c"}
+local newItems = Sift.Array.push(items, "d")  -- ["a", "b", "c", "d"]
+local filtered = Sift.Array.filter(items, function(v) return v ~= "b" end)
+
+-- ✅ CORRECT: Immutable component update in Matter
+world:insert(entityId, HealthComponent(Sift.Dictionary.merge(
+    world:get(entityId, HealthComponent),
+    { Current = newHealth }
+)))
+
+-- ❌ WRONG: Direct mutation
+local data = world:get(entityId, HealthComponent)
+data.Current = newHealth  -- BREAKS MATTER CHANGE DETECTION!
+```
+
+### Signal for Custom Events
+
+**Doc:** https://sleitnick.github.io/RbxUtil/api/Signal/
+
+- Use `Signal` instead of `BindableEvent` for internal communication
+- Use Signal for UI Controller ↔ Manager communication (non-ECS)
+- Always clean up Signal connections with Trove
+
+```lua
+-- ✅ CORRECT: Signal pattern
+local Signal = require(Packages.Signal)
+
+local MyService = {}
+MyService.OnDataChanged = Signal.new()
+
+function MyService.UpdateData(player, newData)
+    -- ... update logic
+    MyService.OnDataChanged:Fire(player, newData)
+end
+
+-- Consumer with Trove cleanup
+_trove:Connect(MyService.OnDataChanged, function(player, data)
+    -- Handle event
+end)
+```
 
 ### Frame Budget Rules (HARD CONSTRAINTS)
 
