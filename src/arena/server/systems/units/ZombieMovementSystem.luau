@@ -118,8 +118,8 @@ local function ZombieMovementSystem(world)
 			newX = basePos.X
 		end
 		
-		-- Update position (immutable via Sift)
-		world:insert(id, Sift.Dictionary.merge(pos, {
+		-- Update position using component constructor
+		world:insert(id, PositionComponent({
 			X = newX,
 			Y = newY,
 			Z = newZ,

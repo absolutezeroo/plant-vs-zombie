@@ -442,6 +442,7 @@ local function ProjectileSystem(world)
 		-- Check max range
 		local distanceTraveled = math.sqrt((newX - proj.SpawnX)^2 + (newZ - pos.Z)^2)
 		local maxRange = proj.MaxRange or ProjectileDefaults.MAX_RANGE
+		
 		if distanceTraveled > maxRange then
 			world:despawn(projId)
 			continue
@@ -451,14 +452,16 @@ local function ProjectileSystem(world)
 		local config = MapConfig.GetConfig()
 		local minX = config.GridCornerA.X - 10
 		local maxX = config.GridCornerB.X + 10
+
 		if newX < minX or newX > maxX then
 			world:despawn(projId)
 			continue
 		end
 		
-		-- Update position (immutable via Sift)
-		world:insert(projId, Sift.Dictionary.merge(pos, {
+		-- Update position using component constructor
+		world:insert(projId, PositionComponent({
 			X = newX,
+			Y = pos.Y,
 			Z = newZ,
 		}))
 	end

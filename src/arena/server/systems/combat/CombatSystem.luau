@@ -59,7 +59,7 @@ local ProjectileHitEvent = Components.ProjectileHitEvent
 -- Combat config
 local CombatConfig = {
 	PROJECTILE_HIT_RADIUS = 2,   -- Studs
-	ZOMBIE_BITE_RANGE = 3,       -- How close zombie must be to start eating
+	ZOMBIE_BITE_RANGE = 4,       -- How close zombie must be to start eating
 	ZOMBIE_BITE_INTERVAL = 1.0,  -- Seconds between bites
 }
 
@@ -93,6 +93,7 @@ end
 
 local function logFrameStats()
 	local hasActivity = _frameStats.projectileHits > 0 or _frameStats.zombieBites > 0 or _frameStats.stunsApplied > 0
+	
 	if hasActivity then
 		Logger.Debug("Combat", `Frame: {_frameStats.projectileHits} hits, {_frameStats.splashHits} splash, {_frameStats.stunsApplied} stuns, {_frameStats.slowsApplied} slows, {_frameStats.zombieBites} bites`)
 	end
@@ -101,12 +102,14 @@ end
 -- Apply damage to an entity (returns true if killed)
 local function applyDamage(world: MatterWorld, entityId: number, damage: number, piercesShields: boolean?): boolean
 	local health = world:get(entityId, HealthComponent)
+	
 	if not health then
 		return false
 	end
 	
 	-- Check if zombie has shield and projectile doesn't pierce
 	local zombie = world:get(entityId, ZombieTypeComponent)
+
 	if zombie and not piercesShields then
 		local zombieStats = ZombieData[zombie.ZombieType]
 		if zombieStats and zombieStats.HasShield and zombieStats.ShieldHealth then
@@ -118,9 +121,10 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 	
 	local newHealth = math.max(0, health.Current - damage)
 	
-	-- Immutable component update via Sift
-	world:insert(entityId, Sift.Dictionary.merge(health, {
+	-- Update health using component constructor
+	world:insert(entityId, HealthComponent({
 		Current = newHealth,
+		Max = health.Max,
 	}))
 	
 	-- Broadcast damage event
@@ -381,9 +385,15 @@ local function CombatSystem(world: MatterWorld)
 		else
 			-- No target - check if there's a plant in our path
 			local column = getColumnFromX(zombiePos.X)
+			local zombieDir = MapConfig.GetZombieDirection()
 			
-			-- Check current and next column
-			for checkCol = column, math.max(1, column - 1), -1 do
+			-- Check current column and columns ahead of zombie (in its movement direction)
+			-- If zombie moves -X, check column and column-1; if +X, check column and column+1
+			local colStep = if zombieDir.X < 0 then -1 else 1
+			local startCol = column
+			local endCol = math.clamp(column + colStep * 2, 1, GridConfig.GRID_COLUMNS)
+			
+			for checkCol = startCol, endCol, colStep do
 				if checkCol < 1 or checkCol > GridConfig.GRID_COLUMNS then
 					continue
 				end
@@ -392,10 +402,11 @@ local function CombatSystem(world: MatterWorld)
 				if plantId then
 					local plantPos = world:get(plantId, PositionComponent)
 					if plantPos then
-						local distance = zombiePos.X - plantPos.X
+						-- Use absolute distance for collision detection
+						local absDistance = math.abs(zombiePos.X - plantPos.X)
 						
-						-- Close enough to start eating?
-						if distance <= CombatConfig.ZOMBIE_BITE_RANGE and distance >= 0 then
+						-- Check if zombie is within bite range of plant
+						if absDistance <= CombatConfig.ZOMBIE_BITE_RANGE then
 							-- Start eating!
 							world:insert(zombieId, TargetComponent({
 								TargetEntity = plantId,

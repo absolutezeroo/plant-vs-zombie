@@ -1,16 +1,16 @@
 --!strict
 --[[
-	CardDeck.luau - Plant selection card deck UI component
+	CardDeck.luau - Arena Plant Selection Deck
 	
-	Modern card deck UI matching Lobby style:
-	- Shows plant cards with mutation badges
-	- Displays cost, cooldown overlay
-	- Highlights selected card
-	- Includes shovel button
+	Uses EXACT same style as LobbyHUD:
+	- CasualTheme.DeckBar for container (identical to Lobby)
+	- CasualTheme.UnitCard for each plant card (identical to Lobby)
+	- Added: cooldown overlay, shovel button
+	
+	Design: Same deck bar as Lobby for visual consistency
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
@@ -19,7 +19,7 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
-local ModernTheme = require(Shared.ui.ModernTheme)
+local CasualTheme = require(Shared.ui.CasualTheme)
 
 local Client = script.Parent.Parent
 local PlayerDataClient = require(Client.modules.PlayerDataClient)
@@ -30,409 +30,355 @@ local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
 local Computed = Fusion.Computed
 local Value = Fusion.Value
-local ForValues = Fusion.ForValues
+local Spring = Fusion.Spring
 
--- Use shared theme colors
-local ThemeColors = ModernTheme.Colors
-local Colors = {
-	CardBg = ThemeColors.PanelLight,
-	CardSelected = ThemeColors.SuccessLight,
-	CardDisabled = ThemeColors.Disabled,
-	SlotEmpty = ThemeColors.SlotEmpty,
-	SlotFilled = ThemeColors.SlotFilled,
-	Green = ThemeColors.SuccessLight,
-	Red = ThemeColors.Error,
-	Gold = ThemeColors.Coins,
-	TextWhite = ThemeColors.TextWhite,
-	TextMuted = ThemeColors.TextMuted,
-	Border = ThemeColors.Border,
-}
-
--- Use shared emoji functions
-local getPlantEmoji = ModernTheme.GetPlantEmoji
-local getMutationEmoji = ModernTheme.GetMutationEmoji
-
--- Card configuration
-local CARD_SIZE = UDim2.fromOffset(75, 95)
-local CARD_SPACING = 8
+-- Theme (same as Lobby)
+local Colors = CasualTheme.Colors
+local Sizing = CasualTheme.Sizing
+local Fonts = CasualTheme.Fonts
+local DeckBar = CasualTheme.DeckBar
+local UnitCard = CasualTheme.UnitCard
 
 export type CardDeckProps = {
-	Scope: any, -- Fusion.Scope
-	SelectedPlant: any, -- Fusion.Value<string?>
-	SunCount: any, -- Fusion.Value<number>
-	Cooldowns: any, -- Fusion.Value<{[string]: number}>
-	ShovelMode: any, -- Fusion.Value<boolean>
-	PlayerMutations: any?, -- Fusion.Value<{[string]: {string}}>?
+	Scope: any,
+	SelectedPlant: any, -- Value<string?>
+	SunCount: any, -- Value<number>
+	Cooldowns: any, -- Value<{[string]: number}>
+	ShovelMode: any, -- Value<boolean>
+	PlayerMutations: any?, -- Value<{[string]: {string}}>?
 	OnSelect: (plantType: string) -> (),
 	OnShovelToggle: () -> (),
 }
 
-local function PlantCard(props: {
-	Scope: any,
-	PlantType: string,
-	SelectedPlant: any,
-	SunCount: any,
-	Cooldowns: any,
-	Mutations: {string}?,
-	OnSelect: (plantType: string) -> (),
-	LayoutOrder: number?,
+--[[
+	ShovelButton - Styled like UnitCard with juicy animation
+]]
+local function ShovelButton(scope: any, props: {
+	ShovelMode: any,
+	OnToggle: () -> (),
 })
-	local scope = props.Scope
-	local plantType = props.PlantType
-	local stats = PlantData[plantType]
-	
-	if not stats then
-		Logger.Warn("CardDeck", `Unknown plant type: {plantType}`)
-		return nil
-	end
-	
-	-- Is this card selected?
-	local isSelected = Computed(scope, function(use)
-		return use(props.SelectedPlant) == plantType
-	end)
-	
-	-- Can player afford this?
-	local canAfford = Computed(scope, function(use)
-		return use(props.SunCount) >= stats.Cost
-	end)
-	
-	-- Cooldown remaining
-	local cooldownRemaining = Value(scope, 0)
-	local isDestroyed = false
-	
-	-- Update cooldown - runs until component is destroyed
-	task.spawn(function()
-		while not isDestroyed do
-			local cooldowns = Fusion.peek(props.Cooldowns)
-			local endTime = cooldowns[plantType]
-			if endTime then
-				cooldownRemaining:set(math.max(0, endTime - tick()))
-			else
-				cooldownRemaining:set(0)
-			end
-			task.wait(0.1)
-		end
-	end)
-	
-	-- Register cleanup when scope is cleaned up
-	table.insert(scope, function()
-		isDestroyed = true
-	end)
-	
-	local isOnCooldown = Computed(scope, function(use)
-		return use(cooldownRemaining) > 0
-	end)
-	
-	-- Modern card colors
-	local backgroundColor = Computed(scope, function(use)
-		if use(isOnCooldown) then
-			return Colors.CardDisabled
-		elseif not use(canAfford) then
-			return Color3.fromRGB(80, 50, 50) -- Dark red when can't afford
-		elseif use(isSelected) then
-			return Colors.CardSelected
-		else
-			return Colors.SlotFilled
-		end
-	end)
-	
-	local borderColor = Computed(scope, function(use)
-		local hasMutation = props.Mutations and #props.Mutations > 0
-		if hasMutation then
-			return Color3.fromRGB(255, 150, 50) -- Orange for mutations
-		elseif use(isSelected) then
-			return Colors.Gold
-		else
-			return Colors.Green
-		end
-	end)
-	
-	local borderThickness = if props.Mutations and #props.Mutations > 0 then 3 else 2
-	
-	-- Hover state
 	local isHovered = Value(scope, false)
+	local isPressed = Value(scope, false)
 	
-	local button = New(scope, "TextButton")({
-		Name = `Card_{plantType}`,
-		Size = CARD_SIZE,
-		BackgroundColor3 = backgroundColor,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		LayoutOrder = props.LayoutOrder or 0,
+	-- Juicy bounce animation (same as UnitCard)
+	local targetScale = Computed(scope, function(use)
+		local active = use(props.ShovelMode)
+		local pressed = use(isPressed)
+		local hovered = use(isHovered)
 		
-		[OnEvent("Activated")] = function()
-			props.OnSelect(plantType)
-		end,
-		
-		[OnEvent("MouseEnter")] = function()
-			isHovered:set(true)
-		end,
-		
-		[OnEvent("MouseLeave")] = function()
-			isHovered:set(false)
-		end,
+		if pressed then return 0.92 end
+		if active then return 1.08 end
+		if hovered then return 1.04 end
+		return 1
+	end)
+	
+	local springScale = Spring(scope, targetScale, 35, 0.7)
+	
+	return New(scope, "Frame") {
+		Name = "ShovelButton",
+		Size = Sizing.UnitCardSize, -- Same size as UnitCard
+		BackgroundTransparency = 1,
+		LayoutOrder = 99999,
 		
 		[Children] = {
-			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
-			New(scope, "UIStroke")({
-				Color = borderColor,
-				Thickness = borderThickness,
-			}),
-			
-			-- Mutation badge (top-right)
-			(props.Mutations and #props.Mutations > 0) and New(scope, "Frame")({
-				Size = UDim2.fromOffset(24, 24),
-				Position = UDim2.new(1, -4, 0, 4),
-				AnchorPoint = Vector2.new(1, 0),
-				BackgroundColor3 = Color3.fromRGB(255, 100, 50),
-				ZIndex = 6,
-				[Children] = {
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-					New(scope, "TextLabel")({
-						Size = UDim2.new(1, 0, 1, 0),
-						BackgroundTransparency = 1,
-						Text = getMutationEmoji(props.Mutations[1]),
-						TextSize = 14,
-					}),
-				},
-			}) or nil,
-			
-			-- Plant emoji
-			New(scope, "TextLabel")({
-				Size = UDim2.new(1, 0, 0, 40),
-				Position = UDim2.fromOffset(0, 10),
+			-- Scale container for bounce
+			New(scope, "Frame") {
+				Size = UDim2.new(1, 0, 1, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 0.5, 0),
 				BackgroundTransparency = 1,
-				Text = getPlantEmoji(plantType),
-				TextSize = 32,
-			}),
-			
-			-- Cost
-			New(scope, "Frame")({
-				Size = UDim2.fromOffset(45, 22),
-				Position = UDim2.new(0.5, 0, 0, 50),
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundColor3 = Colors.CardBg,
+				
 				[Children] = {
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 8) }),
-					New(scope, "UIStroke")({
-						Color = Colors.Border,
-						Thickness = 1,
-					}),
-					New(scope, "TextLabel")({
-						Size = UDim2.fromOffset(16, 22),
-						Position = UDim2.fromOffset(2, 0),
-						BackgroundTransparency = 1,
-						Text = "☀️",
-						TextSize = 12,
-					}),
-					New(scope, "TextLabel")({
-						Size = UDim2.fromOffset(25, 22),
-						Position = UDim2.fromOffset(18, 0),
-						BackgroundTransparency = 1,
-						Text = tostring(stats.Cost),
-						TextColor3 = Computed(scope, function(use)
-							return if use(canAfford) then Colors.Gold else Colors.Red
+					New(scope, "UIScale") { Scale = springScale },
+					
+					-- Main body (brown squircle)
+					New(scope, "Frame") {
+						Size = UDim2.new(1, 0, 1, 0),
+						BackgroundColor3 = Computed(scope, function(use)
+							return if use(props.ShovelMode) 
+								then Colors.CardRed
+								else Color3.fromRGB(139, 90, 43) -- Brown
 						end),
-						TextSize = 13,
-						Font = Enum.Font.GothamBold,
-					}),
-				},
-			}),
-			
-			-- Plant name (small, bottom)
-			New(scope, "TextLabel")({
-				Size = UDim2.new(1, -8, 0, 18),
-				Position = UDim2.new(0, 4, 1, -20),
-				BackgroundTransparency = 1,
-				Text = if #plantType > 9 then plantType:sub(1, 8) .. "." else plantType,
-				TextColor3 = Colors.TextWhite,
-				TextSize = 10,
-				Font = Enum.Font.GothamBold,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-			}),
-			
-			-- Cooldown overlay
-			Computed(scope, function(use)
-				if use(isOnCooldown) then
-					local cd = use(cooldownRemaining)
-					return New(scope, "Frame")({
-						Size = UDim2.new(1, 0, 1, 0),
-						BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-						BackgroundTransparency = 0.6,
-						ZIndex = 3,
+						
 						[Children] = {
-							New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
-							New(scope, "TextLabel")({
+							New(scope, "UICorner") { CornerRadius = Sizing.SquircleMedium },
+							
+							-- Thick stroke (selected = yellow)
+							New(scope, "UIStroke") {
+								Color = Computed(scope, function(use)
+									return if use(props.ShovelMode)
+										then Colors.StrokeSelected
+										else Colors.StrokeDark
+								end),
+								Thickness = Computed(scope, function(use)
+									return if use(props.ShovelMode) 
+										then Sizing.StrokeHeavy 
+										else Sizing.StrokeThick
+								end),
+							},
+							
+							-- Glossy gradient (same as UnitCard)
+							New(scope, "UIGradient") {
+								Color = ColorSequence.new({
+									ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+									ColorSequenceKeypoint.new(0.35, Color3.fromRGB(245, 245, 245)),
+									ColorSequenceKeypoint.new(0.6, Color3.fromRGB(220, 220, 220)),
+									ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 180, 180)),
+								}),
+								Rotation = 90,
+							},
+							
+							-- Shovel icon
+							New(scope, "TextLabel") {
+								Size = UDim2.new(1, 0, 0, 50),
+								Position = UDim2.new(0, 0, 0, 8),
+								BackgroundTransparency = 1,
+								Text = "🪓",
+								TextSize = 36,
+								TextColor3 = Colors.TextWhite,
+								
+								[Children] = {
+									New(scope, "UIStroke") {
+										Color = Colors.TextShadow,
+										Thickness = 1,
+										Transparency = 0.5,
+									},
+								},
+							},
+							
+							-- Cost badge position (same as UnitCard)
+							New(scope, "Frame") {
+								Name = "LabelBadge",
+								Size = Sizing.CostBadgeSize,
+								Position = UDim2.new(0, -4, 1, -6),
+								AnchorPoint = Vector2.new(0, 1),
+								BackgroundColor3 = Computed(scope, function(use)
+									return if use(props.ShovelMode)
+										then Colors.CardRed
+										else Colors.CostBadge
+								end),
+								ZIndex = 5,
+								
+								[Children] = {
+									New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
+									New(scope, "UIStroke") {
+										Color = Colors.StrokeDark,
+										Thickness = Sizing.StrokeNormal,
+									},
+									New(scope, "TextLabel") {
+										Size = UDim2.new(1, 0, 1, 0),
+										BackgroundTransparency = 1,
+										Text = Computed(scope, function(use)
+											return if use(props.ShovelMode) then "❌" else "DIG"
+										end),
+										TextColor3 = Colors.TextWhite,
+										TextSize = 11,
+										Font = Fonts.Numbers,
+										
+										[Children] = {
+											New(scope, "UIStroke") {
+												Color = Colors.TextShadow,
+												Thickness = 1,
+											},
+										},
+									},
+								},
+							},
+							
+							-- Click detector
+							New(scope, "TextButton") {
 								Size = UDim2.new(1, 0, 1, 0),
 								BackgroundTransparency = 1,
-								Text = string.format("%.1f", cd),
-								TextColor3 = Color3.fromRGB(255, 255, 255),
-								TextSize = 20,
-								Font = Enum.Font.GothamBold,
-							}),
+								Text = "",
+								ZIndex = 10,
+								
+								[OnEvent "Activated"] = props.OnToggle,
+								[OnEvent "MouseEnter"] = function() isHovered:set(true) end,
+								[OnEvent "MouseLeave"] = function() 
+									isHovered:set(false) 
+									isPressed:set(false)
+								end,
+								[OnEvent "MouseButton1Down"] = function() isPressed:set(true) end,
+								[OnEvent "MouseButton1Up"] = function() isPressed:set(false) end,
+							},
 						},
-					})
-				end
-				return nil
-			end),
+					},
+				},
+			},
 		},
-	})
-	
-	return button
+	}
 end
 
+--[[
+	CardDeck - Uses DeckBar and UnitCard from CasualTheme (SAME as Lobby)
+]]
 local function CardDeck(props: CardDeckProps)
 	local scope = props.Scope
 	
-	-- Get player's saved deck
-	local sortedDeckPlants = Computed(scope, function(use)
+	-- Get player's deck sorted by cost
+	local sortedDeck = Computed(scope, function(use)
 		local deck = use(PlayerDataClient.GetDeckValue())
-		local sorted = Sift.Array.sort(deck, function(a, b)
+		return Sift.Array.sort(deck, function(a, b)
 			local statsA = PlantData[a]
 			local statsB = PlantData[b]
 			if not statsA then return false end
 			if not statsB then return true end
 			return statsA.Cost < statsB.Cost
 		end)
-		return sorted
 	end)
 	
-	-- Calculate deck size based on saved deck (+1 for shovel button)
-	local deckSize = Computed(scope, function(use)
-		local deck = use(sortedDeckPlants)
-		local numPlants = #deck + 1 -- +1 for shovel
-		return UDim2.fromOffset(
-			numPlants * (CARD_SIZE.X.Offset + CARD_SPACING) - CARD_SPACING + 20,
-			CARD_SIZE.Y.Offset + 20
-		)
-	end)
+	-- Build cards exactly like LobbyHUD does
+	local cards = {}
 	
-	-- Shovel button style
-	local shovelBgColor = Computed(scope, function(use)
-		return if use(props.ShovelMode) 
-			then Colors.Red -- Active = red
-			else Colors.CardBg
-	end)
-	
-	local shovelBorderColor = Computed(scope, function(use)
-		return if use(props.ShovelMode)
-			then Colors.Gold
-			else Colors.Border
-	end)
-	
-	return New(scope, "Frame")({
-		Name = "CardDeck",
-		Position = UDim2.new(0.5, 0, 1, -15),
-		AnchorPoint = Vector2.new(0.5, 1),
-		Size = deckSize,
-		BackgroundColor3 = Colors.CardBg,
-		BackgroundTransparency = 0.1,
-		BorderSizePixel = 0,
+	for slotIndex = 1, 6 do
+		-- Plant type for this slot (reactive)
+		local plantType = Computed(scope, function(use)
+			local deck = use(sortedDeck)
+			return deck[slotIndex]
+		end)
 		
-		[Children] = {
-			New(scope, "UICorner")({ CornerRadius = UDim.new(0, 16) }),
-			New(scope, "UIStroke")({
-				Color = Colors.Border,
-				Thickness = 2,
-			}),
-			New(scope, "UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, CARD_SPACING),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-			New(scope, "UIPadding")({
-				PaddingLeft = UDim.new(0, 10),
-				PaddingRight = UDim.new(0, 10),
-				PaddingTop = UDim.new(0, 10),
-				PaddingBottom = UDim.new(0, 10),
-			}),
-			
-			-- Reactive plant cards based on saved deck
-			ForValues(scope, sortedDeckPlants, function(use, innerScope, plantType)
-				local stats = PlantData[plantType]
-				local layoutOrder = if stats then stats.Cost else 999
-				
-				-- Get mutations for this plant (reactive)
-				local mutations = nil
-				if props.PlayerMutations then
-					local allMutations = use(props.PlayerMutations)
-					if allMutations then
-						mutations = allMutations[plantType]
-						if mutations and #mutations > 0 then
-							Logger.Info("CardDeck", `{plantType} has {#mutations} mutations: {table.concat(mutations, ", ")}`)
-						end
+		-- Cost for this slot (reactive)
+		local cost = Computed(scope, function(use)
+			local plant = use(plantType)
+			if plant then
+				local stats = PlantData[plant]
+				return stats and stats.Cost or 0
+			end
+			return 0
+		end)
+		
+		-- Is selected? (compare plantType to SelectedPlant)
+		local isSelected = Computed(scope, function(use)
+			local plant = use(plantType)
+			local selected = use(props.SelectedPlant)
+			return plant and selected == plant
+		end)
+		
+		-- Cooldown tracking for this slot
+		local cooldownValue = Value(scope, 0)
+		local slotDestroyed = false
+		
+		task.spawn(function()
+			while not slotDestroyed do
+				local plant = Fusion.peek(plantType)
+				if plant then
+					local cooldowns = Fusion.peek(props.Cooldowns)
+					local endTime = cooldowns[plant]
+					if endTime then
+						cooldownValue:set(math.max(0, endTime - tick()))
+					else
+						cooldownValue:set(0)
 					end
+				else
+					cooldownValue:set(0)
 				end
-				
-				return PlantCard({
-					Scope = innerScope,
-					PlantType = plantType,
-					SelectedPlant = props.SelectedPlant,
-					SunCount = props.SunCount,
-					Cooldowns = props.Cooldowns,
-					Mutations = mutations,
-					OnSelect = props.OnSelect,
-					LayoutOrder = layoutOrder,
-				})
-			end),
+				task.wait(0.1)
+			end
+		end)
+		
+		table.insert(scope, function()
+			slotDestroyed = true
+		end)
+		
+		local isOnCooldown = Computed(scope, function(use)
+			return use(cooldownValue) > 0
+		end)
+		
+		-- Can afford?
+		local canAfford = Computed(scope, function(use)
+			local c = use(cost)
+			local sun = use(props.SunCount)
+			return sun >= c
+		end)
+		
+		-- Disabled = on cooldown OR can't afford
+		local isDisabled = Computed(scope, function(use)
+			return use(isOnCooldown) or not use(canAfford)
+		end)
+		
+		-- Wrap UnitCard in a container that adds cooldown overlay
+		local cardContainer = New(scope, "Frame") {
+			Name = `CardSlot_{slotIndex}`,
+			Size = Sizing.UnitCardSize,
+			BackgroundTransparency = 1,
+			LayoutOrder = slotIndex,
 			
-			-- Shovel Button (at the end)
-			New(scope, "TextButton")({
-				Name = "ShovelButton",
-				Size = CARD_SIZE,
-				BackgroundColor3 = shovelBgColor,
-				BorderSizePixel = 0,
-				AutoButtonColor = false,
-				LayoutOrder = 99999, -- Always last
-				
-				[OnEvent("Activated")] = function()
-					props.OnShovelToggle()
-				end,
-				
-				[Children] = {
-					New(scope, "UICorner")({ CornerRadius = UDim.new(0, 12) }),
-					New(scope, "UIStroke")({
-						Color = shovelBorderColor,
-						Thickness = 2,
-					}),
-					
-					-- Shovel icon (emoji)
-					New(scope, "TextLabel")({
-						Name = "Icon",
-						Position = UDim2.new(0.5, 0, 0.4, 0),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.fromOffset(40, 40),
-						BackgroundTransparency = 1,
-						Text = "🪓",
-						TextScaled = true,
-					}),
-					
-					-- Label
-					New(scope, "TextLabel")({
-						Name = "Label",
-						Position = UDim2.new(0.5, 0, 0.78, 0),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Size = UDim2.new(0.9, 0, 0.2, 0),
-						BackgroundTransparency = 1,
-						Text = Computed(scope, function(use)
-							return if use(props.ShovelMode) then "CANCEL" else "DIG"
-						end),
-						TextColor3 = Colors.TextWhite,
-						TextScaled = true,
-						Font = Enum.Font.GothamBold,
+			[Children] = {
+				-- The UnitCard (EXACT same as Lobby)
+				UnitCard(scope, {
+					PlantType = plantType,
+					Cost = cost,
+					SlotIndex = slotIndex,
+					IsSelected = isSelected,
+					IsDisabled = isDisabled,
+					Hotkey = tostring(slotIndex),
+					OnClick = function()
+						local plant = Fusion.peek(plantType)
+						if not plant then return end
 						
-						[Children] = {
-							New(scope, "UIStroke")({
-								Color = Color3.fromRGB(0, 0, 0),
-								Thickness = 1,
-							}),
-						},
-					}),
-				},
-			}),
-		},
+						-- Don't select if on cooldown
+						if Fusion.peek(isOnCooldown) then
+							Logger.Debug("CardDeck", `{plant} is on cooldown`)
+							return
+						end
+						
+						-- Don't select if can't afford
+						if not Fusion.peek(canAfford) then
+							Logger.Debug("CardDeck", `Cannot afford {plant}`)
+							return
+						end
+						
+						props.OnSelect(plant)
+					end,
+				}),
+				
+				-- Cooldown overlay (Arena-specific, on top)
+				Computed(scope, function(use)
+					local cd = use(cooldownValue)
+					if cd > 0 then
+						return New(scope, "Frame") {
+							Size = UDim2.new(1, 0, 1, 0),
+							BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+							BackgroundTransparency = 0.5,
+							ZIndex = 20,
+							
+							[Children] = {
+								New(scope, "UICorner") { CornerRadius = Sizing.SquircleMedium },
+								New(scope, "TextLabel") {
+									Size = UDim2.new(1, 0, 1, 0),
+									BackgroundTransparency = 1,
+									Text = string.format("%.1f", cd),
+									TextColor3 = Colors.TextWhite,
+									TextSize = 22,
+									Font = Fonts.Numbers,
+									
+									[Children] = {
+										New(scope, "UIStroke") {
+											Color = Colors.StrokeDark,
+											Thickness = 2,
+										},
+									},
+								},
+							},
+						}
+					end
+					return nil
+				end),
+			},
+		}
+		
+		table.insert(cards, cardContainer)
+	end
+	
+	-- Add shovel button at the end
+	table.insert(cards, ShovelButton(scope, {
+		ShovelMode = props.ShovelMode,
+		OnToggle = props.OnShovelToggle,
+	}))
+	
+	-- Use DeckBar from CasualTheme (EXACT same as Lobby)
+	return DeckBar(scope, {
+		Children = cards,
 	})
 end
 

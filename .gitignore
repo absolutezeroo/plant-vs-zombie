@@ -50,6 +50,7 @@ src/shared/network/generated/server.luau
 .DS_Store
 Thumbs.db
 desktop.ini
+gui/*
 
 # ================================
 # Logs & Temp Files

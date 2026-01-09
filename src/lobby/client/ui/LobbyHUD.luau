@@ -1,12 +1,13 @@
 --!strict
 --[[
-    LobbyHUD.luau - Modern Lobby HUD
+    LobbyHUD.luau - Casual Mobile HUD
     
-    Minimal, clean overlay showing:
-    - Player resources (top-left pills)
-    - Current deck preview (bottom bar)
+    Modern Mobile Casual UI with glossy cartoon finish:
+    - Player resources (top-left squircle pills)
+    - Player avatar & level badge (top-left)
+    - Current deck preview (bottom bar with UnitCards)
     
-    Dark modern style matching ShopView/DeckBuilderView.
+    Design: Squircle shapes, vibrant colors, thick strokes, juicy animations
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,31 +17,41 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local ModernTheme = require(Shared.ui.ModernTheme)
+local CasualTheme = require(Shared.ui.CasualTheme)
 
 local New = Fusion.New
 local Children = Fusion.Children
 local Computed = Fusion.Computed
+local Value = Fusion.Value
 
--- Use shared theme colors with local aliases for convenience
-local ThemeColors = ModernTheme.Colors
-local Colors = {
-    PanelBg = ThemeColors.BackgroundLight,
-    PanelBgLight = ThemeColors.PanelLight,
-    SlotEmpty = ThemeColors.SlotEmpty,
-    SlotFilled = ThemeColors.SlotFilled,
-    Gold = ThemeColors.Coins,
-    Cyan = ThemeColors.XP,
-    Purple = ThemeColors.Gems,
-    Green = ThemeColors.SuccessLight,
-    TextWhite = ThemeColors.TextWhite,
-    TextMuted = ThemeColors.TextMuted,
-    Border = ThemeColors.Border,
+-- Use CasualTheme colors
+local Colors = CasualTheme.Colors
+local Sizing = CasualTheme.Sizing
+local Fonts = CasualTheme.Fonts
+
+-- Theme component shortcuts
+local UnitCard = CasualTheme.UnitCard
+local ResourcePill = CasualTheme.ResourcePill
+local LevelBadge = CasualTheme.LevelBadge
+local DeckBar = CasualTheme.DeckBar
+local AvatarFrame = CasualTheme.AvatarFrame
+
+-- Plant cost data (for demo - normally from PlantData)
+local PlantCosts: {[string]: number} = {
+    Peashooter = 100, Sunflower = 50, WallNut = 50,
+    PotatoMine = 25, SnowPea = 175, Repeater = 200,
+    CherryBomb = 150, Chomper = 150, Jalapeno = 125,
+    TallNut = 125, Squash = 50, ThreePeater = 325,
+    TorchWood = 175, Spikeweed = 100, Pumpkin = 125,
+    Starfruit = 125, MagnifyingGrass = 50, CattailPlant = 225,
+    CobCannon = 500, Bonkchoy = 150, Snapdragon = 150,
+    IceBerg = 75, SunShroom = 25, Cactus = 125,
 }
 
--- Use shared emoji functions from ModernTheme
-local getPlantEmoji = ModernTheme.GetPlantEmoji
-local getMutationEmoji = ModernTheme.GetMutationEmoji
+local function getPlantCost(plantType: string?): number
+    if not plantType then return 0 end
+    return PlantCosts[plantType] or 100
+end
 
 export type PlayerData = {
     Coins: number,
@@ -56,160 +67,16 @@ export type PlayerData = {
     Deck: {string},
 }
 
--- Resource pill component
-local function ResourcePill(scope: any, props: {
-    Icon: string,
-    Value: any, -- Computed<string>
-    Color: Color3,
-}): Frame
-    return New(scope, "Frame") {
-        Size = UDim2.fromOffset(110, 38),
-        BackgroundColor3 = Colors.PanelBg,
-        
-        [Children] = {
-            New(scope, "UICorner") { CornerRadius = UDim.new(0, 19) },
-            New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2 },
-            
-            New(scope, "TextLabel") {
-                Size = UDim2.fromOffset(30, 38),
-                Position = UDim2.fromOffset(6, 0),
-                BackgroundTransparency = 1,
-                Text = props.Icon,
-                TextSize = 20,
-            },
-            
-            New(scope, "TextLabel") {
-                Size = UDim2.new(1, -42, 1, 0),
-                Position = UDim2.fromOffset(36, 0),
-                BackgroundTransparency = 1,
-                Text = props.Value,
-                TextColor3 = props.Color,
-                TextSize = 16,
-                Font = Enum.Font.GothamBold,
-                TextXAlignment = Enum.TextXAlignment.Left,
-            },
-        },
-    }
-end
-
--- Deck slot component
-local function DeckSlot(scope: any, props: {
-    Index: number,
-    PlantType: any, -- Computed<string?>
-    Mutations: any, -- Computed<{string}?>
-}): Frame
-    return New(scope, "Frame") {
-        Size = UDim2.fromOffset(80, 78),
-        BackgroundColor3 = Computed(scope, function(use)
-            local plant = use(props.PlantType)
-            return if plant then Colors.SlotFilled else Colors.SlotEmpty
-        end),
-        
-        [Children] = {
-            New(scope, "UICorner") { CornerRadius = UDim.new(0, 12) },
-            New(scope, "UIStroke") { 
-                Color = Computed(scope, function(use)
-                    local plant = use(props.PlantType)
-                    local mutations = use(props.Mutations)
-                    local hasMutation = mutations and #mutations > 0
-                    if hasMutation then return Color3.fromRGB(255, 150, 50) end
-                    return if plant then Colors.Green else Colors.Border
-                end),
-                Thickness = Computed(scope, function(use)
-                    local mutations = use(props.Mutations)
-                    return if mutations and #mutations > 0 then 3 else 2
-                end),
-            },
-            
-            -- Mutation badge
-            Computed(scope, function(use)
-                local mutations = use(props.Mutations)
-                if mutations and #mutations > 0 then
-                    return New(scope, "Frame") {
-                        Size = UDim2.fromOffset(22, 22),
-                        Position = UDim2.new(1, -4, 0, 4),
-                        AnchorPoint = Vector2.new(1, 0),
-                        BackgroundColor3 = Color3.fromRGB(255, 100, 50),
-                        ZIndex = 6,
-                        [Children] = {
-                            New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) },
-                            New(scope, "TextLabel") {
-                                Size = UDim2.new(1, 0, 1, 0),
-                                BackgroundTransparency = 1,
-                                Text = getMutationEmoji(mutations[1]),
-                                TextSize = 12,
-                            },
-                        },
-                    }
-                end
-                return nil
-            end),
-            
-            -- Slot number
-            New(scope, "TextLabel") {
-                Size = UDim2.fromOffset(18, 18),
-                Position = UDim2.fromOffset(4, 4),
-                BackgroundColor3 = Colors.PanelBg,
-                Text = tostring(props.Index),
-                TextColor3 = Colors.TextMuted,
-                TextSize = 10,
-                Font = Enum.Font.GothamBold,
-                [Children] = { New(scope, "UICorner") { CornerRadius = UDim.new(0.5, 0) } },
-            },
-            
-            -- Plant emoji or +
-            New(scope, "TextLabel") {
-                Size = UDim2.new(1, 0, 0, 36),
-                Position = UDim2.fromOffset(0, 20),
-                BackgroundTransparency = 1,
-                Text = Computed(scope, function(use)
-                    local plant = use(props.PlantType)
-                    return if plant then getPlantEmoji(plant) else "+"
-                end),
-                TextSize = Computed(scope, function(use)
-                    local plant = use(props.PlantType)
-                    return if plant then 28 else 32
-                end),
-                TextColor3 = Computed(scope, function(use)
-                    local plant = use(props.PlantType)
-                    return if plant then Colors.TextWhite else Colors.TextMuted
-                end),
-                TextTransparency = Computed(scope, function(use)
-                    local plant = use(props.PlantType)
-                    return if plant then 0 else 0.5
-                end),
-            },
-            
-            -- Plant name
-            New(scope, "TextLabel") {
-                Size = UDim2.new(1, -8, 0, 18),
-                Position = UDim2.new(0, 4, 1, -20),
-                BackgroundTransparency = 1,
-                Text = Computed(scope, function(use)
-                    local plant = use(props.PlantType)
-                    if plant then
-                        return if #plant > 9 then plant:sub(1, 8) .. "." else plant
-                    end
-                    return ""
-                end),
-                TextColor3 = Colors.TextWhite,
-                TextSize = 10,
-                Font = Enum.Font.GothamBold,
-                TextTruncate = Enum.TextTruncate.AtEnd,
-            },
-        },
-    }
-end
-
 local function LobbyHUD(scope: any, props: {
-    PlayerData: Fusion.Value<PlayerData?>,
-    CurrentDeck: Fusion.Value<{string}>,
-    EquippedMutations: Fusion.Value<{[string]: {string}}>?,
+    PlayerData: any, -- Value<PlayerData?>
+    CurrentDeck: any, -- Value<{string}>
+    EquippedMutations: any?, -- Value<{[string]: {string}}>?
+    SelectedSlot: any?, -- Value<number?>
 }): ScreenGui
     
     local playerData = props.PlayerData
     local currentDeck = props.CurrentDeck
-    local plantMutations = props.EquippedMutations -- Renamed for HUD display
+    local currentSelectedSlot = props.SelectedSlot or Value(scope, 2) -- Default: slot 2 selected
     
     return New(scope, "ScreenGui") {
         Name = "LobbyHUD",
@@ -219,143 +86,190 @@ local function LobbyHUD(scope: any, props: {
         
         [Children] = {
             -- ============================================
-            -- TOP LEFT: Resource Pills
+            -- TOP LEFT: Avatar + Level Badge (like reference image)
+            -- Avatar circle with star badge extending to the right
+            -- ============================================
+            New(scope, "Frame") {
+                Name = "PlayerInfo",
+                Size = UDim2.fromOffset(180, 80),
+                Position = UDim2.fromOffset(16, 16),
+                BackgroundTransparency = 1,
+                
+                [Children] = {
+                    -- Avatar frame (light blue circle)
+                    AvatarFrame(scope, {
+                        UserId = Players.LocalPlayer.UserId,
+                        Size = UDim2.fromOffset(70, 70),
+                    }),
+                    
+                    -- Level badge (extending from avatar, like in image)
+                    New(scope, "Frame") {
+                        Name = "LevelBadge",
+                        Size = UDim2.fromOffset(90, 36),
+                        Position = UDim2.fromOffset(50, 20), -- Overlaps avatar on right
+                        BackgroundColor3 = Colors.LevelBadgeBg, -- Light blue
+                        BackgroundTransparency = 0, -- OPAQUE
+                        ZIndex = 4,
+                        
+                        [Children] = {
+                            New(scope, "UICorner") { 
+                                CornerRadius = UDim.new(0, 18), -- Pill-like
+                            },
+                            New(scope, "UIStroke") { 
+                                Color = Colors.StrokeDark, 
+                                Thickness = Sizing.StrokeThick,
+                            },
+                            
+                            -- Glossy gradient - COLOR ONLY
+                            New(scope, "UIGradient") {
+                                Color = ColorSequence.new({
+                                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                                    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(240, 248, 255)),
+                                    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 210, 230)),
+                                }),
+                                Rotation = 90,
+                            },
+                            
+                            -- Star icon (positioned on left, slightly rotated)
+                            New(scope, "Frame") {
+                                Name = "Star",
+                                Size = UDim2.fromOffset(32, 32),
+                                Position = UDim2.fromOffset(-6, 2),
+                                BackgroundColor3 = Colors.LevelBadge, -- Golden yellow
+                                BackgroundTransparency = 0, -- OPAQUE
+                                Rotation = 15,
+                                ZIndex = 6,
+                                
+                                [Children] = {
+                                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 6) },
+                                    New(scope, "UIStroke") { 
+                                        Color = Colors.StrokeDark, 
+                                        Thickness = 3,
+                                    },
+                                    -- Glossy star - COLOR ONLY
+                                    New(scope, "UIGradient") {
+                                        Color = ColorSequence.new({
+                                            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 245, 180)),
+                                            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 220, 100)),
+                                            ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 180, 60)),
+                                        }),
+                                        Rotation = 90,
+                                    },
+                                    New(scope, "TextLabel") {
+                                        Size = UDim2.new(1, 0, 1, 0),
+                                        BackgroundTransparency = 1,
+                                        Text = "⭐",
+                                        TextSize = 18,
+                                        Rotation = -15, -- Counter-rotate
+                                    },
+                                },
+                            },
+                            
+                            -- Level text "Lv 15"
+                            New(scope, "TextLabel") {
+                                Size = UDim2.new(1, -28, 1, 0),
+                                Position = UDim2.fromOffset(28, 0),
+                                BackgroundTransparency = 1,
+                                Text = Computed(scope, function(use)
+                                    local data = use(playerData)
+                                    return "Lv " .. tostring(data and data.Level or 15)
+                                end),
+                                TextColor3 = Colors.TextWhite,
+                                TextSize = 16,
+                                Font = Fonts.Header,
+                                TextXAlignment = Enum.TextXAlignment.Center,
+                                
+                                [Children] = {
+                                    New(scope, "UIStroke") {
+                                        Color = Colors.TextShadow,
+                                        Thickness = 1,
+                                        Transparency = 0.3,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            
+            -- ============================================
+            -- TOP RIGHT: Coins & Gems Pills (from image)
             -- ============================================
             New(scope, "Frame") {
                 Name = "ResourceBar",
-                Size = UDim2.fromOffset(360, 45),
-                Position = UDim2.fromOffset(15, 50),
+                Size = UDim2.fromOffset(280, 50),
+                Position = UDim2.new(1, -20, 0, 20),
+                AnchorPoint = Vector2.new(1, 0),
                 BackgroundTransparency = 1,
                 
                 [Children] = {
                     New(scope, "UIListLayout") {
                         FillDirection = Enum.FillDirection.Horizontal,
-                        Padding = UDim.new(0, 10),
+                        Padding = UDim.new(0, 12),
+                        HorizontalAlignment = Enum.HorizontalAlignment.Right,
                         VerticalAlignment = Enum.VerticalAlignment.Center,
                     },
                     
-                    -- Level pill
-                    ResourcePill(scope, {
-                        Icon = "⭐",
-                        Value = Computed(scope, function(use)
-                            local data = use(playerData)
-                            return "Lv." .. tostring(data and data.Level or 1)
-                        end),
-                        Color = Colors.Purple,
-                    }),
-                    
-                    -- Coins pill
+                    -- Coins pill (gold/yellow like in image)
                     ResourcePill(scope, {
                         Icon = "🪙",
                         Value = Computed(scope, function(use)
                             local data = use(playerData)
-                            return tostring(data and data.Coins or 0)
+                            return tostring(data and data.Coins or 1250)
                         end),
-                        Color = Colors.Gold,
+                        Color = Colors.TextWhite,
+                        BackgroundColor = Colors.CoinsPill,
                     }),
                     
-                    -- Gems pill
+                    -- Gems pill (purple/magenta like in image)
                     ResourcePill(scope, {
                         Icon = "💎",
                         Value = Computed(scope, function(use)
                             local data = use(playerData)
-                            return tostring(data and data.Gems or 0)
+                            return tostring(data and data.Gems or 50)
                         end),
-                        Color = Colors.Cyan,
+                        Color = Colors.TextWhite,
+                        BackgroundColor = Colors.GemsPill,
                     }),
                 },
             },
             
             -- ============================================
-            -- TOP RIGHT: Player Badge
+            -- BOTTOM: Unit Deck Bar (main feature)
             -- ============================================
-            New(scope, "Frame") {
-                Name = "PlayerBadge",
-                Size = UDim2.fromOffset(180, 42),
-                Position = UDim2.new(1, -195, 0, 50),
-                BackgroundColor3 = Colors.PanelBg,
-                
-                [Children] = {
-                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 21) },
-                    New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2 },
-                    
-                    New(scope, "TextLabel") {
-                        Size = UDim2.fromOffset(28, 28),
-                        Position = UDim2.fromOffset(8, 7),
-                        BackgroundTransparency = 1,
-                        Text = "🌿",
-                        TextSize = 20,
-                    },
-                    
-                    New(scope, "TextLabel") {
-                        Size = UDim2.new(1, -48, 1, 0),
-                        Position = UDim2.fromOffset(38, 0),
-                        BackgroundTransparency = 1,
-                        Text = Players.LocalPlayer.Name,
-                        TextColor3 = Colors.TextWhite,
-                        TextSize = 14,
-                        Font = Enum.Font.GothamBold,
-                        TextXAlignment = Enum.TextXAlignment.Left,
-                        TextTruncate = Enum.TextTruncate.AtEnd,
-                    },
-                },
-            },
-            
-            -- ============================================
-            -- BOTTOM: Deck Preview Bar
-            -- ============================================
-            New(scope, "Frame") {
-                Name = "DeckBar",
-                Size = UDim2.fromOffset(600, 100),
-                Position = UDim2.new(0.5, 0, 1, -20),
-                AnchorPoint = Vector2.new(0.5, 1),
-                BackgroundColor3 = Colors.PanelBg,
-                BackgroundTransparency = 0.1,
-                
-                [Children] = {
-                    New(scope, "UICorner") { CornerRadius = UDim.new(0, 18) },
-                    New(scope, "UIStroke") { Color = Colors.Border, Thickness = 2 },
-                    
-                    -- Deck slots
-                    New(scope, "Frame") {
-                        Size = UDim2.new(1, 0, 1, 0),
-                        BackgroundTransparency = 1,
+            DeckBar(scope, {
+                Children = (function()
+                    local cards = {}
+                    for i = 1, 6 do
+                        local plantType = Computed(scope, function(use)
+                            local deck = use(currentDeck)
+                            return deck[i]
+                        end)
                         
-                        [Children] = {
-                            New(scope, "UIListLayout") {
-                                FillDirection = Enum.FillDirection.Horizontal,
-                                Padding = UDim.new(0, 14),
-                                HorizontalAlignment = Enum.HorizontalAlignment.Center,
-                                VerticalAlignment = Enum.VerticalAlignment.Center,
-                            },
-                            
-                            -- 6 slots
-                            (function()
-                                local slots = {}
-                                for i = 1, 6 do
-                                    table.insert(slots, DeckSlot(scope, {
-                                        Index = i,
-                                        PlantType = Computed(scope, function(use)
-                                            local deck = use(currentDeck)
-                                            return deck[i]
-                                        end),
-                                        Mutations = Computed(scope, function(use)
-                                            local deck = use(currentDeck)
-                                            local plant = deck[i]
-                                            if plant and plantMutations then
-                                                local mutations = use(plantMutations)
-                                                return mutations[plant]
-                                            end
-                                            return nil
-                                        end),
-                                    }))
-                                end
-                                return slots
-                            end)(),
-                        },
-                    },
-                },
-            },
+                        local cost = Computed(scope, function(use)
+                            local deck = use(currentDeck)
+                            local plant = deck[i]
+                            return getPlantCost(plant)
+                        end)
+                        
+                        local isSelected = Computed(scope, function(use)
+                            return use(currentSelectedSlot) == i
+                        end)
+                        
+                        table.insert(cards, UnitCard(scope, {
+                            PlantType = plantType,
+                            Cost = cost,
+                            SlotIndex = i,
+                            IsSelected = isSelected,
+                            Hotkey = tostring(i),
+                            OnClick = function()
+                                currentSelectedSlot:set(i)
+                            end,
+                        }))
+                    end
+                    return cards
+                end)(),
+            }),
         },
     }
 end
