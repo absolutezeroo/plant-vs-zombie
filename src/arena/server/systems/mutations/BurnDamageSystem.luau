@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -50,10 +51,9 @@ local function BurnDamageSystem(world)
 			if elapsed >= 1 then
 				local damage = burning.DamagePerSecond
 				
-				-- Apply damage
-				world:insert(entityId, HealthComponent({
+				-- Apply damage (immutable via Sift)
+				world:insert(entityId, Sift.Dictionary.merge(health, {
 					Current = math.max(0, health.Current - damage),
-					Max = health.Max,
 				}))
 				
 				-- Emit damage event for visual feedback
@@ -63,9 +63,8 @@ local function BurnDamageSystem(world)
 					SourceEntityId = nil,
 				}))
 				
-				-- Update burn timer
-				world:insert(entityId, BurningComponent({
-					DamagePerSecond = burning.DamagePerSecond,
+				-- Update burn timer (immutable via Sift)
+				world:insert(entityId, Sift.Dictionary.merge(burning, {
 					RemainingDuration = newRemaining,
 					LastTickTime = currentTime,
 				}))

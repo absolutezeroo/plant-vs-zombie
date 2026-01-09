@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -96,7 +97,8 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 		local healthCurrent = health.Current :: number
 		local newMax = math.floor(healthMax * effects.HealthBonus)
 		local newCurrent = math.floor(healthCurrent * effects.HealthBonus)
-		world:insert(entityId, HealthComponent({
+		-- Immutable component update via Sift
+		world:insert(entityId, Sift.Dictionary.merge(health, {
 			Current = newCurrent,
 			Max = newMax,
 		}))

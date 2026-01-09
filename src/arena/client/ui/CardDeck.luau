@@ -11,8 +11,10 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
@@ -285,8 +287,7 @@ local function CardDeck(props: CardDeckProps)
 	-- Get player's saved deck
 	local sortedDeckPlants = Computed(scope, function(use)
 		local deck = use(PlayerDataClient.GetDeckValue())
-		local sorted = table.clone(deck)
-		table.sort(sorted, function(a, b)
+		local sorted = Sift.Array.sort(deck, function(a, b)
 			local statsA = PlantData[a]
 			local statsB = PlantData[b]
 			if not statsA then return false end

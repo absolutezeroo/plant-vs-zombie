@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -74,13 +75,12 @@ local function TrapSystem(world)
 			local lastDamage = _trapDamageTimes[key] or 0
 			if currentTime - lastDamage < TrapConfig.SPIKEWEED_DAMAGE_INTERVAL then continue end
 			
-			-- Apply damage
+			-- Apply damage (immutable via Sift)
 			local health = world:get(zombieId, HealthComponent)
 			if health then
 				local newHealth = math.max(0, health.Current - damage)
-				world:insert(zombieId, HealthComponent({
+				world:insert(zombieId, Sift.Dictionary.merge(health, {
 					Current = newHealth,
-					Max = health.Max,
 				}))
 				
 				_trapDamageTimes[key] = currentTime
@@ -97,10 +97,9 @@ local function TrapSystem(world)
 				if stats.PopsTires then
 					local zombieStats = ZombieData[zombie.ZombieType]
 					if zombieStats and zombieStats.IsVehicle then
-						-- Instant kill vehicle
-						world:insert(zombieId, HealthComponent({
+						-- Instant kill vehicle (immutable via Sift)
+						world:insert(zombieId, Sift.Dictionary.merge(health, {
 							Current = 0,
-							Max = health.Max,
 						}))
 						Logger.Info("Trap", `Spikeweed {trapId} popped tires of vehicle zombie {zombieId}`)
 					end

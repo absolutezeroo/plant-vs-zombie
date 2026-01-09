@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -98,10 +99,9 @@ local function PoisonCloudSystem(world)
 					local distance = math.sqrt(dx * dx + dz * dz)
 					
 					if distance <= cloud.Radius then
-						-- Apply poison damage
-						world:insert(entityId, HealthComponent({
+						-- Apply poison damage (immutable via Sift)
+						world:insert(entityId, Sift.Dictionary.merge(health, {
 							Current = math.max(0, health.Current - cloud.DamagePerSecond),
-							Max = health.Max,
 						}))
 						
 						world:insert(entityId, DamageEvent({

@@ -82,6 +82,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Sift = require(Packages.Sift)
 local Logger = require(Shared.utils.Logger)
 
 -- Types
@@ -140,7 +142,7 @@ function SystemManager.Register(systemModule: SystemModule, name: string?)
         initTime = nil,
     }
     
-    table.insert(_systems, entry)
+    _systems = Sift.Array.push(_systems, entry)
     _systemsByName[systemName] = entry
     
     Logger.Debug("SystemManager", `Registered system: {systemName}`, {
@@ -169,7 +171,7 @@ function SystemManager.RegisterAll(systems: {any})
     end
     
     -- Sort by priority after all registrations
-    table.sort(_systems, function(a, b)
+    _systems = Sift.Array.sort(_systems, function(a, b)
         local priorityA = a.module.priority or 0
         local priorityB = b.module.priority or 0
         return priorityA < priorityB
@@ -232,10 +234,10 @@ function SystemManager.InitializeAll(world: any, timeout: number?): boolean
             
             if not completed then
                 Logger.Error("SystemManager", `Init timeout for '{entry.name}' ({maxTimeout}s)`)
-                table.insert(failedSystems, entry.name)
+                failedSystems = Sift.Array.push(failedSystems, entry.name)
             elseif initError then
                 Logger.Error("SystemManager", `Init failed for '{entry.name}': {initError}`)
-                table.insert(failedSystems, entry.name)
+                failedSystems = Sift.Array.push(failedSystems, entry.name)
             else
                 entry.initialized = true
                 entry.initTime = os.clock() - startTime
@@ -276,7 +278,7 @@ function SystemManager.GetMatterSystems(): {any}
         local systemFn = entry.module.system
         
         if systemFn then
-            table.insert(matterSystems, {
+            matterSystems = Sift.Array.push(matterSystems, {
                 system = systemFn,
                 priority = entry.module.priority or 0,
             })

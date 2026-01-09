@@ -25,6 +25,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Sift = require(Packages.Sift)
 local LoaderUI = require(Shared.ui.LoaderUI)
 local Logger = require(Shared.utils.Logger)
 
@@ -48,7 +50,7 @@ end
 
 -- Add a loading step
 function ServiceLoader:AddStep(name, action, weight)
-    table.insert(self._steps, {
+    self._steps = Sift.Array.push(self._steps, {
         name = name,
         weight = weight or 1,
         action = action,
@@ -77,7 +79,7 @@ function ServiceLoader:Run(onComplete)
         -- Use predefined stages with tips (convert to LoaderUI format)
         for i, stage in self._stages do
             local stepWeight = self._steps[i] and self._steps[i].weight or 1
-            table.insert(loaderStages, {
+            loaderStages = Sift.Array.push(loaderStages, {
                 Name = stage.name,
                 Weight = stepWeight / math.max(totalWeight, 1),
             })
@@ -85,7 +87,7 @@ function ServiceLoader:Run(onComplete)
     else
         -- Build from steps
         for _, step in self._steps do
-            table.insert(loaderStages, {
+            loaderStages = Sift.Array.push(loaderStages, {
                 Name = step.name,
                 Weight = step.weight / math.max(totalWeight, 1),
             })

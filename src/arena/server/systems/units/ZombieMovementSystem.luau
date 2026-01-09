@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -117,11 +118,11 @@ local function ZombieMovementSystem(world)
 			newX = basePos.X
 		end
 		
-		-- Update position
-		world:insert(id, PositionComponent({
+		-- Update position (immutable via Sift)
+		world:insert(id, Sift.Dictionary.merge(pos, {
 			X = newX,
 			Y = newY,
-			Z = newZ
+			Z = newZ,
 		}))
 		
 		-- Track for batch update

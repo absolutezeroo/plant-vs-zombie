@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -132,12 +133,11 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 				VelocityZ = 0,
 			}))
 			
-			-- Small damage
+			-- Small damage (immutable via Sift)
 			local health = world:get(zombieId, HealthComponent)
 			if health then
-				world:insert(zombieId, HealthComponent({
+				world:insert(zombieId, Sift.Dictionary.merge(health, {
 					Current = math.max(0, health.Current - (stats.Damage or 20)),
-					Max = health.Max,
 				}))
 			end
 			killCount += 1
@@ -152,9 +152,8 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 				if zombie.Lane == plant.Lane then
 					local health = world:get(zombieId, HealthComponent)
 					if health then
-						world:insert(zombieId, HealthComponent({
+						world:insert(zombieId, Sift.Dictionary.merge(health, {
 							Current = 0,
-							Max = health.Max,
 						}))
 						killCount += 1
 					end
@@ -183,9 +182,8 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			if distance <= explosionRadius then
 				local health = world:get(zombieId, HealthComponent)
 				if health then
-					world:insert(zombieId, HealthComponent({
+					world:insert(zombieId, Sift.Dictionary.merge(health, {
 						Current = 0,
-						Max = health.Max,
 					}))
 					killCount += 1
 				end
@@ -222,12 +220,11 @@ end
 local function explodePotatoMine(world: any, mineId: number, minePos: any, triggeredByZombieId: number)
 	Logger.Info("SpecialPlant", `PotatoMine {mineId} detonated by zombie {triggeredByZombieId}!`)
 	
-	-- Kill the zombie
+	-- Kill the zombie (immutable via Sift)
 	local health = world:get(triggeredByZombieId, HealthComponent)
 	if health then
-		world:insert(triggeredByZombieId, HealthComponent({
+		world:insert(triggeredByZombieId, Sift.Dictionary.merge(health, {
 			Current = 0,
-			Max = health.Max,
 		}))
 	end
 	
@@ -346,12 +343,11 @@ local function SpecialPlantSystem(world)
 		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, chompRange)
 		
 		if zombieId then
-			-- Chomp! Instant kill
+			-- Chomp! Instant kill (immutable via Sift)
 			local health = world:get(zombieId, HealthComponent)
 			if health then
-				world:insert(zombieId, HealthComponent({
+				world:insert(zombieId, Sift.Dictionary.merge(health, {
 					Current = 0,
-					Max = health.Max,
 				}))
 			end
 			
@@ -390,9 +386,8 @@ local function SpecialPlantSystem(world)
 					if dx < 3 and dz < 3 then
 						local health = world:get(zombieId, HealthComponent)
 						if health then
-							world:insert(zombieId, HealthComponent({
+							world:insert(zombieId, Sift.Dictionary.merge(health, {
 								Current = 0,
-								Max = health.Max,
 							}))
 							Logger.Info("SpecialPlant", `Squash {plantId} squashed zombie {zombieId}`)
 							Network.EntityDied.FireAll({ EntityId = zombieId })

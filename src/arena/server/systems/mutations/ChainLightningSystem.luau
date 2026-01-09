@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -52,7 +53,7 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 			local distance = math.sqrt(dx * dx + dz * dz)
 			
 			if distance <= range then
-				table.insert(nearby, {
+				nearby = Sift.Array.push(nearby, {
 					entityId = entityId,
 					distance = distance,
 				})
@@ -61,17 +62,14 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 	end
 	
 	-- Sort by distance (closest first)
-	table.sort(nearby, function(a, b)
+	local sortedNearby = Sift.Array.sort(nearby, function(a, b)
 		return a.distance < b.distance
 	end)
 	
 	-- Return just entity IDs
-	local result = {}
-	for _, data in nearby do
-		table.insert(result, data.entityId)
-	end
-	
-	return result
+	return Sift.Array.map(sortedNearby, function(data)
+		return data.entityId
+	end)
 end
 
 -- Apply chain lightning damage from a source
@@ -101,16 +99,15 @@ function API.ApplyChainLightning(
 		end
 		
 		local nextTarget = nearbyZombies[1]
-		table.insert(hitZombies, nextTarget)
+		hitZombies = Sift.Array.push(hitZombies, nextTarget)
 		
 		-- Apply damage to next target
 		local targetHealth = world:get(nextTarget, HealthComponent)
 		if targetHealth then
 			local healthCurrent = targetHealth.Current :: number
-			local healthMax = targetHealth.Max :: number
-			world:insert(nextTarget, HealthComponent({
+			-- Immutable component update via Sift
+			world:insert(nextTarget, Sift.Dictionary.merge(targetHealth, {
 				Current = math.max(0, healthCurrent - currentDamage),
-				Max = healthMax,
 			}))
 			
 			-- Emit damage event

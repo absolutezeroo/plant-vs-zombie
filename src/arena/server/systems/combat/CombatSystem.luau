@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -113,9 +114,9 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 	
 	local newHealth = math.max(0, health.Current - damage)
 	
-	world:insert(entityId, HealthComponent({
+	-- Immutable component update via Sift
+	world:insert(entityId, Sift.Dictionary.merge(health, {
 		Current = newHealth,
-		Max = health.Max
 	}))
 	
 	-- Broadcast damage event

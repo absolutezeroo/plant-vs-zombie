@@ -9,6 +9,9 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Sift = require(Packages:WaitForChild("Sift"))
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
 
@@ -148,14 +151,14 @@ function GridService.GetAllOccupied(): {{Column: number, Lane: number, EntityId:
 		for lane = 1, GridConfig.GRID_LANES do
 			local entityId = _occupancy[column] and _occupancy[column][lane]
 			if entityId then
-				table.insert(occupied, {
+				occupied = Sift.Array.push(occupied, {
 					Column = column,
 					Lane = lane,
 					EntityId = entityId,
 				})
+				end
 			end
 		end
-	end
 	return occupied
 end
 

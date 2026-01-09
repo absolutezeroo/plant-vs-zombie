@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -44,14 +45,13 @@ function API.OnPlantDealsDamage(world, plantEntityId: number, damageDealt: numbe
 	local healAmount = math.floor(damageDealt * lifestealPercent)
 	if healAmount <= 0 then return end
 	
-	-- Apply healing (cap at max)
+	-- Apply healing (cap at max, immutable via Sift)
 	local healthCurrent = health.Current :: number
 	local healthMax = health.Max :: number
 	local newHealth = math.min(healthMax, healthCurrent + healAmount)
 	if newHealth > healthCurrent then
-		world:insert(plantEntityId, HealthComponent({
+		world:insert(plantEntityId, Sift.Dictionary.merge(health, {
 			Current = newHealth,
-			Max = healthMax,
 		}))
 		
 		Logger.Debug("LifestealSystem", `Plant {plantEntityId} healed {healAmount} from lifesteal`)

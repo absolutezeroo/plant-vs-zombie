@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -205,7 +206,8 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 	if ability.ArmorBoost then
 		local health = world:get(plantId, HealthComponent)
 		if health then
-			world:insert(plantId, HealthComponent({
+			-- Immutable component update via Sift
+			world:insert(plantId, Sift.Dictionary.merge(health, {
 				Current = health.Current + ability.ArmorBoost,
 				Max = health.Max + ability.ArmorBoost,
 			}))

@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -455,11 +456,10 @@ local function ProjectileSystem(world)
 			continue
 		end
 		
-		-- Update position
-		world:insert(projId, PositionComponent({
+		-- Update position (immutable via Sift)
+		world:insert(projId, Sift.Dictionary.merge(pos, {
 			X = newX,
-			Y = pos.Y,
-			Z = newZ
+			Z = newZ,
 		}))
 	end
 	

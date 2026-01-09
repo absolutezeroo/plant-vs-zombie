@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
@@ -362,7 +363,7 @@ end
 
 return function(scope: any, props: DeckBuilderViewProps): Frame
     local selectedFilter = Value(scope, "All")
-    local localDeck = Value(scope, table.clone(peek(props.SelectedDeck) or {}))
+    local localDeck = Value(scope, Sift.Array.copy(peek(props.SelectedDeck) or {}))
     
     -- Unlocked set
     local unlockedSet = Computed(scope, function(use)
@@ -400,23 +401,26 @@ return function(scope: any, props: DeckBuilderViewProps): Frame
     end)
     
     local function togglePlant(plantType: string)
-        local deck = table.clone(peek(localDeck))
+        local deck = peek(localDeck)
         local idx = table.find(deck, plantType)
+        local newDeck
         if idx then
-            table.remove(deck, idx)
+            newDeck = Sift.Array.filter(deck, function(p) return p ~= plantType end)
         elseif #deck < 6 then
-            table.insert(deck, plantType)
+            newDeck = Sift.Array.push(deck, plantType)
+        else
+            newDeck = deck
         end
-        localDeck:set(deck)
-        props.SelectedDeck:set(table.clone(deck))
+        localDeck:set(newDeck)
+        props.SelectedDeck:set(Sift.Array.copy(newDeck))
     end
     
     local function removePlant(index: number)
-        local deck = table.clone(peek(localDeck))
+        local deck = peek(localDeck)
         if deck[index] then
-            table.remove(deck, index)
-            localDeck:set(deck)
-            props.SelectedDeck:set(table.clone(deck))
+            local newDeck = Sift.Array.removeIndex(deck, index)
+            localDeck:set(newDeck)
+            props.SelectedDeck:set(Sift.Array.copy(newDeck))
         end
     end
     

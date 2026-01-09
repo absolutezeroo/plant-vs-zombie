@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -59,8 +60,8 @@ function API.TryFreeze(world, zombieEntityId: number, freezeChance: number, free
 	-- Check if already frozen
 	local existingFreeze = world:get(zombieEntityId, FrozenComponent)
 	if existingFreeze then
-		-- Refresh duration
-		world:insert(zombieEntityId, FrozenComponent({
+		-- Refresh duration (immutable via Sift)
+		world:insert(zombieEntityId, Sift.Dictionary.merge(existingFreeze, {
 			RemainingDuration = math.max(existingFreeze.RemainingDuration, freezeDuration),
 			AppliedAt = os.clock(),
 		}))

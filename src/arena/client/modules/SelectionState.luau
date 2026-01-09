@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 local SelectionState = {}
 
@@ -89,8 +90,9 @@ end
 ]]
 function SelectionState.StartCooldown(plantType: string, duration: number)
 	local cooldowns = Fusion.peek(SelectionState.Cooldowns)
-	local newCooldowns = table.clone(cooldowns)
-	newCooldowns[plantType] = tick() + duration
+	local newCooldowns = Sift.Dictionary.merge(cooldowns, {
+		[plantType] = tick() + duration,
+	})
 	SelectionState.Cooldowns:set(newCooldowns)
 end
 
@@ -100,8 +102,7 @@ end
 ]]
 function SelectionState.CancelCooldown(plantType: string)
 	local cooldowns = Fusion.peek(SelectionState.Cooldowns)
-	local newCooldowns = table.clone(cooldowns)
-	newCooldowns[plantType] = nil
+	local newCooldowns = Sift.Dictionary.removeKey(cooldowns, plantType)
 	SelectionState.Cooldowns:set(newCooldowns)
 end
 

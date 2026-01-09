@@ -6,7 +6,11 @@
 	In Production: Log errors but keep game running
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Sift = require(Packages.Sift)
 
 local ErrorHandler = {}
 
@@ -47,10 +51,10 @@ function ErrorHandler.Report(message: string, context: string, severity: Severit
 		Realm = realm,
 	}
 	
-	-- Store recent errors
-	table.insert(recentErrors, record)
+	-- Store recent errors (circular buffer with Sift)
+	recentErrors = Sift.Array.push(recentErrors, record)
 	if #recentErrors > MAX_RECENT_ERRORS then
-		table.remove(recentErrors, 1)
+		recentErrors = Sift.Array.removeIndex(recentErrors, 1)
 	end
 	
 	-- Format output

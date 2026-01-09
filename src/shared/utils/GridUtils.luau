@@ -11,6 +11,9 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Sift = require(Packages:WaitForChild("Sift"))
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
@@ -90,7 +93,7 @@ function GridUtils.GetAllCellCenters(): {{Column: number, Lane: number, Position
 	local cells = {}
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do
-			table.insert(cells, {
+			cells = Sift.Array.push(cells, {
 				Column = column,
 				Lane = lane,
 				Position = GridUtils.GridToWorld(column, lane),
