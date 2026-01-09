@@ -440,7 +440,9 @@ function WaveManager.GetTotalWaves(): number
 end
 
 function WaveManager.ResetGameState()
-    _stateManager:Reset()
+    if _stateManager then
+        _stateManager:Reset()
+    end
     _currentWave = 0
     _waveStartTime = 0
     _lastSpawnTime = 0
