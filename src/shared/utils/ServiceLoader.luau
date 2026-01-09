@@ -27,6 +27,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Sift = require(Packages.Sift)
+local Promise = require(Packages.Promise)
 local LoaderUI = require(Shared.ui.LoaderUI)
 local Logger = require(Shared.utils.Logger)
 
@@ -108,16 +109,14 @@ function ServiceLoader:Run(onComplete)
             
             Logger.Info("ServiceLoader", `[{i}/{#self._steps}] {step.name}`)
             
-            -- Execute step action
-            local success, err = pcall(step.action)
-            
-            if success then
+            -- Execute step action with Promise.try for clean error handling
+            Promise.try(step.action):andThen(function()
                 self._loaderUI:SetProgress(1)
                 Logger.Info("ServiceLoader", `{step.name} complete`)
-            else
+            end):catch(function(err)
                 Logger.Error("ServiceLoader", `{step.name} failed: {err}`)
                 -- Continue anyway to not block the game
-            end
+            end):await() -- Wait for step to complete before next
             
             -- Small delay between steps for visual smoothness
             task.wait(0.05)

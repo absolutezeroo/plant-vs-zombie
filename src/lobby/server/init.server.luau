@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Wait for packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Promise = require(Packages:WaitForChild("Promise"))
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -144,19 +145,29 @@ local function handleTeleportToArena(player: Player, worldId: string, difficulty
     local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck, equippedMutations)
     teleportOptions:SetTeleportData(arenaData)
     
-    -- Teleport to Arena
-    local success, err = pcall(function()
-        TeleportService:TeleportAsync(
-            TeleportData.PlaceIds.Arena,
-            { player },
-            teleportOptions
-        )
+    -- Teleport to Arena with Promise.retry (non-blocking)
+    Promise.retry(function()
+        return Promise.new(function(resolve, reject)
+            if player.Parent ~= Players then
+                reject("Player left the game")
+                return
+            end
+            
+            TeleportService:TeleportAsync(
+                TeleportData.PlaceIds.Arena,
+                { player },
+                teleportOptions
+            )
+            resolve()
+        end)
+    end, 3, function(attempt)
+        Logger.Warn("Lobby", `Teleport attempt {attempt} failed for {player.Name}, retrying...`)
+        return 2 * attempt -- Exponential backoff
+    end):andThen(function()
+        Logger.Info("Lobby", `{player.Name} teleported to Arena`)
+    end):catch(function(err)
+        Logger.Error("Lobby", `Teleport failed for {player.Name} after 3 attempts: {err}`)
     end)
-    
-    if not success then
-        Logger.Error("Lobby", `Teleport failed: {err}`)
-        return false, 4, `Teleport failed: {err}`
-    end
     
     return true, 0, "Teleporting..."
 end

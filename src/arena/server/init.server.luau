@@ -20,6 +20,7 @@ local TeleportService = game:GetService("TeleportService")
 -- Wait for packages to be available
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Promise = require(Packages:WaitForChild("Promise"))
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -199,7 +200,11 @@ end
 
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
--- Teleport player back to Lobby with results
+-- Teleport configuration
+local TELEPORT_MAX_RETRIES = 3
+local TELEPORT_RETRY_DELAY = 2
+
+-- Teleport player back to Lobby with results (uses Promise.retry)
 local function sendPlayerToLobby(player: Player, victory: boolean, wavesSurvived: number, coins: number, xp: number)
 	local teleportOptions = Instance.new("TeleportOptions")
 	
@@ -228,13 +233,24 @@ local function sendPlayerToLobby(player: Player, victory: boolean, wavesSurvived
 	)
 	teleportOptions:SetTeleportData(returnData)
 	
-	local success, err = pcall(function()
-		TeleportService:TeleportAsync(TeleportData.PlaceIds.Lobby, { player }, teleportOptions)
+	Promise.retry(function()
+		return Promise.new(function(resolve, reject)
+			if player.Parent ~= Players then
+				reject("Player left the game")
+				return
+			end
+			
+			TeleportService:TeleportAsync(TeleportData.PlaceIds.Lobby, { player }, teleportOptions)
+			resolve()
+		end)
+	end, TELEPORT_MAX_RETRIES, function(attempt)
+		Logger.Warn("Server", `Teleport to Lobby attempt {attempt} failed for {player.Name}, retrying...`)
+		return TELEPORT_RETRY_DELAY * attempt
+	end):andThen(function()
+		Logger.Info("Server", `{player.Name} teleported to Lobby`)
+	end):catch(function(err)
+		Logger.Error("Server", `Failed to teleport {player.Name} to Lobby after {TELEPORT_MAX_RETRIES} attempts: {err}`)
 	end)
-	
-	if not success then
-		Logger.Error("Server", `Failed to teleport {player.Name} to Lobby: {err}`)
-	end
 end
 
 -- ============================================
