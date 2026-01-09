@@ -53,8 +53,10 @@ local playerCooldowns: {[Player]: {[string]: number}} = {}
 
 local STARTING_SUN = 50
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup (connections)
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages.Trove)
+local _trove = Trove.new()
 
 -- Initialize new player
 local function onPlayerAdded(player: Player)
@@ -69,8 +71,8 @@ local function onPlayerRemoving(player: Player)
 end
 
 local function setupListeners()
-	table.insert(_connections, Players.PlayerAdded:Connect(onPlayerAdded))
-	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+	_trove:Connect(Players.PlayerAdded, onPlayerAdded)
+	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
 end
 
 -- Validate placement request
@@ -436,10 +438,8 @@ local function Init(_world)
 end
 
 local function Dispose()
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Destroy()
+	_trove = Trove.new() -- Reset for potential reuse
 	table.clear(playerSun)
 	table.clear(playerCooldowns)
 	_world = nil

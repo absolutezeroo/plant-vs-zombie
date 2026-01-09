@@ -24,6 +24,7 @@ local Workspace = game:GetService("Workspace")
 local Packages = ReplicatedStorage:FindFirstChild("Packages")
 assert(Packages, "GhostPreviewSystem: Packages folder not found")
 local Fusion = require(Packages.Fusion)
+local Trove = require(Packages.Trove)
 
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "GhostPreviewSystem: Shared folder not found")
@@ -70,8 +71,8 @@ local _requestId = 0
 -- { [requestId]: { plantType: string, cost: number } }
 local _pendingPlacements: {[number]: {plantType: string, cost: number}} = {}
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup (connections, instances)
+local _trove = Trove.new()
 
 -- Ghost visual state
 local _ghostModel: Model? = nil
@@ -541,7 +542,7 @@ end
 ]]
 local function setupListeners()
 	-- Left-click / touch to place or shovel
-	table.insert(_connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	_trove:Connect(UserInputService.InputBegan, function(input, gameProcessed)
 		if gameProcessed then
 			return
 		end
@@ -555,10 +556,10 @@ local function setupListeners()
 				handlePlacement()
 			end
 		end
-	end))
+	end)
 	
 	-- Right-click or ESC to cancel selection or shovel mode
-	table.insert(_connections, UserInputService.InputBegan:Connect(function(input, _gameProcessed)
+	_trove:Connect(UserInputService.InputBegan, function(input, _gameProcessed)
 		if input.UserInputType == Enum.UserInputType.MouseButton2
 			or input.KeyCode == Enum.KeyCode.Escape then
 			SelectionState.Select(nil)
@@ -566,10 +567,10 @@ local function setupListeners()
 			destroyGhost() -- Fully destroy when canceling
 			restoreHighlightedPlant() -- Restore any highlighted plant
 		end
-	end))
+	end)
 	
 	-- Handle placement response from server - refund on failure
-	table.insert(_connections, Network.RequestResponse.On(function(data)
+	_trove:Add(Network.RequestResponse.On(function(data)
 		local pending = _pendingPlacements[data.RequestId]
 		if not pending then
 			return -- Not a placement request we're tracking
@@ -603,11 +604,9 @@ end
 	Dispose - Cleanup ghost visuals and connections
 ]]
 local function Dispose()
-	-- Disconnect all events
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	-- Trove handles all connection cleanup
+	_trove:Destroy()
+	_trove = Trove.new() -- Reset for potential reuse
 	
 	-- Cleanup ghost visuals
 	destroyGhost()

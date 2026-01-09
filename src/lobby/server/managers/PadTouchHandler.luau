@@ -8,6 +8,9 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages.Trove)
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
@@ -31,7 +34,7 @@ PadTouchHandler.__index = PadTouchHandler
 
 -- State
 local _playerCooldown: {[Player]: number} = {} -- player -> cooldown end time
-local _connections: {RBXScriptConnection} = {}
+local _trove = Trove.new()
 
 function PadTouchHandler.new(): PadTouchHandler
     local self = setmetatable({}, PadTouchHandler)
@@ -65,7 +68,7 @@ function PadTouchHandler:SetupPadTouch(padModel: Model, platform: BasePart, onTo
         onTouch(player, padModel)
     end)
     
-    table.insert(_connections, connection)
+    _trove:Add(connection)
     Logger.Debug("PadTouchHandler", `Setup touch for pad {padModel.Name}`)
 end
 
@@ -92,10 +95,8 @@ end
 
 -- Cleanup all connections
 function PadTouchHandler:CleanupAll()
-    for _, connection in ipairs(_connections) do
-        connection:Disconnect()
-    end
-    table.clear(_connections)
+    _trove:Destroy()
+    _trove = Trove.new()
     table.clear(_playerCooldown)
 end
 

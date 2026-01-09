@@ -17,6 +17,11 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Packages
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(Packages, "VFXAudioSystem: Packages folder not found")
+local Trove = require(Packages.Trove)
+
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "VFXAudioSystem: Shared folder not found")
@@ -34,8 +39,8 @@ local Network = require(Shared.network.generated.client)
 local _isWaveActive = false
 local _currentWave = 0
 
--- Connection tracking for cleanup
-local _connections: {RBXScriptConnection | () -> ()} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 --------------------------------------------------------------------------------
 -- INIT: Called once before Matter loop (CAN yield)
@@ -48,7 +53,7 @@ local function Init(_world: any)
 	AudioService.SetMusic("calm")
 	
 	-- Connect to wave events for music changes
-	table.insert(_connections, Network.WaveStarted.On(function(data)
+	_trove:Add(Network.WaveStarted.On(function(data)
 		_isWaveActive = true
 		_currentWave = data.WaveNumber
 		
@@ -71,14 +76,14 @@ local function Init(_world: any)
 		Logger.Debug("VFXAudio", `Wave {_currentWave} started - music: {if _currentWave >= 5 then "intense" else "wave"}`)
 	end))
 	
-	table.insert(_connections, Network.WaveCompleted.On(function(_data)
+	_trove:Add(Network.WaveCompleted.On(function(_data)
 		_isWaveActive = false
 		-- Return to calm music between waves
 		AudioService.SetMusic("calm")
 		Logger.Debug("VFXAudio", `Wave completed - music: calm`)
 	end))
 	
-	table.insert(_connections, Network.GameOver.On(function(data)
+	_trove:Add(Network.GameOver.On(function(data)
 		-- Stop music and play end sound
 		AudioService.StopMusic()
 		if data.Victory then
@@ -89,7 +94,7 @@ local function Init(_world: any)
 	end))
 	
 	-- Explosion VFX event
-	table.insert(_connections, Network.ExplosionVFX.On(function(data)
+	_trove:Add(Network.ExplosionVFX.On(function(data)
 		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
 		VFXService.PlayExplosion(pos, data.Radius)
 		AudioService.PlayExplosion(pos)
@@ -117,15 +122,9 @@ local function Dispose(_player: Player?)
 		return
 	end
 	
-	-- Full cleanup
-	for _, conn in _connections do
-		if typeof(conn) == "function" then
-			conn() -- Zap uses unsubscribe functions
-		elseif typeof(conn) == "RBXScriptConnection" then
-			conn:Disconnect()
-		end
-	end
-	table.clear(_connections)
+	-- Trove handles all connection cleanup
+	_trove:Destroy()
+	_trove = Trove.new()
 	
 	AudioService.StopMusic()
 	_isWaveActive = false

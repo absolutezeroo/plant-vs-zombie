@@ -19,6 +19,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
+-- Packages
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages.Trove)
+
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "PlantRenderSystem: Shared folder not found")
@@ -76,8 +80,8 @@ type PlantVisual = {
 }
 local _plantVisuals: {[number]: PlantVisual} = {}
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup (connections)
+local _trove = Trove.new()
 
 -- Fallback visual config (when model not found)
 local FALLBACK_SIZE = Vector3.new(4, 4, 4)
@@ -201,7 +205,7 @@ end
 	Setup network event listeners (called during Init phase)
 ]]
 local function setupNetworkListeners()
-	table.insert(_connections, Network.PlantSpawned.On(function(data)
+	_trove:Add(Network.PlantSpawned.On(function(data)
 		local entityId = data.EntityId
 		local plantType = tostring(data.PlantType)
 		local column = data.Column
@@ -234,7 +238,7 @@ local function setupNetworkListeners()
 		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
 	end))
 
-	table.insert(_connections, Network.EntityDied.On(function(data)
+	_trove:Add(Network.EntityDied.On(function(data)
 		local entityId = data.EntityId
 		local visual = _plantVisuals[entityId]
 		
@@ -285,7 +289,7 @@ local function setupNetworkListeners()
 	end))
 
 	-- Damage flash effect
-	table.insert(_connections, Network.EntityDamaged.On(function(data)
+	_trove:Add(Network.EntityDamaged.On(function(data)
 		local visual = _plantVisuals[data.EntityId]
 		if not visual then return end
 		
@@ -358,11 +362,9 @@ end
 	Dispose - Cleanup all visuals and connections
 ]]
 local function Dispose()
-	-- Disconnect all events
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	-- Trove handles all connection cleanup
+	_trove:Destroy()
+	_trove = Trove.new() -- Reset for potential reuse
 	
 	-- Destroy all plant visuals
 	for entityId in _plantVisuals do

@@ -30,6 +30,14 @@ For every implementation, refer to these specific API docs:
     * **Doc:** https://zap.redblox.dev/usage/generated-api.html
     * **Rule:** Never edit `generated.luau`. Use the generated API strictly for typesafe networking.
 
+7.  **Cleanup: Trove**
+    * **Doc:** https://sleitnick.github.io/RbxUtil/api/Trove/
+    * **Rule:** Use Trove inside generic Classes or Controllers to clean up connections/instances on destroy.
+
+8.  **Events: Signal**
+    * **Doc:** https://sleitnick.github.io/RbxUtil/api/Signal/
+    * **Rule:** Use Signal for communication between UI Controllers and non-ECS Managers.
+
 ## 🏗️ Architecture Context
 - **Src Structure:** `src/shared` (Common), `src/lobby` (Place 1), `src/arena` (Place 2).
 - **Rojo:** We map `src/shared` to `ReplicatedStorage/Shared` in both places.

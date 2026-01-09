@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -53,8 +54,8 @@ end
 -- Session zombie kill tracking (for end-game stats)
 local _sessionStats: {[Player]: {ZombiesKilled: number, CoinsEarned: number}} = {}
 
--- Connections for cleanup
-local _connections: {RBXScriptConnection} = {}
+-- Trove for cleanup
+local _trove = Trove.new()
 
 local function getSessionStats(player: Player)
 	if not _sessionStats[player] then
@@ -143,7 +144,7 @@ local function onPlayerRemoving(player)
 end
 
 local function setupListeners()
-	table.insert(_connections, Players.PlayerRemoving:Connect(onPlayerRemoving))
+	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
 end
 
 local function Init(_world)
@@ -151,10 +152,8 @@ local function Init(_world)
 end
 
 local function Dispose()
-	for _, conn in _connections do
-		conn:Disconnect()
-	end
-	table.clear(_connections)
+	_trove:Destroy()
+	_trove = Trove.new()
 	table.clear(_sessionStats)
 end
 
