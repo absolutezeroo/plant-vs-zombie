@@ -36,7 +36,9 @@ local _Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local Logger = require(Shared.utils.Logger)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 -- NEW: Data-driven world and difficulty
 local WorldData = require(Shared.data.WorldData)
@@ -61,14 +63,8 @@ type SpawnPhase = WaveSpawner.SpawnPhase
 -- Studio Debug Mode: No auto-start in Studio
 local IS_STUDIO_DEBUG = RunService:IsStudio()
 
--- Wave timing configuration
-local WaveConfig = {
-    FIRST_WAVE_DELAY = 20,    -- Preparation time
-    WAVE_DELAY = 10,          -- Intermission between waves
-    TRICKLE_INTERVAL = 4,
-    ASSAULT_INTERVAL = 2,
-    FLAG_INTERVAL = 1.5,
-}
+-- Wave timing configuration (from GameConstants.Wave)
+local WaveConfig = GameConstants.Wave
 
 -- Wave state
 local _currentWave = 0
@@ -172,7 +168,7 @@ local function advancePhase(world: any)
         }))
         
         -- Spawn Flag zombie
-        local lane = math.random(1, GridConfig.GRID_LANES)
+        local lane = ChanceUtils.RandomLane()
         _spawner:SpawnZombie(world, "Flag", lane, _currentWave)
         Logger.Info("WaveManager", "🚩 Flag zombie spawned!")
     end
@@ -632,7 +628,7 @@ local function WaveManagerSystem(world)
             local zombieType = _spawner:PickZombie(_currentPhase, remainingBudget)
             
             if zombieType then
-                local lane = math.random(1, GridConfig.GRID_LANES)
+                local lane = ChanceUtils.RandomLane()
                 _spawner:SpawnZombie(world, zombieType, lane, _currentWave)
                 _phaseSpent += _spawner:GetZombieCost(zombieType)
                 _lastSpawnTime = currentTime

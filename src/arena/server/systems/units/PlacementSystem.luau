@@ -122,17 +122,13 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		-- RequiresWater plants go directly in water (no LilyPad needed)
 	end
 	
-	-- Rule 2: LilyPad (IsPlatform with water context) can ONLY be placed on water lanes
+	-- Rule 2: Platform plants have lane restrictions
 	if stats.IsPlatform and stats.AllowsPlantOnTop then
-		-- Check if this is a water platform (LilyPad) or ground platform (FlowerPot)
-		-- LilyPad can only go on water, FlowerPot can go anywhere except water
-		local isLilyPad = plantType == "LilyPad"
-		local isFlowerPot = plantType == "FlowerPot"
-		
-		if isLilyPad and not isWaterLane then
+		-- DATA-DRIVEN: Use IsWaterPlatform and IsGroundPlatform flags
+		if stats.IsWaterPlatform and not isWaterLane then
 			return false, "Lily Pad can only be placed on water lanes"
 		end
-		if isFlowerPot and isWaterLane then
+		if stats.IsGroundPlatform and isWaterLane then
 			return false, "Flower Pot cannot be placed on water"
 		end
 	end

@@ -26,11 +26,14 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
 local EntityPool = require(Shared.utils.EntityPool)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Type alias for world parameter
 type MatterWorld = Types.MatterWorld
@@ -50,12 +53,8 @@ local PlantFoodComponent = Components.PlantFoodComponent
 local OwnerComponent = Components.OwnerComponent
 local ProjectileComponent = Components.ProjectileComponent
 
--- Configuration
-local Config = {
-	MAX_CHARGES = 3,
-	GLOWING_ZOMBIE_CHANCE = 0.15,  -- 15% chance for zombie to be glowing
-	GUARANTEED_PER_WAVE = 1,       -- At least 1 glowing per wave
-}
+-- Configuration (from GameConstants.PlantFood)
+local Config = GameConstants.PlantFood
 
 -- Player charge storage
 local _playerCharges: {[number]: number} = {}  -- UserId -> charge count
@@ -122,7 +121,7 @@ function PlantFoodSystem.API.ShouldZombieBeGlowing(): boolean
 	end
 	
 	-- Random chance for additional glowing zombies
-	return math.random() < Config.GLOWING_ZOMBIE_CHANCE
+	return ChanceUtils.Roll(Config.GLOWING_ZOMBIE_CHANCE)
 end
 
 function PlantFoodSystem.API.ResetWaveTracking()
@@ -208,12 +207,7 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 	
 	-- Armor Boost (Wall-nut)
 	if ability.ArmorBoost then
-		local health = world:get(plantId, HealthComponent)
-		if health then
-			world:insert(plantId, HealthComponent({
-				Current = health.Current + ability.ArmorBoost,
-				Max = health.Max + ability.ArmorBoost,
-			}))
+		if ECSUtils.BoostHealth(world, plantId, ability.ArmorBoost, Components) then
 			Logger.Info("PlantFood", `{plantType} gained {ability.ArmorBoost} armor`)
 		end
 	end

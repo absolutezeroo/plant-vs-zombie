@@ -30,6 +30,7 @@ local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
@@ -232,7 +233,7 @@ local function setupNetworkListeners()
 			-- Show floating damage number via signal
 			if data.DamageAmount > 0 then
 				local floatPos = pos + Vector3.new(
-					(math.random() - 0.5) * 2, -- Random X offset
+					ChanceUtils.RandomOffset(1), -- Random X offset
 					1, -- Above zombie
 					0
 				)

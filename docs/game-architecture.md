@@ -1114,6 +1114,9 @@ plant-vs-zombie/
 | GridUtils | | Grid coordinate calculations |
 | LaneCache | | Lane-based spatial hashing |
 | MathUtils | | Math helper functions |
+| **ChanceUtils** | | RNG/probability utilities (Roll, RandomLane, PickRandom, etc.) |
+| **ECSUtils** | | Entity manipulation (DamageEntity, KillEntity, ApplyOrRefreshEffect) |
+| **VFXUtils** | | Visual effects (CloneAndEmit, PlayFromFolder, AttachIdleVFX) |
 
 ### Naming Conventions
 

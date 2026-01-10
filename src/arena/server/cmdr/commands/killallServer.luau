@@ -12,6 +12,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local EntityPool = require(Shared.utils.EntityPool)
 local Logger = require(Shared.utils.Logger)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 return function(_context)
 	local world = EntityPool.GetWorld()
@@ -20,19 +21,12 @@ return function(_context)
 		return "World not initialized"
 	end
 	
-	-- Count and kill all zombies by setting health to 0
+	-- Count and kill all zombies using ECSUtils
 	local killCount = 0
 	local ZombieTypeComponent = Components.ZombieTypeComponent
-	local HealthComponent = Components.HealthComponent
 	
 	for id, _zombieType in world:query(ZombieTypeComponent) do
-		-- Get current health and set to 0
-		local health = world:get(id, HealthComponent)
-		if health then
-			world:insert(id, HealthComponent({
-				Current = 0,
-				Max = health.Max,
-			}))
+		if ECSUtils.KillEntity(world, id, Components) then
 			killCount += 1
 		end
 	end

@@ -17,6 +17,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))
@@ -175,7 +176,7 @@ end
 function AudioService.PlayPeaShoot(position: Vector3?)
 	AudioService.PlaySound("PeaShoot", {
 		Position = position,
-		PlaybackSpeed = 0.9 + math.random() * 0.2, -- Slight variation
+		PlaybackSpeed = ChanceUtils.RandomPitch(1.0, 0.1), -- Slight variation
 	})
 end
 
@@ -206,7 +207,7 @@ function AudioService.PlayZombieGroan(position: Vector3?)
 	AudioService.PlaySound("ZombieGroan", {
 		Position = position,
 		Volume = 0.5,
-		PlaybackSpeed = 0.8 + math.random() * 0.4,
+		PlaybackSpeed = ChanceUtils.RandomPitch(1.0, 0.2),
 	})
 end
 
@@ -228,7 +229,7 @@ end
 ]]
 function AudioService.PlaySunCollect()
 	AudioService.PlaySound("SunCollect", {
-		PlaybackSpeed = 1 + math.random() * 0.1,
+		PlaybackSpeed = ChanceUtils.RandomPitch(1.0, 0.05),
 	})
 end
 

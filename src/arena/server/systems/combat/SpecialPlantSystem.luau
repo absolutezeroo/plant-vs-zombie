@@ -32,6 +32,7 @@ local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local EntityPool = require(Shared.utils.EntityPool)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -137,13 +138,7 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			}))
 			
 			-- Small damage
-			local health = world:get(zombieId, HealthComponent)
-			if health then
-				world:insert(zombieId, HealthComponent({
-					Current = math.max(0, health.Current - (stats.Damage or 20)),
-					Max = health.Max,
-				}))
-			end
+			ECSUtils.DamageEntity(world, zombieId, stats.Damage or 20, Components)
 			killCount += 1
 		end
 		Logger.Info("SpecialPlant", `IceShroom {entityId} froze {killCount} zombies for {freezeDuration}s`)
@@ -158,12 +153,7 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			for _, zombieId in zombiesInLane do
 				if not world:contains(zombieId) then continue end
 				
-				local health = world:get(zombieId, HealthComponent)
-				if health then
-					world:insert(zombieId, HealthComponent({
-						Current = 0,
-						Max = health.Max,
-					}))
+				if ECSUtils.KillEntity(world, zombieId, Components) then
 					killCount += 1
 				end
 			end
@@ -188,12 +178,7 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			local distance = math.sqrt(dx * dx + dz * dz)
 			
 			if distance <= explosionRadius then
-				local health = world:get(zombieId, HealthComponent)
-				if health then
-					world:insert(zombieId, HealthComponent({
-						Current = 0,
-						Max = health.Max,
-					}))
+				if ECSUtils.KillEntity(world, zombieId, Components) then
 					killCount += 1
 				end
 			end
@@ -234,13 +219,7 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 	Logger.Info("SpecialPlant", `PotatoMine {mineId} detonated by zombie {triggeredByZombieId}!`)
 	
 	-- Kill the zombie
-	local health = world:get(triggeredByZombieId, HealthComponent)
-	if health then
-		world:insert(triggeredByZombieId, HealthComponent({
-			Current = 0,
-			Max = health.Max,
-		}))
-	end
+	ECSUtils.KillEntity(world, triggeredByZombieId, Components)
 	
 	-- Clear grid cell
 	local plant = world:get(mineId, PlantTypeComponent)
@@ -410,13 +389,7 @@ local function SpecialPlantSystem(world)
 		
 		if zombieId then
 			-- Chomp! Instant kill
-			local health = world:get(zombieId, HealthComponent)
-			if health then
-				world:insert(zombieId, HealthComponent({
-					Current = 0,
-					Max = health.Max,
-				}))
-			end
+			ECSUtils.KillEntity(world, zombieId, Components)
 			
 			-- Start chewing
 			local chewDuration = stats.ChewDuration or SpecialDefaults.CHEW_DURATION
@@ -459,12 +432,7 @@ local function SpecialPlantSystem(world)
 					local dx = math.abs(zombiePos.X - jumpData.targetX)
 					local dz = math.abs(zombiePos.Z - jumpData.targetZ)
 					if dx < 3 and dz < 3 then
-						local health = world:get(zombieId, HealthComponent)
-						if health then
-							world:insert(zombieId, HealthComponent({
-								Current = 0,
-								Max = health.Max,
-							}))
+						if ECSUtils.KillEntity(world, zombieId, Components) then
 							Logger.Info("SpecialPlant", `Squash {plantId} squashed zombie {zombieId}`)
 							Network.EntityDied.FireAll({ EntityId = zombieId })
 						end

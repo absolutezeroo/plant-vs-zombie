@@ -46,6 +46,9 @@ export type PlantStats = {
 	ShotDelay: number?,      -- Delay between multi-shots for IsRepeater (default 0.1)
 	ProjectileSpawnOffset: Vector3?, -- Offset from plant center for projectile spawn (default Vector3.new(2, 2.5, 0))
 	
+	-- Projectile visual variant (data-driven, replaces hardcoded switch)
+	ProjectileVariant: string?,  -- "Pea", "SnowPea", "FirePea", "Cabbage", "Kernel", "Butter", "Melon", "Spore", "Fume", "Star", "Spike", "Thorn"
+	
 	-- Advanced projectile stats
 	IsCatapult: boolean?,    -- Lobs projectiles in an arc (Cabbage-pult, Melon-pult)
 	HasSplash: boolean?,     -- Projectile deals splash damage
@@ -54,6 +57,7 @@ export type PlantStats = {
 	CanStun: boolean?,       -- Can stun zombies (Kernel-pult butter)
 	StunChance: number?,     -- Chance to stun (0-1)
 	StunDuration: number?,   -- Stun duration in seconds
+	StunProjectileVariant: string?, -- Variant when stun procs ("Butter" for KernelPult)
 	CanHitFlying: boolean?,  -- Can hit flying zombies (Cactus, Cattail)
 	ShotsPerBurst: number?,  -- Number of shots per attack (Repeater=2, GatlingPea=4)
 	ShootsMultiDirection: boolean?, -- Shoots in multiple directions (Starfruit)
@@ -67,6 +71,8 @@ export type PlantStats = {
 	
 	-- Platform/Water requirements (data-driven placement validation)
 	IsPlatform: boolean?,         -- Is a platform plant (LilyPad, FlowerPot)
+	IsWaterPlatform: boolean?,    -- Platform for water lanes (LilyPad)
+	IsGroundPlatform: boolean?,   -- Platform for roof/ground (FlowerPot)
 	AllowsPlantOnTop: boolean?,   -- Allows another plant to be placed on top
 	RequiresWater: boolean?,      -- Must be placed on water lane (SeaShroom, TangleKelp)
 	RequiresLilyPad: boolean?,    -- Must be placed on a LilyPad (Cattail)
@@ -119,6 +125,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Shoots peas at zombies",
 		Category = "Attacker",
 		CanShoot = true,
+		ProjectileVariant = "Pea",
 	},
 	
 	WallNut = {
@@ -150,6 +157,7 @@ local PlantData: {[string]: PlantStats} = {
 		-- Behavior
 		CanShoot = true,
 		IsFrozen = true,
+		ProjectileVariant = "SnowPea",
 		-- Frozen projectile stats
 		SlowPercent = 0.5,
 		SlowDuration = 3,
@@ -203,6 +211,7 @@ local PlantData: {[string]: PlantStats} = {
 		-- Behavior
 		CanShoot = true,
 		IsRepeater = true,
+		ProjectileVariant = "Pea",
 		-- Multi-shot stats
 		ShotsPerBurst = 2,
 		ShotDelay = 0.1,
@@ -224,6 +233,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsThreeLane = true,
+		ProjectileVariant = "Pea",
 	},
 	
 	SplitPea = {
@@ -238,6 +248,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		ShootsBehind = true,
+		ProjectileVariant = "Pea",
 	},
 	
 	GatlingPea = {
@@ -252,6 +263,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsRepeater = true,
+		ProjectileVariant = "Pea",
 		ShotsPerBurst = 4,
 		ShotDelay = 0.08,
 	},
@@ -268,6 +280,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		ShootsMultiDirection = true,
+		ProjectileVariant = "Star",
 	},
 	
 	Cactus = {
@@ -282,6 +295,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		CanHitFlying = true,
+		ProjectileVariant = "Spike",
 	},
 	
 	Cattail = {
@@ -296,6 +310,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsHoming = true,
+		ProjectileVariant = "Thorn",
 		RequiresLilyPad = true,
 	},
 	
@@ -315,6 +330,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsCatapult = true,
+		ProjectileVariant = "Cabbage",
 	},
 	
 	KernelPult = {
@@ -329,9 +345,11 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsCatapult = true,
+		ProjectileVariant = "Kernel",
 		CanStun = true,
 		StunChance = 0.2,
 		StunDuration = 4,
+		StunProjectileVariant = "Butter",
 	},
 	
 	MelonPult = {
@@ -346,6 +364,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsCatapult = true,
+		ProjectileVariant = "Melon",
 		HasSplash = true,
 		SplashRadius = 3,
 	},
@@ -363,6 +382,7 @@ local PlantData: {[string]: PlantStats} = {
 		CanShoot = true,
 		IsCatapult = true,
 		IsFrozen = true,
+		ProjectileVariant = "WinterMelon",
 		HasSplash = true,
 		SplashRadius = 3,
 		SlowPercent = 0.5,
@@ -400,6 +420,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Free, short-range spore shooter",
 		Category = "Attacker",
 		CanShoot = true,
+		ProjectileVariant = "Spore",
 		IsMushroom = true,
 		SleepsDuringDay = true,
 	},
@@ -415,6 +436,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Aquatic puff-shroom",
 		Category = "Attacker",
 		CanShoot = true,
+		ProjectileVariant = "Spore",
 		IsMushroom = true,
 		SleepsDuringDay = true,
 		RequiresWater = true,
@@ -431,6 +453,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Fumes pierce shields",
 		Category = "Attacker",
 		CanShoot = true,
+		ProjectileVariant = "Fume",
 		IsMushroom = true,
 		SleepsDuringDay = true,
 		PiercesShields = true,
@@ -447,6 +470,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Long range, hides when zombies near",
 		Category = "Attacker",
 		CanShoot = true,
+		ProjectileVariant = "Spore",
 		IsMushroom = true,
 		SleepsDuringDay = true,
 		HidesWhenNear = true,
@@ -536,6 +560,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsMushroom = true,
 		SleepsDuringDay = true,
 		CanShoot = true,
+		ProjectileVariant = "Fume",
 		ShootsAllDirections = true,
 		PiercesShields = true,
 	},
@@ -779,6 +804,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Platform for water lanes",
 		Category = "Support",
 		IsPlatform = true,
+		IsWaterPlatform = true,
 		AllowsPlantOnTop = true,
 	},
 	
@@ -793,6 +819,7 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Platform for roof levels",
 		Category = "Support",
 		IsPlatform = true,
+		IsGroundPlatform = true,
 		AllowsPlantOnTop = true,
 	},
 	

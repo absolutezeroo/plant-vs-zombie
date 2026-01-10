@@ -21,10 +21,10 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Components
 local LifestealComponent = Components.LifestealComponent
-local HealthComponent = Components.HealthComponent
 local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- System function
@@ -37,25 +37,15 @@ local function LifestealSystem(world)
 		local lifesteal = world:get(sourcePlant, LifestealComponent)
 		if not lifesteal then continue end
 		
-		local health = world:get(sourcePlant, HealthComponent)
-		if not health then continue end
-		
 		-- Calculate heal amount
 		local lifestealPercent = lifesteal.Percent :: number
 		local healAmount = math.floor(hitEvent.Damage * lifestealPercent)
 		if healAmount <= 0 then continue end
 		
-		-- Apply healing (cap at max, immutable via Sift)
-		local healthCurrent = health.Current :: number
-		local healthMax = health.Max :: number
-		local newHealth = math.min(healthMax, healthCurrent + healAmount)
-		if newHealth > healthCurrent then
-			world:insert(sourcePlant, HealthComponent({
-				Current = newHealth,
-				Max = healthMax,
-			}))
-			
-			Logger.Debug("LifestealSystem", `Plant {sourcePlant} healed {healAmount} from lifesteal`)
+		-- Apply healing using ECSUtils
+		local actualHeal = ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
+		if actualHeal > 0 then
+			Logger.Debug("LifestealSystem", `Plant {sourcePlant} healed {actualHeal} from lifesteal`)
 		end
 	end
 end

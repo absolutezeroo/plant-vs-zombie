@@ -5,8 +5,10 @@
     Provides a structured way to load services with progress tracking.
     Works with LoaderUI to show loading progress to players.
     
+    Note: Uses --!nonstrict due to complex Fusion type inference with LoaderUI.
+    
     Usage:
-        local ServiceLoader = require(shared.utils.ServiceLoader)
+        local ServiceLoader = require(Shared.utils.ServiceLoader)
         local loader = ServiceLoader.new()
         
         loader:AddStep("Network", function()

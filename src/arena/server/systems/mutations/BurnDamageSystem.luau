@@ -23,6 +23,7 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Components
 local BurningComponent = Components.BurningComponent
@@ -88,11 +89,8 @@ local function BurnDamageSystem(world)
 			if elapsed >= 1 then
 				local damage = burning.DamagePerSecond
 				
-				-- Apply damage
-				world:insert(entityId, HealthComponent({
-					Current = math.max(0, health.Current - damage),
-					Max = health.Max,
-				}))
+				-- Apply damage using ECSUtils
+				ECSUtils.DamageEntity(world, entityId, damage, Components)
 				
 				-- Emit damage event for visual feedback
 				world:spawn(DamageEvent({

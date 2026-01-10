@@ -1,8 +1,8 @@
 ---
 title: 'API Reference'
 project: 'plant-vs-zombie'
-date: '2026-01-07'
-version: '1.0'
+date: '2026-01-10'
+version: '1.1'
 purpose: 'Document all service APIs to prevent call mismatches'
 ---
 
@@ -277,6 +277,127 @@ type LobbyReturnData = {
 
 ---
 
+## ChanceUtils (NEW)
+
+**Location:** `src/shared/utils/ChanceUtils.luau`
+
+Centralized RNG and probability utilities. Use instead of raw `math.random()`.
+
+### Probability
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Roll(chance)` | `number (0-1)` | `boolean` | Roll chance (0.3 = 30% chance) |
+| `RollPercent(percent)` | `number (0-100)` | `boolean` | Roll percentage (30 = 30%) |
+
+### Grid Random
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `RandomLane()` | - | `number` | Random lane (1 to GRID_LANES) |
+| `RandomColumn()` | - | `number` | Random column (1 to GRID_COLUMNS) |
+| `RandomGridCell()` | - | `number, number` | Random (column, lane) |
+
+### Offsets & Signs
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `RandomDirection()` | - | `number` | Random 1 or -1 |
+| `RandomSign(positiveChance?)` | `number?` | `number` | Random sign with bias |
+| `RandomPitch(base?, variance?)` | `number?, number?` | `number` | Audio pitch variance |
+| `RandomOffset(maxOffset)` | `number` | `number` | Random -max to +max |
+
+### Collections
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `PickRandom(array)` | `{T}` | `T?` | Pick random element |
+| `WeightedPick(items)` | `{{Value: T, Weight: number}}` | `T?` | Weighted random pick |
+| `Shuffle(array)` | `{T}` | `{T}` | Fisher-Yates shuffle |
+
+### Numbers
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `RandomInt(min, max)` | `number, number` | `number` | Random integer |
+| `RandomFloat(min, max)` | `number, number` | `number` | Random float |
+
+---
+
+## ECSUtils (NEW)
+
+**Location:** `src/shared/utils/ECSUtils.luau`
+
+Entity Component System manipulation helpers. Centralizes health/damage patterns.
+
+### Health Manipulation
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `DamageEntity(world, entityId, damage, Components)` | `...` | `number, boolean` | Apply damage, returns (actualDamage, isDead) |
+| `HealEntity(world, entityId, healAmount, Components)` | `...` | `number` | Apply heal, returns actual heal |
+| `ModifyHealth(world, entityId, delta, Components)` | `...` | `number, boolean` | Modify health (+/-), returns (newHealth, isDead) |
+| `KillEntity(world, entityId, Components)` | `...` | `boolean` | Instant kill, returns wasAlive |
+| `BoostHealth(world, entityId, bonusHealth, Components)` | `...` | `boolean` | Add to current AND max health |
+| `ScaleHealth(world, entityId, multiplier, Components)` | `...` | `boolean` | Scale both current and max |
+| `SetMaxHealth(world, entityId, newMax, adjustCurrent?, Components)` | `...` | `void` | Set max health |
+
+### Entity Type Checks
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `IsPlant(world, entityId, Components)` | `...` | `boolean` | Has PlantTypeComponent |
+| `IsZombie(world, entityId, Components)` | `...` | `boolean` | Has ZombieTypeComponent |
+| `IsAlive(world, entityId, Components)` | `...` | `boolean` | Has health > 0 |
+| `Exists(world, entityId)` | `any, number` | `boolean` | Entity exists in world |
+
+### Status Effects
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `ApplyOrRefreshEffect(world, entityId, Component, newData, strategy?, ...)` | `...` | `boolean` | Apply/refresh status effect |
+
+**RefreshStrategy:** `"Longest"` | `"Strongest"` | `"Replace"` | `"Stack"`
+
+### Component Helpers
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetOrDefault(world, entityId, Component, defaultValue)` | `...` | `T` | Get component or default |
+| `HasAllComponents(world, entityId, components)` | `...` | `boolean` | Has all listed components |
+| `HasAnyComponent(world, entityId, components)` | `...` | `boolean` | Has any listed component |
+
+---
+
+## VFXUtils (NEW)
+
+**Location:** `src/shared/utils/VFXUtils.luau`
+
+Visual effects utilities. Eliminates duplicate clone/emit patterns.
+
+### Anchor Creation
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `CreateVFXAnchor(position, name?)` | `Vector3, string?` | `Part` | Create invisible anchor Part |
+
+### Emission
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetEmitCount(emitter, defaultCount?)` | `ParticleEmitter, number?` | `number` | Get EmitCount attribute or default |
+| `Emit(emitter, count?)` | `ParticleEmitter, number?` | `void` | Emit particles |
+| `CloneEmitAndCleanup(sourceEmitter, parent, emitCount?, cleanupDelay?)` | `...` | `ParticleEmitter` | Clone, emit, auto-cleanup |
+| `CloneAndEmit(sourceEmitter, position, emitCount?, cleanupDelay?)` | `...` | `Part, ParticleEmitter` | Create anchor, clone, emit, cleanup |
+
+### Folder/Model Based
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `PlayFromFolder(vfxFolder, position, colorOverride?, cleanupDelay?)` | `...` | `Part?` | Play all emitters in folder |
+| `PlayFromModel(model, vfxName, position?, defaultEmitCount?)` | `...` | `boolean` | Play from model's VFX folder |
+
+### Light Effects
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `CloneAndFadeLight(sourceLight, parent, fadeTime?)` | `...` | `Light` | Clone light with fade-out |
+
+### Idle VFX (Persistent)
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `AttachIdleVFX(model, vfxName?)` | `Model, string?` | `ParticleEmitter?` | Attach persistent VFX |
+| `DetachIdleVFX(model)` | `Model` | `void` | Remove and clean attached VFX |
+
+---
+
 ## Component Index
 
 **Location:** `src/shared/components/init.luau`
@@ -365,4 +486,5 @@ model:PivotTo(cframe)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-01-10 | Added ChanceUtils, ECSUtils, VFXUtils documentation |
 | 1.0 | 2026-01-07 | Initial documentation after API audit |

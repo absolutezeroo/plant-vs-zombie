@@ -25,10 +25,13 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -40,12 +43,8 @@ local PlantTypeComponent = Components.PlantTypeComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local MovementComponent = Components.MovementComponent
 
--- Config
-local TrapConfig = {
-	SPIKEWEED_DAMAGE_INTERVAL = 0.5,  -- Seconds between damage ticks
-	SPIKEWEED_HIT_RADIUS = 3,          -- Studs
-	GARLIC_BITE_THRESHOLD = 3,         -- Bites before zombie switches lane
-}
+-- Config (from GameConstants.Trap)
+local TrapConfig = GameConstants.Trap
 
 -- Track last damage time per zombie per trap
 local _trapDamageTimes: {[string]: number} = {} -- "trapId_zombieId" -> lastDamageTime
@@ -85,34 +84,26 @@ local function TrapSystem(world)
 			local lastDamage = _trapDamageTimes[key] or 0
 			if currentTime - lastDamage < TrapConfig.SPIKEWEED_DAMAGE_INTERVAL then continue end
 			
-			-- Apply damage
-			local health = world:get(zombieId, HealthComponent)
-			if health then
-				local newHealth = math.max(0, health.Current - damage)
-				world:insert(zombieId, HealthComponent({
-					Current = newHealth,
-					Max = health.Max,
-				}))
-				
+			-- Apply damage using ECSUtils
+			local actualDamage, isDead = ECSUtils.DamageEntity(world, zombieId, damage, Components)
+			if actualDamage > 0 then
 				_trapDamageTimes[key] = currentTime
-				Logger.Debug("Trap", `Spikeweed {trapId} damaged zombie {zombieId} for {damage}`)
+				Logger.Debug("Trap", `Spikeweed {trapId} damaged zombie {zombieId} for {actualDamage}`)
 				
 				-- Broadcast damage
+				local health = world:get(zombieId, HealthComponent)
 				Network.EntityDamaged.FireAll({
 					EntityId = zombieId,
-					NewHealth = newHealth,
-					DamageAmount = damage,
+					NewHealth = health and health.Current or 0,
+					DamageAmount = actualDamage,
 				})
 				
 				-- Check for vehicle (PopsTires)
-				if stats.PopsTires then
+				if stats.PopsTires and not isDead then
 					local zombieStats = ZombieData[zombie.ZombieType]
 					if zombieStats and zombieStats.IsVehicle then
 						-- Instant kill vehicle
-						world:insert(zombieId, HealthComponent({
-							Current = 0,
-							Max = health.Max,
-						}))
+						ECSUtils.KillEntity(world, zombieId, Components)
 						Logger.Info("Trap", `Spikeweed {trapId} popped tires of vehicle zombie {zombieId}`)
 					end
 				end
@@ -189,7 +180,7 @@ function TrapAPI.OnGarlicEaten(world: any, garlicId: number, zombieId: number)
 			newLane = currentLane - 1  -- Move up
 		else
 			-- Middle lane - random direction
-			newLane = currentLane + (if math.random() > 0.5 then 1 else -1)
+			newLane = currentLane + ChanceUtils.RandomDirection()
 		end
 		
 		-- Clamp to valid lanes

@@ -41,6 +41,7 @@ local MapConfig = require(Shared.config.MapConfig)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 local Logger = require(Shared.utils.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
+local VFXUtils = require(Shared.utils.VFXUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
@@ -131,23 +132,8 @@ local function playMuzzleFlash(plantModel: Model, spawnPos: Vector3)
 	local shootVFX = vfxFolder and vfxFolder:FindFirstChild("Shoot")
 	
 	if shootVFX and shootVFX:IsA("ParticleEmitter") then
-		-- Create temporary anchor for VFX
-		local anchor = Instance.new("Part")
-		anchor.Name = "MuzzleFlash"
-		anchor.Anchored = true
-		anchor.CanCollide = false
-		anchor.CanQuery = false
-		anchor.Transparency = 1
-		anchor.Size = Vector3.one * 0.1
-		anchor.Position = spawnPos
-		anchor.Parent = Workspace
-		
-		local clone = shootVFX:Clone()
-		clone.Parent = anchor
-		local emitCount = clone:GetAttribute("EmitCount")
-		clone:Emit(if type(emitCount) == "number" then emitCount else 8)
-		
-		Debris:AddItem(anchor, clone.Lifetime.Max + 0.5)
+		-- Use VFXUtils to clone, emit, and cleanup
+		VFXUtils.CloneAndEmit(shootVFX, spawnPos)
 		Logger.Debug("ProjectileRender", "Played muzzle flash VFX")
 	end
 	

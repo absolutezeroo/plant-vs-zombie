@@ -25,8 +25,10 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local Logger = require(Shared.utils.Logger)
 local EntityPool = require(Shared.utils.EntityPool)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -48,15 +50,15 @@ end
 local PositionComponent = Components.PositionComponent
 local SunComponent = Components.SunComponent
 
--- Sun spawning config
+-- Sun spawning config (from GameConstants.Economy)
 local SunConfig = {
-	SPAWN_INTERVAL = 7,       -- Seconds between sky sun spawns
-	SPAWN_INTERVAL_VARIANCE = 3, -- +/- variance (so 4-10 seconds)
-	SUN_VALUE = 25,           -- Sun value when collected
-	LIFE_TIME = 12,           -- Seconds until despawn
-	SPAWN_HEIGHT_OFFSET = 25, -- Y offset above grid for spawn
-	FALL_SPEED = 4,           -- Studs per second
-	GROUND_OFFSET = 1.5,      -- Y offset above GridY for landing
+	SPAWN_INTERVAL = GameConstants.Economy.SKY_SUN_SPAWN_INTERVAL,
+	SPAWN_INTERVAL_VARIANCE = GameConstants.Economy.SKY_SUN_SPAWN_VARIANCE,
+	SUN_VALUE = GameConstants.Economy.SKY_SUN_VALUE,
+	LIFE_TIME = GameConstants.Economy.SKY_SUN_LIFETIME,
+	SPAWN_HEIGHT_OFFSET = GameConstants.Economy.SKY_SUN_SPAWN_HEIGHT,
+	FALL_SPEED = GameConstants.Economy.SKY_SUN_FALL_SPEED,
+	GROUND_OFFSET = 1.5,
 }
 
 -- Get ground Y from MapConfig (dynamic per map)
@@ -75,23 +77,22 @@ local _nextSpawnDelay = 0
 
 local function getRandomGridPosition(): (number, number, number)
 	-- Random column and lane within grid
-	local column = math.random(1, GridConfig.GRID_COLUMNS)
-	local lane = math.random(1, GridConfig.GRID_LANES)
+	local column, lane = ChanceUtils.RandomGridCell()
 	
 	-- Convert to world position using MapConfig (visual config or defaults)
 	local cellCenter = MapConfig.GridToWorld(column, lane)
 	local cellW, cellD = MapConfig.GetCellSize()
 	
 	-- Add some random offset within cell
-	local offsetX = (math.random() - 0.5) * cellW * 0.6
-	local offsetZ = (math.random() - 0.5) * cellD * 0.6
+	local offsetX = ChanceUtils.RandomOffset(cellW * 0.3)
+	local offsetZ = ChanceUtils.RandomOffset(cellD * 0.3)
 	
 	return cellCenter.X + offsetX, getSpawnHeight(), cellCenter.Z + offsetZ
 end
 
 local function spawnSkySun(world: any): number
 	local x, y, z = getRandomGridPosition()
-	local targetY = getGroundY() + SunConfig.GROUND_OFFSET + math.random() * 2
+	local targetY = getGroundY() + SunConfig.GROUND_OFFSET + ChanceUtils.RandomFloat(0, 2)
 	
 	local entityId = EntityPool.Spawn(
 		PositionComponent({
@@ -146,7 +147,7 @@ local function SunSpawnSystem(world)
 	if currentTime - _lastSpawnTime >= _nextSpawnDelay then
 		spawnSkySun(world)
 		_lastSpawnTime = currentTime
-		_nextSpawnDelay = SunConfig.SPAWN_INTERVAL + (math.random() - 0.5) * 2 * SunConfig.SPAWN_INTERVAL_VARIANCE
+		_nextSpawnDelay = SunConfig.SPAWN_INTERVAL + ChanceUtils.RandomOffset(SunConfig.SPAWN_INTERVAL_VARIANCE)
 	end
 	
 	-- Process falling sun and despawning

@@ -21,6 +21,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local EntityPool = require(Shared.utils.EntityPool)
@@ -46,13 +47,13 @@ local PositionComponent = Components.PositionComponent
 local PlantTypeComponent = Components.PlantTypeComponent
 local SunComponent = Components.SunComponent
 
--- Production config (defaults for missing plant data)
+-- Production config (from GameConstants.Economy, used when PlantData doesn't specify)
 local ProductionDefaults = {
-	PRODUCTION_INTERVAL = 24,  -- Default seconds between sun production
-	FIRST_PRODUCTION_DELAY = 7, -- Default seconds before first sun
-	SUN_VALUE = 25,            -- Default sun value when collected
-	SUN_LIFETIME = 12,         -- Seconds until despawn (global)
-	SPAWN_OFFSET_Y = 3,        -- Height above plant to spawn sun (global)
+	PRODUCTION_INTERVAL = GameConstants.Economy.DEFAULT_SUN_PRODUCTION_INTERVAL,
+	FIRST_PRODUCTION_DELAY = GameConstants.Economy.DEFAULT_FIRST_SUN_DELAY,
+	SUN_VALUE = GameConstants.Economy.DEFAULT_SUN_VALUE,
+	SUN_LIFETIME = GameConstants.Economy.PLANT_SUN_LIFETIME,
+	SPAWN_OFFSET_Y = 3,
 }
 
 -- Track production timers per sunflower entity

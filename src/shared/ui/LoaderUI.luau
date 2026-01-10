@@ -24,6 +24,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModernTheme = require(Shared.ui.ModernTheme)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 local LoaderUI = {}
 LoaderUI.__index = LoaderUI
@@ -156,7 +157,7 @@ function LoaderUI:_createUI()
     local subtitle = self._subtitle
     
     -- Random tip
-    local tip = TIPS[math.random(1, #TIPS)]
+    local tip = ChanceUtils.PickRandom(TIPS) or TIPS[1]
     
     self._screenGui = scope:New "ScreenGui" {
         Name = "LoaderUI",

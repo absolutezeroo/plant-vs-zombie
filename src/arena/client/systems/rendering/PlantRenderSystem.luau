@@ -32,6 +32,7 @@ local PlantData = require(Shared.data.PlantData)
 local GridUtils = require(Shared.utils.GridUtils)
 local Logger = require(Shared.utils.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
+local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
@@ -225,7 +226,6 @@ local function setupNetworkListeners()
 		if vfx then
 			if visual.Model then
 				-- Model-aware: use Center Attachment (spatial contract)
-				local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 				local vfxPos = AttachmentUtils.GetWorldPosition(visual.Model, AttachmentUtils.Names.Center, false)
 				vfx.PlayPlantPlaced(vfxPos)
 			else

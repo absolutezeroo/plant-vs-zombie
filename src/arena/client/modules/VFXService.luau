@@ -29,6 +29,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 local GameSignals = require(Shared.signals.GameSignals)
+local VFXUtils = require(Shared.utils.VFXUtils)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))
@@ -64,17 +66,9 @@ function VFXService.Initialize()
 	Logger.Info("VFX", "VFXService initialized with signal listeners")
 end
 
--- Helper: Create a part for VFX attachment
+-- Helper: Create a part for VFX attachment (delegates to VFXUtils)
 local function createVFXPart(position: Vector3): Part
-	local part = Instance.new("Part")
-	part.Name = "VFXAnchor"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.Transparency = 1
-	part.Size = Vector3.new(0.1, 0.1, 0.1)
-	part.Position = position
+	local part = VFXUtils.CreateVFXAnchor(position, "VFXAnchor")
 	part.Parent = _vfxFolder
 	return part
 end
@@ -103,15 +97,9 @@ local function playVFXFromAsset(position: Vector3, vfxName: string, fallbackColo
 		-- Clone and play all ParticleEmitters from the asset
 		for _, child in vfxTemplate:GetChildren() do
 			if child:IsA("ParticleEmitter") then
-				local clone = child:Clone()
-				clone.Parent = part
-				local emitCount = clone:GetAttribute("EmitCount")
-				clone:Emit(if type(emitCount) == "number" then emitCount else 8)
+				VFXUtils.CloneEmitAndCleanup(child, part)
 			elseif child:IsA("PointLight") or child:IsA("SpotLight") then
-				local clone = child:Clone() :: Light
-				clone.Parent = part
-				-- Fade out light
-				TweenService:Create(clone, TweenInfo.new(0.5), { Brightness = 0 }):Play()
+				VFXUtils.CloneAndFadeLight(child, part, 0.5)
 			end
 		end
 		Debris:AddItem(part, 2)
@@ -128,8 +116,7 @@ local function playVFXFromAsset(position: Vector3, vfxName: string, fallbackColo
 						clone.Color = ColorSequence.new(fallbackColor)
 					end
 					clone.Parent = part
-					local emitCount = clone:GetAttribute("EmitCount")
-					clone:Emit(if type(emitCount) == "number" then emitCount else 8)
+					VFXUtils.Emit(clone)
 				end
 			end
 		end
@@ -287,8 +274,8 @@ function VFXService.ScreenShake(intensity: number?, duration: number?)
 			local progress = (tick() - startTime) / actualDuration
 			local shake = actualIntensity * (1 - progress) -- Decay
 			
-			local offsetX = (math.random() - 0.5) * 2 * shake
-			local offsetY = (math.random() - 0.5) * 2 * shake
+			local offsetX = ChanceUtils.RandomOffset(shake)
+			local offsetY = ChanceUtils.RandomOffset(shake)
 			
 			camera.CFrame = camera.CFrame * CFrame.new(offsetX, offsetY, 0)
 			task.wait()
@@ -324,11 +311,8 @@ function VFXService.PlayPlantShootFromModel(model: Model, isFrozen: boolean?)
 	
 	if shootVFX and shootVFX:IsA("ParticleEmitter") then
 		local part = createVFXPart(position)
-		local clone = shootVFX:Clone()
-		clone.Parent = part
-		local emitCount = clone:GetAttribute("EmitCount")
-		clone:Emit(if type(emitCount) == "number" then emitCount else 8)
-		Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+		VFXUtils.CloneEmitAndCleanup(shootVFX, part)
+		Debris:AddItem(part, shootVFX.Lifetime.Max + 0.5)
 		return
 	end
 	
@@ -358,11 +342,8 @@ function VFXService.PlayPlantShoot(model: Model?, position: Vector3, isFrozen: b
 		
 		if shootVFX and shootVFX:IsA("ParticleEmitter") then
 			local part = createVFXPart(position)
-			local clone = shootVFX:Clone()
-			clone.Parent = part
-			local emitCount = clone:GetAttribute("EmitCount")
-			clone:Emit(if type(emitCount) == "number" then emitCount else 8)
-			Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+			VFXUtils.CloneEmitAndCleanup(shootVFX, part)
+			Debris:AddItem(part, shootVFX.Lifetime.Max + 0.5)
 			return
 		end
 	end
@@ -389,11 +370,8 @@ function VFXService.PlayPlantDeathFromModel(model: Model)
 	
 	if deathVFX and deathVFX:IsA("ParticleEmitter") then
 		local part = createVFXPart(position)
-		local clone = deathVFX:Clone()
-		clone.Parent = part
-		local emitCount = clone:GetAttribute("EmitCount")
-		clone:Emit(if type(emitCount) == "number" then emitCount else 15)
-		Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+		VFXUtils.CloneEmitAndCleanup(deathVFX, part, 15)
+		Debris:AddItem(part, deathVFX.Lifetime.Max + 0.5)
 		return
 	end
 	
@@ -419,11 +397,8 @@ function VFXService.PlayPlantDeath(model: Model?, position: Vector3)
 		
 		if deathVFX and deathVFX:IsA("ParticleEmitter") then
 			local part = createVFXPart(position)
-			local clone = deathVFX:Clone()
-			clone.Parent = part
-			local emitCount = clone:GetAttribute("EmitCount")
-			clone:Emit(if type(emitCount) == "number" then emitCount else 15)
-			Debris:AddItem(part, clone.Lifetime.Max + 0.5)
+			VFXUtils.CloneEmitAndCleanup(deathVFX, part, 15)
+			Debris:AddItem(part, deathVFX.Lifetime.Max + 0.5)
 			return
 		end
 	end
@@ -438,39 +413,15 @@ end
 	Returns the emitter for cleanup later
 ]]
 function VFXService.AttachIdleVFX(model: Model): ParticleEmitter?
-	local vfxFolder = model:FindFirstChild("VFX")
-	local idleVFX = vfxFolder and vfxFolder:FindFirstChild("Idle")
-	
-	if idleVFX and idleVFX:IsA("ParticleEmitter") then
-		local visual = model:FindFirstChild("Visual")
-		local targetPart = visual and visual:FindFirstChildWhichIsA("BasePart")
-		
-		if targetPart then
-			local clone = idleVFX:Clone()
-			clone.Name = "IdleVFX_Active"
-			clone.Parent = targetPart
-			-- Idle VFX uses Rate, not Emit
-			clone.Enabled = true
-			return clone
-		end
-	end
-	
-	return nil
+	return VFXUtils.AttachIdleVFX(model, "Idle")
 end
 
 --[[
 	Stop idle VFX attached to a model
 ]]
 function VFXService.DetachIdleVFX(model: Model)
-	local visual = model:FindFirstChild("Visual")
-	if visual then
-		for _, part in visual:GetDescendants() do
-			if part:IsA("ParticleEmitter") and part.Name == "IdleVFX_Active" then
-				part.Enabled = false
-				Debris:AddItem(part, part.Lifetime.Max)
-			end
-		end
-	end
+	VFXUtils.DetachIdleVFX(model)
+end
 end
 
 return VFXService

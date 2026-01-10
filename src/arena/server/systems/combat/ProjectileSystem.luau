@@ -30,6 +30,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
@@ -48,14 +49,14 @@ local SleepingComponent = Components.SleepingComponent
 local HidingComponent = Components.HidingComponent
 local ChewingComponent = Components.ChewingComponent
 
--- Projectile config defaults (used when PlantData doesn't specify)
+-- Projectile config defaults (from GameConstants + local fallbacks)
 local ProjectileDefaults = {
 	SPEED = 15,              -- Studs per second (global)
 	FIRE_INTERVAL = 0.67,    -- Seconds between shots (1.5 attacks/sec)
 	MAX_RANGE = 100,         -- Max distance before despawn (global)
 	DAMAGE = 20,             -- Base pea damage
-	SLOW_PERCENT = 0.5,      -- Default slow (50%)
-	SLOW_DURATION = 3,       -- Default slow duration
+	SLOW_PERCENT = GameConstants.Combat.DEFAULT_SLOW_PERCENT,
+	SLOW_DURATION = GameConstants.Combat.DEFAULT_SLOW_DURATION,
 	SHOT_DELAY = 0.1,        -- Default delay for multi-shot plants
 	CATAPULT_SPEED = 10,     -- Slower for arcing projectiles
 	SPAWN_OFFSET_X = 2,      -- Default X offset from plant center
@@ -181,28 +182,16 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 		}))
 	end
 	
-	-- Determine projectile variant for client VFX
-	local variant = "Pea"
-	if isFrozen then
+	-- Determine projectile variant for client VFX (DATA-DRIVEN)
+	local plantStats = PlantData.GetStatsRaw(plantType)
+	local variant: string = (plantStats and plantStats.ProjectileVariant) or "Pea"
+	
+	-- Handle special cases
+	if isFrozen and variant == "Pea" then
 		variant = "FrozenPea"
-	elseif isCatapult then
-		if plantType == "CabbagePult" then
-			variant = "Cabbage"
-		elseif plantType == "KernelPult" then
-			variant = if canStun then "Butter" else "Kernel"
-		elseif plantType == "MelonPult" or plantType == "WinterMelon" then
-			variant = "Melon"
-		end
-	elseif plantType:find("Shroom") then
-		if plantType == "FumeShroom" or plantType == "GloomShroom" then
-			variant = "Fume"
-		else
-			variant = "Spore"
-		end
-	elseif plantType == "Starfruit" then
-		variant = "Star"
-	elseif plantType == "Cactus" then
-		variant = "Spike"
+	elseif plantStats and plantStats.IsCatapult and plantStats.StunProjectileVariant and canStun then
+		-- KernelPult throws Butter when stun procs
+		variant = plantStats.StunProjectileVariant :: string
 	end
 	
 	-- Broadcast to clients

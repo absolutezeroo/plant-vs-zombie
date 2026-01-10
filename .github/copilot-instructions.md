@@ -84,15 +84,46 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
     local zombies = LaneCache.GetEntitiesInLane(row)
     ```
 
-### 3. System Lifecycle (SystemManager Pipeline)
+### 3. Entity Health Manipulation (ECSUtils)
+* **❌ BAD:** Direct `world:insert(id, HealthComponent({...}))` for damage/heal.
+* **✅ GOOD:** Use **`ECSUtils`** for consistent behavior.
+    ```lua
+    local ECSUtils = require(Shared.utils.ECSUtils)
+    local actualDamage, isDead = ECSUtils.DamageEntity(world, zombieId, 50, Components)
+    ECSUtils.KillEntity(world, zombieId, Components)  -- Instant kill
+    ECSUtils.BoostHealth(world, plantId, 100, Components)  -- Armor boost
+    ```
+
+### 4. Random Number Generation (ChanceUtils)
+* **❌ BAD:** Raw `math.random()` calls scattered everywhere.
+* **✅ GOOD:** Use **`ChanceUtils`** for consistent RNG.
+    ```lua
+    local ChanceUtils = require(Shared.utils.ChanceUtils)
+    if ChanceUtils.Roll(0.3) then  -- 30% chance
+    local lane = ChanceUtils.RandomLane()
+    local offset = ChanceUtils.RandomOffset(2)  -- -2 to +2
+    local item = ChanceUtils.PickRandom(itemArray)
+    ```
+
+### 5. Visual Effects (VFXUtils)
+* **❌ BAD:** Creating anchor Parts and cloning emitters inline.
+* **✅ GOOD:** Use **`VFXUtils`** for standardized VFX patterns.
+    ```lua
+    local VFXUtils = require(Shared.utils.VFXUtils)
+    VFXUtils.CloneAndEmit(particleEmitter, position)  -- Clone, emit, auto-cleanup
+    VFXUtils.PlayFromModel(model, "Death")  -- Play VFX from model's VFX folder
+    VFXUtils.AttachIdleVFX(model)  -- Persistent idle particles
+    ```
+
+### 6. System Lifecycle (SystemManager Pipeline)
 * **Pattern:** Systems have `Init` (can yield) and `OnStep` (cannot yield).
 * **Reference:** See `src/shared/utils/SystemManager.luau` for implementation details.
 
-### 4. Data-Driven Content
+### 7. Data-Driven Content
 * **Rule:** Never hardcode stats (Damage, Health, Speed).
 * **Source:** Always require from `src/shared/data/` (e.g., `PlantData`, `ZombieData`, `DifficultyData`).
 
-### 5. Asset-First Visuals (NO `Instance.new` for Art)
+### 8. Asset-First Visuals (NO `Instance.new` for Art)
 * **STRICT:** Never create visual elements (Parts, ParticleEmitters, Beams, Lights, Models) using `Instance.new()` in code.
 * **✅ GOOD:** Create the asset in Roblox Studio, store it in `ReplicatedStorage.Assets`, and `Clone()` it.
     ```lua

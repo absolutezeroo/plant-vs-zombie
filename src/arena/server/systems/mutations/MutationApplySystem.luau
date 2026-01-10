@@ -27,6 +27,7 @@ local Components = require(Shared.components)
 local MutationData = require(Shared.data.MutationData)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Component references
 local PlantTypeComponent = Components.PlantTypeComponent
@@ -91,16 +92,8 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	local effects = MutationData.CalculateCombinedEffects(mutationIds)
 	
 	-- Apply stat modifiers to existing components
-	local health = world:get(entityId, HealthComponent)
-	if health and effects.HealthBonus and effects.HealthBonus ~= 1 then
-		local healthMax = health.Max :: number
-		local healthCurrent = health.Current :: number
-		local newMax = math.floor(healthMax * effects.HealthBonus)
-		local newCurrent = math.floor(healthCurrent * effects.HealthBonus)
-		world:insert(entityId, HealthComponent({
-			Current = newCurrent,
-			Max = newMax,
-		}))
+	if effects.HealthBonus and effects.HealthBonus ~= 1 then
+		ECSUtils.ScaleHealth(world, entityId, effects.HealthBonus, Components)
 	end
 	
 	-- Track mutations on the entity

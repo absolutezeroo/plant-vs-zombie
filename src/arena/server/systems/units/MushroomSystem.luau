@@ -24,6 +24,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
@@ -44,12 +45,12 @@ local HidingComponent = Components.HidingComponent
 local SpawnEvent = Components.SpawnEvent
 local PlantActionEvent = Components.PlantActionEvent
 
--- Config
+-- Config (from GameConstants.MushroomDefaults)
 local MushroomConfig = {
-	DEFAULT_HIDE_RADIUS = 6,      -- Studs
-	SUN_SHROOM_GROW_TIME = 120,   -- Seconds to grow to full size
-	SUN_SHROOM_SMALL_VALUE = 15,  -- Small sun value
-	SUN_SHROOM_LARGE_VALUE = 25,  -- Full sun value
+	DEFAULT_HIDE_RADIUS = GameConstants.MushroomDefaults.HIDE_RADIUS,
+	SUN_SHROOM_GROW_TIME = GameConstants.MushroomDefaults.SUN_SHROOM_GROW_TIME,
+	SUN_SHROOM_SMALL_VALUE = GameConstants.MushroomDefaults.SUN_SHROOM_SMALL_VALUE,
+	SUN_SHROOM_LARGE_VALUE = GameConstants.MushroomDefaults.SUN_SHROOM_LARGE_VALUE,
 }
 
 -- Track SunShroom growth timers

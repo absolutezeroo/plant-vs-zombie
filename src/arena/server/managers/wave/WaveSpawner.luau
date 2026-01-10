@@ -21,6 +21,7 @@ local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local Components = require(Shared.components)
 local EntityPool = require(Shared.utils.EntityPool)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 -- Components
 local PositionComponent = Components.PositionComponent
@@ -178,7 +179,7 @@ function WaveSpawner:SpawnDefinedWave(world: any, waveNumber: number)
         task.delay(delay, function()
             for i = 1, count do
                 -- If no lane specified, pick random
-                local spawnLane = lane or math.random(1, GridConfig.GRID_LANES)
+                local spawnLane = lane or ChanceUtils.RandomLane()
                 self:SpawnZombie(world, spawn.ZombieType, spawnLane)
                 
                 -- Small delay between multiple spawns of same entry
@@ -271,7 +272,7 @@ function WaveSpawner:PickZombie(phase: SpawnPhase, remainingBudget: number): str
         return nil
     end
     
-    return affordable[math.random(1, #affordable)]
+    return ChanceUtils.PickRandom(affordable)
 end
 
 -- Spawn a zombie entity

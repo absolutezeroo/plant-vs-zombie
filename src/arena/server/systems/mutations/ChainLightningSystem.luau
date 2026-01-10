@@ -23,6 +23,7 @@ local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local GridConfig = require(Shared.config.GridConfig)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Components
 local PositionComponent = Components.PositionComponent
@@ -117,15 +118,9 @@ local function applyChainLightning(
 		local nextTarget = nearbyZombies[1]
 		hitZombies = Sift.Array.push(hitZombies, nextTarget)
 		
-		-- Apply damage to next target
-		local targetHealth = world:get(nextTarget, HealthComponent)
-		if targetHealth then
-			local healthCurrent = targetHealth.Current :: number
-			world:insert(nextTarget, HealthComponent({
-				Current = math.max(0, healthCurrent - currentDamage),
-				Max = targetHealth.Max,
-			}))
-			
+		-- Apply damage to next target using ECSUtils
+		local actualDamage, died = ECSUtils.DamageEntity(world, nextTarget, currentDamage, Components)
+		if actualDamage > 0 then
 			-- Emit damage event
 			world:spawn(DamageEvent({
 				Target = nextTarget,

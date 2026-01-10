@@ -25,6 +25,8 @@ local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local ECSUtils = require(Shared.utils.ECSUtils)
+local MathUtils = require(Shared.utils.MathUtils)
 
 -- Components
 local PoisonCloudComponent = Components.PoisonCloudComponent
@@ -111,25 +113,20 @@ local function PoisonCloudSystem(world)
 					if not world:contains(entityId) then continue end
 					
 					local pos = LaneCache.GetPosition(entityId)
-					local health = world:get(entityId, HealthComponent)
-					if not pos or not health then continue end
+					if not pos then continue end
 					
-					local dx = pos.X - cloud.Position.X
-					local dz = pos.Z - cloud.Position.Z
-					local distance = math.sqrt(dx * dx + dz * dz)
+					local distance = MathUtils.Distance2D(pos.X, pos.Z, cloud.Position.X, cloud.Position.Z)
 					
 					if distance <= cloud.Radius then
-						-- Apply poison damage
-						world:insert(entityId, HealthComponent({
-							Current = math.max(0, health.Current - cloud.DamagePerSecond),
-							Max = health.Max,
-						}))
-						
-						world:insert(entityId, DamageEvent({
-							Amount = cloud.DamagePerSecond,
-							DamageType = "Poison",
-							SourceEntityId = nil,
-						}))
+						-- Apply poison damage using ECSUtils
+						local actualDamage, died = ECSUtils.DamageEntity(world, entityId, cloud.DamagePerSecond, Components)
+						if actualDamage > 0 then
+							world:insert(entityId, DamageEvent({
+								Amount = cloud.DamagePerSecond,
+								DamageType = "Poison",
+								SourceEntityId = nil,
+							}))
+						end
 					end
 				end
 			end

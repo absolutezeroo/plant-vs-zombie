@@ -29,11 +29,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local ZombieData = require(Shared.data.ZombieData)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
 local EntityPool = require(Shared.utils.EntityPool)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ECSUtils = require(Shared.utils.ECSUtils)
 
 -- Type alias for world parameter
 type MatterWorld = Types.MatterWorld
@@ -57,11 +60,11 @@ local EnhancedProjectileComponent = Components.EnhancedProjectileComponent
 -- Event component for mutation systems
 local ProjectileHitEvent = Components.ProjectileHitEvent
 
--- Combat config
+-- Combat config (from GameConstants.Combat)
 local CombatConfig = {
-	PROJECTILE_HIT_RADIUS = 2.5,   -- Studs (slightly larger for dt tolerance)
-	ZOMBIE_BITE_RANGE = 4,         -- How close zombie must be to start eating
-	ZOMBIE_BITE_INTERVAL = 1.0,    -- Seconds between bites
+	PROJECTILE_HIT_RADIUS = GameConstants.Combat.PROJECTILE_HIT_RADIUS,
+	ZOMBIE_BITE_RANGE = GameConstants.Combat.ZOMBIE_BITE_RANGE,
+	ZOMBIE_BITE_INTERVAL = GameConstants.Combat.ZOMBIE_BITE_INTERVAL,
 }
 
 -- Track zombie attack timers
@@ -160,22 +163,18 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 		end
 	end
 	
-	local newHealth = math.max(0, health.Current - damage)
-	
-	-- Update health using component constructor
-	world:insert(entityId, HealthComponent({
-		Current = newHealth,
-		Max = health.Max,
-	}))
+	-- Apply damage using ECSUtils (handles clamping and returns actual damage)
+	local actualDamage, isDead = ECSUtils.DamageEntity(world, entityId, damage, Components)
 	
 	-- Broadcast damage event
+	local newHealth = world:get(entityId, HealthComponent)
 	Network.EntityDamaged.FireAll({
 		EntityId = entityId,
-		NewHealth = newHealth,
-		DamageAmount = damage,
+		NewHealth = newHealth and newHealth.Current or 0,
+		DamageAmount = actualDamage,
 	})
 	
-	return newHealth <= 0 -- Return true if dead
+	return isDead
 end
 
 -- Apply splash damage to zombies near impact point
@@ -213,7 +212,7 @@ local function tryApplyStun(world: MatterWorld, zombieId: number, proj: any): bo
 	end
 	
 	-- Roll for stun chance
-	if math.random() <= proj.StunChance then
+	if ChanceUtils.Roll(proj.StunChance) then
 		world:insert(zombieId, StunComponent({
 			Duration = proj.StunDuration,
 			AppliedAt = os.clock(),

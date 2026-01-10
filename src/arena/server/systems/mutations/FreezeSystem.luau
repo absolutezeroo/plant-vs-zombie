@@ -22,7 +22,9 @@ local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+local GameConstants = require(Shared.config.GameConstants)
 local Logger = require(Shared.utils.Logger)
+local ChanceUtils = require(Shared.utils.ChanceUtils)
 
 -- Components
 local FrozenComponent = Components.FrozenComponent
@@ -47,8 +49,7 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 	end
 	
 	-- Roll for freeze
-	local roll = math.random()
-	if roll <= freezeChance then
+	if ChanceUtils.Roll(freezeChance) then
 		-- Freeze successful!
 		world:insert(zombieEntityId, FrozenComponent({
 			RemainingDuration = freezeDuration,
@@ -60,16 +61,16 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 		-- Apply enhanced slow if specified
 		if enhancedSlow and enhancedSlow > 0 then
 			local existingSlow = world:get(zombieEntityId, SlowComponent)
-			local slowPercent = 0.5 + enhancedSlow -- Base slow + enhanced
+			local slowPercent = GameConstants.Combat.DEFAULT_SLOW_PERCENT + enhancedSlow -- Base slow + enhanced
 			
 			if existingSlow then
 				local existingSlowPercent = existingSlow.SlowPercent :: number
-				slowPercent = math.min(0.9, existingSlowPercent + enhancedSlow)
+				slowPercent = math.min(GameConstants.Combat.MAX_SLOW_PERCENT, existingSlowPercent + enhancedSlow)
 			end
 			
 			world:insert(zombieEntityId, SlowComponent({
 				SlowPercent = slowPercent,
-				Duration = 3,
+				Duration = GameConstants.Combat.DEFAULT_SLOW_DURATION,
 				AppliedAt = os.clock(),
 			}))
 		end

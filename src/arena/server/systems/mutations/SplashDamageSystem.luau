@@ -23,6 +23,8 @@ local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local GridConfig = require(Shared.config.GridConfig)
+local ECSUtils = require(Shared.utils.ECSUtils)
+local MathUtils = require(Shared.utils.MathUtils)
 
 -- Components
 local SplashDamageComponent = Components.SplashDamageComponent
@@ -65,13 +67,10 @@ local function applySplashDamage(
 		if not world:contains(entityId) then continue end
 		
 		local pos = world:get(entityId, PositionComponent)
-		local health = world:get(entityId, HealthComponent)
-		if not pos or not health then continue end
+		if not pos then continue end
 		
-		-- Calculate distance
-		local dx = pos.X - impactPosition.X
-		local dz = pos.Z - impactPosition.Z
-		local distance = math.sqrt(dx * dx + dz * dz)
+		-- Calculate distance using MathUtils
+		local distance = MathUtils.Distance2D(pos.X, pos.Z, impactPosition.X, impactPosition.Z)
 		
 		if distance <= splashRadius then
 			-- Apply splash damage (can optionally scale by distance)
@@ -79,19 +78,17 @@ local function applySplashDamage(
 			local finalDamage = math.floor(splashDamage * distanceMultiplier)
 			
 			if finalDamage > 0 then
-				world:insert(entityId, HealthComponent({
-					Current = math.max(0, health.Current - finalDamage),
-					Max = health.Max,
-				}))
-				
-				world:spawn(DamageEvent({
-					Target = entityId,
-					Amount = finalDamage,
-					DamageType = "Splash",
-					Source = sourceEntityId or 0,
-				}))
-				
-				hitCount += 1
+				local actualDamage, died = ECSUtils.DamageEntity(world, entityId, finalDamage, Components)
+				if actualDamage > 0 then
+					world:spawn(DamageEvent({
+						Target = entityId,
+						Amount = finalDamage,
+						DamageType = "Splash",
+						Source = sourceEntityId or 0,
+					}))
+					
+					hitCount += 1
+				end
 			end
 		end
 	end
