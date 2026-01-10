@@ -204,9 +204,13 @@ local function updateGhostPosition(column: number, lane: number, valid: boolean,
 	
 	local worldPos = GridUtils.GridToWorld(column, lane)
 	
-	-- Position using PivotTo with 180° rotation (same as PlantRenderSystem)
-	local facingRotation = CFrame.Angles(0, math.rad(180), 0)
-	ghost:PivotTo(CFrame.new(worldPos) * facingRotation)
+	-- Calculate rotation based on zombie direction (same as PlantRenderSystem)
+	-- Plants face OPPOSITE of zombie movement direction
+	local zombieDir = MapConfig.GetZombieDirection()
+	local facingDir = Vector3.new(-zombieDir.X, 0, -zombieDir.Z)
+	local facingCFrame = CFrame.lookAt(worldPos, worldPos + facingDir)
+	-- Add -90° rotation to correct model orientation (same as PlantRenderSystem)
+	ghost:PivotTo(facingCFrame * CFrame.Angles(0, math.rad(-90), 0))
 	
 	-- Update color based on validity
 	updateGhostColor(valid)
@@ -517,15 +521,9 @@ local function handlePlacement()
 		cost = stats.Cost,
 	}
 	
-	local plantTypeEnum = ({
-		Peashooter = "Peashooter",
-		Sunflower = "Sunflower",
-		WallNut = "WallNut",
-		SnowPea = "SnowPea",
-		CherryBomb = "CherryBomb",
-		PotatoMine = "PotatoMine",
-		Repeater = "Repeater",
-	})[selectedPlant] or "Peashooter"
+	-- Map selected plant name to network enum
+	-- The PlantType enum in Zap accepts string keys directly
+	local plantTypeEnum = selectedPlant
 	
 	Network.PlacePlantRequest.Fire({
 		RequestId = _requestId,

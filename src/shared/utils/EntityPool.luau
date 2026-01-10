@@ -185,4 +185,14 @@ function EntityPool.IsInitialized(): boolean
 	return _initialized
 end
 
+--[[
+	Get the Matter World instance
+	Used by debug commands and utilities
+	
+	@return Matter World or nil if not initialized
+]]
+function EntityPool.GetWorld(): any
+	return _world
+end
+
 return EntityPool

@@ -27,6 +27,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -56,6 +57,9 @@ local WaveStateEvent = Components.WaveStateEvent
 -- Types
 type GameState = GameStateManager.GameState
 type SpawnPhase = WaveSpawner.SpawnPhase
+
+-- Studio Debug Mode: No auto-start in Studio
+local IS_STUDIO_DEBUG = RunService:IsStudio()
 
 -- Wave timing configuration
 local WaveConfig = {
@@ -550,6 +554,11 @@ local function WaveManagerSystem(world)
     
     -- Wait for first wave
     if _currentWave == 0 then
+        -- In Studio Debug mode, don't auto-start - wait for manual StartGame()
+        if IS_STUDIO_DEBUG and _waveStartTime == 0 then
+            return -- Waiting for manual start via Cmdr
+        end
+        
         if currentTime >= _waveStartTime then
             startWave(1, world)
         end

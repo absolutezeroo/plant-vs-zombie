@@ -184,10 +184,15 @@ local function tryApplyStun(world: MatterWorld, zombieId: number, proj: any): bo
 	return false
 end
 
--- Find plant at grid position
+-- Find plant at grid position (ignores traps - zombies walk over them)
 local function findPlantAtPosition(world: MatterWorld, column: number, lane: number): number?
 	for id, plant in world:query(PlantTypeComponent) do
 		if plant.Column == column and plant.Lane == lane then
+			-- Skip traps - zombies don't stop to eat them
+			local plantStats = PlantData[plant.PlantType]
+			if plantStats and plantStats.IsTrap then
+				continue
+			end
 			return id
 		end
 	end

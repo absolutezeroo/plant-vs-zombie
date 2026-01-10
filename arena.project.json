@@ -21,6 +21,10 @@
     },
 
     "StarterPlayer": {
+      "$properties": {
+        "CharacterWalkSpeed": 16,
+        "CameraMode": "Classic"
+      },
       "StarterPlayerScripts": {
         "Client": {
           "$path": "src/arena/client"
@@ -28,9 +32,27 @@
       }
     },
 
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+
     "Workspace": {
       "$properties": {
         "FilteringEnabled": true
+      },
+      "DefaultSpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Position": [0, 10, 0],
+          "Size": [6, 1, 6],
+          "Anchored": true,
+          "CanCollide": true,
+          "Transparency": 1,
+          "Neutral": true,
+          "Duration": 0
+        }
       }
     },
     "Lighting": {

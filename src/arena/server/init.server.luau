@@ -41,11 +41,15 @@ local SystemManager = require(Shared.utils.SystemManager)
 local Components = require(Shared.components)
 local Tags = Components.Tags
 
+-- Check if running in Studio (for debug mode)
+local IS_STUDIO = RunService:IsStudio()
+
 -- Import server services
 local Server = script
 local PlayerDataService = require(Server.services.PlayerDataService)
 local ProgressionHandler = require(Server.handlers.ProgressionHandler)
 local ArenaService = require(Server.services.ArenaService)
+local MapLoader = require(Server.services.MapLoader)
 
 -- Import MutationApplySystem for its API (to load player mutations on join)
 local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
@@ -166,6 +170,44 @@ TeleportDataHandler.InitializeArena({
 
 Logger.Info("Server", "TeleportDataHandler initialized for Arena")
 
+-- ============================================
+-- STUDIO DEBUG MODE: Load map only, no gameplay
+-- ============================================
+if IS_STUDIO then
+	Logger.Info("Server", "=== STUDIO DEBUG MODE ===")
+	Logger.Info("Server", "Loading default map without starting gameplay...")
+	Logger.Info("Server", "Use Cmdr commands (F2) to test: loadmap, spawn, wave, sun, killall")
+	
+	-- Load the default map immediately
+	local defaultMapId = "Map_Day" -- or read from config
+	local mapLoaded = MapLoader.LoadMap(defaultMapId)
+	if mapLoaded then
+		Logger.Info("Server", `Default map '{defaultMapId}' loaded successfully`)
+	else
+		Logger.Warn("Server", `Failed to load default map '{defaultMapId}', using existing ArenaMap`)
+	end
+	
+	-- Handle player join in Studio Debug mode
+	_serverTrove:Connect(TeleportDataHandler.OnPlayerReady, function(player: Player, _teleportData: TeleportData.ArenaJoinData?)
+		Logger.Info("Server", `[Studio Debug] Player {player.Name} joined`)
+		
+		-- Sync player data
+		if ProgressionHandler.SyncPlayerData then
+			ProgressionHandler.SyncPlayerData(player)
+		end
+		if ProgressionHandler.SyncDeck then
+			ProgressionHandler.SyncDeck(player)
+		end
+		
+		-- Spawn character but DON'T start battle
+		player:LoadCharacterAsync()
+		Logger.Info("Server", `[Studio Debug] Spawned {player.Name} - use Cmdr to test!`)
+	end)
+else
+	-- ============================================
+	-- PRODUCTION MODE: Normal gameplay flow
+	-- ============================================
+
 -- Subscribe to OnPlayerReady signal to start battles
 _serverTrove:Connect(TeleportDataHandler.OnPlayerReady, function(player: Player, teleportData: TeleportData.ArenaJoinData?)
 	Logger.Info("Server", `Player {player.Name} is ready (profile loaded, teleport data applied)`)
@@ -191,7 +233,14 @@ _serverTrove:Connect(TeleportDataHandler.OnPlayerReady, function(player: Player,
 		Logger.Info("Server", `Starting test battle: World={defaultWorldId}, Difficulty={defaultDifficulty}`)
 		ArenaService.StartBattle(player, defaultWorldId, defaultDifficulty, defaultDeck)
 	end
+	
+	-- NOW spawn the character (after map is loaded)
+	-- CharacterAutoLoads is disabled, so we spawn manually
+	player:LoadCharacterAsync()
+	Logger.Info("Server", `Spawned character for {player.Name}`)
 end)
+
+end -- End of IS_STUDIO check
 
 -- Clean up when player leaves
 local function onPlayerRemoving(player: Player)

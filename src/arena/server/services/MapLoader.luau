@@ -53,6 +53,25 @@ local _mapsFolder: Folder? = nil
 local MapLoader = {}
 
 --[[
+    Teleport all connected players to a spawn location
+    Used after loading a new map to move players from default spawn
+]]
+function MapLoader._TeleportPlayersToSpawn(spawnLocation: SpawnLocation)
+    local spawnCFrame = spawnLocation.CFrame + Vector3.new(0, 3, 0)
+    
+    for _, player in Players:GetPlayers() do
+        local character = player.Character
+        if character then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp:IsA("BasePart") then
+                hrp.CFrame = spawnCFrame
+                Logger.Debug("MapLoader", `Teleported {player.Name} to spawn`)
+            end
+        end
+    end
+end
+
+--[[
     Initialize the MapLoader
 ]]
 function MapLoader.Initialize()
@@ -173,6 +192,9 @@ function MapLoader.LoadMap(mapId: string): boolean
         spawnClone.Parent = Workspace
         
         Logger.Info("MapLoader", `SpawnLocation loaded at {spawnClone.Position}`)
+        
+        -- Teleport all players to the new spawn location
+        MapLoader._TeleportPlayersToSpawn(spawnClone)
     else
         Logger.Warn("MapLoader", `No SpawnLocation found in {mapId}`)
     end
