@@ -26,6 +26,7 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -92,7 +93,7 @@ local function spawnSkySun(world: any): number
 	local x, y, z = getRandomGridPosition()
 	local targetY = getGroundY() + SunConfig.GROUND_OFFSET + math.random() * 2
 	
-	local entityId = world:spawn(
+	local entityId = EntityPool.Spawn(
 		PositionComponent({
 			X = x,
 			Y = y,
@@ -107,6 +108,11 @@ local function spawnSkySun(world: any): number
 			SourceType = "Sky",
 		})
 	)
+	
+	if not entityId then
+		Logger.Warn("SunSpawnSystem", "EntityPool exhausted! Cannot spawn sun")
+		return -1
+	end
 	
 	-- Broadcast to all clients
 	Network.SunSpawned.FireAll({
@@ -148,7 +154,11 @@ local function SunSpawnSystem(world)
 		-- Despawn check
 		local age = currentTime - sun.SpawnTime
 		if age >= sun.Lifetime then
-			world:despawn(id)
+			if EntityPool.IsPooledEntity(id) then
+				EntityPool.Despawn(id)
+			else
+				world:despawn(id)
+			end
 			
 			-- Broadcast despawn to all clients
 			Network.SunDespawned.FireAll({

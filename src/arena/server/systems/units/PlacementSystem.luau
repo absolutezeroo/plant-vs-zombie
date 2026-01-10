@@ -31,6 +31,7 @@ local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local WorldData = require(Shared.data.WorldData)
 local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Components (via index module)
 local PositionComponent = Components.PositionComponent
@@ -252,7 +253,7 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		end
 	end
 	
-	local entityId = world:spawn(
+	local entityId = EntityPool.Spawn(
 		PositionComponent({
 			X = worldPos.X,
 			Y = worldPos.Y + 2, -- Slightly above ground
@@ -271,6 +272,11 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 			PlayerId = player.UserId
 		})
 	)
+	
+	if not entityId then
+		Logger.Error("PlacementSystem", "EntityPool exhausted! Cannot spawn plant")
+		return nil :: any
+	end
 	
 	-- Mark cell as occupied (only if not stacking)
 	if not stats.CanStackOnPlant and not existingEntityId then
@@ -423,8 +429,12 @@ function PlacementAPI.ShovelPlant(world: any, player: Player, plantEntityId: num
 	-- Clear grid cell
 	GridService.ClearByEntity(plantEntityId)
 	
-	-- Despawn entity
-	world:despawn(plantEntityId)
+	-- Release plant back to pool
+	if EntityPool.IsPooledEntity(plantEntityId) then
+		EntityPool.Despawn(plantEntityId)
+	else
+		world:despawn(plantEntityId)
+	end
 	
 	-- Refund sun to player
 	PlacementAPI.AddSun(player, refundAmount)

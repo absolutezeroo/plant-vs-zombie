@@ -352,10 +352,10 @@ event EntityDied = {
     }
 }
 
--- Projectile spawned
+-- Projectile spawned (Unreliable: visual-only, client can handle missing spawns)
 event ProjectileSpawned = {
     from: Server,
-    type: Reliable,
+    type: Unreliable,
     call: ManyAsync,
     data: struct {
         EntityId: EntityId,
@@ -368,7 +368,7 @@ event ProjectileSpawned = {
     }
 }
 
--- Projectile hit a target (for impact VFX)
+-- Projectile hit a target (for impact VFX) - Reliable: critical for gameplay feedback
 event ProjectileHit = {
     from: Server,
     type: Reliable,
@@ -387,7 +387,7 @@ event ProjectileHit = {
 -- Projectile despawned without hitting (out of bounds, max range)
 event ProjectileDespawned = {
     from: Server,
-    type: Reliable,
+    type: Unreliable,
     call: ManyAsync,
     data: struct {
         EntityId: EntityId,

@@ -75,8 +75,8 @@ local loop = Matter.Loop.new(world)
 
 Logger.Info("Server", "Matter World created")
 
--- Initialize Entity Pool
-EntityPool.Initialize(world, Tags.InactiveTag)
+-- Initialize Entity Pool with all components for cleanup on release
+EntityPool.Initialize(world, Tags.InactiveTag, Components)
 Logger.Info("Server", "Entity Pool initialized", EntityPool.GetStats())
 
 -- Load all systems from systems folder (RECURSIVELY scan subfolders)

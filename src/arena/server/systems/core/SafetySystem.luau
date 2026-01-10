@@ -30,6 +30,7 @@ local function SafetySystem(world)
 	local inactiveCount = 0
 	
 	-- Count entities by type
+	-- IMPORTANT: Skip entities with InactiveTag - those are managed by EntityPool
 	for entityId in world do
 		if world:get(entityId, Tags.InactiveTag) then
 			inactiveCount = inactiveCount + 1
@@ -38,34 +39,16 @@ local function SafetySystem(world)
 		end
 	end
 	
-	local totalCount = activeCount + inactiveCount
 	local warningLimit = math.floor(PerformanceConfig.ENTITY_CAP * WARNING_THRESHOLD)
 	
-	-- Check for entity cap violations
+	-- Only warn, don't take action - EntityPool manages entity lifecycle
 	if activeCount > PerformanceConfig.ENTITY_CAP then
 		Logger.Warn("SafetySystem", "CRITICAL: Active entity cap exceeded!", {
 			ActiveCount = activeCount,
 			Cap = PerformanceConfig.ENTITY_CAP,
 		})
-		
-		-- Emergency: mark oldest entities as inactive
-		-- This is a safety net, should never happen in normal gameplay
-		local toDeactivate = activeCount - PerformanceConfig.ENTITY_CAP
-		local deactivated = 0
-		
-		for entityId in world do
-			if not world:get(entityId, Tags.InactiveTag) then
-				world:insert(entityId, Tags.InactiveTag)
-				deactivated = deactivated + 1
-				if deactivated >= toDeactivate then
-					break
-				end
-			end
-		end
-		
-		Logger.Warn("SafetySystem", "Emergency deactivation", {
-			Deactivated = deactivated,
-		})
+		-- NOTE: Removed emergency deactivation - it interferes with EntityPool
+		-- EntityPool.Spawn() will return nil when exhausted, which is safer
 	elseif activeCount > warningLimit then
 		-- Throttled warning
 		local now = tick()

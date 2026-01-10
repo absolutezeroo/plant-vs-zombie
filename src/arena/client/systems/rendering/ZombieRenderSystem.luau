@@ -253,6 +253,12 @@ local function Init(_world)
 	Logger.Debug("ZombieRender", "Initialized")
 end
 
+-- Movement config
+local MovementConfig = {
+	MIN_DT = 1/120,  -- Minimum deltaTime
+	MAX_DT = 1/15,   -- Maximum deltaTime
+}
+
 --[[
 	System - Interpolate zombie positions (CANNOT yield)
 ]]
@@ -262,7 +268,10 @@ local function ZombieRenderSystem(_world)
 		return
 	end
 	
-	local dt = 1/60
+	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
+	local Matter = require(Packages:FindFirstChild("Matter"))
+	local dt = Matter.useDeltaTime()
+	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 	local groundY = MapConfig.GetConfig().GridY
 	local zombieDir = MapConfig.GetZombieDirection()
 	

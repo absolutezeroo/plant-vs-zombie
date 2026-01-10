@@ -23,6 +23,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -82,8 +83,12 @@ local function processCollection(world: any, player: Player, entityId: number): 
 	
 	local value = sun.Value
 	
-	-- Despawn the sun
-	world:despawn(entityId)
+	-- Release sun back to pool
+	if EntityPool.IsPooledEntity(entityId) then
+		EntityPool.Despawn(entityId)
+	else
+		world:despawn(entityId)
+	end
 	
 	Logger.Debug("SunCollection", `{player.Name} collected sun {entityId} worth {value}`)
 	

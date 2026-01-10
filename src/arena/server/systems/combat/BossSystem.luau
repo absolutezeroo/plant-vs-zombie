@@ -27,6 +27,7 @@ local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -54,7 +55,7 @@ local function spawnMinion(world: MatterWorld, bossId: number, minionType: strin
 	-- Spawn the minion slightly behind the boss
 	local direction = MapConfig.GetZombieDirection()
 	
-	local minionId = world:spawn(
+	local minionId = EntityPool.Spawn(
 		PositionComponent({
 			X = posX + 2, -- Behind the boss
 			Y = 1,
@@ -75,6 +76,11 @@ local function spawnMinion(world: MatterWorld, bossId: number, minionType: strin
 			SpawnTime = os.clock(),
 		})
 	)
+	
+	if not minionId then
+		Logger.Warn("BossSystem", "EntityPool exhausted! Cannot spawn minion")
+		return
+	end
 	
 	-- Broadcast to clients
 	Network.ZombieSpawned.FireAll({

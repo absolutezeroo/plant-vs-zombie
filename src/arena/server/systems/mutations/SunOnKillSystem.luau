@@ -20,6 +20,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Components
 local SunOnKillComponent = Components.SunOnKillComponent
@@ -47,7 +48,7 @@ local function SunOnKillSystem(world)
 		-- Spawn sun at zombie death location
 		local sunAmount = sunOnKill.SunAmount
 		
-		world:spawn(
+		local sunId = EntityPool.Spawn(
 			PositionComponent({
 				X = hitEvent.PositionX,
 				Y = hitEvent.PositionY + 3, -- Above ground
@@ -62,7 +63,9 @@ local function SunOnKillSystem(world)
 			})
 		)
 		
-		Logger.Debug("SunOnKillSystem", `Spawned {sunAmount} sun from kill by plant {sourcePlant}`)
+		if sunId then
+			Logger.Debug("SunOnKillSystem", `Spawned {sunAmount} sun from kill by plant {sourcePlant}`)
+		end
 	end
 end
 

@@ -30,6 +30,7 @@ local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Type alias for world parameter
 type MatterWorld = Types.MatterWorld
@@ -168,7 +169,7 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 				if not plantPos then break end
 				
 				-- Create rapid-fire projectile
-				world:spawn(
+				local projId = EntityPool.Spawn(
 					ProjectileComponent({
 						Damage = 20,
 						Speed = 30,  -- Faster than normal
@@ -181,6 +182,8 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 						Z = plantPos.Z,
 					})
 				)
+				
+				if not projId then break end -- Pool exhausted
 				
 				task.wait(interval)
 			end
@@ -234,12 +237,20 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 			local dist = math.sqrt(dx * dx + dz * dz)
 			
 			if dist <= radius then
-				world:despawn(zombieId)
+				if EntityPool.IsPooledEntity(zombieId) then
+					EntityPool.Despawn(zombieId)
+				else
+					world:despawn(zombieId)
+				end
 			end
 		end
 		
 		-- Remove the plant after explosion
-		world:despawn(plantId)
+		if EntityPool.IsPooledEntity(plantId) then
+			EntityPool.Despawn(plantId)
+		else
+			world:despawn(plantId)
+		end
 		Logger.Info("PlantFood", `{plantType} exploded with radius {radius}`)
 	end
 end

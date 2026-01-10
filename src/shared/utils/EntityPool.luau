@@ -1,11 +1,15 @@
 --!strict
 --[[
-	EntityPool.lua - Pre-spawned entity pool for zero-allocation gameplay
+	EntityPool.luau - Simple entity manager with count cap
 	
-	CRITICAL: NEVER use world:spawn() during gameplay after initialization.
-	Always use EntityPool.Acquire() to get entities from the pool.
+	REPLACES world:spawn/despawn for gameplay entities.
+	- EntityPool.Spawn(...) - Create entity with cap enforcement
+	- EntityPool.Despawn(id) - Remove entity and decrement count
 	
-	Pool is initialized at server boot with ENTITY_CAP inactive entities.
+	For ephemeral events (1-frame), use world:spawn() directly.
+	
+	Matter already optimizes entity recycling internally - this module
+	just enforces the ENTITY_CAP and provides stats.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,130 +18,119 @@ local PerformanceConfig = require(ReplicatedStorage.Shared.config.PerformanceCon
 local Logger = require(ReplicatedStorage.Shared.utils.Logger)
 local ErrorHandler = require(ReplicatedStorage.Shared.utils.ErrorHandler)
 
--- Import tag component (will be available after package install)
--- local Tags = require(ReplicatedStorage.Shared.components.Tags)
-
 local EntityPool = {}
 
--- Pool state (module-level is OK for singletons, not systems)
-local _available: {number} = {}
-local _inUse: {[number]: boolean} = {}
-local _world: any = nil -- Matter World reference
+-- Simple state
+local _world: any = nil
 local _initialized: boolean = false
-local _InactiveTag: any = nil
+local _activeCount: number = 0
+local _trackedEntities: {[number]: boolean} = {}
 
 --[[
-	Initialize the entity pool with pre-spawned inactive entities
-	
-	MUST be called once at server boot before any gameplay.
-	Creates ENTITY_CAP entities with InactiveTag component.
+	Initialize the entity pool
 	
 	@param world - Matter World instance
-	@param InactiveTag - Inactive tag component factory
+	@param InactiveTag - UNUSED (kept for API compatibility)
+	@param components - UNUSED (kept for API compatibility)
 ]]
-function EntityPool.Initialize(world: any, InactiveTag: any)
+function EntityPool.Initialize(world: any, _InactiveTag: any?, _components: {[string]: any}?)
 	if _initialized then
 		ErrorHandler.Report("EntityPool already initialized", "EntityPool.Initialize", "Important")
 		return
 	end
 	
 	_world = world
-	_InactiveTag = InactiveTag
-	
-	local poolSize = PerformanceConfig.ENTITY_CAP
-	Logger.Info("EntityPool", `Initializing pool with {poolSize} entities`)
-	
-	-- Pre-spawn all entities with InactiveTag
-	for i = 1, poolSize do
-		local entityId = world:spawn(InactiveTag())
-		table.insert(_available, entityId)
-	end
-	
 	_initialized = true
-	Logger.Info("EntityPool", `Pool initialized: {#_available} entities available`)
+	_activeCount = 0
+	table.clear(_trackedEntities)
+	
+	Logger.Info("EntityPool", `Initialized with cap of {PerformanceConfig.ENTITY_CAP} entities`)
 end
 
 --[[
-	Acquire an entity from the pool
+	Spawn an entity with components (enforces entity cap)
 	
-	Removes InactiveTag and prepares entity for use.
-	Caller should add appropriate components after acquiring.
+	REPLACES world:spawn() for gameplay entities.
 	
-	@return Entity ID, or nil if pool exhausted
+	@param ... - Component instances to add to the entity
+	@return Entity ID, or nil if cap reached
 ]]
-function EntityPool.Acquire(): number?
+function EntityPool.Spawn(...: any): number?
 	if not _initialized then
-		ErrorHandler.Report("EntityPool not initialized", "EntityPool.Acquire", "Critical")
+		ErrorHandler.Report("EntityPool not initialized", "EntityPool.Spawn", "Critical")
 		return nil
 	end
 	
-	if #_available == 0 then
+	-- Check cap
+	if _activeCount >= PerformanceConfig.ENTITY_CAP then
 		ErrorHandler.Report(
-			"Entity pool exhausted! This should never happen.",
-			"EntityPool.Acquire",
+			`Entity cap reached ({PerformanceConfig.ENTITY_CAP}). Cannot spawn more entities.`,
+			"EntityPool.Spawn",
 			"Critical"
 		)
 		return nil
 	end
 	
-	-- Pop from available pool
-	local entityId = table.remove(_available)
-	if entityId then
-		_inUse[entityId] = true
-		
-		-- Remove inactive tag
-		if _world:contains(entityId) then
-			_world:remove(entityId, _InactiveTag)
-		end
-	end
+	-- Spawn directly via Matter (already optimized internally)
+	local entityId = _world:spawn(...)
+	
+	-- Track it
+	_trackedEntities[entityId] = true
+	_activeCount += 1
 	
 	return entityId
 end
 
 --[[
-	Release an entity back to the pool
+	Despawn an entity (decrements count)
 	
-	Strips all components except InactiveTag.
-	Entity becomes available for reuse.
+	REPLACES world:despawn() for pooled entities.
 	
-	@param entityId - Entity to release
+	@param entityId - Entity to remove
+]]
+function EntityPool.Despawn(entityId: number)
+	if not _initialized then
+		ErrorHandler.Report("EntityPool not initialized", "EntityPool.Despawn", "Critical")
+		return
+	end
+	
+	-- Only track entities we spawned
+	if not _trackedEntities[entityId] then
+		return
+	end
+	
+	-- Clean up tracking
+	_trackedEntities[entityId] = nil
+	_activeCount -= 1
+	
+	-- Despawn if still exists
+	if _world:contains(entityId) then
+		_world:despawn(entityId)
+	end
+end
+
+--[[
+	Check if an entity is tracked by the pool
+	
+	@param entityId - Entity to check
+	@return true if entity was spawned via EntityPool
+]]
+function EntityPool.IsPooledEntity(entityId: number): boolean
+	return _trackedEntities[entityId] == true
+end
+
+--[[
+	Legacy: Acquire (prefer Spawn)
+]]
+function EntityPool.Acquire(): number?
+	return EntityPool.Spawn()
+end
+
+--[[
+	Legacy: Release (prefer Despawn)
 ]]
 function EntityPool.Release(entityId: number)
-	if not _initialized then
-		ErrorHandler.Report("EntityPool not initialized", "EntityPool.Release", "Critical")
-		return
-	end
-	
-	if not _inUse[entityId] then
-		ErrorHandler.Report(
-			`Entity {entityId} not in use, cannot release`,
-			"EntityPool.Release",
-			"Minor"
-		)
-		return
-	end
-	
-	-- Verify entity still exists
-	if not _world:contains(entityId) then
-		ErrorHandler.Report(
-			`Entity {entityId} no longer exists in world`,
-			"EntityPool.Release",
-			"Important"
-		)
-		_inUse[entityId] = nil
-		return
-	end
-	
-	-- Strip all components (Matter's despawn would remove entity, we just clear it)
-	-- For Matter, we need to iterate and remove each component
-	-- This is done by the caller before Release, or we add InactiveTag which systems ignore
-	
-	-- Re-add inactive tag
-	_world:insert(entityId, _InactiveTag())
-	
-	-- Move back to available pool
-	_inUse[entityId] = nil
-	table.insert(_available, entityId)
+	EntityPool.Despawn(entityId)
 end
 
 --[[
@@ -146,40 +139,30 @@ end
 	@return { Available: number, InUse: number, Total: number }
 ]]
 function EntityPool.GetStats(): { Available: number, InUse: number, Total: number }
-	local inUseCount = 0
-	for _ in _inUse do
-		inUseCount = inUseCount + 1
-	end
-	
+	local cap = PerformanceConfig.ENTITY_CAP
 	return {
-		Available = #_available,
-		InUse = inUseCount,
-		Total = #_available + inUseCount,
+		Available = cap - _activeCount,
+		InUse = _activeCount,
+		Total = cap,
 	}
 end
 
 --[[
-	Check if pool has available entities
-	
-	@return true if entities available
+	Check if more entities can be spawned
 ]]
 function EntityPool.HasAvailable(): boolean
-	return #_available > 0
+	return _activeCount < PerformanceConfig.ENTITY_CAP
 end
 
 --[[
-	Get count of available entities
-	
-	@return Number of available entities
+	Get count of remaining entity slots
 ]]
 function EntityPool.GetAvailableCount(): number
-	return #_available
+	return PerformanceConfig.ENTITY_CAP - _activeCount
 end
 
 --[[
 	Check if pool is initialized
-	
-	@return true if initialized
 ]]
 function EntityPool.IsInitialized(): boolean
 	return _initialized
@@ -187,12 +170,20 @@ end
 
 --[[
 	Get the Matter World instance
-	Used by debug commands and utilities
-	
-	@return Matter World or nil if not initialized
 ]]
 function EntityPool.GetWorld(): any
 	return _world
+end
+
+--[[
+	Reset pool state (for testing/cleanup)
+]]
+function EntityPool.Reset()
+	table.clear(_trackedEntities)
+	_activeCount = 0
+	_world = nil
+	_initialized = false
+	Logger.Debug("EntityPool", "Pool reset")
 end
 
 return EntityPool

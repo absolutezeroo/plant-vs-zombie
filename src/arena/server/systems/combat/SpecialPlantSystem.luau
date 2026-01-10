@@ -31,6 +31,7 @@ local GridConfig = require(Shared.config.GridConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -220,8 +221,12 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 		EntityId = entityId,
 	})
 	
-	-- Destroy the plant
-	world:despawn(entityId)
+	-- Release plant back to pool
+	if EntityPool.IsPooledEntity(entityId) then
+		EntityPool.Despawn(entityId)
+	else
+		world:despawn(entityId)
+	end
 end
 
 -- Explode PotatoMine: kill the triggering zombie
@@ -256,8 +261,12 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 		EntityId = mineId,
 	})
 	
-	-- Destroy the mine
-	world:despawn(mineId)
+	-- Release mine back to pool
+	if EntityPool.IsPooledEntity(mineId) then
+		EntityPool.Despawn(mineId)
+	else
+		world:despawn(mineId)
+	end
 end
 
 -- Find nearest zombie in range for Chomper/Squash
@@ -466,7 +475,11 @@ local function SpecialPlantSystem(world)
 				-- Squash dies after landing
 				GridService.Clear(plant.Column, plant.Lane)
 				Network.EntityDied.FireAll({ EntityId = plantId })
-				world:despawn(plantId)
+				if EntityPool.IsPooledEntity(plantId) then
+					EntityPool.Despawn(plantId)
+				else
+					world:despawn(plantId)
+				end
 			end
 			_squashJumps[plantId] = nil
 		else

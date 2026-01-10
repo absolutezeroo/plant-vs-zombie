@@ -312,7 +312,18 @@ local function setupNetworkListeners()
 		local visual = _projectileVisuals[data.EntityId]
 		if visual then
 			local part = getVisualPart(visual)
-			local pos = if part then part.Position else Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+			
+			-- CRITICAL: Teleport visual to impact position (sync with server)
+			local impactPos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+			if part then
+				if visual.Model then
+					visual.Model:PivotTo(CFrame.new(impactPos))
+				else
+					part.Position = impactPos
+				end
+			end
+			
+			local pos = impactPos
 			
 			-- Fire signal for VFX/Audio (decoupled)
 			GameSignals.OnProjectileImpact:Fire({
@@ -322,9 +333,9 @@ local function setupNetworkListeners()
 				IsEnhanced = visual.IsEnhanced or data.IsEnhanced,
 			})
 			
-			-- Hit animation (quick scale down)
+			-- Hit animation (quick scale down) - immediate destroy to avoid traversal
 			if part then
-				local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
+				local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Quad)
 				local tween = TweenService:Create(part, tweenInfo, {
 					Size = Vector3.new(0.1, 0.1, 0.1),
 					Transparency = 1
@@ -354,13 +365,22 @@ local function Init(_world)
 	Logger.Debug("ProjectileRender", "Initialized")
 end
 
+-- Movement config
+local MovementConfig = {
+	MIN_DT = 1/120,  -- Minimum deltaTime
+	MAX_DT = 1/15,   -- Maximum deltaTime
+}
+
 --[[
 	System - Move projectiles each frame (CANNOT yield)
 ]]
 local function ProjectileRenderSystem(_world)
-	local dt = 1/60
+	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
+	local Matter = require(Packages:FindFirstChild("Matter"))
+	local dt = Matter.useDeltaTime()
+	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 	
-	-- Move projectiles
+	-- Move projectiles and check client-side collision for responsive visuals
 	for entityId, visual in _projectileVisuals do
 		local part = getVisualPart(visual)
 		if not part then
@@ -378,6 +398,45 @@ local function ProjectileRenderSystem(_world)
 		local minX = mapConfig.GridCornerA.X - 50
 		local maxX = mapConfig.GridCornerB.X + 50
 		if newX < minX or newX > maxX then
+			destroyProjectileVisual(entityId)
+			continue
+		end
+		
+		-- CLIENT-SIDE COLLISION: Check if projectile visually hits any zombie
+		-- This makes impacts feel instant without waiting for server
+		local hitZombie = false
+		local hitPosition = Vector3.new(newX, part.Position.Y, newZ)
+		
+		-- Look for zombie models in workspace (tagged with Zombie_ prefix)
+		for _, child in Workspace:GetChildren() do
+			if child:IsA("Model") and child.Name:find("Zombie_") then
+				local zombieRoot = child.PrimaryPart
+				if zombieRoot then
+					-- Check if same lane (Z position) and close enough on X
+					local zombieZ = zombieRoot.Position.Z
+					local zombieX = zombieRoot.Position.X
+					local laneMatch = math.abs(zombieZ - newZ) < 3 -- Same lane tolerance
+					local xDistance = math.abs(newX - zombieX)
+					
+					if laneMatch and xDistance < 2.5 then
+						hitZombie = true
+						hitPosition = Vector3.new(zombieX, part.Position.Y, zombieZ)
+						break
+					end
+				end
+			end
+		end
+		
+		if hitZombie then
+			-- Fire impact signal for VFX/Audio immediately
+			GameSignals.OnProjectileImpact:Fire({
+				Position = hitPosition,
+				ProjectileType = visual.Variant,
+				IsFrozen = visual.IsFrozen,
+				IsEnhanced = visual.IsEnhanced,
+			})
+			
+			-- Destroy visual immediately (server will confirm damage)
 			destroyProjectileVisual(entityId)
 		else
 			-- Move model or part

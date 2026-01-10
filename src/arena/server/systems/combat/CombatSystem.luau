@@ -33,6 +33,7 @@ local ZombieData = require(Shared.data.ZombieData)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local Types = require(Shared.Types)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Type alias for world parameter
 type MatterWorld = Types.MatterWorld
@@ -58,9 +59,9 @@ local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- Combat config
 local CombatConfig = {
-	PROJECTILE_HIT_RADIUS = 2,   -- Studs
-	ZOMBIE_BITE_RANGE = 4,       -- How close zombie must be to start eating
-	ZOMBIE_BITE_INTERVAL = 1.0,  -- Seconds between bites
+	PROJECTILE_HIT_RADIUS = 2.5,   -- Studs (slightly larger for dt tolerance)
+	ZOMBIE_BITE_RANGE = 4,         -- How close zombie must be to start eating
+	ZOMBIE_BITE_INTERVAL = 1.0,    -- Seconds between bites
 }
 
 -- Track zombie attack timers
@@ -374,8 +375,12 @@ local function CombatSystem(world: MatterWorld)
 				IsEnhanced = if enhanced then enhanced.IsFirePea else false,
 			})
 			
-			-- Despawn projectile
-			world:despawn(projId)
+			-- Release projectile back to pool
+			if EntityPool.IsPooledEntity(projId) then
+				EntityPool.Despawn(projId)
+			else
+				world:despawn(projId)
+			end
 		end
 	end
 	

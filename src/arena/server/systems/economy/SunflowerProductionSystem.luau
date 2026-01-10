@@ -23,6 +23,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -92,7 +93,7 @@ local function SunflowerProductionSystem(world)
 		-- Check if it's time to produce
 		if currentTime >= _productionTimers[id] then
 			-- Spawn sun at plant position (slightly above)
-			local sunId = world:spawn(
+			local sunId = EntityPool.Spawn(
 				PositionComponent({
 					X = pos.X,
 					Y = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y,
@@ -106,6 +107,12 @@ local function SunflowerProductionSystem(world)
 					SourceType = plant.PlantType,
 				})
 			)
+			
+			if not sunId then
+				Logger.Warn("SunflowerProduction", "EntityPool exhausted! Cannot spawn sun")
+				_productionTimers[id] = currentTime + productionInterval
+				continue
+			end
 			
 			-- Broadcast to clients
 			Network.SunSpawned.FireAll({

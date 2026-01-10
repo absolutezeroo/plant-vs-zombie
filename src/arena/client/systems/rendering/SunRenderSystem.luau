@@ -246,11 +246,20 @@ local function Init(_world)
 	Logger.Debug("SunRender", "Initialized")
 end
 
+-- Movement config
+local MovementConfig = {
+	MIN_DT = 1/120,  -- Minimum deltaTime
+	MAX_DT = 1/15,   -- Maximum deltaTime
+}
+
 --[[
 	System - Animate falling suns (CANNOT yield)
 ]]
 local function SunRenderSystem(_world)
-	local dt = 1/60 -- Approximate delta time
+	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
+	local Matter = require(Packages:FindFirstChild("Matter"))
+	local dt = Matter.useDeltaTime()
+	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 	
 	for entityId, sunData in _sunData do
 		if sunData.Falling then

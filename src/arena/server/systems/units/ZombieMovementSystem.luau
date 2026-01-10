@@ -28,6 +28,7 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -143,8 +144,12 @@ local function ZombieMovementSystem(world)
 				-- Deal damage to base
 				BaseHealth.OnZombieReachedHouse()
 				
-				-- Despawn the zombie
-				world:despawn(id)
+				-- Release zombie back to pool
+				if EntityPool.IsPooledEntity(id) then
+					EntityPool.Despawn(id)
+				else
+					world:despawn(id)
+				end
 				
 				-- Broadcast zombie death
 				Network.EntityDied.FireAll({

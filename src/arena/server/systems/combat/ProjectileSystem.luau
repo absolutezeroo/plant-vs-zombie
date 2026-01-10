@@ -33,6 +33,7 @@ local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -140,7 +141,7 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	local actualDirX = forwardDirX * dir
 	local actualDirZ = forwardDirZ * dir
 	
-	local entityId = world:spawn(
+	local entityId = EntityPool.Spawn(
 		PositionComponent({
 			X = startX + (offsetX * actualDirX), -- Offset in shooting direction
 			Y = offsetY,                         -- Height from config
@@ -166,6 +167,11 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 			CanHitFlying = canHitFlying,
 		})
 	)
+	
+	if not entityId then
+		Logger.Warn("Projectile", "EntityPool exhausted! Cannot spawn projectile")
+		return nil
+	end
 	
 	-- Add splash component if needed
 	if hasSplash and splashRadius > 0 then
@@ -267,7 +273,7 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 		local normDx = if mag > 0 then dir.dx / mag else dir.dx
 		local normDz = if mag > 0 then dir.dz / mag else dir.dz
 		
-		local entityId = world:spawn(
+		local entityId = EntityPool.Spawn(
 			PositionComponent({
 				X = startX + normDx * offsetX,
 				Y = offsetY,
@@ -284,6 +290,11 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 				MaxRange = ProjectileDefaults.MAX_RANGE,
 			})
 		)
+		
+		if not entityId then
+			Logger.Warn("Projectile", "EntityPool exhausted in Starfruit burst")
+			continue
+		end
 		
 		Network.ProjectileSpawned.FireAll({
 			EntityId = entityId,
@@ -470,7 +481,11 @@ local function ProjectileSystem(world)
 		if distanceTraveled > maxRange then
 			-- Notify client to remove visual (no impact VFX)
 			Network.ProjectileDespawned.FireAll({ EntityId = projId })
-			world:despawn(projId)
+			if EntityPool.IsPooledEntity(projId) then
+				EntityPool.Despawn(projId)
+			else
+				world:despawn(projId)
+			end
 			continue
 		end
 		

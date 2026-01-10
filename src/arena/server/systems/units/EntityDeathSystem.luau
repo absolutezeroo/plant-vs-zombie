@@ -28,6 +28,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
 local ProgressionData = require(Shared.data.ProgressionData)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -144,18 +145,25 @@ local function EntityDeathSystem(world)
 				EntityId = id,
 			})
 			
+			-- Get position for death event
+			local deathPos = world:get(id, PositionComponent)
+			
 			-- Spawn DeathEvent for other systems to react (VFX, Audio, etc.)
 			local entityType = if plant then "Plant" elseif zombie then "Zombie" else "Unknown"
 			world:spawn(DeathEvent({
 				Target = id,
 				EntityType = entityType,
-				PositionX = if pos then pos.X else 0,
-				PositionY = if pos then pos.Y else 0,
-				PositionZ = if pos then pos.Z else 0,
+				PositionX = if deathPos then deathPos.X else 0,
+				PositionY = if deathPos then deathPos.Y else 0,
+				PositionZ = if deathPos then deathPos.Z else 0,
 			}))
 			
-			-- Despawn the entity
-			world:despawn(id)
+			-- Release entity back to pool (or despawn if not pooled)
+			if EntityPool.IsPooledEntity(id) then
+				EntityPool.Despawn(id)
+			else
+				world:despawn(id)
+			end
 		end
 	end
 end

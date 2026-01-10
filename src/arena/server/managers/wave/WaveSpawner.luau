@@ -20,6 +20,7 @@ local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
 local Components = require(Shared.components)
+local EntityPool = require(Shared.utils.EntityPool)
 
 -- Components
 local PositionComponent = Components.PositionComponent
@@ -288,7 +289,7 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
     -- Get zombie direction from MapConfig (adapts to visual config)
     local direction = MapConfig.GetZombieDirection()
     
-    local entityId = world:spawn(
+    local entityId = EntityPool.Spawn(
         PositionComponent({
             X = spawnPos.X,
             Y = spawnPos.Y,
@@ -309,6 +310,11 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
             SpawnTime = os.clock()
         })
     )
+    
+    if not entityId then
+        Logger.Error("WaveSpawner", "EntityPool exhausted! Cannot spawn zombie")
+        return -1
+    end
     
     -- Check if this zombie should be a Plant Food carrier (glowing)
     local PlantFoodSystemAPI = getPlantFoodSystem().API
