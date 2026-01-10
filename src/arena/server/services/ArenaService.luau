@@ -100,15 +100,14 @@ function ArenaService.StartBattle(player: Player, worldId: string, difficulty: s
         Deck = deck,
     }
     
-    -- Lazy load WaveManager to avoid circular dependency
-    local WaveManagerSystemModule = require(script.Parent.Parent.systems.wave.WaveManagerSystem) :: any
-    local WaveManager = WaveManagerSystemModule.WaveManager
+    -- Load WaveService
+    local WaveService = require(script.Parent.WaveService)
     
     -- Reset game state before starting new battle
-    WaveManager.ResetGameState()
+    WaveService.ResetGameState()
     
-    -- Start the game with world + difficulty (NEW API)
-    local success = WaveManager.StartGame(worldId, difficulty)
+    -- Start the game with world + difficulty
+    local success = WaveService.StartGame(worldId, difficulty)
     
     if not success then
         Logger.Error("ArenaService", `Failed to start game: {worldId}/{difficulty}`)

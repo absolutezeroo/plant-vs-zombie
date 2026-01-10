@@ -6,112 +6,109 @@
 	
 	Sunflowers produce sun orbs every 24 seconds.
 	Sun spawns at plant position and can be collected.
-	Uses SunComponent for consistency with sky sun.
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - manages sun production
-	- Dispose(): Clear production timers
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
-local Logger = require(Shared.utils.Logger)
 local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Server modules
+-- Server modules (lazy-loaded)
 local Server = script.Parent.Parent.Parent
 
--- Lazy-load WaveManager to check game state
-local _waveManager: any = nil
-local function getWaveManager()
-	if not _waveManager then
-		local WaveManagerSystemModule = require(Server.systems.wave.WaveManagerSystem)
-		_waveManager = WaveManagerSystemModule.WaveManager
-	end
-	return _waveManager
-end
-
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local SunComponent = Components.SunComponent
-
--- Production config (from GameConstants.Economy, used when PlantData doesn't specify)
-local ProductionDefaults = {
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
 	PRODUCTION_INTERVAL = GameConstants.Economy.DEFAULT_SUN_PRODUCTION_INTERVAL,
 	FIRST_PRODUCTION_DELAY = GameConstants.Economy.DEFAULT_FIRST_SUN_DELAY,
 	SUN_VALUE = GameConstants.Economy.DEFAULT_SUN_VALUE,
 	SUN_LIFETIME = GameConstants.Economy.PLANT_SUN_LIFETIME,
 	SPAWN_OFFSET_Y = 3,
+})
+
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	ProductionTimers = {} :: {[number]: number}, -- entityId -> nextProductionTime
+	WaveService = nil :: any, -- Lazy-loaded reference
 }
 
--- Track production timers per sunflower entity
-local _productionTimers: {[number]: number} = {}
+-- Helper: Get WaveService (lazy load to avoid circular dependency)
+local function getWaveService()
+	if not State.WaveService then
+		State.WaveService = require(Server.services.WaveService)
+	end
+	return State.WaveService
+end
 
-local function SunflowerProductionSystem(world)
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+	table.clear(State.ProductionTimers)
+	State.WaveService = nil
+end
+
+-- 6. MAIN LOOP
+local function OnStep(world)
 	local currentTime = os.clock()
 	
 	-- Only produce sun during "Playing" or "Preparation" states
-	-- (Sunflowers can produce during prep since player planted them)
-	local WaveManager = getWaveManager()
-	local gameState = WaveManager.GetGameState()
+	local WaveService = getWaveService()
+	local gameState = WaveService.GetGameState()
 	
 	if gameState ~= "Playing" and gameState ~= "Preparation" then
 		return
 	end
 	
-	-- Find all plants with ProducesSun flag and manage their production
-	for id, plant, pos in world:query(PlantTypeComponent, PositionComponent) do
-		-- Get plant stats and check if it produces sun (data-driven)
+	-- Find all plants with ProducesSun flag
+	for id, plant, pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.ProducesSun then
 			continue
 		end
 		
 		-- Read production values from PlantData (with defaults)
-		local firstDelay = stats.FirstSunDelay or ProductionDefaults.FIRST_PRODUCTION_DELAY
-		local productionInterval = stats.SunProductionInterval or ProductionDefaults.PRODUCTION_INTERVAL
-		local sunValue = stats.SunValue or ProductionDefaults.SUN_VALUE
+		local firstDelay = stats.FirstSunDelay or CONFIG.FIRST_PRODUCTION_DELAY
+		local productionInterval = stats.SunProductionInterval or CONFIG.PRODUCTION_INTERVAL
+		local sunValue = stats.SunValue or CONFIG.SUN_VALUE
 		
 		-- Initialize timer for new sun-producing plants
-		if not _productionTimers[id] then
-			-- First production is faster to feel rewarding
-			_productionTimers[id] = currentTime + firstDelay
-			Logger.Debug("SunflowerProduction", `{plant.PlantType} {id} initialized, first sun in {firstDelay}s`)
+		if not State.ProductionTimers[id] then
+			State.ProductionTimers[id] = currentTime + firstDelay
 		end
 		
 		-- Check if it's time to produce
-		if currentTime >= _productionTimers[id] then
+		if currentTime >= State.ProductionTimers[id] then
 			-- Spawn sun at plant position (slightly above)
 			local sunId = EntityPool.Spawn(
-				PositionComponent({
+				Components.PositionComponent({
 					X = pos.X,
-					Y = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y,
+					Y = pos.Y + CONFIG.SPAWN_OFFSET_Y,
 					Z = pos.Z,
 				}),
-				SunComponent({
+				Components.SunComponent({
 					Value = sunValue,
 					SpawnTime = currentTime,
-					Lifetime = ProductionDefaults.SUN_LIFETIME,
-					IsFalling = false, -- Plant-produced sun doesn't fall, just floats
+					Lifetime = CONFIG.SUN_LIFETIME,
+					IsFalling = false,
 					SourceType = plant.PlantType,
 				})
 			)
 			
 			if not sunId then
-				Logger.Warn("SunflowerProduction", "EntityPool exhausted! Cannot spawn sun")
-				_productionTimers[id] = currentTime + productionInterval
+				State.ProductionTimers[id] = currentTime + productionInterval
 				continue
 			end
 			
@@ -119,39 +116,29 @@ local function SunflowerProductionSystem(world)
 			Network.SunSpawned.FireAll({
 				EntityId = sunId,
 				PositionX = pos.X,
-				PositionY = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y,
+				PositionY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
 				PositionZ = pos.Z,
 				Value = sunValue,
-				TargetY = pos.Y + ProductionDefaults.SPAWN_OFFSET_Y, -- Plant sun doesn't fall
+				TargetY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
 			})
 			
-			Logger.Debug("SunflowerProduction", `{plant.PlantType} {id} produced sun {sunId} (value={sunValue})`)
-			
 			-- Reset timer for next production
-			_productionTimers[id] = currentTime + productionInterval
+			State.ProductionTimers[id] = currentTime + productionInterval
 		end
 	end
 	
 	-- Cleanup timers for despawned sunflowers
-	for id in _productionTimers do
+	for id in State.ProductionTimers do
 		if not world:contains(id) then
-			_productionTimers[id] = nil
+			State.ProductionTimers[id] = nil
 		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	table.clear(_productionTimers)
-end
-
+-- 7. EXPORT
 return {
-	_name = "SunflowerProductionSystem",
 	priority = 305,
-	system = SunflowerProductionSystem,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

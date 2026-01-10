@@ -422,6 +422,5 @@ end
 function VFXService.DetachIdleVFX(model: Model)
 	VFXUtils.DetachIdleVFX(model)
 end
-end
 
 return VFXService

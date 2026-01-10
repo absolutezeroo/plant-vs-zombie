@@ -2,6 +2,8 @@
 --[[
 	MutationApplySystem.luau - Applies mutations to newly spawned plants
 	
+	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	
 	Priority: 205 (Right after PlacementSystem at 200)
 	
 	Watches for new plants and applies mutation components based on
@@ -12,80 +14,49 @@
 	
 	LIFECYCLE:
 	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - applies mutations to new plants
-	- Dispose(): Clear player mutation cache
+	- OnStep(): Main loop (CANNOT yield) - applies mutations to new plants
+	- Dispose(): No cleanup needed (MutationService handles cache)
 ]]
 
+-- ============================================================
+-- SECTION 1: IMPORTS
+-- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local MutationData = require(Shared.data.MutationData)
-local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local ECSUtils = require(Shared.utils.ECSUtils)
 
--- Component references
-local PlantTypeComponent = Components.PlantTypeComponent
-local OwnerComponent = Components.OwnerComponent
-local HealthComponent = Components.HealthComponent
-local MutationsComponent = Components.MutationsComponent
-
--- Mutation effect components
-local BurnEffectComponent = Components.BurnEffectComponent
-local FreezeEffectComponent = Components.FreezeEffectComponent
-local ChainLightningComponent = Components.ChainLightningComponent
-local PoisonCloudComponent = Components.PoisonCloudComponent
-local LifestealComponent = Components.LifestealComponent
-local SunOnKillComponent = Components.SunOnKillComponent
-local DamageReductionComponent = Components.DamageReductionComponent
-local SplashDamageComponent = Components.SplashDamageComponent
-
--- Server reference for PlayerDataService
+-- Server services
 local Server = script.Parent.Parent.Parent
-local PlayerDataService = require(Server.services.PlayerDataService)
+local MutationService = require(Server.services.MutationService)
 
--- Cache for player mutations (refreshed when player joins arena)
-local playerMutationsCache: {[number]: {[string]: {string}}} = {} -- [UserId] -> [PlantType] -> {mutations}
+-- ============================================================
+-- SECTION 2: CONFIG (immutable settings)
+-- ============================================================
+local CONFIG = table.freeze({
+	PRIORITY = 205, -- Right after PlacementSystem (200)
+})
 
--- Module API for external use
-local API = {}
+-- ============================================================
+-- SECTION 3: STATE (all mutable data)
+-- ============================================================
+local State = {
+	-- No mutable state needed - MutationService handles cache
+}
 
--- Load player mutations into cache
-function API.LoadPlayerMutations(userId: number, mutations: {[string]: {string}})
-	playerMutationsCache[userId] = mutations
-	Logger.Info("MutationApplySystem", `Loaded mutations for user {userId}`)
-end
-
--- Clear player mutations on leave
-function API.ClearPlayerMutations(userId: number)
-	playerMutationsCache[userId] = nil
-end
-
--- Get all mutations for a player (all plants)
-function API.GetPlayerMutations(userId: number): {[string]: {string}}
-	return playerMutationsCache[userId] or {}
-end
-
--- Get mutations for a specific plant
-function API.GetPlantMutations(userId: number, plantType: string): {string}
-	local playerMutations = playerMutationsCache[userId]
-	if not playerMutations then return {} end
-	return playerMutations[plantType] or {}
-end
-
--- Get mutations for a player's plant
-local function getPlayerMutations(userId: number, plantType: string): {string}
-	return API.GetPlantMutations(userId, plantType)
-end
+-- ============================================================
+-- SECTION 4: PRIVATE HELPERS
+-- ============================================================
 
 -- Apply mutation components to a plant entity
 local function applyMutationsToPlant(world, entityId: number, plantType: string, userId: number)
-	local mutationIds = getPlayerMutations(userId, plantType)
+	local mutationIds = MutationService.GetPlantMutations(userId, plantType)
 	if #mutationIds == 0 then return end
 	
 	-- Get combined effects
@@ -97,7 +68,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	end
 	
 	-- Track mutations on the entity
-	world:insert(entityId, MutationsComponent({
+	world:insert(entityId, Components.MutationsComponent({
 		MutationIds = mutationIds,
 		OwnerId = userId,
 	}))
@@ -106,7 +77,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Fire: Burn on hit
 	if effects.AddsBurnDamage then
-		world:insert(entityId, BurnEffectComponent({
+		world:insert(entityId, Components.BurnEffectComponent({
 			DamagePerSecond = effects.BurnDamagePerSecond or 5,
 			Duration = effects.BurnDuration or 3,
 		}))
@@ -115,7 +86,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Ice: Freeze on hit
 	if effects.AddsFreeze then
-		world:insert(entityId, FreezeEffectComponent({
+		world:insert(entityId, Components.FreezeEffectComponent({
 			FreezeChance = effects.FreezeChance or 0.2,
 			FreezeDuration = effects.FreezeDuration or 2,
 			EnhancedSlow = effects.EnhancedSlow,
@@ -125,7 +96,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Electric: Chain lightning
 	if effects.AddsChainLightning then
-		world:insert(entityId, ChainLightningComponent({
+		world:insert(entityId, Components.ChainLightningComponent({
 			ChainCount = effects.ChainCount or 2,
 			ChainDamage = effects.ChainDamage or 0.5,
 			ChainRange = effects.ChainRange or 8,
@@ -135,7 +106,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Toxic: Poison cloud on death
 	if effects.AddsPoisonCloud then
-		world:insert(entityId, PoisonCloudComponent({
+		world:insert(entityId, Components.PoisonCloudComponent({
 			Radius = effects.PoisonRadius or 6,
 			DamagePerSecond = effects.PoisonDamagePerSecond or 3,
 			Duration = effects.PoisonDuration or 4,
@@ -145,7 +116,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Shadow: Lifesteal
 	if effects.AddsLifesteal then
-		world:insert(entityId, LifestealComponent({
+		world:insert(entityId, Components.LifestealComponent({
 			Percent = effects.LifestealPercent or 0.15,
 		}))
 		Logger.Debug("MutationApplySystem", `Applied Lifesteal to entity {entityId}`)
@@ -153,7 +124,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Solar: Sun on kill
 	if effects.AddsSunOnKill then
-		world:insert(entityId, SunOnKillComponent({
+		world:insert(entityId, Components.SunOnKillComponent({
 			SunAmount = effects.SunPerKill or 10,
 		}))
 		Logger.Debug("MutationApplySystem", `Applied SunOnKill to entity {entityId}`)
@@ -161,7 +132,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Reinforced: Damage reduction
 	if effects.DamageReduction and effects.DamageReduction > 0 then
-		world:insert(entityId, DamageReductionComponent({
+		world:insert(entityId, Components.DamageReductionComponent({
 			Percent = effects.DamageReduction,
 		}))
 		Logger.Debug("MutationApplySystem", `Applied DamageReduction to entity {entityId}`)
@@ -169,7 +140,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	
 	-- Primal: Splash damage
 	if effects.SplashDamage then
-		world:insert(entityId, SplashDamageComponent({
+		world:insert(entityId, Components.SplashDamageComponent({
 			Radius = effects.SplashRadius or 4,
 			Percent = effects.SplashPercent or 0.3,
 			Knockback = effects.Knockback,
@@ -180,28 +151,36 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 	Logger.Info("MutationApplySystem", `Applied {#mutationIds} mutations to {plantType} (Entity {entityId})`)
 end
 
--- System function - runs each frame
-local function MutationApplySystem(world)
+-- ============================================================
+-- SECTION 5: ONSTEP (main ECS loop)
+-- ============================================================
+local function OnStep(world)
 	-- Watch for new plants being spawned
-	for entityId, plantType, owner in world:query(PlantTypeComponent, OwnerComponent):without(MutationsComponent) do
+	for entityId, plantType, owner in world:query(Components.PlantTypeComponent, Components.OwnerComponent):without(Components.MutationsComponent) do
 		-- This plant was just spawned and doesn't have mutations applied yet
 		applyMutationsToPlant(world, entityId, plantType.PlantType, owner.PlayerId)
 	end
 end
 
+-- ============================================================
+-- SECTION 6: INIT / DISPOSE
+-- ============================================================
 local function Init(_world)
 	-- No initialization needed
+	Logger.Debug("MutationApplySystem", "Initialized")
 end
 
 local function Dispose()
-	table.clear(playerMutationsCache)
+	-- MutationService handles cache cleanup
+	Logger.Debug("MutationApplySystem", "Disposed")
 end
 
+-- ============================================================
+-- SECTION 7: MODULE EXPORT
+-- ============================================================
 return {
-	_name = "MutationApplySystem",
-	priority = 205, -- Right after PlacementSystem (200)
-	system = MutationApplySystem,
+	priority = CONFIG.PRIORITY,
+	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
 }

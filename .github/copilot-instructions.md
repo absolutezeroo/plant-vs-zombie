@@ -3,6 +3,8 @@
 I am working on a Roblox Project with a **Monorepo Multi-Place Architecture** (Lobby + Arena).
 **Core Principle:** Do not reinvent the wheel. Use the Roblox Engine API (C++) and the specific libraries below.
 
+**IMPORTANT:** All ECS Systems MUST strictly follow the architecture defined in `docs/SYSTEM-STANDARD.md`. This is the single source of truth for system structure.
+
 ---
 
 ## 📚 Documentation Sources of Truth (STRICT ADHERENCE)

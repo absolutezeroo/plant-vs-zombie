@@ -90,15 +90,14 @@ local _spawnPools: {Trickle: {string}, Assault: {string}, Flag: {string}} = {
     Flag = {"Cone", "Cone", "Bucket", "Bucket", "Pole", "Imp"},
 }
 
--- Lazy-load PlantFoodSystem to avoid circular deps
-local _plantFoodSystem: any = nil
-local function getPlantFoodSystem()
-    if not _plantFoodSystem then
+-- Lazy-load PlantFoodService to avoid circular deps
+local _plantFoodService: any = nil
+local function getPlantFoodService()
+    if not _plantFoodService then
         local Server = script.Parent.Parent.Parent
-        local Systems = Server.systems
-        _plantFoodSystem = require(Systems.combat.PlantFoodSystem)
+        _plantFoodService = require(Server.services.PlantFoodService)
     end
-    return _plantFoodSystem
+    return _plantFoodService
 end
 
 -- Lazy-load Network
@@ -318,8 +317,8 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
     end
     
     -- Check if this zombie should be a Plant Food carrier (glowing)
-    local PlantFoodSystemAPI = getPlantFoodSystem().API
-    if PlantFoodSystemAPI.ShouldZombieBeGlowing() then
+    local PlantFoodService = getPlantFoodService()
+    if PlantFoodService.ShouldZombieBeGlowing() then
         world:insert(entityId, PlantFoodComponent({
             IsGlowing = true,
         }))

@@ -22,7 +22,7 @@ local Network = require(Shared.network.generated.server)
 -- Server modules
 local Server = script.Parent.Parent
 local PlayerDataService = require(Server.services.PlayerDataService)
-local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
+local MutationService = require(Server.services.MutationService)
 
 local ProgressionHandler = {}
 
@@ -42,8 +42,8 @@ local function syncPlayerData(player: Player)
 		end
 	end
 	
-	-- Get equipped mutations from MutationApplySystem cache
-	local equippedMutationsDict = MutationApplySystemModule.API.GetPlayerMutations(player.UserId)
+	-- Get equipped mutations from MutationService
+	local equippedMutationsDict = MutationService.GetPlayerMutations(player.UserId)
 	
 	-- Convert to array format for Zap
 	local equippedMutationsArray = {}

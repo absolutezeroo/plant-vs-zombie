@@ -7,143 +7,123 @@
 	Handles:
 	- Gargantuar spawning Imp at 50% health
 	- Boss-specific death effects
-	- Future boss mechanics
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes boss behavior
-	- Dispose(): Clear tracking state
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
-local Logger = require(Shared.utils.Logger)
-local Types = require(Shared.Types)
 local EntityPool = require(Shared.utils.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Type alias for world parameter
-type MatterWorld = Types.MatterWorld
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	MINION_SPAWN_OFFSET_X = 2, -- Studs behind boss
+	MINION_SPAWN_Y = 1,
+})
 
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local HealthComponent = Components.HealthComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local MovementComponent = Components.MovementComponent
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	HasSpawnedMinion = {} :: {[number]: boolean}, -- Track bosses that spawned minions
+}
 
--- Track bosses that have already spawned their minions
-local _hasSpawnedMinion: {[number]: boolean} = {}
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
 
--- Spawn a minion zombie at the boss's position
-local function spawnMinion(world: MatterWorld, bossId: number, minionType: string, lane: number, posX: number, posZ: number)
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+	table.clear(State.HasSpawnedMinion)
+end
+
+-- Helper: Spawn a minion zombie at the boss's position
+local function spawnMinion(world, bossId: number, minionType: string, lane: number, posX: number, posZ: number)
 	local minionStats = ZombieData[minionType]
-	if not minionStats then
-		Logger.Warn("BossSystem", `Unknown minion type: {minionType}`)
-		return
-	end
+	if not minionStats then return end
 	
-	-- Spawn the minion slightly behind the boss
 	local direction = MapConfig.GetZombieDirection()
 	
 	local minionId = EntityPool.Spawn(
-		PositionComponent({
-			X = posX + 2, -- Behind the boss
-			Y = 1,
+		Components.PositionComponent({
+			X = posX + CONFIG.MINION_SPAWN_OFFSET_X,
+			Y = CONFIG.MINION_SPAWN_Y,
 			Z = posZ,
 		}),
-		HealthComponent({
+		Components.HealthComponent({
 			Current = minionStats.Health,
 			Max = minionStats.Health,
 		}),
-		MovementComponent({
+		Components.MovementComponent({
 			VelocityX = direction.X * minionStats.Speed,
 			VelocityY = 0,
 			VelocityZ = direction.Z * minionStats.Speed,
 		}),
-		ZombieTypeComponent({
+		Components.ZombieTypeComponent({
 			ZombieType = minionType,
 			Lane = lane,
 			SpawnTime = os.clock(),
 		})
 	)
 	
-	if not minionId then
-		Logger.Warn("BossSystem", "EntityPool exhausted! Cannot spawn minion")
-		return
-	end
+	if not minionId then return end
 	
 	-- Broadcast to clients
 	Network.ZombieSpawned.FireAll({
 		EntityId = minionId,
 		ZombieType = minionType,
 		Lane = lane,
-		PositionX = posX + 2,
+		PositionX = posX + CONFIG.MINION_SPAWN_OFFSET_X,
 	})
-	
-	Logger.Info("BossSystem", `Boss {bossId} spawned {minionType} (entity {minionId}) in lane {lane}`)
 end
 
-local function BossSystem(world: MatterWorld)
+-- 6. MAIN LOOP
+local function OnStep(world)
 	-- Check all zombies for boss behavior
-	for zombieId, health, zombie, pos in world:query(HealthComponent, ZombieTypeComponent, PositionComponent) do
+	for zombieId, health, zombie, pos in world:query(Components.HealthComponent, Components.ZombieTypeComponent, Components.PositionComponent) do
 		local stats = ZombieData[zombie.ZombieType]
 		if not stats or not stats.IsBoss then
 			continue
 		end
 		
 		-- Check if boss should spawn minion at 50% health
-		if stats.SpawnsOnHalfHealth and not _hasSpawnedMinion[zombieId] then
+		if stats.SpawnsOnHalfHealth and not State.HasSpawnedMinion[zombieId] then
 			local halfHealth = health.Max / 2
 			
 			if health.Current <= halfHealth and health.Current > 0 then
-				-- Spawn minion(s)
 				local spawnCount = stats.SpawnCount or 1
 				local minionType = stats.SpawnsOnHalfHealth
 				
 				for i = 1, spawnCount do
-					-- Slight offset for multiple spawns
 					local offsetZ = (i - 1) * 2
 					spawnMinion(world, zombieId, minionType, zombie.Lane, pos.X, pos.Z + offsetZ)
 				end
 				
-				-- Mark as spawned
-				_hasSpawnedMinion[zombieId] = true
-				
-				Logger.Info("BossSystem", `Gargantuar {zombieId} threw {spawnCount} {minionType}(s)!`)
+				State.HasSpawnedMinion[zombieId] = true
 			end
 		end
 	end
 	
 	-- Clean up tracking for despawned bosses
-	for zombieId in _hasSpawnedMinion do
+	for zombieId in State.HasSpawnedMinion do
 		if not world:contains(zombieId) then
-			_hasSpawnedMinion[zombieId] = nil
+			State.HasSpawnedMinion[zombieId] = nil
 		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	table.clear(_hasSpawnedMinion)
-end
-
+-- 7. EXPORT
 return {
-	_name = "BossSystem",
-	priority = 175, -- After combat (170), before death (180)
-	system = BossSystem,
+	priority = 175,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

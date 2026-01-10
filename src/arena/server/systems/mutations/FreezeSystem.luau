@@ -7,41 +7,48 @@
 	Two responsibilities:
 	1. Query ProjectileHitEvent + FreezeEffectComponent to apply freezes
 	2. Process zombies with FrozenComponent (expiration)
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes frozen entities
-	- Dispose(): No cleanup needed
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
-local Logger = require(Shared.utils.Logger)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
 
--- Components
-local FrozenComponent = Components.FrozenComponent
-local FreezeEffectComponent = Components.FreezeEffectComponent
-local SlowComponent = Components.SlowComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local ProjectileHitEvent = Components.ProjectileHitEvent
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	DEFAULT_SLOW_PERCENT = GameConstants.Combat.DEFAULT_SLOW_PERCENT,
+	MAX_SLOW_PERCENT = GameConstants.Combat.MAX_SLOW_PERCENT,
+	DEFAULT_SLOW_DURATION = GameConstants.Combat.DEFAULT_SLOW_DURATION,
+})
+
+-- 3. STATE (minimal - stateless system)
+local State = {
+	IsInitialized = false,
+}
+
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+end
 
 -- Helper: Try to freeze a zombie (with chance roll)
 local function tryFreeze(world, zombieEntityId: number, freezeChance: number, freezeDuration: number, enhancedSlow: number?): boolean
 	if not world:contains(zombieEntityId) then return false end
 	
 	-- Check if already frozen
-	local existingFreeze = world:get(zombieEntityId, FrozenComponent)
+	local existingFreeze = world:get(zombieEntityId, Components.FrozenComponent)
 	if existingFreeze then
 		-- Refresh duration
-		world:insert(zombieEntityId, FrozenComponent({
+		world:insert(zombieEntityId, Components.FrozenComponent({
 			RemainingDuration = math.max(existingFreeze.RemainingDuration, freezeDuration),
 			AppliedAt = os.clock(),
 		}))
@@ -51,26 +58,25 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 	-- Roll for freeze
 	if ChanceUtils.Roll(freezeChance) then
 		-- Freeze successful!
-		world:insert(zombieEntityId, FrozenComponent({
+		world:insert(zombieEntityId, Components.FrozenComponent({
 			RemainingDuration = freezeDuration,
 			AppliedAt = os.clock(),
 		}))
-		Logger.Debug("FreezeSystem", `Froze entity {zombieEntityId} for {freezeDuration}s`)
 		return true
 	else
 		-- Apply enhanced slow if specified
 		if enhancedSlow and enhancedSlow > 0 then
-			local existingSlow = world:get(zombieEntityId, SlowComponent)
-			local slowPercent = GameConstants.Combat.DEFAULT_SLOW_PERCENT + enhancedSlow -- Base slow + enhanced
+			local existingSlow = world:get(zombieEntityId, Components.SlowComponent)
+			local slowPercent = CONFIG.DEFAULT_SLOW_PERCENT + enhancedSlow
 			
 			if existingSlow then
 				local existingSlowPercent = existingSlow.SlowPercent :: number
-				slowPercent = math.min(GameConstants.Combat.MAX_SLOW_PERCENT, existingSlowPercent + enhancedSlow)
+				slowPercent = math.min(CONFIG.MAX_SLOW_PERCENT, existingSlowPercent + enhancedSlow)
 			end
 			
-			world:insert(zombieEntityId, SlowComponent({
+			world:insert(zombieEntityId, Components.SlowComponent({
 				SlowPercent = slowPercent,
-				Duration = GameConstants.Combat.DEFAULT_SLOW_DURATION,
+				Duration = CONFIG.DEFAULT_SLOW_DURATION,
 				AppliedAt = os.clock(),
 			}))
 		end
@@ -78,16 +84,16 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 	end
 end
 
--- System function
-local function FreezeSystem(world)
+-- 6. MAIN LOOP
+local function OnStep(world)
 	local currentTime = os.clock()
 	
 	-- 1. Process ProjectileHitEvents: apply freezes from plants with FreezeEffectComponent
-	for _, hitEvent in world:query(ProjectileHitEvent) do
+	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
 		if not world:contains(sourcePlant) then continue end
 		
-		local freezeEffect = world:get(sourcePlant, FreezeEffectComponent)
+		local freezeEffect = world:get(sourcePlant, Components.FreezeEffectComponent)
 		if freezeEffect then
 			tryFreeze(
 				world,
@@ -100,30 +106,20 @@ local function FreezeSystem(world)
 	end
 	
 	-- 2. Process all frozen zombies (expiration)
-	for entityId, frozen, zombie in world:query(FrozenComponent, ZombieTypeComponent) do
+	for entityId, frozen in world:query(Components.FrozenComponent, Components.ZombieTypeComponent) do
 		local elapsed = currentTime - frozen.AppliedAt
 		
 		if elapsed >= frozen.RemainingDuration then
 			-- Freeze expired, remove component
-			world:remove(entityId, FrozenComponent)
-			Logger.Debug("FreezeSystem", `Freeze expired on entity {entityId}`)
+			world:remove(entityId, Components.FrozenComponent)
 		end
-		-- While frozen, movement is handled by ZombieMovementSystem checking for FrozenComponent
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	-- No state to clean up
-end
-
+-- 7. EXPORT
 return {
-	_name = "FreezeSystem",
 	priority = 355,
-	system = FreezeSystem,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

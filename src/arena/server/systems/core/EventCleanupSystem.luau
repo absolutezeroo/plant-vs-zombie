@@ -2,82 +2,63 @@
 --[[
 	EventCleanupSystem.luau - Cleans up ephemeral event entities
 	
-	Priority: 400 (Cleanup phase)
+	Priority: 400 (Cleanup phase - LAST)
 	
 	Events in Matter ECS are entities with event components.
 	This system removes all event entities at the end of each frame.
 	"Events exist for exactly one frame"
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - despawns event entities
-	- Dispose(): No cleanup needed
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Components = require(Shared.components)
 
--- Import event components
-local DamageEvent = require(Shared.components.events.DamageEvent)
-local DeathEvent = require(Shared.components.events.DeathEvent)
-local SpawnEvent = require(Shared.components.events.SpawnEvent)
-local ProjectileHitEvent = require(Shared.components.events.ProjectileHitEvent)
-local WaveStateEvent = require(Shared.components.events.WaveStateEvent)
-local CoinDropEvent = require(Shared.components.events.CoinDropEvent)
-local PlantActionEvent = require(Shared.components.events.PlantActionEvent)
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	-- List of all ephemeral event components to clean up each frame
+	EVENT_COMPONENTS = {
+		Components.DamageEvent,
+		Components.DeathEvent,
+		Components.SpawnEvent,
+		Components.ProjectileHitEvent,
+		Components.WaveStateEvent,
+		Components.CoinDropEvent,
+		Components.PlantActionEvent,
+	},
+})
 
-local function EventCleanupSystem(world)
+-- 3. STATE (minimal - this system is stateless)
+local State = {
+	IsInitialized = false,
+}
+
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+end
+
+-- 6. MAIN LOOP
+local function OnStep(world)
 	-- Query for all event entities and despawn them
 	-- Events only exist for one frame
-	
-	-- Clean DamageEvents
-	for entityId in world:query(DamageEvent) do
-		world:despawn(entityId)
-	end
-	
-	-- Clean DeathEvents
-	for entityId in world:query(DeathEvent) do
-		world:despawn(entityId)
-	end
-	
-	-- Clean SpawnEvents
-	for entityId in world:query(SpawnEvent) do
-		world:despawn(entityId)
-	end
-	
-	-- Clean ProjectileHitEvents
-	for entityId in world:query(ProjectileHitEvent) do
-		world:despawn(entityId)
-	end
-	
-	-- Clean WaveStateEvents
-	for entityId in world:query(WaveStateEvent) do
-		world:despawn(entityId)
-	end
-	
-	-- Clean CoinDropEvents
-	for entityId in world:query(CoinDropEvent) do
-		world:despawn(entityId)
-	end
-	
-	-- Clean PlantActionEvents
-	for entityId in world:query(PlantActionEvent) do
-		world:despawn(entityId)
+	for _, eventComponent in CONFIG.EVENT_COMPONENTS do
+		for entityId in world:query(eventComponent) do
+			world:despawn(entityId)
+		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	-- No cleanup needed
-end
-
+-- 7. EXPORT
 return {
-	_name = "EventCleanupSystem",
-	priority = 400,  -- Cleanup phase
-	system = EventCleanupSystem,
+	priority = 400,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

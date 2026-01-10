@@ -2,6 +2,8 @@
 --[[
 	SpecialPlantSystem.luau - Server-side special plant abilities
 	
+	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	
 	Priority: 175 (Simulation phase - after projectiles, before combat)
 	
 	Handles:
@@ -15,15 +17,17 @@
 	
 	LIFECYCLE:
 	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes special plants
+	- OnStep(): Main loop (CANNOT yield) - processes special plants
 	- Dispose(): Clear tracking state
 ]]
 
+-- ============================================================
+-- SECTION 1: IMPORTS
+-- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -41,75 +45,45 @@ local Network = require(Shared.network.generated.server)
 local Server = script.Parent.Parent.Parent
 local GridService = require(Server.services.GridService)
 
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local HealthComponent = Components.HealthComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local ArmedComponent = Components.ArmedComponent
-local ChewingComponent = Components.ChewingComponent
-local JumpingComponent = Components.JumpingComponent
-local SlowComponent = Components.SlowComponent
-local MovementComponent = Components.MovementComponent
-local SpawnEvent = Components.SpawnEvent
-
--- Config defaults (used when PlantData doesn't specify)
-local SpecialDefaults = {
+-- ============================================================
+-- SECTION 2: CONFIG (immutable settings)
+-- ============================================================
+local CONFIG = table.freeze({
+	PRIORITY = 175,
+	
 	-- Explosion defaults
-	FUSE_TIME = 0.5,           -- Seconds before explosion
-	EXPLOSION_RADIUS = 9,      -- Studs (1.5 cells in each direction)
+	FUSE_TIME = 0.5,
+	EXPLOSION_RADIUS = 9,
 	
 	-- Armed plant defaults
-	ARM_DURATION = 15,         -- Seconds to arm
-	TRIGGER_RADIUS = 2,        -- Studs to trigger explosion
+	ARM_DURATION = 15,
+	TRIGGER_RADIUS = 2,
 	
 	-- Chomper defaults
-	CHEW_DURATION = 42,        -- Seconds to digest
-	CHOMP_RANGE = 6,           -- Studs to chomp
+	CHEW_DURATION = 42,
+	CHOMP_RANGE = 6,
 	
 	-- Squash defaults
-	JUMP_DURATION = 0.5,       -- Seconds for jump
-	SQUASH_RANGE = 6,          -- Studs to detect target
+	JUMP_DURATION = 0.5,
+	SQUASH_RANGE = 6,
 	
 	-- Freeze defaults
-	FREEZE_DURATION = 4,       -- Seconds frozen
+	FREEZE_DURATION = 4,
+})
+
+-- ============================================================
+-- SECTION 3: STATE (all mutable data)
+-- ============================================================
+local State = {
+	-- Track plants with fuse timers
+	FusePlants = {} :: {[number]: {explodeTime: number, plantType: string}},
+	-- Track Squash jumping state
+	SquashJumps = {} :: {[number]: {targetX: number, targetZ: number, startTime: number, startX: number, startZ: number}},
 }
 
--- Track plants with fuse timers
-local _fusePlants: {[number]: {explodeTime: number, plantType: string}} = {}
-
--- Track Squash jumping state
-local _squashJumps: {[number]: {targetX: number, targetZ: number, startTime: number, startX: number, startZ: number}} = {}
-
--- Called by PlacementSystem when a special plant is placed
-local SpecialPlantAPI = {}
-
-function SpecialPlantAPI.OnPlantPlaced(world: any, entityId: number, plantType: string)
-	local stats = PlantData[plantType]
-	if not stats then
-		return
-	end
-	
-	-- Check behavior flags instead of hardcoded names
-	if stats.ExplodesOnPlace then
-		-- CherryBomb/DoomShroom/IceShroom/Jalapeno: Start fuse timer
-		local fuseTime = stats.FuseTime or SpecialDefaults.FUSE_TIME
-		_fusePlants[entityId] = {
-			explodeTime = os.clock() + fuseTime,
-			plantType = plantType,
-		}
-		Logger.Debug("SpecialPlant", `{plantType} {entityId} fuse started ({fuseTime}s)`)
-	elseif stats.NeedsArming then
-		-- PotatoMine: Add ArmedComponent (starts unarmed)
-		local armDuration = stats.ArmDuration or SpecialDefaults.ARM_DURATION
-		world:insert(entityId, ArmedComponent({
-			IsArmed = false,
-			ArmTime = os.clock(),
-			ArmDuration = armDuration,
-		}))
-		Logger.Debug("SpecialPlant", `{plantType} {entityId} placed, arming in {armDuration}s`)
-	end
-end
+-- ============================================================
+-- SECTION 4: PRIVATE HELPERS
+-- ============================================================
 
 -- Handle explosion for various plant types
 local function handleExplosion(world: any, entityId: number, pos: any, plantType: string)
@@ -121,17 +95,17 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	
 	if stats.FreezesAll then
 		-- IceShroom: Freeze ALL zombies on screen
-		local freezeDuration = stats.FreezeDuration or SpecialDefaults.FREEZE_DURATION
-		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+		local freezeDuration = stats.FreezeDuration or CONFIG.FREEZE_DURATION
+		for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
 			-- Apply freeze (slow to 0%)
-			world:insert(zombieId, SlowComponent({
-				SlowPercent = 1.0,  -- 100% slow = frozen
+			world:insert(zombieId, Components.SlowComponent({
+				SlowPercent = 1.0,
 				Duration = freezeDuration,
 				AppliedAt = currentTime,
 			}))
 			
 			-- Stop movement
-			world:insert(zombieId, MovementComponent({
+			world:insert(zombieId, Components.MovementComponent({
 				VelocityX = 0,
 				VelocityY = 0,
 				VelocityZ = 0,
@@ -145,9 +119,8 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 		
 	elseif stats.IsLaneWide then
 		-- Jalapeno: Destroy entire lane
-		local plant = world:get(entityId, PlantTypeComponent)
+		local plant = world:get(entityId, Components.PlantTypeComponent)
 		if plant then
-			-- O(1) lane lookup instead of O(N) world:query
 			local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
 			
 			for _, zombieId in zombiesInLane do
@@ -165,14 +138,14 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			PositionX = pos.X,
 			PositionY = 1,
 			PositionZ = pos.Z,
-			Radius = GridConfig.GRID_COLUMNS * GridConfig.CELL_SIZE, -- Lane-wide
+			Radius = GridConfig.GRID_COLUMNS * GridConfig.CELL_SIZE,
 		})
 		
 	else
 		-- Normal explosion (CherryBomb, DoomShroom)
-		local explosionRadius = (stats.Range and stats.Range > 0) and stats.Range or SpecialDefaults.EXPLOSION_RADIUS
+		local explosionRadius = (stats.Range and stats.Range > 0) and stats.Range or CONFIG.EXPLOSION_RADIUS
 		
-		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+		for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
 			local dx = zombiePos.X - pos.X
 			local dz = zombiePos.Z - pos.Z
 			local distance = math.sqrt(dx * dx + dz * dz)
@@ -196,7 +169,7 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	end
 	
 	-- Clear grid cell
-	local plant = world:get(entityId, PlantTypeComponent)
+	local plant = world:get(entityId, Components.PlantTypeComponent)
 	if plant then
 		GridService.Clear(plant.Column, plant.Lane)
 	end
@@ -222,7 +195,7 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 	ECSUtils.KillEntity(world, triggeredByZombieId, Components)
 	
 	-- Clear grid cell
-	local plant = world:get(mineId, PlantTypeComponent)
+	local plant = world:get(mineId, Components.PlantTypeComponent)
 	if plant then
 		GridService.Clear(plant.Column, plant.Lane)
 	end
@@ -249,19 +222,17 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 end
 
 -- Find nearest zombie in range for Chomper/Squash
--- Uses LaneCache for O(1) lane lookup + O(lane_size) distance check
 local function findNearestZombieInRange(world: any, plantPos: any, lane: number, range: number): (number?, any?)
 	local nearestId = nil
 	local nearestPos = nil
 	local nearestDist = range + 1
 	
-	-- O(1) lane lookup instead of O(N) world:query
 	local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
 	
 	for _, zombieId in zombiesInLane do
 		if not world:contains(zombieId) then continue end
 		
-		local zombiePos = world:get(zombieId, PositionComponent)
+		local zombiePos = world:get(zombieId, Components.PositionComponent)
 		if not zombiePos then continue end
 		
 		local distance = zombiePos.X - plantPos.X
@@ -275,17 +246,20 @@ local function findNearestZombieInRange(world: any, plantPos: any, lane: number,
 	return nearestId, nearestPos
 end
 
-local function SpecialPlantSystem(world)
+-- ============================================================
+-- SECTION 5: ONSTEP (main ECS loop)
+-- ============================================================
+local function OnStep(world)
 	local currentTime = os.clock()
 	
-	-- React to SpawnEvent for new special plants (replaces OnPlantPlaced API call)
-	for _, event in world:query(SpawnEvent) do
+	-- React to SpawnEvent for new special plants
+	for _, event in world:query(Components.SpawnEvent) do
 		if event.EntityType ~= "Plant" then continue end
 		
 		local entityId = event.Target
 		if not world:contains(entityId) then continue end
 		
-		local plant = world:get(entityId, PlantTypeComponent)
+		local plant = world:get(entityId, Components.PlantTypeComponent)
 		if not plant then continue end
 		
 		local stats = PlantData[plant.PlantType]
@@ -293,17 +267,15 @@ local function SpecialPlantSystem(world)
 		
 		-- Initialize special plant behaviors
 		if stats.ExplodesOnPlace then
-			-- CherryBomb/DoomShroom/IceShroom/Jalapeno: Start fuse timer
-			local fuseTime = stats.FuseTime or SpecialDefaults.FUSE_TIME
-			_fusePlants[entityId] = {
+			local fuseTime = stats.FuseTime or CONFIG.FUSE_TIME
+			State.FusePlants[entityId] = {
 				explodeTime = currentTime + fuseTime,
 				plantType = plant.PlantType,
 			}
 			Logger.Debug("SpecialPlant", `{plant.PlantType} {entityId} fuse started ({fuseTime}s)`)
 		elseif stats.NeedsArming then
-			-- PotatoMine: Add ArmedComponent (starts unarmed)
-			local armDuration = stats.ArmDuration or SpecialDefaults.ARM_DURATION
-			world:insert(entityId, ArmedComponent({
+			local armDuration = stats.ArmDuration or CONFIG.ARM_DURATION
+			world:insert(entityId, Components.ArmedComponent({
 				IsArmed = false,
 				ArmTime = currentTime,
 				ArmDuration = armDuration,
@@ -313,20 +285,20 @@ local function SpecialPlantSystem(world)
 	end
 	
 	-- Process fuse plants (CherryBomb, DoomShroom, IceShroom, Jalapeno)
-	for entityId, fuseData in _fusePlants do
+	for entityId, fuseData in State.FusePlants do
 		if currentTime >= fuseData.explodeTime then
 			if world:contains(entityId) then
-				local pos = world:get(entityId, PositionComponent)
+				local pos = world:get(entityId, Components.PositionComponent)
 				if pos then
 					handleExplosion(world, entityId, pos, fuseData.plantType)
 				end
 			end
-			_fusePlants[entityId] = nil
+			State.FusePlants[entityId] = nil
 		end
 	end
 	
 	-- Process armed plants (PotatoMine) triggering
-	for mineId, pos, plant, armed in world:query(PositionComponent, PlantTypeComponent, ArmedComponent) do
+	for mineId, pos, plant, armed in world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ArmedComponent) do
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.NeedsArming then
 			continue
@@ -336,7 +308,7 @@ local function SpecialPlantSystem(world)
 		if not armed.IsArmed then
 			if currentTime - armed.ArmTime >= armed.ArmDuration then
 				-- Now armed!
-				world:insert(mineId, ArmedComponent({
+				world:insert(mineId, Components.ArmedComponent({
 					IsArmed = true,
 					ArmTime = armed.ArmTime,
 					ArmDuration = armed.ArmDuration,
@@ -347,15 +319,13 @@ local function SpecialPlantSystem(world)
 		end
 		
 		-- Armed mine - check for zombie contact
-		local triggerRadius = stats.TriggerRadius or SpecialDefaults.TRIGGER_RADIUS
-		
-		-- O(1) lane lookup instead of O(N) world:query
+		local triggerRadius = stats.TriggerRadius or CONFIG.TRIGGER_RADIUS
 		local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
 		
 		for _, zombieId in zombiesInLane do
 			if not world:contains(zombieId) then continue end
 			
-			local zombiePos = world:get(zombieId, PositionComponent)
+			local zombiePos = world:get(zombieId, Components.PositionComponent)
 			if not zombiePos then continue end
 			
 			local distance = math.abs(zombiePos.X - pos.X)
@@ -367,24 +337,23 @@ local function SpecialPlantSystem(world)
 	end
 	
 	-- Process Chomper chewing completion
-	for plantId, pos, plant, chewing in world:query(PositionComponent, PlantTypeComponent, ChewingComponent) do
+	for plantId, pos, plant, chewing in world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ChewingComponent) do
 		if currentTime - chewing.ChewStartTime >= chewing.ChewDuration then
-			-- Done chewing, remove component
-			world:remove(plantId, ChewingComponent)
+			world:remove(plantId, Components.ChewingComponent)
 			Logger.Debug("SpecialPlant", `Chomper {plantId} finished chewing`)
 		end
 	end
 	
 	-- Process Chomper looking for targets (when not chewing)
-	for plantId, pos, plant in world:query(PositionComponent, PlantTypeComponent) do
+	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.IsInstantKill then continue end
 		if stats.JumpsToTarget then continue end -- Squash handled separately
 		
 		-- Skip if already chewing
-		if world:get(plantId, ChewingComponent) then continue end
+		if world:get(plantId, Components.ChewingComponent) then continue end
 		
-		local chompRange = stats.Range or SpecialDefaults.CHOMP_RANGE
+		local chompRange = stats.Range or CONFIG.CHOMP_RANGE
 		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, chompRange)
 		
 		if zombieId then
@@ -392,15 +361,14 @@ local function SpecialPlantSystem(world)
 			ECSUtils.KillEntity(world, zombieId, Components)
 			
 			-- Start chewing
-			local chewDuration = stats.ChewDuration or SpecialDefaults.CHEW_DURATION
-			world:insert(plantId, ChewingComponent({
+			local chewDuration = stats.ChewDuration or CONFIG.CHEW_DURATION
+			world:insert(plantId, Components.ChewingComponent({
 				ChewDuration = chewDuration,
 				ChewStartTime = currentTime,
 			}))
 			
 			Logger.Info("SpecialPlant", `Chomper {plantId} ate zombie {zombieId}, chewing for {chewDuration}s`)
 			
-			-- Broadcast to clients
 			Network.EntityDied.FireAll({
 				EntityId = zombieId,
 			})
@@ -408,25 +376,24 @@ local function SpecialPlantSystem(world)
 	end
 	
 	-- Process Squash jumping
-	for plantId, jumpData in _squashJumps do
+	for plantId, jumpData in State.SquashJumps do
 		if not world:contains(plantId) then
-			_squashJumps[plantId] = nil
+			State.SquashJumps[plantId] = nil
 			continue
 		end
 		
-		local jumpProgress = (currentTime - jumpData.startTime) / SpecialDefaults.JUMP_DURATION
+		local jumpProgress = (currentTime - jumpData.startTime) / CONFIG.JUMP_DURATION
 		
 		if jumpProgress >= 1 then
 			-- Landed! Kill zombie at target location
-			local plant = world:get(plantId, PlantTypeComponent)
+			local plant = world:get(plantId, Components.PlantTypeComponent)
 			if plant then
-				-- O(1) lane lookup instead of O(N) world:query
 				local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
 				
 				for _, zombieId in zombiesInLane do
 					if not world:contains(zombieId) then continue end
 					
-					local zombiePos = world:get(zombieId, PositionComponent)
+					local zombiePos = world:get(zombieId, Components.PositionComponent)
 					if not zombiePos then continue end
 					
 					local dx = math.abs(zombiePos.X - jumpData.targetX)
@@ -449,14 +416,14 @@ local function SpecialPlantSystem(world)
 					world:despawn(plantId)
 				end
 			end
-			_squashJumps[plantId] = nil
+			State.SquashJumps[plantId] = nil
 		else
 			-- Update position during jump (arc motion)
-			local arcHeight = math.sin(jumpProgress * math.pi) * 5  -- Arc up to 5 studs
+			local arcHeight = math.sin(jumpProgress * math.pi) * 5
 			local newX = jumpData.startX + (jumpData.targetX - jumpData.startX) * jumpProgress
 			local newZ = jumpData.startZ + (jumpData.targetZ - jumpData.startZ) * jumpProgress
 			
-			world:insert(plantId, PositionComponent({
+			world:insert(plantId, Components.PositionComponent({
 				X = newX,
 				Y = 2.5 + arcHeight,
 				Z = newZ,
@@ -465,19 +432,18 @@ local function SpecialPlantSystem(world)
 	end
 	
 	-- Process Squash looking for targets
-	for plantId, pos, plant in world:query(PositionComponent, PlantTypeComponent) do
+	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.JumpsToTarget then continue end
 		
 		-- Skip if already jumping
-		if _squashJumps[plantId] then continue end
+		if State.SquashJumps[plantId] then continue end
 		
-		local squashRange = stats.Range or SpecialDefaults.SQUASH_RANGE
+		local squashRange = stats.Range or CONFIG.SQUASH_RANGE
 		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, squashRange)
 		
 		if zombieId and zombiePos then
-			-- Start jumping!
-			_squashJumps[plantId] = {
+			State.SquashJumps[plantId] = {
 				targetX = zombiePos.X,
 				targetZ = zombiePos.Z,
 				startTime = currentTime,
@@ -489,27 +455,32 @@ local function SpecialPlantSystem(world)
 	end
 	
 	-- Cleanup tracking for despawned entities
-	for entityId in _fusePlants do
+	for entityId in State.FusePlants do
 		if not world:contains(entityId) then
-			_fusePlants[entityId] = nil
+			State.FusePlants[entityId] = nil
 		end
 	end
 end
 
+-- ============================================================
+-- SECTION 6: INIT / DISPOSE
+-- ============================================================
 local function Init(_world)
-	-- No initialization needed
+	Logger.Debug("SpecialPlantSystem", "Initialized")
 end
 
 local function Dispose()
-	table.clear(_fusePlants)
-	table.clear(_squashJumps)
+	table.clear(State.FusePlants)
+	table.clear(State.SquashJumps)
+	Logger.Debug("SpecialPlantSystem", "Disposed")
 end
 
+-- ============================================================
+-- SECTION 7: MODULE EXPORT
+-- ============================================================
 return {
-	_name = "SpecialPlantSystem",
-	priority = 175,
-	system = SpecialPlantSystem,
+	priority = CONFIG.PRIORITY,
+	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
-	API = SpecialPlantAPI,
 }

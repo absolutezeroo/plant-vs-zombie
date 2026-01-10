@@ -9,24 +9,22 @@
 	- Broadcasting EntityDied events
 	- Cleaning up grid occupancy for plants
 	- Spawning coins for zombie kills
-	- Despawning dead entities
 	
-	LIFECYCLE:
-	- Init(): Setup player listener (CAN yield)
-	- system(): Main loop (CANNOT yield) - processes entity deaths
-	- Dispose(): Cleanup player connection and session stats
+	V2.0 Architecture:
+	- Init(world): Initialize trove for cleanup
+	- Dispose(): Clean up connections
+	- OnStep(world): Process entity deaths via health query
 ]]
 
+-- 1. IMPORTS
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
 local ProgressionData = require(Shared.data.ProgressionData)
 local EntityPool = require(Shared.utils.EntityPool)
 
@@ -37,80 +35,82 @@ local Network = require(Shared.network.generated.server)
 local Server = script.Parent.Parent.Parent
 local GridService = require(Server.services.GridService)
 
--- Components (via index module)
-local HealthComponent = Components.HealthComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local PositionComponent = Components.PositionComponent
-local DeathEvent = Components.DeathEvent
-local CoinDropEvent = Components.CoinDropEvent
+-- 2. CONFIGURATION (no config needed for this system)
+local CONFIG = table.freeze({
+	DEFAULT_COIN_VALUE = 5,
+})
 
--- Player data service (lazy load to avoid circular deps)
-local _playerDataService: any = nil
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	Trove = nil :: any,
+	-- Lazy loaded
+	PlayerDataService = nil :: any,
+	StatsService = nil :: any,
+}
+
+-- 4. PRIVATE HELPERS
+
+-- Helper: Get PlayerDataService (lazy load)
 local function getPlayerDataService()
-	if not _playerDataService then
-		_playerDataService = require(Server.services.PlayerDataService)
+	if not State.PlayerDataService then
+		State.PlayerDataService = require(Server.services.PlayerDataService)
 	end
-	return _playerDataService
+	return State.PlayerDataService
 end
 
--- Session zombie kill tracking (for end-game stats)
-local _sessionStats: {[Player]: {ZombiesKilled: number, CoinsEarned: number}} = {}
-
--- Trove for cleanup
-local _trove = Trove.new()
-
-local function getSessionStats(player: Player)
-	if not _sessionStats[player] then
-		_sessionStats[player] = {ZombiesKilled = 0, CoinsEarned = 0}
+-- Helper: Get StatsService (lazy load)
+local function getStatsService()
+	if not State.StatsService then
+		State.StatsService = require(Server.services.StatsService)
 	end
-	return _sessionStats[player]
+	return State.StatsService
 end
 
--- API for external access to session stats
-local API = {}
-
-function API.GetSessionStats(player: Player): {ZombiesKilled: number, CoinsEarned: number}
-	return getSessionStats(player)
+-- 5. LIFECYCLE: INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+	
+	State.Trove = Trove.new()
 end
 
-function API.ResetSessionStats(player: Player)
-	_sessionStats[player] = {ZombiesKilled = 0, CoinsEarned = 0}
+-- 6. LIFECYCLE: DISPOSE
+local function Dispose()
+	if State.Trove then
+		State.Trove:Destroy()
+		State.Trove = Trove.new()
+	end
+	State.IsInitialized = false
+	State.PlayerDataService = nil
+	State.StatsService = nil
 end
 
-function API.ResetAllSessionStats()
-	table.clear(_sessionStats)
-end
-
-local function EntityDeathSystem(world)
+-- 7. MAIN LOOP
+local function OnStep(world)
 	-- Check all entities with health
-	for id, health in world:query(HealthComponent) do
+	for id, health in world:query(Components.HealthComponent) do
 		if health.Current <= 0 then
 			-- Entity is dead
 			
 			-- Check if it's a plant (need to clear grid)
-			local plant = world:get(id, PlantTypeComponent)
+			local plant = world:get(id, Components.PlantTypeComponent)
 			if plant then
 				GridService.Clear(plant.Column, plant.Lane)
-				Logger.Info("EntityDeath", `Plant {id} ({plant.PlantType}) died at ({plant.Column}, {plant.Lane})`)
 			end
 			
 			-- Check if it's a zombie (need to drop coins)
-			local zombie = world:get(id, ZombieTypeComponent)
+			local zombie = world:get(id, Components.ZombieTypeComponent)
 			if zombie then
-				Logger.Info("EntityDeath", `Zombie {id} ({zombie.ZombieType}) died in lane {zombie.Lane}`)
+				local coinValue = ProgressionData.ZombieCoinRewards[zombie.ZombieType] or CONFIG.DEFAULT_COIN_VALUE
 				
-				-- Calculate coin reward
-				local coinValue = ProgressionData.ZombieCoinRewards[zombie.ZombieType] or 5
-				
-				-- Get zombie position for coin spawn location
-				local pos = world:get(id, PositionComponent)
+				local pos = world:get(id, Components.PositionComponent)
 				local posX = if pos then pos.X else 0
 				local posY = if pos then pos.Y else 0
 				local posZ = if pos then pos.Z else 0
 				
 				-- Spawn CoinDropEvent for VFX/Audio systems
-				world:spawn(CoinDropEvent({
+				world:spawn(Components.CoinDropEvent({
 					Amount = coinValue,
 					PositionX = posX,
 					PositionY = posY,
@@ -118,19 +118,17 @@ local function EntityDeathSystem(world)
 					SourceEntityId = id,
 				}))
 				
-				-- Award coins to all players (multiplayer fairness)
-				-- In a competitive mode, we'd track who dealt damage
+				-- Award coins to all players
 				local PlayerDataService = getPlayerDataService()
+				local StatsService = getStatsService()
 				for _, player in Players:GetPlayers() do
 					PlayerDataService.AddCoins(player, coinValue)
 					PlayerDataService.IncrementStat(player, "ZombiesKilled", 1)
 					
-					-- Track session stats
-					local stats = getSessionStats(player)
-					stats.ZombiesKilled += 1
-					stats.CoinsEarned += coinValue
+					-- Update session stats via StatsService
+					StatsService.AddZombieKill(player, 1)
+					StatsService.AddCoinsEarned(player, coinValue)
 					
-					-- Notify client for VFX
 					Network.CoinGained.Fire(player, {
 						Amount = coinValue,
 						TotalCoins = PlayerDataService.GetCoins(player),
@@ -145,12 +143,10 @@ local function EntityDeathSystem(world)
 				EntityId = id,
 			})
 			
-			-- Get position for death event
-			local deathPos = world:get(id, PositionComponent)
-			
-			-- Spawn DeathEvent for other systems to react (VFX, Audio, etc.)
+			-- Spawn DeathEvent for other systems
+			local deathPos = world:get(id, Components.PositionComponent)
 			local entityType = if plant then "Plant" elseif zombie then "Zombie" else "Unknown"
-			world:spawn(DeathEvent({
+			world:spawn(Components.DeathEvent({
 				Target = id,
 				EntityType = entityType,
 				PositionX = if deathPos then deathPos.X else 0,
@@ -158,7 +154,7 @@ local function EntityDeathSystem(world)
 				PositionZ = if deathPos then deathPos.Z else 0,
 			}))
 			
-			-- Release entity back to pool (or despawn if not pooled)
+			-- Release entity back to pool
 			if EntityPool.IsPooledEntity(id) then
 				EntityPool.Despawn(id)
 			else
@@ -168,30 +164,10 @@ local function EntityDeathSystem(world)
 	end
 end
 
--- Clean up when players leave
-local function onPlayerRemoving(player)
-	_sessionStats[player] = nil
-end
-
-local function setupListeners()
-	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-end
-
-local function Init(_world)
-	setupListeners()
-end
-
-local function Dispose()
-	_trove:Destroy()
-	_trove = Trove.new()
-	table.clear(_sessionStats)
-end
-
+-- 8. EXPORT
 return {
-	_name = "EntityDeathSystem",
 	priority = 180,
-	system = EntityDeathSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
+	system = OnStep,
 }

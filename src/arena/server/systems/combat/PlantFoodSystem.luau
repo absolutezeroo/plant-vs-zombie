@@ -2,187 +2,112 @@
 --[[
 	PlantFoodSystem.luau - Plant Food mechanics
 	
+	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	
 	Priority: 185 (After death system 180, before cleanup)
 	
 	Handles:
-	- Tracking glowing zombies that drop Plant Food
-	- Collecting Plant Food charges when glowing zombies die
-	- Activating Plant Food abilities on plants
-	- Managing player charge counts (max 3)
+	- Processing Plant Food activation requests
+	- Detecting glowing zombie deaths for charge collection
+	- Executing Plant Food abilities on plants
 	
 	LIFECYCLE:
-	- Init(): Setup player listeners and network handlers (CAN yield)
-	- system(): Main loop (CANNOT yield) - processes Plant Food requests
-	- Dispose(): Cleanup player connections and state
+	- Init(): Setup network handlers (CAN yield)
+	- OnStep(): Main loop (CANNOT yield) - processes requests
+	- Dispose(): Clear pending requests
 ]]
 
+-- ============================================================
+-- SECTION 1: IMPORTS
+-- ============================================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
-local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
 local Logger = require(Shared.utils.Logger)
-local Types = require(Shared.Types)
 local EntityPool = require(Shared.utils.EntityPool)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
 local ECSUtils = require(Shared.utils.ECSUtils)
-
--- Type alias for world parameter
-type MatterWorld = Types.MatterWorld
 
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Server modules
+-- Server services
 local Server = script.Parent.Parent.Parent
+local PlantFoodService = require(Server.services.PlantFoodService)
 
--- Components
-local PositionComponent = Components.PositionComponent
-local HealthComponent = Components.HealthComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local PlantFoodComponent = Components.PlantFoodComponent
-local OwnerComponent = Components.OwnerComponent
-local ProjectileComponent = Components.ProjectileComponent
+-- ============================================================
+-- SECTION 2: CONFIG (immutable settings)
+-- ============================================================
+local CONFIG = table.freeze({
+	PRIORITY = 185,
+})
 
--- Configuration (from GameConstants.PlantFood)
-local Config = GameConstants.PlantFood
+-- ============================================================
+-- SECTION 3: STATE (all mutable data)
+-- ============================================================
+local State = {
+	PendingRequests = {} :: {{player: Player, plantEntityId: number}},
+}
 
--- Player charge storage
-local _playerCharges: {[number]: number} = {}  -- UserId -> charge count
+-- ============================================================
+-- SECTION 4: PRIVATE HELPERS
+-- ============================================================
 
--- Track glowing zombies spawned this wave (for guaranteed spawns)
-local _glowingSpawnedThisWave = 0
-
--- Trove for cleanup
-local _trove = Trove.new()
-
--- Module API for external access
-local PlantFoodSystem = {}
-PlantFoodSystem._name = "PlantFoodSystem"
-PlantFoodSystem.priority = 185
-PlantFoodSystem.API = {}
-
--- ============================================
--- API Functions (for other systems)
--- ============================================
-
-function PlantFoodSystem.API.GetCharges(player: Player): number
-	return _playerCharges[player.UserId] or 0
-end
-
-function PlantFoodSystem.API.AddCharge(player: Player, amount: number?): number
-	local userId = player.UserId
-	local current = _playerCharges[userId] or 0
-	local newCount = math.min(current + (amount or 1), Config.MAX_CHARGES)
-	_playerCharges[userId] = newCount
-	
-	-- Notify client
-	Network.PlantFoodChargeUpdate.Fire(player, {
-		ChargeCount = newCount,
-	})
-	
-	Logger.Info("PlantFood", `Player {player.Name} gained charge: {current} -> {newCount}`)
-	return newCount
-end
-
-function PlantFoodSystem.API.UseCharge(player: Player): boolean
-	local userId = player.UserId
-	local current = _playerCharges[userId] or 0
-	
-	if current <= 0 then
-		return false
-	end
-	
-	_playerCharges[userId] = current - 1
-	
-	-- Notify client
-	Network.PlantFoodChargeUpdate.Fire(player, {
-		ChargeCount = current - 1,
-	})
-	
-	Logger.Info("PlantFood", `Player {player.Name} used charge: {current} -> {current - 1}`)
-	return true
-end
-
-function PlantFoodSystem.API.ShouldZombieBeGlowing(): boolean
-	-- First zombie each wave is guaranteed to be glowing
-	if _glowingSpawnedThisWave < Config.GUARANTEED_PER_WAVE then
-		_glowingSpawnedThisWave += 1
-		return true
-	end
-	
-	-- Random chance for additional glowing zombies
-	return ChanceUtils.Roll(Config.GLOWING_ZOMBIE_CHANCE)
-end
-
-function PlantFoodSystem.API.ResetWaveTracking()
-	_glowingSpawnedThisWave = 0
-end
-
--- ============================================
--- Plant Food Ability Execution
--- ============================================
-
-local function executeAbility(world: MatterWorld, plantId: number, plantType: string, player: Player)
+-- Execute Plant Food ability on a plant
+local function executeAbility(world: any, plantId: number, plantType: string, player: Player)
 	local ability = PlantFoodData.GetAbility(plantType)
 	if not ability then
 		Logger.Warn("PlantFood", `No Plant Food ability defined for {plantType}`)
 		return
 	end
 	
-	local pos = world:get(plantId, PositionComponent)
+	local pos = world:get(plantId, Components.PositionComponent)
 	if not pos then return end
 	
 	Logger.Info("PlantFood", `Executing {ability.Name} for {plantType}`)
 	
 	-- Instant Sun (Sunflower)
 	if ability.InstantSun then
-		-- Award sun to player
-		local PlayerDataService = require(Server.services.PlayerDataService)
-		PlayerDataService.AddSun(player, ability.InstantSun)
+		local SunService = require(Server.services.SunService)
+		SunService.AddSun(player, ability.InstantSun)
+		SunService.BroadcastSunUpdate(player)
 		Logger.Info("PlantFood", `{plantType} produced {ability.InstantSun} instant sun`)
 	end
 	
 	-- Rapid Fire (Peashooter, Repeater, etc.)
 	if ability.RapidFireShots and ability.ShotInterval then
-		-- Schedule rapid fire shots
 		local shots = ability.RapidFireShots
 		local interval = ability.ShotInterval
 		
 		task.spawn(function()
 			for i = 1, shots do
-				-- Check if plant still exists
 				if not world:contains(plantId) then break end
 				
-				-- Find nearest zombie in lane (same logic as ProjectileSystem)
-				local plantPos = world:get(plantId, PositionComponent)
+				local plantPos = world:get(plantId, Components.PositionComponent)
 				if not plantPos then break end
 				
 				-- Create rapid-fire projectile
 				local projId = EntityPool.Spawn(
-					ProjectileComponent({
+					Components.ProjectileComponent({
 						Damage = 20,
-						Speed = 30,  -- Faster than normal
+						Speed = 30,
 						SourcePlantId = plantId,
 						OwnerId = player.UserId,
 					}),
-					PositionComponent({
+					Components.PositionComponent({
 						X = plantPos.X + 2,
 						Y = plantPos.Y + 2.5,
 						Z = plantPos.Z,
 					})
 				)
 				
-				if not projId then break end -- Pool exhausted
+				if not projId then break end
 				
 				task.wait(interval)
 			end
@@ -191,12 +116,10 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 	
 	-- Freeze All (Snow Pea)
 	if ability.FreezeAll and ability.FreezeDuration then
-		-- Apply slow to all zombies
-		local SlowComponent = Components.SlowComponent
-		for zombieId, _ in world:query(ZombieTypeComponent) do
-			if not world:get(zombieId, SlowComponent) then
-				world:insert(zombieId, SlowComponent({
-					Multiplier = 0,  -- Complete freeze
+		for zombieId, _ in world:query(Components.ZombieTypeComponent) do
+			if not world:get(zombieId, Components.SlowComponent) then
+				world:insert(zombieId, Components.SlowComponent({
+					Multiplier = 0,
 					Duration = ability.FreezeDuration,
 					AppliedAt = os.clock(),
 				}))
@@ -216,7 +139,6 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 	if ability.InstantExplode then
 		local radius = ability.ExplosionRadius or 9
 		
-		-- Trigger explosion at plant position
 		Network.ExplosionVFX.FireAll({
 			PositionX = pos.X,
 			PositionY = pos.Y,
@@ -224,8 +146,7 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 			Radius = radius,
 		})
 		
-		-- Damage all zombies in radius
-		for zombieId, zombiePos in world:query(PositionComponent, ZombieTypeComponent) do
+		for zombieId, zombiePos in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
 			local dx = zombiePos.X - pos.X
 			local dz = zombiePos.Z - pos.Z
 			local dist = math.sqrt(dx * dx + dz * dz)
@@ -239,7 +160,6 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 			end
 		end
 		
-		-- Remove the plant after explosion
 		if EntityPool.IsPooledEntity(plantId) then
 			EntityPool.Despawn(plantId)
 		else
@@ -249,52 +169,25 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 	end
 end
 
--- ============================================
--- Network Handler
--- ============================================
-
-local function handlePlantFoodRequest(player: Player, data: {PlantEntityId: number})
-	local PlayerDataService = require(Server.services.PlayerDataService)
-	
-	-- Get the world from the loop (need to access global state)
-	-- This is handled by the system function below
-	Logger.Info("PlantFood", `Player {player.Name} requested Plant Food on entity {data.PlantEntityId}`)
-end
-
--- Store pending requests for the system to process
-local _pendingRequests: {{player: Player, plantEntityId: number}} = {}
-
-Network.PlantFoodRequest.SetCallback(function(player, data)
-	table.insert(_pendingRequests, {
-		player = player,
-		plantEntityId = data.PlantEntityId,
-	})
-end)
-
--- ============================================
--- Main System Function
--- ============================================
-
-function PlantFoodSystem.system(world: MatterWorld)
+-- ============================================================
+-- SECTION 5: ONSTEP (main ECS loop)
+-- ============================================================
+local function OnStep(world)
 	-- Process pending Plant Food activation requests
-	for _, request in _pendingRequests do
+	for _, request in State.PendingRequests do
 		local player = request.player
 		local plantId = request.plantEntityId
 		
-		-- Validate plant exists and belongs to player
-		local plant = world:get(plantId, PlantTypeComponent)
-		local owner = world:get(plantId, OwnerComponent)
+		-- Validate plant exists
+		local plant = world:get(plantId, Components.PlantTypeComponent)
 		
 		if not plant then
 			Logger.Warn("PlantFood", `Invalid plant entity {plantId}`)
 			continue
 		end
 		
-		-- Check if player owns the plant (or allow any player for coop)
-		-- For MVP, allow any player to use Plant Food on any plant
-		
 		-- Try to use a charge
-		if not PlantFoodSystem.API.UseCharge(player) then
+		if not PlantFoodService.UseCharge(player) then
 			Logger.Warn("PlantFood", `Player {player.Name} has no Plant Food charges`)
 			continue
 		end
@@ -311,21 +204,20 @@ function PlantFoodSystem.system(world: MatterWorld)
 	end
 	
 	-- Clear processed requests
-	table.clear(_pendingRequests)
+	table.clear(State.PendingRequests)
 	
 	-- Handle glowing zombie deaths (grant Plant Food charges)
-	for entityId, record in world:queryChanged(HealthComponent) do
+	for entityId, record in world:queryChanged(Components.HealthComponent) do
 		-- Check if entity just died
 		if record.new and record.new.Current <= 0 then
 			-- Check if it was a glowing zombie
-			local plantFood = world:get(entityId, PlantFoodComponent)
-			local zombie = world:get(entityId, ZombieTypeComponent)
+			local plantFood = world:get(entityId, Components.PlantFoodComponent)
+			local zombie = world:get(entityId, Components.ZombieTypeComponent)
 			
 			if plantFood and zombie then
 				-- Grant charge to all players (coop friendly)
-				-- In competitive mode, could grant to killer only
 				for _, player in Players:GetPlayers() do
-					local newCharges = PlantFoodSystem.API.AddCharge(player)
+					local newCharges = PlantFoodService.AddCharge(player)
 					
 					Network.PlantFoodCollected.FireAll({
 						CollectorId = player.UserId,
@@ -340,39 +232,32 @@ function PlantFoodSystem.system(world: MatterWorld)
 	end
 end
 
--- Initialize charges for new players
-local function onPlayerAdded(player: Player)
-	_playerCharges[player.UserId] = 0
-	
-	Network.PlantFoodChargeUpdate.Fire(player, {
-		ChargeCount = 0,
-	})
-end
-
--- Cleanup on player leave
-local function onPlayerRemoving(player: Player)
-	_playerCharges[player.UserId] = nil
-end
-
-local function setupListeners()
-	_trove:Connect(Players.PlayerAdded, onPlayerAdded)
-	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-end
-
+-- ============================================================
+-- SECTION 6: INIT / DISPOSE
+-- ============================================================
 local function Init(_world)
-	setupListeners()
+	-- Setup network handler for Plant Food requests
+	Network.PlantFoodRequest.SetCallback(function(player, data)
+		table.insert(State.PendingRequests, {
+			player = player,
+			plantEntityId = data.PlantEntityId,
+		})
+	end)
+	
 	Logger.Debug("PlantFoodSystem", "Initialized")
 end
 
 local function Dispose()
-	_trove:Clean()
-	table.clear(_playerCharges)
-	table.clear(_pendingRequests)
-	_glowingSpawnedThisWave = 0
+	table.clear(State.PendingRequests)
 	Logger.Debug("PlantFoodSystem", "Disposed")
 end
 
-PlantFoodSystem.Init = Init
-PlantFoodSystem.Dispose = Dispose
-
-return PlantFoodSystem
+-- ============================================================
+-- SECTION 7: MODULE EXPORT
+-- ============================================================
+return {
+	priority = CONFIG.PRIORITY,
+	system = OnStep,
+	Init = Init,
+	Dispose = Dispose,
+}

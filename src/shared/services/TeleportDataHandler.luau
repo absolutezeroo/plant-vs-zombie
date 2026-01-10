@@ -77,7 +77,7 @@ local _playerReturnData: { [number]: TeleportData.LobbyReturnData } = {}
 -- Dependencies (set during initialization)
 local _dependencies: {
     PlayerDataService: any?,
-    MutationApplySystem: any?,
+    MutationService: any?,
     ArenaService: any?,
     ProgressionHandler: any?,
 } = {}
@@ -105,7 +105,7 @@ end
 
 export type ArenaDependencies = {
     PlayerDataService: any,
-    MutationApplySystem: any?,
+    MutationService: any?,
     ArenaService: any?,
     ProgressionHandler: any?,
 }
@@ -118,7 +118,7 @@ function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
     Logger.Info("TeleportDataHandler", "Initializing for Arena")
     
     _dependencies.PlayerDataService = deps.PlayerDataService
-    _dependencies.MutationApplySystem = deps.MutationApplySystem
+    _dependencies.MutationService = deps.MutationService
     _dependencies.ArenaService = deps.ArenaService
     _dependencies.ProgressionHandler = deps.ProgressionHandler
     
@@ -202,7 +202,7 @@ function TeleportDataHandler._applyTeleportData(
     profileData: PlayerDataCore.ProfileData
 )
     local PlayerDataService = _dependencies.PlayerDataService
-    local MutationApplySystem = _dependencies.MutationApplySystem
+    local MutationService = _dependencies.MutationService
     
     -- Auto-unlock any plants in the teleported deck that aren't unlocked
     local needsUnlock = false
@@ -231,15 +231,15 @@ function TeleportDataHandler._applyTeleportData(
         Logger.Warn("TeleportDataHandler", `Invalid deck for {player.Name}: {deckError}`)
     end
     
-    -- Load mutations into the MutationApplySystem cache
-    if MutationApplySystem and teleportData.EquippedMutations then
+    -- Load mutations into the MutationService cache
+    if MutationService and teleportData.EquippedMutations then
         local mutationCount = 0
         for plantType, mutations in teleportData.EquippedMutations do
             mutationCount += #mutations
         end
         
         if mutationCount > 0 then
-            MutationApplySystem.LoadPlayerMutations(player.UserId, teleportData.EquippedMutations)
+            MutationService.LoadPlayerMutations(player.UserId, teleportData.EquippedMutations)
             Logger.Info("TeleportDataHandler", `Loaded {mutationCount} mutations for {player.Name}`)
         end
     end

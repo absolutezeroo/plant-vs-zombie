@@ -7,42 +7,46 @@
 	Two responsibilities:
 	1. Query ProjectileHitEvent + BurnEffectComponent to apply burns
 	2. Process zombies with BurningComponent (DoT ticks)
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes burning entities
-	- Dispose(): No cleanup needed
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
 local ECSUtils = require(Shared.utils.ECSUtils)
 
--- Components
-local BurningComponent = Components.BurningComponent
-local BurnEffectComponent = Components.BurnEffectComponent
-local HealthComponent = Components.HealthComponent
-local DamageEvent = Components.DamageEvent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local ProjectileHitEvent = Components.ProjectileHitEvent
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	TICK_INTERVAL = 1, -- Seconds between burn ticks
+})
+
+-- 3. STATE (minimal - stateless system)
+local State = {
+	IsInitialized = false,
+}
+
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+end
 
 -- Helper: Apply burn to a zombie
 local function applyBurn(world, zombieEntityId: number, damagePerSecond: number, duration: number)
 	if not world:contains(zombieEntityId) then return end
 	
-	local existingBurn = world:get(zombieEntityId, BurningComponent)
+	local existingBurn = world:get(zombieEntityId, Components.BurningComponent)
 	
 	if existingBurn then
 		-- Refresh duration if new burn is stronger or longer
 		if damagePerSecond >= existingBurn.DamagePerSecond then
-			world:insert(zombieEntityId, BurningComponent({
+			world:insert(zombieEntityId, Components.BurningComponent({
 				DamagePerSecond = damagePerSecond,
 				RemainingDuration = math.max(existingBurn.RemainingDuration, duration),
 				LastTickTime = os.clock(),
@@ -50,50 +54,47 @@ local function applyBurn(world, zombieEntityId: number, damagePerSecond: number,
 		end
 	else
 		-- Apply new burn
-		world:insert(zombieEntityId, BurningComponent({
+		world:insert(zombieEntityId, Components.BurningComponent({
 			DamagePerSecond = damagePerSecond,
 			RemainingDuration = duration,
 			LastTickTime = os.clock(),
 		}))
-		Logger.Debug("BurnDamageSystem", `Applied burn to zombie {zombieEntityId}: {damagePerSecond} dps for {duration}s`)
 	end
 end
 
--- System function
-local function BurnDamageSystem(world)
+-- 6. MAIN LOOP
+local function OnStep(world)
 	local currentTime = os.clock()
 	
 	-- 1. Process ProjectileHitEvents: apply burns from plants with BurnEffectComponent
-	for _, hitEvent in world:query(ProjectileHitEvent) do
+	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
 		if not world:contains(sourcePlant) then continue end
 		
-		local burnEffect = world:get(sourcePlant, BurnEffectComponent)
+		local burnEffect = world:get(sourcePlant, Components.BurnEffectComponent)
 		if burnEffect then
 			applyBurn(world, hitEvent.TargetZombie, burnEffect.DamagePerSecond, burnEffect.Duration)
 		end
 	end
 	
 	-- 2. Process all burning zombies (DoT ticks)
-	for entityId, burning, health, zombie in world:query(BurningComponent, HealthComponent, ZombieTypeComponent) do
-		-- Check if burn expired
+	for entityId, burning in world:query(Components.BurningComponent, Components.HealthComponent, Components.ZombieTypeComponent) do
 		local elapsed = currentTime - burning.LastTickTime
 		local newRemaining = burning.RemainingDuration - elapsed
 		
 		if newRemaining <= 0 then
 			-- Burn expired, remove component
-			world:remove(entityId, BurningComponent)
-			Logger.Debug("BurnDamageSystem", `Burn expired on entity {entityId}`)
+			world:remove(entityId, Components.BurningComponent)
 		else
 			-- Tick damage every second
-			if elapsed >= 1 then
+			if elapsed >= CONFIG.TICK_INTERVAL then
 				local damage = burning.DamagePerSecond
 				
 				-- Apply damage using ECSUtils
 				ECSUtils.DamageEntity(world, entityId, damage, Components)
 				
 				-- Emit damage event for visual feedback
-				world:spawn(DamageEvent({
+				world:spawn(Components.DamageEvent({
 					Target = entityId,
 					Amount = damage,
 					DamageType = "Burn",
@@ -101,30 +102,20 @@ local function BurnDamageSystem(world)
 				}))
 				
 				-- Update burn timer
-				world:insert(entityId, BurningComponent({
+				world:insert(entityId, Components.BurningComponent({
 					DamagePerSecond = burning.DamagePerSecond,
 					RemainingDuration = newRemaining,
 					LastTickTime = currentTime,
 				}))
-				
-				Logger.Debug("BurnDamageSystem", `Burn tick: {damage} damage to entity {entityId}`)
 			end
 		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	-- No state to clean up
-end
-
+-- 7. EXPORT
 return {
-	_name = "BurnDamageSystem",
 	priority = 350,
-	system = BurnDamageSystem,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

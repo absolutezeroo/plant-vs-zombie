@@ -194,4 +194,15 @@ function LaneCache.GetTotalCount(): number
 	return total
 end
 
+--[[
+	Clear all cached data
+	Used during system dispose/cleanup
+]]
+function LaneCache.Clear()
+	for i = 1, GridConfig.GRID_LANES do
+		table.clear(_lanes[i])
+	end
+	table.clear(_positions)
+end
+
 return LaneCache

@@ -2,22 +2,26 @@
 --[[
 	PoisonCloudSystem.luau - Handles poison clouds and poisoned zombies
 	
+	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	
 	Priority: 365 (Combat processing)
 	
-	Spawns poison clouds when plants with PoisonCloud die.
+	Spawns poison clouds when plants with PoisonCloudComponent die.
 	Damages zombies inside poison clouds over time.
 	
 	LIFECYCLE:
 	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes poison clouds
+	- OnStep(): Main loop (CANNOT yield) - processes poison clouds
 	- Dispose(): Clear active clouds
 ]]
 
+-- ============================================================
+-- SECTION 1: IMPORTS
+-- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -28,37 +32,41 @@ local MapConfig = require(Shared.config.MapConfig)
 local ECSUtils = require(Shared.utils.ECSUtils)
 local MathUtils = require(Shared.utils.MathUtils)
 
--- Components
-local PoisonCloudComponent = Components.PoisonCloudComponent
-local PoisonedComponent = Components.PoisonedComponent
-local PositionComponent = Components.PositionComponent
-local HealthComponent = Components.HealthComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local DamageEvent = Components.DamageEvent
+-- ============================================================
+-- SECTION 2: CONFIG (immutable settings)
+-- ============================================================
+local CONFIG = table.freeze({
+	PRIORITY = 365,
+	TICK_INTERVAL = 1, -- Damage tick every second
+})
 
--- Active poison clouds (entity has been destroyed but cloud lingers)
+-- ============================================================
+-- SECTION 3: STATE (all mutable data)
+-- ============================================================
 export type ActiveCloud = {
 	Position: {X: number, Y: number, Z: number},
-	Lane: number, -- Cached lane for optimized lookups
+	Lane: number,
 	Radius: number,
 	DamagePerSecond: number,
 	RemainingDuration: number,
 	LastTickTime: number,
 }
 
-local activeClouds: {ActiveCloud} = {}
+local State = {
+	ActiveClouds = {} :: {ActiveCloud},
+}
 
--- Module API
-local API = {}
+-- ============================================================
+-- SECTION 4: PRIVATE HELPERS
+-- ============================================================
 
 -- Spawn a poison cloud at a position
-function API.SpawnPoisonCloud(position: {X: number, Y: number, Z: number}, radius: number, damagePerSecond: number, duration: number)
-	-- Calculate lane from world position for optimized lookups
+local function spawnPoisonCloud(position: {X: number, Y: number, Z: number}, radius: number, damagePerSecond: number, duration: number)
 	local _, lane = MapConfig.WorldToGrid(Vector3.new(position.X, position.Y, position.Z))
 	
-	table.insert(activeClouds, {
+	table.insert(State.ActiveClouds, {
 		Position = position,
-		Lane = lane or 3, -- Default to middle lane if calculation fails
+		Lane = lane or 3,
 		Radius = radius,
 		DamagePerSecond = damagePerSecond,
 		RemainingDuration = duration,
@@ -67,31 +75,36 @@ function API.SpawnPoisonCloud(position: {X: number, Y: number, Z: number}, radiu
 	Logger.Debug("PoisonCloudSystem", `Spawned poison cloud at ({position.X}, {position.Z}) lane {lane or 3} - radius {radius}, {damagePerSecond} dps for {duration}s`)
 end
 
--- Called when a plant with PoisonCloud dies
-function API.OnPlantDeath(world, plantEntityId: number)
-	if not world:contains(plantEntityId) then return end
-	
-	local poisonCloud = world:get(plantEntityId, PoisonCloudComponent)
-	if not poisonCloud then return end
-	
-	local pos = world:get(plantEntityId, PositionComponent)
-	if not pos then return end
-	
-	API.SpawnPoisonCloud(
-		{X = pos.X, Y = pos.Y, Z = pos.Z},
-		poisonCloud.Radius,
-		poisonCloud.DamagePerSecond,
-		poisonCloud.Duration
-	)
-end
-
--- System function
-local function PoisonCloudSystem(world)
+-- ============================================================
+-- SECTION 5: ONSTEP (main ECS loop)
+-- ============================================================
+local function OnStep(world)
 	local currentTime = os.clock()
 	local cloudsToRemove = {}
 	
+	-- React to plant deaths with PoisonCloudComponent
+	for entityId, record in world:queryChanged(Components.HealthComponent) do
+		-- Check if entity just died
+		if record.new and record.new.Current <= 0 then
+			-- Check if it had PoisonCloudComponent
+			local poisonCloud = world:get(entityId, Components.PoisonCloudComponent)
+			if not poisonCloud then continue end
+			
+			local pos = world:get(entityId, Components.PositionComponent)
+			if not pos then continue end
+			
+			-- Spawn cloud at death location
+			spawnPoisonCloud(
+				{X = pos.X, Y = pos.Y, Z = pos.Z},
+				poisonCloud.Radius,
+				poisonCloud.DamagePerSecond,
+				poisonCloud.Duration
+			)
+		end
+	end
+	
 	-- Process each active cloud
-	for i, cloud in activeClouds do
+	for i, cloud in State.ActiveClouds do
 		local elapsed = currentTime - cloud.LastTickTime
 		cloud.RemainingDuration -= elapsed
 		
@@ -99,7 +112,7 @@ local function PoisonCloudSystem(world)
 			table.insert(cloudsToRemove, i)
 		else
 			-- Tick damage every second
-			if elapsed >= 1 then
+			if elapsed >= CONFIG.TICK_INTERVAL then
 				cloud.LastTickTime = currentTime
 				
 				-- Calculate how many lanes the cloud radius covers
@@ -118,10 +131,10 @@ local function PoisonCloudSystem(world)
 					local distance = MathUtils.Distance2D(pos.X, pos.Z, cloud.Position.X, cloud.Position.Z)
 					
 					if distance <= cloud.Radius then
-						-- Apply poison damage using ECSUtils
+						-- Apply poison damage
 						local actualDamage, died = ECSUtils.DamageEntity(world, entityId, cloud.DamagePerSecond, Components)
 						if actualDamage > 0 then
-							world:insert(entityId, DamageEvent({
+							world:insert(entityId, Components.DamageEvent({
 								Amount = cloud.DamagePerSecond,
 								DamageType = "Poison",
 								SourceEntityId = nil,
@@ -135,28 +148,28 @@ local function PoisonCloudSystem(world)
 	
 	-- Remove expired clouds (in reverse order to preserve indices)
 	for i = #cloudsToRemove, 1, -1 do
-		table.remove(activeClouds, cloudsToRemove[i])
+		table.remove(State.ActiveClouds, cloudsToRemove[i])
 	end
 end
 
--- Reset clouds (for new game)
-function API.Reset()
-	activeClouds = {}
-end
-
+-- ============================================================
+-- SECTION 6: INIT / DISPOSE
+-- ============================================================
 local function Init(_world)
-	-- No initialization needed
+	Logger.Debug("PoisonCloudSystem", "Initialized")
 end
 
 local function Dispose()
-	activeClouds = {}
+	table.clear(State.ActiveClouds)
+	Logger.Debug("PoisonCloudSystem", "Disposed")
 end
 
+-- ============================================================
+-- SECTION 7: MODULE EXPORT
+-- ============================================================
 return {
-	_name = "PoisonCloudSystem",
-	priority = 365,
-	system = PoisonCloudSystem,
+	priority = CONFIG.PRIORITY,
+	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
-	API = API,
 }

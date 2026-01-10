@@ -137,6 +137,106 @@ This document lists all public functions for each service module to prevent call
 
 ---
 
+## WaveService
+
+**Location:** `src/arena/server/services/WaveService.luau`
+
+Manages game state and wave progression. Extracted from WaveManagerSystem.
+
+### Game State
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetGameState()` | - | `GameState` | Get current game state (`"Idle"`, `"Playing"`, `"Victory"`, `"Defeat"`) |
+| `SetGameState(state)` | `string` | `void` | Set game state |
+| `IsPlaying()` | - | `boolean` | Check if game is active |
+| `IsDay()` | - | `boolean` | Check if current world is daytime |
+
+### Wave Management
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetCurrentWave()` | - | `number` | Get current wave number |
+| `GetTotalWaves()` | - | `number` | Get total waves in level |
+| `StartGame(worldId, difficulty)` | `string, string` | `void` | Start a new game |
+| `EndGame(victory)` | `boolean` | `void` | End the game |
+
+### Configuration
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetCurrentWorldConfig()` | - | `WorldConfig?` | Get current world configuration |
+| `GetCurrentDifficultyConfig()` | - | `DifficultyConfig?` | Get current difficulty configuration |
+
+---
+
+## SunService
+
+**Location:** `src/arena/server/services/SunService.luau`
+
+Manages player sun economy. Extracted from PlacementSystem.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Initialize()` | - | `void` | Initialize service |
+| `GetSun(player)` | `Player` | `number` | Get player's current sun |
+| `AddSun(player, amount)` | `Player, number` | `number` | Add sun, returns new total |
+| `SpendSun(player, amount)` | `Player, number` | `boolean` | Spend sun (returns false if insufficient) |
+| `SetSun(player, amount)` | `Player, number` | `void` | Set sun to specific amount |
+| `BroadcastSunUpdate(player)` | `Player` | `void` | Sync sun to client |
+| `Dispose()` | - | `void` | Clean up |
+
+---
+
+## MutationService
+
+**Location:** `src/arena/server/services/MutationService.luau`
+
+Manages player mutation cache for combat bonuses.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `LoadPlayerMutations(userId, mutations)` | `number, {[string]: {string}}` | `void` | Load mutations from teleport data |
+| `ClearPlayerMutations(userId)` | `number` | `void` | Clear cache on leave |
+| `GetPlayerMutations(userId)` | `number` | `{[string]: {string}}` | Get all mutations for player |
+| `GetPlantMutations(userId, plantType)` | `number, string` | `{string}` | Get mutations for specific plant |
+| `Dispose()` | - | `void` | Clear all caches |
+
+---
+
+## PlantFoodService
+
+**Location:** `src/arena/server/services/PlantFoodService.luau`
+
+Manages Plant Food charges and glowing zombie spawning.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetCharges(player)` | `Player` | `number` | Get current Plant Food charges |
+| `AddCharge(player, amount)` | `Player, number?` | `number` | Add charge(s), returns new total |
+| `UseCharge(player)` | `Player` | `boolean` | Use one charge (returns false if none) |
+| `ShouldZombieBeGlowing()` | - | `boolean` | Check if next zombie should be glowing |
+| `ResetWaveTracking()` | - | `void` | Reset glowing spawn tracker |
+| `Dispose()` | - | `void` | Clean up |
+
+---
+
+## StatsService
+
+**Location:** `src/arena/server/services/StatsService.luau`
+
+Manages session statistics (reset each game).
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Initialize()` | - | `void` | Initialize service |
+| `GetSessionStats(player)` | `Player` | `SessionStats` | Get session stats (`ZombiesKilled`, `CoinsEarned`, `PlantsPlaced`) |
+| `AddZombieKill(player, count)` | `Player, number?` | `void` | Increment zombie kill count |
+| `AddCoinsEarned(player, amount)` | `Player, number` | `void` | Add coins earned this session |
+| `AddPlantPlaced(player, count)` | `Player, number?` | `void` | Increment plants placed |
+| `ResetSessionStats(player)` | `Player` | `void` | Reset stats for one player |
+| `ResetAllSessionStats()` | - | `void` | Reset stats for all players |
+| `Dispose()` | - | `void` | Clean up |
+
+---
+
 ## LobbyService
 
 **Location:** `src/lobby/server/services/LobbyService.luau`
@@ -486,5 +586,6 @@ model:PivotTo(cframe)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2 | 2026-01-10 | Added ECS Services (WaveService, SunService, MutationService, PlantFoodService, StatsService) |
 | 1.1 | 2026-01-10 | Added ChanceUtils, ECSUtils, VFXUtils documentation |
 | 1.0 | 2026-01-07 | Initial documentation after API audit |

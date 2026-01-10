@@ -2,20 +2,24 @@
 --[[
 	SunCollectionSystem.luau - Server-side sun collection processing
 	
+	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	
 	Priority: 310 (After sun spawning)
 	
 	Handles sun collection requests from clients via Zap.
 	Validates the sun entity exists and is collectible.
-	Awards sun to player and despawns entity.
+	Awards sun to player via SunService and despawns entity.
 	
 	LIFECYCLE:
 	- Init(): Setup network listener (CAN yield)
-	- system(): Main loop (CANNOT yield) - processes collection queue
+	- OnStep(): Main loop (CANNOT yield) - processes collection queue
 	- Dispose(): Clear collection queue
 ]]
 
+-- ============================================================
+-- SECTION 1: IMPORTS
+-- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
@@ -28,43 +32,37 @@ local EntityPool = require(Shared.utils.EntityPool)
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local SunComponent = Components.SunComponent
+-- Server services
+local Server = script.Parent.Parent.Parent
+local SunService = require(Server.services.SunService)
 
--- Collection queue (populated by network handler)
-local _collectionQueue: {{Player: Player, EntityId: number, RequestId: number}} = {}
+-- ============================================================
+-- SECTION 2: CONFIG (immutable settings)
+-- ============================================================
+local CONFIG = table.freeze({
+	PRIORITY = 310,
+})
 
--- World reference (set during first system call)
-local _world: any = nil
+-- ============================================================
+-- SECTION 3: STATE (all mutable data)
+-- ============================================================
+local State = {
+	World = nil :: any?,
+	CollectionQueue = {} :: {{Player: Player, EntityId: number, RequestId: number}},
+}
 
--- Lazy-load PlacementSystem to avoid circular dependency
-local _placementAPI: any = nil
-local function getPlacementAPI()
-	if not _placementAPI then
-		-- PlacementSystem is in systems/units/
-		local Systems = script.Parent.Parent
-		local PlacementSystem = require(Systems.units.PlacementSystem)
-		_placementAPI = PlacementSystem.API
-	end
-	return _placementAPI
-end
+-- ============================================================
+-- SECTION 4: PRIVATE HELPERS
+-- ============================================================
 
--- API
-local SunCollectionAPI = {}
-
-function SunCollectionAPI.QueueCollection(player: Player, entityId: number, requestId: number)
-	table.insert(_collectionQueue, {
+-- Queue a collection request (called by network handler)
+local function queueCollection(player: Player, entityId: number, requestId: number)
+	table.insert(State.CollectionQueue, {
 		Player = player,
 		EntityId = entityId,
 		RequestId = requestId
 	})
 end
-
--- Set up network handler
-Network.CollectSunRequest.SetCallback(function(player: Player, data)
-	SunCollectionAPI.QueueCollection(player, data.SunEntityId, data.RequestId)
-end)
 
 -- Validate collection and return sun value if valid
 local function processCollection(world: any, player: Player, entityId: number): number?
@@ -75,7 +73,7 @@ local function processCollection(world: any, player: Player, entityId: number): 
 	end
 	
 	-- Check entity has SunComponent
-	local sun = world:get(entityId, SunComponent)
+	local sun = world:get(entityId, Components.SunComponent)
 	if not sun then
 		Logger.Warn("SunCollection", `Entity {entityId} is not a sun`)
 		return nil
@@ -95,18 +93,20 @@ local function processCollection(world: any, player: Player, entityId: number): 
 	return value
 end
 
-local function SunCollectionSystem(world)
-	_world = world
+-- ============================================================
+-- SECTION 5: ONSTEP (main ECS loop)
+-- ============================================================
+local function OnStep(world)
+	State.World = world
 	
 	-- Process collection queue
-	for _, request in _collectionQueue do
+	for _, request in State.CollectionQueue do
 		local value = processCollection(world, request.Player, request.EntityId)
 		
 		if value then
-			-- Get current sun count
-			local placementAPI = getPlacementAPI()
-			placementAPI.AddSun(request.Player, value)
-			local newTotal = placementAPI.GetPlayerSun(request.Player)
+			-- Add sun via SunService
+			SunService.AddSun(request.Player, value)
+			local newTotal = SunService.GetSun(request.Player)
 			
 			-- Broadcast SunCollected to all clients
 			Network.SunCollected.FireAll({
@@ -132,26 +132,33 @@ local function SunCollectionSystem(world)
 	end
 	
 	-- Clear queue
-	table.clear(_collectionQueue)
+	table.clear(State.CollectionQueue)
 end
 
+-- ============================================================
+-- SECTION 6: INIT / DISPOSE
+-- ============================================================
 local function Init(_world)
-	-- Network handler is already set up at module load
+	-- Set up network handler
+	Network.CollectSunRequest.SetCallback(function(player: Player, data)
+		queueCollection(player, data.SunEntityId, data.RequestId)
+	end)
+	
 	Logger.Debug("SunCollectionSystem", "Initialized")
 end
 
 local function Dispose()
-	table.clear(_collectionQueue)
-	_world = nil
-	_placementAPI = nil
+	table.clear(State.CollectionQueue)
+	State.World = nil
 	Logger.Debug("SunCollectionSystem", "Disposed")
 end
 
+-- ============================================================
+-- SECTION 7: MODULE EXPORT
+-- ============================================================
 return {
-	_name = "SunCollectionSystem",
-	priority = 310, -- After sun spawning
-	system = SunCollectionSystem,
+	priority = CONFIG.PRIORITY,
+	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
-	API = SunCollectionAPI,
 }

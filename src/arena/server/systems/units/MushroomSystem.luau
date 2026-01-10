@@ -10,92 +10,83 @@
 	- Scaredy-shroom hiding when zombies near (HidesWhenNear)
 	- Sun-shroom growing over time (GrowsOverTime)
 	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes mushroom behavior
+	V2.0 Architecture:
+	- Init(world): No init needed
 	- Dispose(): Clear tracking state
+	- OnStep(world): Process mushroom behaviors
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local GridConfig = require(Shared.config.GridConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 
--- Network
-local Network = require(Shared.network.generated.server)
-
 -- Server modules
 local Server = script.Parent.Parent.Parent
-local GridService = require(Server.services.GridService)
 
--- Components
-local PositionComponent = Components.PositionComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local SleepingComponent = Components.SleepingComponent
-local HidingComponent = Components.HidingComponent
-local SpawnEvent = Components.SpawnEvent
-local PlantActionEvent = Components.PlantActionEvent
-
--- Config (from GameConstants.MushroomDefaults)
-local MushroomConfig = {
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
 	DEFAULT_HIDE_RADIUS = GameConstants.MushroomDefaults.HIDE_RADIUS,
 	SUN_SHROOM_GROW_TIME = GameConstants.MushroomDefaults.SUN_SHROOM_GROW_TIME,
 	SUN_SHROOM_SMALL_VALUE = GameConstants.MushroomDefaults.SUN_SHROOM_SMALL_VALUE,
 	SUN_SHROOM_LARGE_VALUE = GameConstants.MushroomDefaults.SUN_SHROOM_LARGE_VALUE,
+})
+
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	SunShroomPlanted = {} :: {[number]: number}, -- entityId -> plantTime
+	WaveService = nil :: any,
 }
 
--- Track SunShroom growth timers
-local _sunShroomPlanted: {[number]: number} = {} -- entityId -> plantTime
+-- 4. PRIVATE HELPERS
 
--- Lazy-load WaveManagerSystem to avoid circular dependencies
-local _waveManager: any = nil
-local function getWaveManager()
-	if not _waveManager then
-		_waveManager = require(script.Parent.Parent.wave.WaveManagerSystem)
+-- Lazy-load WaveService to avoid circular dependencies
+local function getWaveService()
+	if not State.WaveService then
+		State.WaveService = require(Server.services.WaveService)
 	end
-	return _waveManager
+	return State.WaveService
 end
 
--- API for other systems
-local MushroomAPI = {}
+-- Check if it's currently day based on WorldData.IsNight
+local function isDay(): boolean
+	local waveService = getWaveService()
+	return waveService.IsDay()
+end
 
--- Check if it's currently day or night based on WorldData.IsNight
-function MushroomAPI.IsDay(): boolean
-	local waveManager = getWaveManager()
-	local worldConfig = waveManager.GetCurrentWorldConfig()
-	
-	-- If no world loaded yet, default to day (mushrooms sleep)
-	if not worldConfig then
-		return true
+-- Get current SunShroom sun value (grows over time)
+local function getSunShroomValue(entityId: number): number
+	local plantTime = State.SunShroomPlanted[entityId]
+	if not plantTime then
+		return CONFIG.SUN_SHROOM_LARGE_VALUE
 	end
 	
-	-- IsNight = true means it's night (mushrooms awake)
-	-- IsNight = false or nil means it's day (mushrooms sleep)
-	return not worldConfig.IsNight
+	local elapsed = os.clock() - plantTime
+	if elapsed >= CONFIG.SUN_SHROOM_GROW_TIME then
+		return CONFIG.SUN_SHROOM_LARGE_VALUE
+	else
+		-- Linear interpolation from small to large
+		local progress = elapsed / CONFIG.SUN_SHROOM_GROW_TIME
+		local value = CONFIG.SUN_SHROOM_SMALL_VALUE + 
+			(CONFIG.SUN_SHROOM_LARGE_VALUE - CONFIG.SUN_SHROOM_SMALL_VALUE) * progress
+		return math.floor(value)
+	end
 end
 
--- Check if current world is a night world (for UI/feedback)
-function MushroomAPI.IsNightWorld(): boolean
-	return not MushroomAPI.IsDay()
-end
-
--- Called when a mushroom is placed
-function MushroomAPI.OnMushroomPlaced(world: any, entityId: number, plantType: string)
+-- Initialize a newly spawned mushroom
+local function initializeMushroom(world, entityId: number, plantType: string)
 	local stats = PlantData[plantType]
 	if not stats or not stats.IsMushroom then return end
 	
 	-- Check if mushroom sleeps during day
-	if stats.SleepsDuringDay and MushroomAPI.IsDay() then
-		world:insert(entityId, SleepingComponent({
+	if stats.SleepsDuringDay and isDay() then
+		world:insert(entityId, Components.SleepingComponent({
 			IsSleeping = true,
 			WokeAt = nil,
 		}))
@@ -104,117 +95,84 @@ function MushroomAPI.OnMushroomPlaced(world: any, entityId: number, plantType: s
 	
 	-- Track SunShroom growth
 	if stats.GrowsOverTime then
-		_sunShroomPlanted[entityId] = os.clock()
+		State.SunShroomPlanted[entityId] = os.clock()
 		Logger.Debug("Mushroom", `SunShroom {entityId} planted, will grow over time`)
 	end
 	
 	-- Initialize Scaredy-shroom hiding component
 	if stats.HidesWhenNear then
-		local hideRadius = stats.HideRadius or MushroomConfig.DEFAULT_HIDE_RADIUS
-		world:insert(entityId, HidingComponent({
+		local hideRadius = stats.HideRadius or CONFIG.DEFAULT_HIDE_RADIUS
+		world:insert(entityId, Components.HidingComponent({
 			IsHiding = false,
 			HideRadius = hideRadius,
 		}))
 	end
 end
 
--- Wake a sleeping mushroom (called by Coffee Bean placement)
-function MushroomAPI.WakeMushroom(world: any, entityId: number)
-	local sleeping = world:get(entityId, SleepingComponent)
+-- Wake a sleeping mushroom
+local function wakeMushroom(world, entityId: number)
+	local sleeping = world:get(entityId, Components.SleepingComponent)
 	if sleeping and sleeping.IsSleeping then
-		world:insert(entityId, SleepingComponent({
+		world:insert(entityId, Components.SleepingComponent({
 			IsSleeping = false,
 			WokeAt = os.clock(),
 		}))
 		Logger.Info("Mushroom", `Mushroom {entityId} woke up!`)
-		return true
-	end
-	return false
-end
-
--- Get current SunShroom sun value (grows over time)
-function MushroomAPI.GetSunShroomValue(entityId: number): number
-	local plantTime = _sunShroomPlanted[entityId]
-	if not plantTime then
-		return MushroomConfig.SUN_SHROOM_LARGE_VALUE
-	end
-	
-	local elapsed = os.clock() - plantTime
-	if elapsed >= MushroomConfig.SUN_SHROOM_GROW_TIME then
-		return MushroomConfig.SUN_SHROOM_LARGE_VALUE
-	else
-		-- Linear interpolation from small to large
-		local progress = elapsed / MushroomConfig.SUN_SHROOM_GROW_TIME
-		local value = MushroomConfig.SUN_SHROOM_SMALL_VALUE + 
-			(MushroomConfig.SUN_SHROOM_LARGE_VALUE - MushroomConfig.SUN_SHROOM_SMALL_VALUE) * progress
-		return math.floor(value)
 	end
 end
 
-local function MushroomSystem(world)
-	local currentTime = os.clock()
-	
+-- 5. LIFECYCLE: INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 6. LIFECYCLE: DISPOSE
+local function Dispose()
+	table.clear(State.SunShroomPlanted)
+	State.WaveService = nil
+	State.IsInitialized = false
+end
+
+-- 7. MAIN LOOP
+local function OnStep(world)
 	-- React to SpawnEvent for new mushroom plants
-	for _, event in world:query(SpawnEvent) do
+	for _, event in world:query(Components.SpawnEvent) do
 		if event.EntityType ~= "Plant" then continue end
 		
 		local entityId = event.Target
 		if not world:contains(entityId) then continue end
 		
-		local plant = world:get(entityId, PlantTypeComponent)
+		local plant = world:get(entityId, Components.PlantTypeComponent)
 		if not plant then continue end
 		
-		local stats = PlantData[plant.PlantType]
-		if not stats or not stats.IsMushroom then continue end
-		
-		-- Initialize mushroom (replaces OnMushroomPlaced API call)
-		if stats.SleepsDuringDay and MushroomAPI.IsDay() then
-			world:insert(entityId, SleepingComponent({
-				IsSleeping = true,
-				WokeAt = nil,
-			}))
-			Logger.Debug("Mushroom", `{plant.PlantType} {entityId} is sleeping (day time)`)
-		end
-		
-		if stats.GrowsOverTime then
-			_sunShroomPlanted[entityId] = os.clock()
-			Logger.Debug("Mushroom", `SunShroom {entityId} planted, will grow over time`)
-		end
-		
-		if stats.HidesWhenNear then
-			local hideRadius = stats.HideRadius or MushroomConfig.DEFAULT_HIDE_RADIUS
-			world:insert(entityId, HidingComponent({
-				IsHiding = false,
-				HideRadius = hideRadius,
-			}))
-		end
+		initializeMushroom(world, entityId, plant.PlantType)
 	end
 	
 	-- React to PlantActionEvent for Coffee Bean waking mushrooms
-	for _, actionEvent in world:query(PlantActionEvent) do
+	for _, actionEvent in world:query(Components.PlantActionEvent) do
 		if actionEvent.ActionType ~= "WakeMushroom" then continue end
 		
 		local targetId = actionEvent.TargetEntity
 		if not world:contains(targetId) then continue end
 		
-		local sleeping = world:get(targetId, SleepingComponent)
-		if sleeping and sleeping.IsSleeping then
-			world:insert(targetId, SleepingComponent({
-				IsSleeping = false,
-				WokeAt = os.clock(),
-			}))
-			Logger.Info("Mushroom", `Mushroom {targetId} woke up!`)
-		end
+		wakeMushroom(world, targetId)
 	end
 	
 	-- Process Scaredy-shroom hiding behavior
-	for plantId, pos, plant, hiding in world:query(PositionComponent, PlantTypeComponent, HidingComponent) do
+	for plantId, hiding in world:query(Components.HidingComponent) do
+		local plant = world:get(plantId, Components.PlantTypeComponent)
+		if not plant then continue end
+		
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.HidesWhenNear then continue end
 		
 		-- Skip if sleeping
-		local sleeping = world:get(plantId, SleepingComponent)
+		local sleeping = world:get(plantId, Components.SleepingComponent)
 		if sleeping and sleeping.IsSleeping then continue end
+		
+		local pos = world:get(plantId, Components.PositionComponent)
+		if not pos then continue end
 		
 		-- Check for zombies within hide radius
 		local shouldHide = false
@@ -235,7 +193,7 @@ local function MushroomSystem(world)
 		
 		-- Update hiding state
 		if shouldHide ~= hiding.IsHiding then
-			world:insert(plantId, HidingComponent({
+			world:insert(plantId, Components.HidingComponent({
 				IsHiding = shouldHide,
 				HideRadius = hiding.HideRadius,
 			}))
@@ -249,26 +207,17 @@ local function MushroomSystem(world)
 	end
 	
 	-- Cleanup for despawned entities
-	for entityId in _sunShroomPlanted do
+	for entityId in State.SunShroomPlanted do
 		if not world:contains(entityId) then
-			_sunShroomPlanted[entityId] = nil
+			State.SunShroomPlanted[entityId] = nil
 		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	table.clear(_sunShroomPlanted)
-end
-
+-- 8. EXPORT
 return {
-	_name = "MushroomSystem",
 	priority = 155,
-	system = MushroomSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = MushroomAPI,
+	system = OnStep,
 }

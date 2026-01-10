@@ -331,7 +331,7 @@ loader:AddStep("ECS", function()
             end, `LoadSystem.{descendant.Name}`)
             
             if success and system then
-                SystemManager.Register(system)
+                SystemManager.Register(system, descendant.Name)
                 Logger.Debug("ArenaClient", `Registered system: {descendant.Name}`)
             end
         end

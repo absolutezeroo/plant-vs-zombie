@@ -7,54 +7,54 @@
 	Handles:
 	- Torchwood converting peas to fire peas (EnhancesPeas)
 	- Fire pea damage multiplier (FireDamageMultiplier)
-	- Future: Other enhancement plants
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes enhancements
-	- Dispose(): Clear tracking state
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local GridConfig = require(Shared.config.GridConfig)
 local PlantData = require(Shared.data.PlantData)
-local Logger = require(Shared.utils.Logger)
 
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Components
-local PositionComponent = Components.PositionComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ProjectileComponent = Components.ProjectileComponent
-local EnhancedProjectileComponent = Components.EnhancedProjectileComponent
-
--- Config
-local EnhancementConfig = {
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
 	TORCHWOOD_HIT_RADIUS = 2,     -- Studs - how close pea must pass
 	DEFAULT_FIRE_MULTIPLIER = 2,  -- 2x damage
+})
+
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	EnhancedProjectiles = {} :: {[number]: boolean}, -- Prevent double-enhancement
 }
 
--- Track which projectiles have already been enhanced (prevent double-enhancement)
-local _enhancedProjectiles: {[number]: boolean} = {}
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
 
-local function EnhancementSystem(world)
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+	table.clear(State.EnhancedProjectiles)
+end
+
+-- 6. MAIN LOOP
+local function OnStep(world)
 	-- Find all Torchwood plants
 	local torchwoods = {}
-	for plantId, pos, plant in world:query(PositionComponent, PlantTypeComponent) do
+	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[plant.PlantType]
 		if stats and stats.EnhancesPeas then
 			table.insert(torchwoods, {
 				id = plantId,
 				pos = pos,
 				lane = plant.Lane,
-				multiplier = stats.FireDamageMultiplier or EnhancementConfig.DEFAULT_FIRE_MULTIPLIER,
+				multiplier = stats.FireDamageMultiplier or CONFIG.DEFAULT_FIRE_MULTIPLIER,
 			})
 		end
 	end
@@ -63,15 +63,15 @@ local function EnhancementSystem(world)
 	if #torchwoods == 0 then return end
 	
 	-- Check each projectile
-	for projId, projPos, proj in world:query(PositionComponent, ProjectileComponent) do
+	for projId, projPos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		-- Skip already enhanced
-		if _enhancedProjectiles[projId] then continue end
+		if State.EnhancedProjectiles[projId] then continue end
 		
 		-- Skip non-pea projectiles (catapults don't get enhanced)
 		if proj.IsCatapult then continue end
 		
 		-- Skip if already a fire pea
-		local existing = world:get(projId, EnhancedProjectileComponent)
+		local existing = world:get(projId, Components.EnhancedProjectileComponent)
 		if existing and existing.IsFirePea then continue end
 		
 		-- Check if passing through any Torchwood
@@ -81,25 +81,25 @@ local function EnhancementSystem(world)
 			
 			-- Check if projectile is passing through Torchwood position
 			local distance = math.abs(projPos.X - torch.pos.X)
-			if distance <= EnhancementConfig.TORCHWOOD_HIT_RADIUS then
+			if distance <= CONFIG.TORCHWOOD_HIT_RADIUS then
 				-- Enhance the projectile!
-				world:insert(projId, EnhancedProjectileComponent({
+				world:insert(projId, Components.EnhancedProjectileComponent({
 					IsFirePea = true,
 					DamageMultiplier = torch.multiplier,
 					ThawsFrozen = true,
 				}))
 				
-				_enhancedProjectiles[projId] = true
+				State.EnhancedProjectiles[projId] = true
 				
 				-- If it was a frozen pea, it's no longer frozen (fire melts ice)
 				if proj.IsFrozen then
-					world:insert(projId, ProjectileComponent({
+					world:insert(projId, Components.ProjectileComponent({
 						Damage = proj.Damage,
 						Speed = proj.Speed,
 						SourceEntity = proj.SourceEntity,
 						Lane = proj.Lane,
 						SpawnX = proj.SpawnX,
-						IsFrozen = false,  -- No longer frozen
+						IsFrozen = false,
 						SlowPercent = nil,
 						SlowDuration = nil,
 						IsCatapult = proj.IsCatapult,
@@ -113,8 +113,6 @@ local function EnhancementSystem(world)
 					}))
 				end
 				
-				Logger.Debug("Enhancement", `Pea {projId} became fire pea (x{torch.multiplier} damage)`)
-				
 				-- Broadcast to clients for VFX change
 				Network.ProjectileEnhanced.FireAll({
 					EntityId = projId,
@@ -127,25 +125,17 @@ local function EnhancementSystem(world)
 	end
 	
 	-- Cleanup tracked projectiles
-	for projId in _enhancedProjectiles do
+	for projId in State.EnhancedProjectiles do
 		if not world:contains(projId) then
-			_enhancedProjectiles[projId] = nil
+			State.EnhancedProjectiles[projId] = nil
 		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	table.clear(_enhancedProjectiles)
-end
-
+-- 7. EXPORT
 return {
-	_name = "EnhancementSystem",
 	priority = 158,
-	system = EnhancementSystem,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

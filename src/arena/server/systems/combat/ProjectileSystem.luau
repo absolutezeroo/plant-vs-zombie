@@ -13,18 +13,15 @@
 	- Catapult plants (lobbing projectiles)
 	- Projectile movement
 	- Short-range mushrooms (PuffShroom, SeaShroom, FumeShroom)
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - manages projectiles
-	- Dispose(): Clear tracking state
 ]]
 
+--------------------------------------------------------------------------------
+-- [1] IMPORTS
+--------------------------------------------------------------------------------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -32,70 +29,74 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
-local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local EntityPool = require(Shared.utils.EntityPool)
 
--- Network
 local Network = require(Shared.network.generated.server)
 
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ProjectileComponent = Components.ProjectileComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local SplashComponent = Components.SplashComponent
-local SleepingComponent = Components.SleepingComponent
-local HidingComponent = Components.HidingComponent
-local ChewingComponent = Components.ChewingComponent
-
--- Projectile config defaults (from GameConstants + local fallbacks)
-local ProjectileDefaults = {
-	SPEED = 15,              -- Studs per second (global)
-	FIRE_INTERVAL = 0.67,    -- Seconds between shots (1.5 attacks/sec)
-	MAX_RANGE = 100,         -- Max distance before despawn (global)
-	DAMAGE = 20,             -- Base pea damage
+--------------------------------------------------------------------------------
+-- [2] CONFIG (frozen constants)
+--------------------------------------------------------------------------------
+local CONFIG = table.freeze({
+	-- Projectile defaults
+	SPEED = 15,
+	FIRE_INTERVAL = 0.67,
+	MAX_RANGE = 100,
+	DAMAGE = 20,
 	SLOW_PERCENT = GameConstants.Combat.DEFAULT_SLOW_PERCENT,
 	SLOW_DURATION = GameConstants.Combat.DEFAULT_SLOW_DURATION,
-	SHOT_DELAY = 0.1,        -- Default delay for multi-shot plants
-	CATAPULT_SPEED = 10,     -- Slower for arcing projectiles
-	SPAWN_OFFSET_X = 2,      -- Default X offset from plant center
-	SPAWN_OFFSET_Y = 2.5,    -- Default Y (height) of projectile spawn
+	SHOT_DELAY = 0.1,
+	CATAPULT_SPEED = 10,
+	SPAWN_OFFSET_X = 2,
+	SPAWN_OFFSET_Y = 2.5,
 	SHOOT_RANGE = 54,
+	-- Movement limits
+	MIN_DT = 1/120,
+	MAX_DT = 1/15,
+})
+
+--------------------------------------------------------------------------------
+-- [3] STATE (mutable runtime state)
+--------------------------------------------------------------------------------
+local State = {
+	PlantFireTimes = {} :: {[number]: number},
+	PendingMultiShots = {} :: {[number]: {
+		shotsRemaining: number,
+		nextShotTime: number,
+		lane: number,
+		startX: number,
+		plantType: string,
+		direction: number,
+	}},
 }
 
--- Track last fire time per plant
-local _plantFireTimes: {[number]: number} = {}
--- Track pending multi-shot plants: { plantId -> { shotsRemaining, nextShotTime, lane, startX, plantType } }
-local _pendingMultiShots: {[number]: {shotsRemaining: number, nextShotTime: number, lane: number, startX: number, plantType: string, direction: number}} = {}
-
--- Check if there are zombies in the lane within shoot range (optionally behind plant for SplitPea)
+--------------------------------------------------------------------------------
+-- [4] PRIVATE HELPERS
+--------------------------------------------------------------------------------
+-- Check if there are zombies in the lane within shoot range
 -- Uses LaneCache for O(1) lane lookup + O(lane_size) direction check
--- Uses MapConfig.GetZombieDirection() to determine "in front" vs "behind"
--- ROBLOX ADAPTATION: Uses SHOOT_RANGE to only detect zombies that have entered the playable area
 local function hasZombiesInLane(_world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?, customRange: number?): boolean
 	local zombieDir = MapConfig.GetZombieDirection()
-	local shootRange = customRange or ProjectileDefaults.SHOOT_RANGE
-	-- Convert Vector3 to table format expected by LaneCache, with range limit
+	local shootRange = customRange or CONFIG.SHOOT_RANGE
 	return LaneCache.HasZombiesInDirection(lane, plantX, plantZ, {X = zombieDir.X, Z = zombieDir.Z}, checkBehind, shootRange)
 end
 
 -- Check if plant can shoot (not sleeping, not hiding, not chewing)
 local function canPlantShoot(world: any, plantId: number): boolean
 	-- Check if sleeping (mushrooms during day)
-	local sleeping = world:get(plantId, SleepingComponent)
+	local sleeping = world:get(plantId, Components.SleepingComponent)
 	if sleeping and sleeping.IsSleeping then
 		return false
 	end
 	
 	-- Check if hiding (ScaredyShroom)
-	local hiding = world:get(plantId, HidingComponent)
+	local hiding = world:get(plantId, Components.HidingComponent)
 	if hiding and hiding.IsHiding then
 		return false
 	end
 	
 	-- Check if chewing (Chomper)
-	local chewing = world:get(plantId, ChewingComponent)
+	local chewing = world:get(plantId, Components.ChewingComponent)
 	if chewing then
 		return false
 	end
@@ -117,10 +118,10 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	
 	-- Read stats from PlantData (data-driven)
 	local stats = PlantData[plantType]
-	local damage = (stats and stats.Damage) or ProjectileDefaults.DAMAGE
+	local damage = (stats and stats.Damage) or CONFIG.DAMAGE
 	local isFrozen = (stats and stats.IsFrozen) or false
-	local slowPercent = (stats and stats.SlowPercent) or ProjectileDefaults.SLOW_PERCENT
-	local slowDuration = (stats and stats.SlowDuration) or ProjectileDefaults.SLOW_DURATION
+	local slowPercent = (stats and stats.SlowPercent) or CONFIG.SLOW_PERCENT
+	local slowDuration = (stats and stats.SlowDuration) or CONFIG.SLOW_DURATION
 	local isCatapult = (stats and stats.IsCatapult) or false
 	local hasSplash = (stats and stats.HasSplash) or false
 	local splashRadius = (stats and stats.SplashRadius) or 0
@@ -133,22 +134,22 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	
 	-- Projectile spawn offset (data-driven with defaults)
 	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
-	local offsetX = if spawnOffset then spawnOffset.X else ProjectileDefaults.SPAWN_OFFSET_X
-	local offsetY = if spawnOffset then spawnOffset.Y else ProjectileDefaults.SPAWN_OFFSET_Y
+	local offsetX = if spawnOffset then spawnOffset.X else CONFIG.SPAWN_OFFSET_X
+	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
 	
-	local speed = if isCatapult then ProjectileDefaults.CATAPULT_SPEED else ProjectileDefaults.SPEED
+	local speed = if isCatapult then CONFIG.CATAPULT_SPEED else CONFIG.SPEED
 	
 	-- Calculate actual projectile direction (using forward direction from MapConfig)
 	local actualDirX = forwardDirX * dir
 	local actualDirZ = forwardDirZ * dir
 	
 	local entityId = EntityPool.Spawn(
-		PositionComponent({
+		Components.PositionComponent({
 			X = startX + (offsetX * actualDirX), -- Offset in shooting direction
 			Y = offsetY,                         -- Height from config
 			Z = z + (offsetX * actualDirZ)       -- Also offset Z if needed
 		}),
-		ProjectileComponent({
+		Components.ProjectileComponent({
 			Damage = damage,
 			Speed = speed,  -- Always positive, direction is in DirectionX/Z
 			DirectionX = actualDirX,
@@ -164,19 +165,18 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 			CanStun = canStun,
 			StunChance = stunChance,
 			StunDuration = stunDuration,
-			MaxRange = if range > 0 then range else ProjectileDefaults.MAX_RANGE,
+			MaxRange = if range > 0 then range else CONFIG.MAX_RANGE,
 			CanHitFlying = canHitFlying,
 		})
 	)
 	
 	if not entityId then
-		Logger.Warn("Projectile", "EntityPool exhausted! Cannot spawn projectile")
 		return nil
 	end
 	
 	-- Add splash component if needed
 	if hasSplash and splashRadius > 0 then
-		world:insert(entityId, SplashComponent({
+		world:insert(entityId, Components.SplashComponent({
 			SplashRadius = splashRadius,
 			SplashDamage = math.floor(damage * 0.5), -- Splash does 50% damage
 		}))
@@ -222,8 +222,6 @@ local function fireThreeLanes(world: any, plantId: number, centerLane: number, s
 	if centerLane < GridConfig.GRID_LANES then
 		spawnProjectile(world, plantId, centerLane + 1, startX, plantType, 1)
 	end
-	
-	Logger.Debug("Projectile", `Threepeater {plantId} fired in 3 lanes`)
 end
 
 -- Fire in multiple directions for Starfruit
@@ -234,12 +232,12 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	local z = laneCenter.Z
 	
 	local stats = PlantData[plantType]
-	local damage = (stats and stats.Damage) or ProjectileDefaults.DAMAGE
+	local damage = (stats and stats.Damage) or CONFIG.DAMAGE
 	
 	-- Projectile spawn offset (data-driven with defaults)
 	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
-	local offsetX = if spawnOffset then spawnOffset.X else ProjectileDefaults.SPAWN_OFFSET_X
-	local offsetY = if spawnOffset then spawnOffset.Y else ProjectileDefaults.SPAWN_OFFSET_Y
+	local offsetX = if spawnOffset then spawnOffset.X else CONFIG.SPAWN_OFFSET_X
+	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
 	
 	-- Get forward direction (opposite of zombie movement)
 	local zombieDir = MapConfig.GetZombieDirection()
@@ -263,25 +261,24 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 		local normDz = if mag > 0 then dir.dz / mag else dir.dz
 		
 		local entityId = EntityPool.Spawn(
-			PositionComponent({
+			Components.PositionComponent({
 				X = startX + normDx * offsetX,
 				Y = offsetY,
 				Z = z + normDz * offsetX
 			}),
-			ProjectileComponent({
+			Components.ProjectileComponent({
 				Damage = damage,
-				Speed = ProjectileDefaults.SPEED,
+				Speed = CONFIG.SPEED,
 				SourceEntity = plantId,
 				Lane = lane,
 				SpawnX = startX,
 				DirectionX = normDx,
 				DirectionZ = normDz,
-				MaxRange = ProjectileDefaults.MAX_RANGE,
+				MaxRange = CONFIG.MAX_RANGE,
 			})
 		)
 		
 		if not entityId then
-			Logger.Warn("Projectile", "EntityPool exhausted in Starfruit burst")
 			continue
 		end
 		
@@ -295,44 +292,38 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 			IsEnhanced = false,
 		})
 	end
-	
-	Logger.Debug("Projectile", `Starfruit {plantId} fired 5 stars`)
 end
 
--- Movement config
-local MovementConfig = {
-	MIN_DT = 1/120,  -- Minimum deltaTime to prevent physics explosion
-	MAX_DT = 1/15,   -- Maximum deltaTime to prevent teleporting on lag spikes
-}
-
-local function ProjectileSystem(world)
+--------------------------------------------------------------------------------
+-- [5] ONSTEP (main loop - CANNOT yield)
+--------------------------------------------------------------------------------
+local function OnStep(world)
 	local currentTime = os.clock()
 	
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
 	local dt = Matter.useDeltaTime()
-	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
+	dt = math.clamp(dt, CONFIG.MIN_DT, CONFIG.MAX_DT)
 	
 	-- Process pending multi-shots (Repeater, GatlingPea, etc.)
-	for plantId, shotData in _pendingMultiShots do
+	for plantId, shotData in State.PendingMultiShots do
 		if currentTime >= shotData.nextShotTime then
 			if world:contains(plantId) and canPlantShoot(world, plantId) then
 				spawnProjectile(world, plantId, shotData.lane, shotData.startX, shotData.plantType, shotData.direction)
-				Logger.Debug("Projectile", `{shotData.plantType} {plantId} fired shot (remaining: {shotData.shotsRemaining - 1})`)
 			end
 			
 			shotData.shotsRemaining -= 1
 			if shotData.shotsRemaining <= 0 then
-				_pendingMultiShots[plantId] = nil
+				State.PendingMultiShots[plantId] = nil
 			else
 				local stats = PlantData[shotData.plantType]
-				local shotDelay = (stats and stats.ShotDelay) or ProjectileDefaults.SHOT_DELAY
+				local shotDelay = (stats and stats.ShotDelay) or CONFIG.SHOT_DELAY
 				shotData.nextShotTime = currentTime + shotDelay
 			end
 		end
 	end
 	
 	-- Process plants that can shoot
-	for plantId, pos, plant in world:query(PositionComponent, PlantTypeComponent) do
+	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		-- Get plant stats and check if this plant type can shoot
 		local plantType = plant.PlantType
 		local stats = PlantData[plantType]
@@ -347,8 +338,8 @@ local function ProjectileSystem(world)
 		end
 		
 		-- Check fire cooldown (use AttackSpeed from PlantData if available)
-		local fireInterval = if stats.AttackSpeed > 0 then (1 / stats.AttackSpeed) else ProjectileDefaults.FIRE_INTERVAL
-		local lastFire = _plantFireTimes[plantId] or 0
+		local fireInterval = if stats.AttackSpeed > 0 then (1 / stats.AttackSpeed) else CONFIG.FIRE_INTERVAL
+		local lastFire = State.PlantFireTimes[plantId] or 0
 		if currentTime - lastFire < fireInterval then
 			continue
 		end
@@ -358,7 +349,7 @@ local function ProjectileSystem(world)
 		if stats.ShootsMultiDirection then
 			-- Starfruit shoots regardless of zombie position
 			hasTargets = true
-			for _, zombie in world:query(ZombieTypeComponent) do
+			for _, zombie in world:query(Components.ZombieTypeComponent) do
 				hasTargets = true
 				break
 			end
@@ -388,7 +379,7 @@ local function ProjectileSystem(world)
 			local hasInRange = false
 			local zombieDir = MapConfig.GetZombieDirection()
 			
-			for _, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+			for _, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
 				if zombie.Lane == plant.Lane then
 					-- Calculate distance in the direction zombies come from
 					local dx = zombiePos.X - pos.X
@@ -408,7 +399,7 @@ local function ProjectileSystem(world)
 			end
 		end
 		
-		_plantFireTimes[plantId] = currentTime
+		State.PlantFireTimes[plantId] = currentTime
 		
 		-- Fire based on plant type behavior
 		if stats.ShootsMultiDirection then
@@ -425,9 +416,9 @@ local function ProjectileSystem(world)
 			if stats.ShootsBehind then
 				spawnProjectile(world, plantId, plant.Lane, pos.X, plantType, -1)
 				-- SplitPea fires 2 peas backward
-				_pendingMultiShots[plantId] = {
+				State.PendingMultiShots[plantId] = {
 					shotsRemaining = 1,
-					nextShotTime = currentTime + (stats.ShotDelay or ProjectileDefaults.SHOT_DELAY),
+					nextShotTime = currentTime + (stats.ShotDelay or CONFIG.SHOT_DELAY),
 					lane = plant.Lane,
 					startX = pos.X,
 					plantType = plantType,
@@ -439,9 +430,9 @@ local function ProjectileSystem(world)
 			if stats.IsRepeater then
 				local totalShots = (stats.ShotsPerBurst or 2) - 1 -- -1 because we already fired one
 				if totalShots > 0 then
-					_pendingMultiShots[plantId] = {
+					State.PendingMultiShots[plantId] = {
 						shotsRemaining = totalShots,
-						nextShotTime = currentTime + (stats.ShotDelay or ProjectileDefaults.SHOT_DELAY),
+						nextShotTime = currentTime + (stats.ShotDelay or CONFIG.SHOT_DELAY),
 						lane = plant.Lane,
 						startX = pos.X,
 						plantType = plantType,
@@ -450,12 +441,10 @@ local function ProjectileSystem(world)
 				end
 			end
 		end
-		
-		Logger.Debug("Projectile", `{plantType} {plantId} fired in lane {plant.Lane}`)
 	end
 	
 	-- Move projectiles
-	for projId, pos, proj in world:query(PositionComponent, ProjectileComponent) do
+	for projId, pos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		-- Handle multi-directional projectiles (Starfruit)
 		local dx = proj.DirectionX or 1
 		local dz = proj.DirectionZ or 0
@@ -465,7 +454,7 @@ local function ProjectileSystem(world)
 		
 		-- Check max range
 		local distanceTraveled = math.sqrt((newX - proj.SpawnX)^2 + (newZ - pos.Z)^2)
-		local maxRange = proj.MaxRange or ProjectileDefaults.MAX_RANGE
+		local maxRange = proj.MaxRange or CONFIG.MAX_RANGE
 		
 		if distanceTraveled > maxRange then
 			-- Notify client to remove visual (no impact VFX)
@@ -479,7 +468,7 @@ local function ProjectileSystem(world)
 		end
 		
 		-- Update position using component constructor
-		world:insert(projId, PositionComponent({
+		world:insert(projId, Components.PositionComponent({
 			X = newX,
 			Y = pos.Y,
 			Z = newZ,
@@ -487,27 +476,32 @@ local function ProjectileSystem(world)
 	end
 	
 	-- Clean up fire times for despawned plants
-	for plantId in _plantFireTimes do
+	for plantId in State.PlantFireTimes do
 		if not world:contains(plantId) then
-			_plantFireTimes[plantId] = nil
-			_pendingMultiShots[plantId] = nil
+			State.PlantFireTimes[plantId] = nil
+			State.PendingMultiShots[plantId] = nil
 		end
 	end
 end
 
+--------------------------------------------------------------------------------
+-- [6] INIT / DISPOSE
+--------------------------------------------------------------------------------
 local function Init(_world)
 	-- No initialization needed
 end
 
 local function Dispose()
-	table.clear(_plantFireTimes)
-	table.clear(_pendingMultiShots)
+	table.clear(State.PlantFireTimes)
+	table.clear(State.PendingMultiShots)
 end
 
+--------------------------------------------------------------------------------
+-- [7] EXPORT
+--------------------------------------------------------------------------------
 return {
-	_name = "ProjectileSystem",
 	priority = 160,
-	system = ProjectileSystem,
+	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
 }

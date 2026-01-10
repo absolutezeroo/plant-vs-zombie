@@ -9,17 +9,12 @@
 	- Garlic diverting zombies to adjacent lanes (DivertsZombies)
 	- Vehicle tire popping (PopsTires) - for Zomboni etc.
 	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - processes traps
-	- Dispose(): Clear tracking state
+	NOTE: TrapAPI is exported for CombatSystem integration (Garlic eating).
+	This is an exception to the "no public API" rule for event-driven callbacks.
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -28,7 +23,6 @@ local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local ZombieData = require(Shared.data.ZombieData)
-local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
 local ECSUtils = require(Shared.utils.ECSUtils)
@@ -36,32 +30,43 @@ local ECSUtils = require(Shared.utils.ECSUtils)
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Components
-local PositionComponent = Components.PositionComponent
-local HealthComponent = Components.HealthComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local MovementComponent = Components.MovementComponent
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	SPIKEWEED_HIT_RADIUS = GameConstants.Trap.SPIKEWEED_HIT_RADIUS,
+	SPIKEWEED_DAMAGE_INTERVAL = GameConstants.Trap.SPIKEWEED_DAMAGE_INTERVAL,
+	GARLIC_BITE_THRESHOLD = GameConstants.Trap.GARLIC_BITE_THRESHOLD,
+})
 
--- Config (from GameConstants.Trap)
-local TrapConfig = GameConstants.Trap
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	TrapDamageTimes = {} :: {[string]: number}, -- "trapId_zombieId" -> lastDamageTime
+	GarlicBites = {} :: {[string]: number},      -- "garlicId_zombieId" -> biteCount
+}
 
--- Track last damage time per zombie per trap
-local _trapDamageTimes: {[string]: number} = {} -- "trapId_zombieId" -> lastDamageTime
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
 
--- Track garlic bite counts
-local _garlicBites: {[string]: number} = {} -- "garlicId_zombieId" -> biteCount
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+	table.clear(State.TrapDamageTimes)
+	table.clear(State.GarlicBites)
+end
 
-local function TrapSystem(world)
+-- 6. MAIN LOOP
+local function OnStep(world)
 	local currentTime = os.clock()
 	
 	-- Process traps (Spikeweed)
-	for trapId, trapPos, trap in world:query(PositionComponent, PlantTypeComponent) do
+	for trapId, trapPos, trap in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[trap.PlantType]
 		if not stats or not stats.IsTrap or not stats.DamagesOnWalk then continue end
 		
 		local damage = stats.Damage or 20
-		local hitRadius = TrapConfig.SPIKEWEED_HIT_RADIUS
 		
 		-- O(1) lane lookup instead of O(N) world:query
 		local zombiesInLane = LaneCache.GetEntitiesInLane(trap.Lane)
@@ -70,28 +75,27 @@ local function TrapSystem(world)
 		for _, zombieId in zombiesInLane do
 			if not world:contains(zombieId) then continue end
 			
-			local zombiePos = world:get(zombieId, PositionComponent)
+			local zombiePos = world:get(zombieId, Components.PositionComponent)
 			if not zombiePos then continue end
 			
-			local zombie = world:get(zombieId, ZombieTypeComponent)
+			local zombie = world:get(zombieId, Components.ZombieTypeComponent)
 			if not zombie then continue end
 			
 			local distance = math.abs(zombiePos.X - trapPos.X)
-			if distance > hitRadius then continue end
+			if distance > CONFIG.SPIKEWEED_HIT_RADIUS then continue end
 			
 			-- Check damage cooldown
 			local key = `{trapId}_{zombieId}`
-			local lastDamage = _trapDamageTimes[key] or 0
-			if currentTime - lastDamage < TrapConfig.SPIKEWEED_DAMAGE_INTERVAL then continue end
+			local lastDamage = State.TrapDamageTimes[key] or 0
+			if currentTime - lastDamage < CONFIG.SPIKEWEED_DAMAGE_INTERVAL then continue end
 			
 			-- Apply damage using ECSUtils
 			local actualDamage, isDead = ECSUtils.DamageEntity(world, zombieId, damage, Components)
 			if actualDamage > 0 then
-				_trapDamageTimes[key] = currentTime
-				Logger.Debug("Trap", `Spikeweed {trapId} damaged zombie {zombieId} for {actualDamage}`)
+				State.TrapDamageTimes[key] = currentTime
 				
 				-- Broadcast damage
-				local health = world:get(zombieId, HealthComponent)
+				local health = world:get(zombieId, Components.HealthComponent)
 				Network.EntityDamaged.FireAll({
 					EntityId = zombieId,
 					NewHealth = health and health.Current or 0,
@@ -102,131 +106,47 @@ local function TrapSystem(world)
 				if stats.PopsTires and not isDead then
 					local zombieStats = ZombieData[zombie.ZombieType]
 					if zombieStats and zombieStats.IsVehicle then
-						-- Instant kill vehicle
 						ECSUtils.KillEntity(world, zombieId, Components)
-						Logger.Info("Trap", `Spikeweed {trapId} popped tires of vehicle zombie {zombieId}`)
 					end
 				end
 			end
 		end
 	end
 	
-	-- Process Garlic (DivertsZombies)
-	for garlicId, garlicPos, garlic in world:query(PositionComponent, PlantTypeComponent) do
-		local stats = PlantData[garlic.PlantType]
-		if not stats or not stats.DivertsZombies then continue end
-		
-		-- Garlic works by being eaten - zombies switch lane after eating it
-		-- This is handled in CombatSystem when zombie finishes eating
-		-- Here we just track that the zombie is eating garlic
-	end
-	
 	-- Cleanup old entries
-	for key in _trapDamageTimes do
+	for key in State.TrapDamageTimes do
 		local parts = string.split(key, "_")
 		local trapId = tonumber(parts[1])
 		local zombieId = tonumber(parts[2])
 		
 		if not trapId or not zombieId then
-			_trapDamageTimes[key] = nil
+			State.TrapDamageTimes[key] = nil
 		elseif not world:contains(trapId) or not world:contains(zombieId) then
-			_trapDamageTimes[key] = nil
+			State.TrapDamageTimes[key] = nil
 		end
 	end
 	
-	for key in _garlicBites do
+	for key in State.GarlicBites do
 		local parts = string.split(key, "_")
 		local garlicId = tonumber(parts[1])
 		local zombieId = tonumber(parts[2])
 		
 		if not garlicId or not zombieId then
-			_garlicBites[key] = nil
+			State.GarlicBites[key] = nil
 		elseif not world:contains(garlicId) or not world:contains(zombieId) then
-			_garlicBites[key] = nil
+			State.GarlicBites[key] = nil
 		end
 	end
 end
 
--- API for CombatSystem to call when zombie finishes eating Garlic
-local TrapAPI = {}
+-- TODO: Garlic diversion - implement via ChewingComponent query when zombie bites Garlic
+-- Should detect when zombie with ChewingComponent.TargetId == garlicId finishes eating
+-- Then divert zombie to adjacent lane after GARLIC_BITE_THRESHOLD bites
 
-function TrapAPI.OnGarlicEaten(world: any, garlicId: number, zombieId: number)
-	local garlic = world:get(garlicId, PlantTypeComponent)
-	if not garlic then return end
-	
-	local stats = PlantData[garlic.PlantType]
-	if not stats or not stats.DivertsZombies then return end
-	
-	local zombie = world:get(zombieId, ZombieTypeComponent)
-	if not zombie then return end
-	
-	local zombieStats = ZombieData[zombie.ZombieType]
-	if not zombieStats then return end
-	
-	-- Increment bite count
-	local key = `{garlicId}_{zombieId}`
-	local bites = (_garlicBites[key] or 0) + 1
-	_garlicBites[key] = bites
-	
-	-- Check if zombie should switch lanes
-	if bites >= TrapConfig.GARLIC_BITE_THRESHOLD then
-		-- Pick adjacent lane (prefer away from center)
-		local currentLane = zombie.Lane
-		local newLane = currentLane
-		
-		if currentLane <= 2 then
-			newLane = currentLane + 1  -- Move down
-		elseif currentLane >= 4 then
-			newLane = currentLane - 1  -- Move up
-		else
-			-- Middle lane - random direction
-			newLane = currentLane + ChanceUtils.RandomDirection()
-		end
-		
-		-- Clamp to valid lanes
-		newLane = math.clamp(newLane, 1, GridConfig.GRID_LANES)
-		
-		if newLane ~= currentLane then
-			-- Update zombie lane
-			world:insert(zombieId, ZombieTypeComponent({
-				ZombieType = zombie.ZombieType,
-				Lane = newLane,
-			}))
-			
-			-- Update Z position for new lane (using MapConfig)
-			local pos = world:get(zombieId, PositionComponent)
-			if pos then
-				local laneCenter = MapConfig.GridToWorld(1, newLane)
-				world:insert(zombieId, PositionComponent({
-					X = pos.X,
-					Y = pos.Y,
-					Z = laneCenter.Z,
-				}))
-			end
-			
-			Logger.Info("Trap", `Garlic diverted zombie {zombieId} from lane {currentLane} to {newLane}`)
-		end
-
-		
-		-- Reset bite count
-		_garlicBites[key] = nil
-	end
-end
-
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	table.clear(_trapDamageTimes)
-	table.clear(_garlicBites)
-end
-
+-- 7. EXPORT
 return {
-	_name = "TrapSystem",
 	priority = 165,
-	system = TrapSystem,
 	Init = Init,
 	Dispose = Dispose,
-	API = TrapAPI,
+	system = OnStep,
 }

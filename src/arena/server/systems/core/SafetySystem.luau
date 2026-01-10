@@ -6,40 +6,55 @@
 	
 	CRITICAL SYSTEM - This prevents crashes from entity overflow.
 	Enforces ENTITY_CAP of 200 entities maximum.
-	Logs warnings when approaching limits.
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop (CANNOT yield) - enforces entity cap
-	- Dispose(): No cleanup needed
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local Components = require(Shared.components)
-local Tags = Components.Tags
 
-local WARNING_THRESHOLD = 0.8 -- Warn at 80% capacity
-local lastWarningTime = 0
-local WARNING_COOLDOWN = 5 -- seconds between warnings
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	WARNING_THRESHOLD = 0.8, -- Warn at 80% capacity
+	WARNING_COOLDOWN = 5,    -- Seconds between warnings
+})
 
-local function SafetySystem(world)
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	LastWarningTime = 0,
+}
+
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+	State.LastWarningTime = 0
+end
+
+-- 6. MAIN LOOP
+local function OnStep(world)
 	local activeCount = 0
 	local inactiveCount = 0
 	
-	-- Count entities by type
-	-- IMPORTANT: Skip entities with InactiveTag - those are managed by EntityPool
+	-- Count entities by type (skip InactiveTag - managed by EntityPool)
 	for entityId in world do
-		if world:get(entityId, Tags.InactiveTag) then
+		if world:get(entityId, Components.Tags.InactiveTag) then
 			inactiveCount = inactiveCount + 1
 		else
 			activeCount = activeCount + 1
 		end
 	end
 	
-	local warningLimit = math.floor(PerformanceConfig.ENTITY_CAP * WARNING_THRESHOLD)
+	local warningLimit = math.floor(PerformanceConfig.ENTITY_CAP * CONFIG.WARNING_THRESHOLD)
 	
 	-- Only warn, don't take action - EntityPool manages entity lifecycle
 	if activeCount > PerformanceConfig.ENTITY_CAP then
@@ -47,34 +62,24 @@ local function SafetySystem(world)
 			ActiveCount = activeCount,
 			Cap = PerformanceConfig.ENTITY_CAP,
 		})
-		-- NOTE: Removed emergency deactivation - it interferes with EntityPool
-		-- EntityPool.Spawn() will return nil when exhausted, which is safer
 	elseif activeCount > warningLimit then
 		-- Throttled warning
 		local now = tick()
-		if now - lastWarningTime >= WARNING_COOLDOWN then
+		if now - State.LastWarningTime >= CONFIG.WARNING_COOLDOWN then
 			Logger.Warn("SafetySystem", "Approaching entity cap", {
 				ActiveCount = activeCount,
 				Cap = PerformanceConfig.ENTITY_CAP,
 				Percent = math.floor((activeCount / PerformanceConfig.ENTITY_CAP) * 100),
 			})
-			lastWarningTime = now
+			State.LastWarningTime = now
 		end
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	lastWarningTime = 0
-end
-
+-- 7. EXPORT
 return {
-	_name = "SafetySystem",
-	priority = 1,  -- Runs very early
-	system = SafetySystem,
+	priority = 1,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

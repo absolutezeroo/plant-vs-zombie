@@ -1,664 +1,305 @@
 --!strict
 --[[
-    WaveManagerSystem.luau - Wave management orchestrator
-    
-    Priority: 100 (Simulation phase - early)
-    
-    This is a thin orchestrator that delegates to:
-    - GameStateManager: State transitions
-    - WaveSpawner: Zombie spawning logic
-    - RewardCalculator: End-game rewards
-    - WaveBroadcaster: Network events
-    
-    Wave structure:
-    - Preparation phase: Initial setup time
-    - Trickle phase (20% budget): Slow spawns
-    - Assault phase (50% budget): Main wave
-    - Flag phase (30% budget): Final push
-    
-    Configuration:
-    - World = map, mechanics, zombie pool
-    - Difficulty = wave count, budget, multipliers
-    
-    LIFECYCLE:
-    - Init(): No init needed (managers lazy-loaded)
-    - system(): Main loop (CANNOT yield) - manages waves
-    - Dispose(): Reset game state
+	WaveManagerSystem.luau - Wave spawning ECS loop
+	
+	Priority: 100 (Simulation phase - early)
+	
+	This is a pure ECS system that handles the wave loop.
+	All state and API are in WaveService - this system only:
+	- Checks state transitions (Preparation → Playing → Intermission)
+	- Spawns zombies based on phase/budget
+	- Fires WaveStateEvents for UI/Audio
+	
+	For API calls, use: require(WaveService).StartGame(), etc.
 ]]
 
+--------------------------------------------------------------------------------
+-- [1] IMPORTS
+--------------------------------------------------------------------------------
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local _Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local GridConfig = require(Shared.config.GridConfig)
 local GameConstants = require(Shared.config.GameConstants)
-local Logger = require(Shared.utils.Logger)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
 
--- NEW: Data-driven world and difficulty
-local WorldData = require(Shared.data.WorldData)
-local DifficultyData = require(Shared.data.DifficultyData)
-
--- Managers
+-- Service (contains state + API)
 local Server = script.Parent.Parent.Parent
-local GameStateManager = require(Server.managers.wave.GameStateManager)
-local WaveSpawner = require(Server.managers.wave.WaveSpawner)
-local RewardCalculator = require(Server.managers.wave.RewardCalculator)
-local WaveBroadcaster = require(Server.managers.wave.WaveBroadcaster)
+local WaveService = require(Server.services.WaveService)
 local BaseHealth = require(Server.modules.BaseHealth)
 
--- Components
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local WaveStateEvent = Components.WaveStateEvent
+--------------------------------------------------------------------------------
+-- [2] CONFIG (frozen constants)
+--------------------------------------------------------------------------------
+local CONFIG = table.freeze({
+	-- Wave timing from GameConstants
+	TRICKLE_INTERVAL = GameConstants.Wave.TRICKLE_INTERVAL,
+	ASSAULT_INTERVAL = GameConstants.Wave.ASSAULT_INTERVAL,
+	FLAG_INTERVAL = GameConstants.Wave.FLAG_INTERVAL,
+	WAVE_DELAY = GameConstants.Wave.WAVE_DELAY,
+	FIRST_WAVE_DELAY = GameConstants.Wave.FIRST_WAVE_DELAY,
+	-- Wave completion timing
+	MIN_WAVE_TIME_FOR_COMPLETION = 3,
+})
 
--- Types
-type GameState = GameStateManager.GameState
-type SpawnPhase = WaveSpawner.SpawnPhase
+--------------------------------------------------------------------------------
+-- [3] STATE (reference to WaveService.State)
+-- Note: WaveManagerSystem uses WaveService.GetState() for mutable state
+--------------------------------------------------------------------------------
 
--- Studio Debug Mode: No auto-start in Studio
-local IS_STUDIO_DEBUG = RunService:IsStudio()
-
--- Wave timing configuration (from GameConstants.Wave)
-local WaveConfig = GameConstants.Wave
-
--- Wave state
-local _currentWave = 0
-local _totalWaves = 10
-local _waveStartTime = 0
-local _lastSpawnTime = 0
-local _currentPhase: SpawnPhase = "Trickle"
-local _phaseSpent = 0
-local _phaseBudget = 0
-local _totalBudget = 0
-local _zombiesSpawnedThisWave = 0
-
--- World + Difficulty config
-local _currentWorldId = "day"
-local _currentDifficulty = "normal"
-local _currentWorldConfig: WorldData.WorldConfig? = nil
-local _currentDifficultyConfig: DifficultyData.DifficultyConfig? = nil
-local _autoStartEnabled = false
-
--- Manager instances
-local _stateManager: GameStateManager.GameStateManager
-local _spawner: WaveSpawner.WaveSpawner
-local _rewardCalc: RewardCalculator.RewardCalculator
-local _broadcaster: WaveBroadcaster.WaveBroadcaster
-
--- Lazy-load dependencies
-local _playerDataService: any = nil
-local function getPlayerDataService()
-    if not _playerDataService then
-        _playerDataService = require(Server.services.PlayerDataService)
-    end
-    return _playerDataService
-end
-
-local _entityDeathSystem: any = nil
-local function getEntityDeathSystem()
-    if not _entityDeathSystem then
-        local Systems = script.Parent.Parent
-        _entityDeathSystem = require(Systems.units.EntityDeathSystem)
-    end
-    return _entityDeathSystem
-end
-
-local _arenaService: any = nil
-local function getArenaService()
-    if not _arenaService then
-        _arenaService = require(Server.services.ArenaService)
-    end
-    return _arenaService
-end
-
-local _plantFoodSystem: any = nil
-local function getPlantFoodSystem()
-    if not _plantFoodSystem then
-        local Systems = script.Parent.Parent
-        _plantFoodSystem = require(Systems.combat.PlantFoodSystem)
-    end
-    return _plantFoodSystem
-end
-
---[[ ============================================
-    PRIVATE: Wave logic helpers
-============================================ ]]--
+--------------------------------------------------------------------------------
+-- [4] PRIVATE HELPERS
+--------------------------------------------------------------------------------
 
 -- Get spawn interval for current phase
-local function getSpawnInterval(): number
-    if _currentPhase == "Trickle" then
-        return WaveConfig.TRICKLE_INTERVAL
-    elseif _currentPhase == "Assault" then
-        return WaveConfig.ASSAULT_INTERVAL
-    else
-        return WaveConfig.FLAG_INTERVAL
-    end
+local function getSpawnInterval(phase: string): number
+	if phase == "Trickle" then
+		return CONFIG.TRICKLE_INTERVAL
+	elseif phase == "Assault" then
+		return CONFIG.ASSAULT_INTERVAL
+	else
+		return CONFIG.FLAG_INTERVAL
+	end
 end
 
 -- Advance to next phase
-local function advancePhase(world: any)
-    if _currentPhase == "Trickle" then
-        _currentPhase = "Assault"
-        _phaseSpent = 0
-        _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Assault")
-        Logger.Debug("WaveManager", `Phase: Assault (budget: {math.floor(_phaseBudget)})`)
-        
-        -- Fire phase change event
-        world:spawn(WaveStateEvent({
-            StateType = "Phase",
-            WaveNumber = _currentWave,
-            Phase = "Assault",
-        }))
-    elseif _currentPhase == "Assault" then
-        _currentPhase = "Flag"
-        _phaseSpent = 0
-        _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Flag")
-        Logger.Debug("WaveManager", `Phase: Flag (budget: {math.floor(_phaseBudget)})`)
-        
-        -- Fire phase change event
-        world:spawn(WaveStateEvent({
-            StateType = "Phase",
-            WaveNumber = _currentWave,
-            Phase = "Flag",
-        }))
-        
-        -- Spawn Flag zombie
-        local lane = ChanceUtils.RandomLane()
-        _spawner:SpawnZombie(world, "Flag", lane, _currentWave)
-        Logger.Info("WaveManager", "🚩 Flag zombie spawned!")
-    end
+local function advancePhase(world: any, state: any, spawner: any)
+	if state.CurrentPhase == "Trickle" then
+		state.CurrentPhase = "Assault"
+		state.PhaseSpent = 0
+		state.PhaseBudget = spawner:GetPhaseBudget(state.TotalBudget, "Assault")
+		
+		-- Fire phase change event
+		world:spawn(Components.WaveStateEvent({
+			StateType = "Phase",
+			WaveNumber = state.CurrentWave,
+			Phase = "Assault",
+		}))
+	elseif state.CurrentPhase == "Assault" then
+		state.CurrentPhase = "Flag"
+		state.PhaseSpent = 0
+		state.PhaseBudget = spawner:GetPhaseBudget(state.TotalBudget, "Flag")
+		
+		-- Fire phase change event
+		world:spawn(Components.WaveStateEvent({
+			StateType = "Phase",
+			WaveNumber = state.CurrentWave,
+			Phase = "Flag",
+		}))
+		
+		-- Spawn Flag zombie
+		local lane = ChanceUtils.RandomLane()
+		spawner:SpawnZombie(world, "Flag", lane, state.CurrentWave)
+	end
 end
-
--- Track if current wave uses defined spawns
-local _usingDefinedWave = false
 
 -- Start a new wave
-local function startWave(waveNumber: number, world: any?)
-    _currentWave = waveNumber
-    _zombiesSpawnedThisWave = 0
-    _lastSpawnTime = os.clock()
-    _waveStartTime = os.clock()
-    
-    -- Fire WaveStateEvent for UI/Audio systems
-    if world then
-        world:spawn(WaveStateEvent({
-            StateType = "Start",
-            WaveNumber = waveNumber,
-            TotalWaves = _totalWaves,
-        }))
-    end
-    
-    -- Reset Plant Food tracking
-    local PlantFoodSystemAPI = getPlantFoodSystem().API
-    PlantFoodSystemAPI.ResetWaveTracking()
-    
-    -- Check if this wave has precise spawn definitions
-    if _spawner:HasDefinedWave(waveNumber) then
-        _usingDefinedWave = true
-        local waveDef = _spawner:GetWaveDefinition(waveNumber)
-        
-        -- Apply pre-delay if specified
-        local preDelay = waveDef and waveDef.PreDelay or 0
-        if preDelay > 0 then
-            task.delay(preDelay, function()
-                if world then
-                    _spawner:SpawnDefinedWave(world, waveNumber)
-                end
-            end)
-        elseif world then
-            _spawner:SpawnDefinedWave(world, waveNumber)
-        end
-        
-        Logger.Info("WaveManager", `=== WAVE {waveNumber} START === (Defined spawns)`)
-    else
-        -- Fallback to budget-based system
-        _usingDefinedWave = false
-        _totalBudget = _spawner:CalculateBudget(waveNumber)
-        _currentPhase = "Trickle"
-        _phaseSpent = 0
-        _phaseBudget = _spawner:GetPhaseBudget(_totalBudget, "Trickle")
-        
-        Logger.Info("WaveManager", `=== WAVE {waveNumber} START === Budget: {math.floor(_totalBudget)}`)
-    end
-    
-    _broadcaster:BroadcastWaveStarted(waveNumber, 0)
+local function startWave(waveNumber: number, world: any, state: any, spawner: any, broadcaster: any)
+	state.CurrentWave = waveNumber
+	state.ZombiesSpawnedThisWave = 0
+	state.LastSpawnTime = os.clock()
+	state.WaveStartTime = os.clock()
+	
+	-- Fire WaveStateEvent for UI/Audio systems
+	world:spawn(Components.WaveStateEvent({
+		StateType = "Start",
+		WaveNumber = waveNumber,
+		TotalWaves = state.TotalWaves,
+	}))
+	
+	-- Reset Plant Food tracking
+	local PlantFoodService = WaveService.GetPlantFoodService()
+	if PlantFoodService then
+		PlantFoodService.ResetWaveTracking()
+	end
+	
+	-- Check if this wave has precise spawn definitions
+	if spawner:HasDefinedWave(waveNumber) then
+		state.UsingDefinedWave = true
+		local waveDef = spawner:GetWaveDefinition(waveNumber)
+		
+		-- Apply pre-delay if specified
+		local preDelay = waveDef and waveDef.PreDelay or 0
+		if preDelay > 0 then
+			task.delay(preDelay, function()
+				spawner:SpawnDefinedWave(world, waveNumber)
+			end)
+		else
+			spawner:SpawnDefinedWave(world, waveNumber)
+		end
+	else
+		-- Fallback to budget-based system
+		state.UsingDefinedWave = false
+		state.TotalBudget = spawner:CalculateBudget(waveNumber)
+		state.CurrentPhase = "Trickle"
+		state.PhaseSpent = 0
+		state.PhaseBudget = spawner:GetPhaseBudget(state.TotalBudget, "Trickle")
+	end
+	
+	broadcaster:BroadcastWaveStarted(waveNumber, 0)
 end
 
--- Handle end game (victory/defeat)
-local function handleGameEnd(isVictory: boolean)
-    local PlayerDataService = getPlayerDataService()
-    local EntityDeathSystem = getEntityDeathSystem()
-    local ArenaService = getArenaService()
-    
-    local starRating = if isVictory then BaseHealth.GetStarRating() else 0
-    local difficultyConfig = _currentDifficultyConfig
-    
-    -- Process rewards for each player
-    for _, player in Players:GetPlayers() do
-        local sessionStats = EntityDeathSystem.API.GetSessionStats(player)
-        
-        -- Calculate base rewards from difficulty config
-        local baseCoins = if difficultyConfig then difficultyConfig.CoinReward else 100
-        local baseXP = if difficultyConfig then difficultyConfig.XPReward else 50
-        local waveMultiplier = _currentWave / (if _totalWaves > 0 then _totalWaves else 1)
-        
-        -- Calculate rewards
-        local rewards = _rewardCalc:CalculateRewards({
-            IsVictory = isVictory,
-            WaveReached = _currentWave,
-            SessionStats = {
-                ZombiesKilled = sessionStats.ZombiesKilled,
-                CoinsEarned = sessionStats.CoinsEarned,
-                PlantsPlaced = sessionStats.PlantsPlaced or 0,
-            },
-            DifficultyConfig = difficultyConfig,
-            WorldConfig = _currentWorldConfig,
-            StarRating = starRating,
-            BaseCoins = baseCoins,
-            BaseXP = baseXP,
-            WaveMultiplier = waveMultiplier,
-            IsFirstClear = false,  -- Not tracking per-run completion
-            IsNewBest = false,
-        })
-        
-        -- Award rewards
-        if isVictory then
-            PlayerDataService.AddCoins(player, rewards.TotalCoins or (baseCoins * waveMultiplier))
-        end
-        
-        local levelsGained = PlayerDataService.AddXP(player, rewards.XPEarned or baseXP)
-        local newLevel = PlayerDataService.GetLevel(player)
-        
-        if rewards.GemsEarned and rewards.GemsEarned > 0 then
-            PlayerDataService.AddGems(player, rewards.GemsEarned)
-        end
-        
-        -- Update stats
-        PlayerDataService.IncrementStat(player, "GamesPlayed", 1)
-        if isVictory then
-            PlayerDataService.IncrementStat(player, "GamesWon", 1)
-        end
-        
-        -- Broadcast to client (World + Difficulty based)
-        _broadcaster:BroadcastGameEndRewards(player, {
-            Victory = isVictory,
-            CoinsEarned = rewards.TotalCoins or baseCoins,
-            ZombiesKilled = sessionStats.ZombiesKilled,
-            WavesCompleted = _currentWave,
-            BonusCoins = rewards.BonusCoins or 0,
-            StarRating = starRating,
-            XPEarned = rewards.XPEarned or baseXP,
-            GemsEarned = rewards.GemsEarned or 0,
-            NewLevel = newLevel,
-            LevelsGained = levelsGained,
-        })
-        
-        Logger.Info("WaveManager", `{player.Name}: +{rewards.XPEarned or baseXP} XP, World={_currentWorldId}, Difficulty={_currentDifficulty}`)
-    end
-    
-    -- Teleport countdown
-    task.spawn(function()
-        for countdown = 5, 1, -1 do
-            _broadcaster:BroadcastTeleportCountdown(countdown)
-            task.wait(1)
-        end
-        
-        -- Teleport all players
-        for _, player in Players:GetPlayers() do
-            ArenaService.EndBattle(player, isVictory, starRating, 0, 0)
-        end
-    end)
-    
-    -- Reset session stats
-    EntityDeathSystem.API.ResetAllSessionStats()
-    
-    -- Broadcast game over
-    _broadcaster:BroadcastGameOver(isVictory, _currentWave)
+--------------------------------------------------------------------------------
+-- [5] ONSTEP (main loop - CANNOT yield)
+--------------------------------------------------------------------------------
+local function OnStep(world)
+	local state = WaveService.GetState()
+	local spawner = WaveService.GetSpawner()
+	local broadcaster = WaveService.GetBroadcaster()
+	
+	if not spawner or not broadcaster then
+		return -- Managers not yet initialized
+	end
+	
+	local currentTime = os.clock()
+	local gameState = WaveService.GetGameState()
+	
+	-- Auto-start when players join (testing only)
+	if gameState == "Waiting" and state.AutoStartEnabled then
+		if #Players:GetPlayers() > 0 then
+			WaveService.StartGame()
+		end
+		return
+	end
+	
+	-- Game over states stop processing
+	if WaveService.IsGameOver() then
+		return
+	end
+	
+	-- Check defeat condition (only during active gameplay)
+	if WaveService.IsPlaying() and BaseHealth.IsDefeated() and gameState ~= "Defeat" then
+		WaveService.SetGameState("Defeat")
+		return
+	end
+	
+	-- Preparation phase countdown
+	if gameState == "Preparation" then
+		local remaining = math.ceil(state.WaveStartTime - currentTime)
+		if remaining > 0 then
+			-- Broadcast preparation time periodically
+			if math.floor(currentTime) ~= math.floor(currentTime - 0.016) then
+				broadcaster:BroadcastPreparationTime(remaining)
+			end
+		else
+			-- Start first wave
+			WaveService.SetGameState("Playing")
+			startWave(1, world, state, spawner, broadcaster)
+		end
+		return
+	end
+	
+	-- Intermission between waves
+	if gameState == "Intermission" then
+		if currentTime - state.WaveStartTime >= CONFIG.WAVE_DELAY then
+			WaveService.SetGameState("Playing")
+			startWave(state.CurrentWave + 1, world, state, spawner, broadcaster)
+		end
+		return
+	end
+	
+	-- Wait for first wave
+	if state.CurrentWave == 0 then
+		-- In Studio Debug mode, don't auto-start
+		if WaveService.IsStudioDebug() and state.WaveStartTime == 0 then
+			return
+		end
+		
+		if currentTime >= state.WaveStartTime then
+			startWave(1, world, state, spawner, broadcaster)
+		end
+		return
+	end
+	
+	-- Check wave completion
+	local waveComplete = false
+	local activeZombies = 0
+	for _ in world:query(Components.ZombieTypeComponent) do
+		activeZombies += 1
+	end
+	
+	if state.UsingDefinedWave then
+		-- For defined waves, complete when all zombies dead after min time
+		local timeSinceWaveStart = currentTime - state.WaveStartTime
+		if activeZombies == 0 and timeSinceWaveStart > CONFIG.MIN_WAVE_TIME_FOR_COMPLETION then
+			waveComplete = true
+		end
+	else
+		-- For budget waves, check phase completion
+		local allSpawned = state.PhaseSpent >= state.PhaseBudget and state.CurrentPhase == "Flag"
+		if allSpawned and activeZombies == 0 then
+			waveComplete = true
+		end
+	end
+	
+	if waveComplete then
+		-- Fire WaveStateEvent End for UI/Audio systems
+		world:spawn(Components.WaveStateEvent({
+			StateType = "End",
+			WaveNumber = state.CurrentWave,
+			TotalWaves = state.TotalWaves,
+		}))
+		
+		broadcaster:BroadcastWaveCompleted(state.CurrentWave, true)
+		
+		-- Check victory
+		if state.CurrentWave >= state.TotalWaves then
+			WaveService.SetGameState("Victory")
+			return
+		end
+		
+		-- Start intermission
+		WaveService.SetGameState("Intermission")
+		state.WaveStartTime = currentTime
+		return
+	end
+	
+	-- Budget-based spawning (only for non-defined waves)
+	if not state.UsingDefinedWave then
+		if currentTime - state.LastSpawnTime >= getSpawnInterval(state.CurrentPhase) then
+			if state.PhaseSpent >= state.PhaseBudget then
+				if state.CurrentPhase ~= "Flag" then
+					advancePhase(world, state, spawner)
+				end
+				return
+			end
+			
+			local remainingBudget = state.PhaseBudget - state.PhaseSpent
+			local zombieType = spawner:PickZombie(state.CurrentPhase, remainingBudget)
+			
+			if zombieType then
+				local lane = ChanceUtils.RandomLane()
+				spawner:SpawnZombie(world, zombieType, lane, state.CurrentWave)
+				state.PhaseSpent += spawner:GetZombieCost(zombieType)
+				state.LastSpawnTime = currentTime
+				state.ZombiesSpawnedThisWave += 1
+			else
+				state.PhaseSpent = state.PhaseBudget
+			end
+		end
+	end
 end
 
---[[ ============================================
-    PUBLIC: WaveManager API
-============================================ ]]--
-
-local WaveManager = {}
-
-function WaveManager.SetAutoStart(enabled: boolean)
-    _autoStartEnabled = enabled
-    Logger.Info("WaveManager", `Auto-start {if enabled then "enabled" else "disabled"}`)
-end
-
-function WaveManager.GetGameState(): GameState
-    return _stateManager:GetState()
-end
-
-function WaveManager.GetCurrentWave(): number
-    return _currentWave
-end
-
-function WaveManager.IsPlaying(): boolean
-    return _stateManager:IsPlaying()
-end
-
-function WaveManager.SetGameState(state: GameState)
-    local success = _stateManager:SetState(state)
-    if success and (state == "Victory" or state == "Defeat") then
-        handleGameEnd(state == "Victory")
-    end
-end
-
-function WaveManager.StartGame(worldId: string?, difficulty: string?): boolean
-    -- If no worldId/difficulty provided, use defaults (for testing)
-    if not worldId or not difficulty then
-        if not _stateManager:CanStartGame() then
-            return false
-        end
-        _currentWave = 0
-        _stateManager:SetState("Playing")
-        _waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
-        Logger.Info("WaveManager", `Game started (default)! First wave in {WaveConfig.FIRST_WAVE_DELAY}s`)
-        return true
-    end
-    
-    if not _stateManager:CanStartGame() then
-        Logger.Warn("WaveManager", `Cannot start game - already in progress`)
-        return false
-    end
-    
-    -- Load World config
-    local worldConfig = WorldData.GetWorld(worldId)
-    if not worldConfig then
-        Logger.Error("WaveManager", `Invalid world ID: {worldId}`)
-        return false
-    end
-    
-    -- Load Difficulty config
-    local difficultyConfig = DifficultyData.GetDifficulty(difficulty)
-    if not difficultyConfig then
-        Logger.Error("WaveManager", `Invalid difficulty: {difficulty}`)
-        return false
-    end
-    
-    -- Configure game session
-    _currentWorldId = worldId
-    _currentDifficulty = difficulty
-    _currentWorldConfig = worldConfig
-    _currentDifficultyConfig = difficultyConfig
-    
-    -- Determine wave count from difficulty
-    _totalWaves = difficultyConfig.WaveCount or 10
-    
-    -- Build merged config for spawner (combine world + difficulty)
-    local spawnerConfig = {
-        -- From World
-        Name = worldConfig.Name,
-        MapId = worldConfig.MapId,
-        ZombiePool = worldConfig.ZombiePool,
-        Mechanics = worldConfig.Mechanics,
-        -- From Difficulty (use existing field names)
-        BaseZombieHP = difficultyConfig.ZombieHealthMult or 1.0,
-        BaseBudgetMultiplier = difficultyConfig.ZombieDamageMult or 1.0, -- Use damage as budget proxy
-        SpawnInterval = difficultyConfig.SpawnInterval or 2.5,
-        TotalWaves = _totalWaves,
-    }
-    
-    _spawner:SetWorldConfig(spawnerConfig)
-    
-    -- Update timing from difficulty
-    local spawnInterval = spawnerConfig.SpawnInterval
-    WaveConfig.TRICKLE_INTERVAL = spawnInterval + 1.5
-    WaveConfig.ASSAULT_INTERVAL = spawnInterval
-    WaveConfig.FLAG_INTERVAL = math.max(0.5, spawnInterval - 0.5)
-    
-    -- Start preparation phase
-    _currentWave = 0
-    _stateManager:SetState("Preparation")
-    _waveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
-    
-    Logger.Info("WaveManager", `=== {worldConfig.Name} | {difficultyConfig.Name} ({_totalWaves} waves) ===`)
-    
-    _broadcaster:BroadcastGameStarted(worldId, difficulty, worldConfig.Name, difficultyConfig.Name, _totalWaves)
-    _broadcaster:BroadcastWaveStarted(0, 0)
-    
-    return true
-end
-
-function WaveManager.StartWaves(): boolean
-    if _stateManager:GetState() ~= "Preparation" then
-        return false
-    end
-    
-    _stateManager:SetState("Playing")
-    _waveStartTime = os.clock()
-    Logger.Info("WaveManager", "Preparation skipped - starting waves!")
-    return true
-end
-
-function WaveManager.OnZombieDied()
-    -- Called by EntityDeathSystem
-end
-
--- Getters for World + Difficulty system
-function WaveManager.GetCurrentWorldId(): string
-    return _currentWorldId
-end
-
-function WaveManager.GetCurrentDifficulty(): string
-    return _currentDifficulty
-end
-
-function WaveManager.GetCurrentWorldConfig(): WorldData.WorldConfig?
-    return _currentWorldConfig
-end
-
-function WaveManager.GetCurrentDifficultyConfig(): DifficultyData.DifficultyConfig?
-    return _currentDifficultyConfig
-end
-
-function WaveManager.GetTotalWaves(): number
-    return _totalWaves
-end
-
-function WaveManager.ResetGameState()
-    if _stateManager then
-        _stateManager:Reset()
-    end
-    _currentWave = 0
-    _waveStartTime = 0
-    _lastSpawnTime = 0
-    _currentPhase = "Trickle"
-    _phaseSpent = 0
-    _phaseBudget = 0
-    _totalBudget = 0
-    _zombiesSpawnedThisWave = 0
-    _totalWaves = 0
-    _currentWorldId = ""
-    _currentDifficulty = ""
-    _currentWorldConfig = nil
-    _currentDifficultyConfig = nil
-    
-    -- Reset base health for new game
-    BaseHealth.Reset()
-    
-    Logger.Info("WaveManager", "Game state reset")
-end
-
---[[ ============================================
-    SYSTEM: Matter system function
-============================================ ]]--
-
-local function WaveManagerSystem(world)
-    -- Initialize managers on first run
-    if not _stateManager then
-        _stateManager = GameStateManager.GetInstance()
-        _spawner = WaveSpawner.GetInstance()
-        _rewardCalc = RewardCalculator.GetInstance()
-        _broadcaster = WaveBroadcaster.GetInstance()
-    end
-    
-    local currentTime = os.clock()
-    local state: string = _stateManager:GetState()
-    
-    -- Auto-start when players join (testing only)
-    if state == "Waiting" and _autoStartEnabled then
-        if #Players:GetPlayers() > 0 then
-            WaveManager.StartGame()
-        end
-        return
-    end
-    
-    -- Game over states stop processing
-    if _stateManager:IsGameOver() then
-        return
-    end
-    
-    -- Check defeat condition (only during active gameplay)
-    if _stateManager:IsPlaying() and BaseHealth.IsDefeated() and state ~= "Defeat" then
-        WaveManager.SetGameState("Defeat")
-        Logger.Info("WaveManager", "💀 DEFEAT - Base destroyed!")
-        return
-    end
-    
-    -- Preparation phase countdown
-    if state :: string == "Preparation" then
-        local remaining = math.ceil(_waveStartTime - currentTime)
-        if remaining > 0 then
-            -- Broadcast preparation time periodically
-            if math.floor(currentTime) ~= math.floor(currentTime - 0.016) then
-                _broadcaster:BroadcastPreparationTime(remaining)
-            end
-        else
-            -- Start first wave
-            _stateManager:SetState("Playing")
-            startWave(1, world)
-        end
-        return
-    end
-    
-    -- Intermission between waves
-    if state :: string == "Intermission" then
-        if currentTime - _waveStartTime >= WaveConfig.WAVE_DELAY then
-            _stateManager:SetState("Playing")
-            startWave(_currentWave + 1, world)
-        end
-        return
-    end
-    
-    -- Wait for first wave
-    if _currentWave == 0 then
-        -- In Studio Debug mode, don't auto-start - wait for manual StartGame()
-        if IS_STUDIO_DEBUG and _waveStartTime == 0 then
-            return -- Waiting for manual start via Cmdr
-        end
-        
-        if currentTime >= _waveStartTime then
-            startWave(1, world)
-        end
-        return
-    end
-    
-    -- Check wave completion
-    -- For defined waves: just check if all zombies are dead
-    -- For budget waves: check if all phases are spent
-    local waveComplete = false
-    local activeZombies = 0
-    local queryResult: any = world:query(ZombieTypeComponent)
-    if queryResult then
-        for _ in queryResult do
-            activeZombies += 1
-        end
-    end
-    
-    if _usingDefinedWave then
-        -- For defined waves, wave is complete when spawning is done and all zombies dead
-        -- We consider spawning "done" after 15 seconds max or when all zombies spawned are dead
-        local timeSinceWaveStart = currentTime - _waveStartTime
-        if activeZombies == 0 and timeSinceWaveStart > 3 then
-            waveComplete = true
-        end
-    else
-        -- For budget waves, check phase completion
-        local allSpawned = _phaseSpent >= _phaseBudget and _currentPhase == "Flag"
-        if allSpawned and activeZombies == 0 then
-            waveComplete = true
-        end
-    end
-    
-    if waveComplete then
-        Logger.Info("WaveManager", `=== WAVE {_currentWave} COMPLETE ===`)
-        
-        -- Fire WaveStateEvent End for UI/Audio systems
-        world:spawn(WaveStateEvent({
-            StateType = "End",
-            WaveNumber = _currentWave,
-            TotalWaves = _totalWaves,
-        }))
-        
-        _broadcaster:BroadcastWaveCompleted(_currentWave, true)
-        
-        -- Check victory
-        if _currentWave >= _totalWaves then
-            WaveManager.SetGameState("Victory")
-            Logger.Info("WaveManager", "🏆 VICTORY! All waves completed!")
-            return
-        end
-        
-        -- Start intermission
-        _stateManager:SetState("Intermission")
-        _waveStartTime = currentTime
-        Logger.Info("WaveManager", `Next wave in {WaveConfig.WAVE_DELAY}s`)
-        return
-    end
-    
-    -- Budget-based spawning (only for non-defined waves)
-    if not _usingDefinedWave then
-        if currentTime - _lastSpawnTime >= getSpawnInterval() then
-            if _phaseSpent >= _phaseBudget then
-                if _currentPhase ~= "Flag" then
-                    advancePhase(world)
-                end
-                return
-            end
-            
-            local remainingBudget = _phaseBudget - _phaseSpent
-            local zombieType = _spawner:PickZombie(_currentPhase, remainingBudget)
-            
-            if zombieType then
-                local lane = ChanceUtils.RandomLane()
-                _spawner:SpawnZombie(world, zombieType, lane, _currentWave)
-                _phaseSpent += _spawner:GetZombieCost(zombieType)
-                _lastSpawnTime = currentTime
-                _zombiesSpawnedThisWave += 1
-            else
-                _phaseSpent = _phaseBudget
-            end
-        end
-    end
-end
-
+--------------------------------------------------------------------------------
+-- [6] INIT / DISPOSE
+--------------------------------------------------------------------------------
 local function Init(_world)
-    -- Managers are lazy-loaded on first system run
-    Logger.Info("WaveManagerSystem", "Initialized")
+	-- WaveService handles manager initialization
 end
 
 local function Dispose()
-    WaveManager.ResetGameState()
-    _stateManager = nil :: any
-    _spawner = nil :: any
-    _rewardCalc = nil :: any
-    _broadcaster = nil :: any
-    Logger.Info("WaveManagerSystem", "Disposed")
+	WaveService.ResetGameState()
 end
 
+--------------------------------------------------------------------------------
+-- [7] EXPORT
+--------------------------------------------------------------------------------
 return {
-    _name = "WaveManagerSystem",
-    priority = 100,
-    system = WaveManagerSystem,
-    Init = Init,
-    Dispose = Dispose,
-    WaveManager = WaveManager,
+	priority = 100,
+	system = OnStep,
+	Init = Init,
+	Dispose = Dispose,
+	-- Legacy compatibility: expose WaveManager API via WaveService
+	WaveManager = WaveService,
 }

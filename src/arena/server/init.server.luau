@@ -51,8 +51,9 @@ local ProgressionHandler = require(Server.handlers.ProgressionHandler)
 local ArenaService = require(Server.services.ArenaService)
 local MapLoader = require(Server.services.MapLoader)
 
--- Import MutationApplySystem for its API (to load player mutations on join)
-local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
+-- Import MutationService for teleport data handling
+local MutationService = require(Server.services.MutationService)
+local StatsService = require(Server.services.StatsService)
 
 -- Import server systems folder
 -- Note: init.server.luau IS the Server script, so children are direct
@@ -61,6 +62,9 @@ local Systems = script:WaitForChild("systems")
 -- Initialize services
 PlayerDataService.Initialize()
 Logger.Info("Server", "PlayerDataService initialized")
+
+StatsService.Initialize()
+Logger.Info("Server", "StatsService initialized")
 
 -- Initialize handlers
 ProgressionHandler.Initialize()
@@ -86,7 +90,7 @@ local function loadSystem(moduleScript: ModuleScript)
 	end, `LoadSystem.{moduleScript.Name}`)
 	
 	if success and system then
-		SystemManager.Register(system)
+		SystemManager.Register(system, moduleScript.Name)
 		Logger.Debug("Server", `Registered system: {moduleScript.Name}`, {
 			priority = system.priority or 0
 		})
@@ -168,7 +172,7 @@ end)
 -- This handles ALL player join logic: profile waiting, teleport data, mutations, deck sync
 TeleportDataHandler.InitializeArena({
 	PlayerDataService = PlayerDataService,
-	MutationApplySystem = MutationApplySystemModule.API,
+	MutationService = MutationService,
 	ArenaService = ArenaService,
 	ProgressionHandler = ProgressionHandler,
 })
@@ -252,7 +256,7 @@ local function onPlayerRemoving(player: Player)
 	-- Dispose player-specific resources in all systems
 	SystemManager.DisposePlayer(player)
 	
-	MutationApplySystemModule.API.ClearPlayerMutations(player.UserId)
+	MutationService.ClearPlayerMutations(player.UserId)
 	ArenaService.OnPlayerRemoving(player)
 	
 	-- Check if this was the last player (after a short delay to let other systems process)
@@ -331,12 +335,11 @@ local Network = require(Shared.network.generated.server)
 Network.StartWaveRequest.SetCallback(function(player: Player, data: {RequestId: number}): {Success: boolean, ErrorCode: number}
 	Logger.Info("Server", `{player.Name} pressed Ready button`)
 	
-	-- Get WaveManager
-	local WaveManagerSystemModule = require(Server.systems.wave.WaveManagerSystem)
-	local WaveManager = WaveManagerSystemModule.WaveManager
+	-- Get WaveService
+	local WaveService = require(Server.services.WaveService)
 	
 	-- Try to start waves
-	local success = WaveManager.StartWaves()
+	local success = WaveService.StartWaves()
 	
 	if success then
 		return {Success = true, ErrorCode = 0}

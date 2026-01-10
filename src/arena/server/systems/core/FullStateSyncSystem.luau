@@ -4,30 +4,18 @@
 	
 	Priority: 50 (Very early - before other systems)
 	
-	When a player joins, sends them:
-	- All existing plants
-	- All existing zombies
-	- All existing sun orbs
-	- Current wave number
-	- Base health
-	- Game state
-	
-	LIFECYCLE:
-	- Init(): Setup player connection listeners (CAN yield)
-	- system(): Main loop (CANNOT yield) - processes pending syncs
-	- Dispose(): Cleanup player connections
+	When a player joins, sends them all existing entities and game state.
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -36,56 +24,45 @@ local Network = require(Shared.network.generated.server)
 local Server = script.Parent.Parent.Parent
 local BaseHealth = require(Server.modules.BaseHealth)
 
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local ZombieTypeComponent = Components.ZombieTypeComponent
-local SunComponent = Components.SunComponent
-local HealthComponent = Components.HealthComponent
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	SYNC_DELAY = 0.5, -- Seconds to wait for client readiness
+})
 
--- Trove for cleanup
-local _trove = Trove.new()
+-- 3. STATE
+local State = {
+	IsInitialized = false,
+	Trove = nil :: any,
+	PendingSync = {} :: {[Player]: boolean},
+	World = nil :: any,
+}
 
--- Track players pending sync
-local _pendingSync: {[Player]: boolean} = {}
-local _world: any = nil
-
+-- Helper: Sync all state to a player
 local function syncPlayer(player: Player, world: any)
-	if not player or not player.Parent then
-		return
-	end
-	
-	Logger.Info("FullStateSync", `Syncing full state to {player.Name}`)
-	
-	-- Count entities for logging
-	local plantCount = 0
-	local zombieCount = 0
-	local sunCount = 0
+	if not player or not player.Parent then return end
 	
 	-- Sync all plants
-	for id, plant, pos in world:query(PlantTypeComponent, PositionComponent) do
+	for id, plant, pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
 		Network.PlantSpawned.Fire(player, {
 			EntityId = id,
 			PlantType = plant.PlantType :: any,
 			Column = plant.Column :: any,
 			Lane = plant.Lane :: any,
 		})
-		plantCount += 1
 	end
 	
 	-- Sync all zombies
-	for id, zombie, pos in world:query(ZombieTypeComponent, PositionComponent) do
+	for id, zombie, pos in world:query(Components.ZombieTypeComponent, Components.PositionComponent) do
 		Network.ZombieSpawned.Fire(player, {
 			EntityId = id,
 			ZombieType = zombie.ZombieType :: any,
 			Lane = zombie.Lane :: any,
 			PositionX = pos.X,
 		})
-		zombieCount += 1
 	end
 	
 	-- Sync all sun orbs
-	for id, sun, pos in world:query(SunComponent, PositionComponent) do
+	for id, sun, pos in world:query(Components.SunComponent, Components.PositionComponent) do
 		Network.SunSpawned.Fire(player, {
 			EntityId = id,
 			PositionX = pos.X,
@@ -94,7 +71,6 @@ local function syncPlayer(player: Player, world: any)
 			Value = sun.Value,
 			TargetY = sun.TargetY or pos.Y,
 		})
-		sunCount += 1
 	end
 	
 	-- Sync base health
@@ -103,59 +79,56 @@ local function syncPlayer(player: Player, world: any)
 		MaxHealth = BaseHealth.GetMaxHealth(),
 		DamageAmount = 0,
 	})
+end
+
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
 	
-	Logger.Info("FullStateSync", `Synced to {player.Name}: {plantCount} plants, {zombieCount} zombies, {sunCount} sun`)
+	State.Trove = Trove.new()
+	
+	State.Trove:Connect(Players.PlayerAdded, function(player: Player)
+		State.PendingSync[player] = true
+	end)
+	
+	State.Trove:Connect(Players.PlayerRemoving, function(player: Player)
+		State.PendingSync[player] = nil
+	end)
 end
 
--- Handle player joining
-local function onPlayerAdded(player: Player)
-	-- Delay sync slightly to ensure client is ready
-	_pendingSync[player] = true
+-- 5. DISPOSE
+local function Dispose()
+	if State.Trove then
+		State.Trove:Clean()
+		State.Trove = nil
+	end
+	State.IsInitialized = false
+	table.clear(State.PendingSync)
+	State.World = nil
 end
 
-local function onPlayerRemoving(player: Player)
-	_pendingSync[player] = nil
-end
-
-local function setupListeners()
-	_trove:Connect(Players.PlayerAdded, onPlayerAdded)
-	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-end
-
--- System runs each frame to process pending syncs
-local function FullStateSyncSystem(world)
-	_world = world
+-- 6. MAIN LOOP
+local function OnStep(world)
+	State.World = world
 	
 	-- Process pending syncs (with small delay for client readiness)
-	for player, _ in _pendingSync do
+	for player, _ in State.PendingSync do
 		if player and player.Parent then
-			-- Check if player has been connected for at least 0.5 seconds
-			-- This gives time for client to initialize
-			task.delay(0.5, function()
+			task.delay(CONFIG.SYNC_DELAY, function()
 				if player and player.Parent then
 					syncPlayer(player, world)
 				end
 			end)
 		end
-		_pendingSync[player] = nil
+		State.PendingSync[player] = nil
 	end
 end
 
-local function Init(_world)
-	setupListeners()
-	Logger.Debug("FullStateSyncSystem", "Initialized")
-end
-
-local function Dispose()
-	_trove:Clean()
-	table.clear(_pendingSync)
-	Logger.Debug("FullStateSyncSystem", "Disposed")
-end
-
+-- 7. EXPORT
 return {
-	_name = "FullStateSyncSystem",
 	priority = 50,
-	system = FullStateSyncSystem,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

@@ -2,6 +2,8 @@
 --[[
 	PlacementSystem.luau - Server-side plant placement validation
 	
+	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	
 	Priority: 200 (Core game logic)
 	
 	Validates placement requests from clients:
@@ -13,16 +15,20 @@
 	Spawns plant entity on success, rejects on failure.
 	
 	LIFECYCLE:
-	- Init(): Setup player listeners (CAN yield)
-	- system(): Main loop (CANNOT yield) - stores world reference
+	- Init(): Setup player listeners and network handlers (CAN yield)
+	- OnStep(): Main loop (CANNOT yield) - stores world reference
 	- Dispose(): Cleanup player connections and state
 ]]
 
+-- ============================================================
+-- SECTION 1: IMPORTS
+-- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -33,53 +39,53 @@ local WorldData = require(Shared.data.WorldData)
 local Logger = require(Shared.utils.Logger)
 local EntityPool = require(Shared.utils.EntityPool)
 
--- Components (via index module)
-local PositionComponent = Components.PositionComponent
-local HealthComponent = Components.HealthComponent
-local PlantTypeComponent = Components.PlantTypeComponent
-local OwnerComponent = Components.OwnerComponent
-local SpawnEvent = Components.SpawnEvent
-local PlantActionEvent = Components.PlantActionEvent
-
 -- Network
 local Network = require(Shared.network.generated.server)
 
--- Server modules
+-- Server services
 local Server = script.Parent.Parent.Parent
 local GridService = require(Server.services.GridService)
+local SunService = require(Server.services.SunService)
+local WaveService = require(Server.services.WaveService)
+local MutationService = require(Server.services.MutationService)
 
--- Import MutationApplySystem for mutation queries
-local MutationApplySystemModule = require(Server.systems.mutations.MutationApplySystem)
+-- ============================================================
+-- SECTION 2: CONFIG (immutable settings)
+-- ============================================================
+local CONFIG = table.freeze({
+	PRIORITY = 200,
+})
 
--- Player sun tracking (temporary until ProfileStore integration)
-local playerSun: {[Player]: number} = {}
-local playerCooldowns: {[Player]: {[string]: number}} = {}
+-- ============================================================
+-- SECTION 3: STATE (all mutable data)
+-- ============================================================
+local State = {
+	World = nil :: any?,
+	Trove = Trove.new(),
+	PlayerCooldowns = {} :: {[Player]: {[string]: number}},
+}
 
-local STARTING_SUN = 50
-
--- Trove for cleanup (connections)
-local Trove = require(Packages.Trove)
-local _trove = Trove.new()
+-- ============================================================
+-- SECTION 4: PRIVATE HELPERS
+-- ============================================================
 
 -- Initialize new player
 local function onPlayerAdded(player: Player)
-	playerSun[player] = STARTING_SUN
-	playerCooldowns[player] = {}
-	Logger.Info("PlacementSystem", `Player {player.Name} initialized with {STARTING_SUN} sun`)
+	State.PlayerCooldowns[player] = {}
+	Logger.Debug("PlacementSystem", `Player {player.Name} initialized`)
 end
 
 local function onPlayerRemoving(player: Player)
-	playerSun[player] = nil
-	playerCooldowns[player] = nil
-end
-
-local function setupListeners()
-	_trove:Connect(Players.PlayerAdded, onPlayerAdded)
-	_trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
+	State.PlayerCooldowns[player] = nil
 end
 
 -- Validate placement request
-local function validatePlacement(player: Player, column: number, lane: number, plantType: string, world: any?): (boolean, string?)
+local function validatePlacement(player: Player, column: number, lane: number, plantType: string): (boolean, string?)
+	local world = State.World
+	if not world then
+		return false, "World not ready"
+	end
+	
 	-- Check plant type exists
 	local stats = PlantData[plantType]
 	if not stats then
@@ -96,8 +102,8 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	local existingPlant = nil
 	local existingStats = nil
 	
-	if existingEntityId and world and world:contains(existingEntityId) then
-		existingPlant = world:get(existingEntityId, PlantTypeComponent)
+	if existingEntityId and world:contains(existingEntityId) then
+		existingPlant = world:get(existingEntityId, Components.PlantTypeComponent)
 		if existingPlant then
 			existingStats = PlantData[existingPlant.PlantType]
 		end
@@ -107,10 +113,8 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	-- Water/Platform validation (DATA-DRIVEN)
 	-- ==============================================
 	
-	-- Get current world config from WaveManager (lazy require with safety check)
-	local WaveManagerModule = require(script.Parent.Parent.wave.WaveManagerSystem) :: any
-	local WaveManager = WaveManagerModule and WaveManagerModule.WaveManager
-	local worldConfig = WaveManager and WaveManager.GetCurrentWorldConfig and WaveManager.GetCurrentWorldConfig()
+	-- Get current world config from WaveService
+	local worldConfig = WaveService.GetCurrentWorldConfig()
 	local waterLanes: {number} = if worldConfig then worldConfig.WaterLanes or {} else {}
 	local isWaterLane = table.find(waterLanes, lane) ~= nil
 	
@@ -163,14 +167,10 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		-- Coffee Bean can only be placed on sleeping mushrooms
 		if existingEntityId and existingStats and existingStats.IsMushroom then
 			-- Check if mushroom is sleeping
-			local Systems = script.Parent.Parent
-			local MushroomSystem = require(Systems.units.MushroomSystem)
-			if world then
-				local SleepingComponent = Components.SleepingComponent
-				local sleeping = world:get(existingEntityId, SleepingComponent)
-				if not sleeping or not sleeping.IsSleeping then
-					return false, "Mushroom is already awake"
-				end
+			local SleepingComponent = Components.SleepingComponent
+			local sleeping = world:get(existingEntityId, SleepingComponent)
+			if not sleeping or not sleeping.IsSleeping then
+				return false, "Mushroom is already awake"
 			end
 			-- Allow placing Coffee Bean on sleeping mushroom
 		else
@@ -192,14 +192,14 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		end
 	end
 	
-	-- Check player has enough sun
-	local sun = playerSun[player] or 0
+	-- Check player has enough sun (via SunService)
+	local sun = SunService.GetSun(player)
 	if sun < stats.Cost then
 		return false, "Not enough sun"
 	end
 	
 	-- Check cooldown
-	local cooldowns = playerCooldowns[player]
+	local cooldowns = State.PlayerCooldowns[player]
 	if cooldowns then
 		local cooldownEnd = cooldowns[plantType]
 		if cooldownEnd and os.clock() < cooldownEnd then
@@ -211,7 +211,13 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 end
 
 -- Spawn plant entity
-local function spawnPlant(world: any, player: Player, column: number, lane: number, plantType: string): number
+local function spawnPlant(player: Player, column: number, lane: number, plantType: string): number
+	local world = State.World
+	if not world then
+		Logger.Error("PlacementSystem", "World not initialized")
+		return -1
+	end
+	
 	local stats = PlantData[plantType]
 	if not stats then
 		Logger.Error("PlacementSystem", `Invalid plant type: {plantType}`)
@@ -228,7 +234,7 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		if existingEntityId and world:contains(existingEntityId) then
 			-- Fire PlantActionEvent instead of direct API call
 			-- MushroomSystem will react to this event
-			world:spawn(PlantActionEvent({
+			world:spawn(Components.PlantActionEvent({
 				ActionType = "WakeMushroom",
 				TargetEntity = existingEntityId,
 				PositionX = worldPos.X,
@@ -238,8 +244,8 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 			
 			-- Coffee Bean is consumed - don't spawn entity
 			-- Deduct sun and start cooldown
-			playerSun[player] = (playerSun[player] or 0) - stats.Cost
-			local cooldowns = playerCooldowns[player]
+			SunService.SpendSun(player, stats.Cost)
+			local cooldowns = State.PlayerCooldowns[player]
 			if cooldowns then
 				cooldowns[plantType] = os.clock() + stats.Cooldown
 			end
@@ -250,21 +256,21 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	end
 	
 	local entityId = EntityPool.Spawn(
-		PositionComponent({
+		Components.PositionComponent({
 			X = worldPos.X,
 			Y = worldPos.Y + 2, -- Slightly above ground
 			Z = worldPos.Z
 		}),
-		HealthComponent({
+		Components.HealthComponent({
 			Current = stats.Health,
 			Max = stats.Health
 		}),
-		PlantTypeComponent({
+		Components.PlantTypeComponent({
 			PlantType = plantType,
 			Column = column,
 			Lane = lane
 		}),
-		OwnerComponent({
+		Components.OwnerComponent({
 			PlayerId = player.UserId
 		})
 	)
@@ -279,17 +285,17 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 		GridService.Occupy(column, lane, entityId)
 	end
 	
-	-- Deduct sun
-	playerSun[player] = (playerSun[player] or 0) - stats.Cost
+	-- Deduct sun via SunService
+	SunService.SpendSun(player, stats.Cost)
 	
 	-- Start cooldown
-	local cooldowns = playerCooldowns[player]
+	local cooldowns = State.PlayerCooldowns[player]
 	if cooldowns then
 		cooldowns[plantType] = os.clock() + stats.Cooldown
 	end
 	
-	-- Get equipped mutations for this plant
-	local mutations = MutationApplySystemModule.API.GetPlantMutations(player.UserId, plantType)
+	-- Get equipped mutations for this plant (via MutationService)
+	local mutations = MutationService.GetPlantMutations(player.UserId, plantType)
 	local mutationInfo = ""
 	if #mutations > 0 then
 		mutationInfo = ` with {#mutations} mutation(s): {table.concat(mutations, ", ")}`
@@ -309,7 +315,7 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	-- Spawn SpawnEvent for presentation systems (VFX, Audio)
 	-- MushroomSystem and SpecialPlantSystem will also react to this event
 	-- to initialize mushroom sleeping state or arm explosives
-	world:spawn(SpawnEvent({
+	world:spawn(Components.SpawnEvent({
 		Target = entityId,
 		EntityType = "Plant",
 		PositionX = worldPos.X,
@@ -320,18 +326,16 @@ local function spawnPlant(world: any, player: Player, column: number, lane: numb
 	return entityId
 end
 
--- API for handling placement requests (will be called by Zap handler)
-local PlacementAPI = {}
-
-function PlacementAPI.RequestPlacement(world: any, player: Player, column: number, lane: number, plantType: string): (boolean, string?)
-	local success, reason = validatePlacement(player, column, lane, plantType, world)
+-- Handle placement request
+local function handlePlacementRequest(player: Player, column: number, lane: number, plantType: string): (boolean, string?)
+	local success, reason = validatePlacement(player, column, lane, plantType)
 	
 	if not success then
 		Logger.Warn("PlacementSystem", `Placement denied for {player.Name}: {reason}`)
 		return false, reason
 	end
 	
-	local entityId = spawnPlant(world, player, column, lane, plantType)
+	local entityId = spawnPlant(player, column, lane, plantType)
 	if entityId < 0 and not PlantData[plantType].CanStackOnMushroom then
 		-- entityId -1 is valid for Coffee Bean (consumed on use)
 		return false, "Spawn failed"
@@ -340,69 +344,21 @@ function PlacementAPI.RequestPlacement(world: any, player: Player, column: numbe
 	return true, nil
 end
 
-function PlacementAPI.GetPlayerSun(player: Player): number
-	return playerSun[player] or 0
-end
-
-function PlacementAPI.AddSun(player: Player, amount: number)
-	playerSun[player] = (playerSun[player] or 0) + amount
-	Logger.Debug("PlacementSystem", `{player.Name} now has {playerSun[player]} sun`)
-end
-
--- World reference for Zap handler
-local _world: any = nil
-
--- Set up network handler for placement requests
-Network.PlacePlantRequest.SetCallback(function(player: Player, data)
-	if not _world then
-		Logger.Warn("PlacementSystem", "World not initialized, rejecting placement")
-		Network.RequestResponse.Fire(player, {
-			RequestId = data.RequestId,
-			Success = false,
-			ErrorCode = 0,
-		})
-		return
+-- Shovel (remove) a plant and refund partial sun
+local function handleShovelRequest(player: Player, plantEntityId: number): (boolean, string?)
+	local world = State.World
+	if not world then
+		return false, "World not ready"
 	end
 	
-	local plantType = tostring(data.PlantType)
-	local column = data.Column
-	local lane = data.Lane
-	
-	local success, reason = PlacementAPI.RequestPlacement(_world, player, column, lane, plantType)
-	
-	-- Map reason to error code
-	local errorCode = 0
-	if reason == "Not enough sun" then
-		errorCode = 1
-	elseif reason == "Cell already occupied" then
-		errorCode = 2
-	elseif reason == "Cell out of bounds" then
-		errorCode = 3
-	end
-	
-	Network.RequestResponse.Fire(player, {
-		RequestId = data.RequestId,
-		Success = success,
-		ErrorCode = if success then nil else errorCode,
-	})
-end)
-
---[[
-	Shovel (remove) a plant and refund partial sun
-	@param world any - Matter world
-	@param player Player - Player requesting removal
-	@param plantEntityId number - Entity ID of plant to remove
-	@return boolean, string? - Success and optional error reason
-]]
-function PlacementAPI.ShovelPlant(world: any, player: Player, plantEntityId: number): (boolean, string?)
 	-- Validate entity exists
 	if not world:contains(plantEntityId) then
 		return false, "Plant not found"
 	end
 	
 	-- Get plant info
-	local plantType = world:get(plantEntityId, PlantTypeComponent)
-	local owner = world:get(plantEntityId, OwnerComponent)
+	local plantType = world:get(plantEntityId, Components.PlantTypeComponent)
+	local owner = world:get(plantEntityId, Components.OwnerComponent)
 	
 	if not plantType then
 		return false, "Not a plant"
@@ -432,8 +388,8 @@ function PlacementAPI.ShovelPlant(world: any, player: Player, plantEntityId: num
 		world:despawn(plantEntityId)
 	end
 	
-	-- Refund sun to player
-	PlacementAPI.AddSun(player, refundAmount)
+	-- Refund sun to player via SunService
+	SunService.AddSun(player, refundAmount)
 	
 	Logger.Info("PlacementSystem", `{player.Name} shoveled {plantType.PlantType} - refunded {refundAmount} sun`)
 	
@@ -445,67 +401,117 @@ function PlacementAPI.ShovelPlant(world: any, player: Player, plantEntityId: num
 	return true, nil
 end
 
--- Set up network handler for shovel requests
-Network.ShovelPlantRequest.SetCallback(function(player: Player, data)
-	if not _world then
-		Logger.Warn("PlacementSystem", "World not initialized, rejecting shovel")
+-- Set up network handlers
+local function setupNetworkHandlers()
+	-- Placement request handler
+	Network.PlacePlantRequest.SetCallback(function(player: Player, data)
+		if not State.World then
+			Logger.Warn("PlacementSystem", "World not initialized, rejecting placement")
+			Network.RequestResponse.Fire(player, {
+				RequestId = data.RequestId,
+				Success = false,
+				ErrorCode = 0,
+			})
+			return
+		end
+		
+		local plantType = tostring(data.PlantType)
+		local column = data.Column
+		local lane = data.Lane
+		
+		local success, reason = handlePlacementRequest(player, column, lane, plantType)
+		
+		-- Map reason to error code
+		local errorCode = 0
+		if reason == "Not enough sun" then
+			errorCode = 1
+		elseif reason == "Cell already occupied" then
+			errorCode = 2
+		elseif reason == "Cell out of bounds" then
+			errorCode = 3
+		end
+		
 		Network.RequestResponse.Fire(player, {
 			RequestId = data.RequestId,
-			Success = false,
-			ErrorCode = 4, -- 4 = World not ready
+			Success = success,
+			ErrorCode = if success then nil else errorCode,
 		})
-		return
-	end
+	end)
 	
-	local success, reason = PlacementAPI.ShovelPlant(_world, player, data.PlantEntityId)
-	
-	-- Map reason to error code
-	local errorCode = 0
-	if reason == "Plant not found" then
-		errorCode = 5
-	elseif reason == "Not your plant" then
-		errorCode = 6
-	elseif reason == "Not a plant" then
-		errorCode = 7
-	end
-	
-	Network.RequestResponse.Fire(player, {
-		RequestId = data.RequestId,
-		Success = success,
-		ErrorCode = if success then nil else errorCode,
-	})
-end)
+	-- Shovel request handler
+	Network.ShovelPlantRequest.SetCallback(function(player: Player, data)
+		if not State.World then
+			Logger.Warn("PlacementSystem", "World not initialized, rejecting shovel")
+			Network.RequestResponse.Fire(player, {
+				RequestId = data.RequestId,
+				Success = false,
+				ErrorCode = 4, -- 4 = World not ready
+			})
+			return
+		end
+		
+		local success, reason = handleShovelRequest(player, data.PlantEntityId)
+		
+		-- Map reason to error code
+		local errorCode = 0
+		if reason == "Plant not found" then
+			errorCode = 5
+		elseif reason == "Not your plant" then
+			errorCode = 6
+		elseif reason == "Not a plant" then
+			errorCode = 7
+		end
+		
+		Network.RequestResponse.Fire(player, {
+			RequestId = data.RequestId,
+			Success = success,
+			ErrorCode = if success then nil else errorCode,
+		})
+	end)
+end
 
--- System that processes cooldowns each frame (optional, for syncing)
-local function PlacementSystem(world)
-	_world = world -- Store world reference for Zap handler
+-- ============================================================
+-- SECTION 5: ONSTEP (main ECS loop)
+-- ============================================================
+local function OnStep(world)
+	State.World = world
 	-- Cooldown processing handled by os.clock() comparisons
 	-- No per-frame work needed
 end
 
+-- ============================================================
+-- SECTION 6: INIT / DISPOSE
+-- ============================================================
 local function Init(_world)
-	setupListeners()
+	-- Setup player listeners
+	State.Trove:Connect(Players.PlayerAdded, onPlayerAdded)
+	State.Trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
+	
 	-- Initialize existing players
 	for _, player in Players:GetPlayers() do
 		onPlayerAdded(player)
 	end
+	
+	-- Setup network handlers
+	setupNetworkHandlers()
+	
 	Logger.Debug("PlacementSystem", "Initialized")
 end
 
 local function Dispose()
-	_trove:Destroy()
-	_trove = Trove.new() -- Reset for potential reuse
-	table.clear(playerSun)
-	table.clear(playerCooldowns)
-	_world = nil
+	State.Trove:Destroy()
+	State.Trove = Trove.new()
+	table.clear(State.PlayerCooldowns)
+	State.World = nil
 	Logger.Debug("PlacementSystem", "Disposed")
 end
 
+-- ============================================================
+-- SECTION 7: MODULE EXPORT
+-- ============================================================
 return {
-	_name = "PlacementSystem",
-	priority = 200,
-	system = PlacementSystem,
+	priority = CONFIG.PRIORITY,
+	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
-	API = PlacementAPI,
 }

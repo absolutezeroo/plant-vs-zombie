@@ -5,63 +5,61 @@
 	Priority: 370 (After damage processing)
 	
 	Queries ProjectileHitEvent + LifestealComponent to heal plants.
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- system(): Main loop - processes hit events for lifesteal
-	- Dispose(): No cleanup needed
 ]]
 
+-- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
 local ECSUtils = require(Shared.utils.ECSUtils)
 
--- Components
-local LifestealComponent = Components.LifestealComponent
-local ProjectileHitEvent = Components.ProjectileHitEvent
+-- 2. CONFIGURATION
+local CONFIG = table.freeze({
+	-- Minimum heal amount to apply (prevents micro-heals)
+	MIN_HEAL_AMOUNT = 1,
+})
 
--- System function
-local function LifestealSystem(world)
+-- 3. STATE (minimal - this system is stateless)
+local State = {
+	IsInitialized = false,
+}
+
+-- 4. INIT
+local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+	State.IsInitialized = false
+end
+
+-- 6. MAIN LOOP
+local function OnStep(world)
 	-- Process ProjectileHitEvents: heal plants with LifestealComponent
-	for _, hitEvent in world:query(ProjectileHitEvent) do
+	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
 		if not world:contains(sourcePlant) then continue end
 		
-		local lifesteal = world:get(sourcePlant, LifestealComponent)
+		local lifesteal = world:get(sourcePlant, Components.LifestealComponent)
 		if not lifesteal then continue end
 		
 		-- Calculate heal amount
 		local lifestealPercent = lifesteal.Percent :: number
 		local healAmount = math.floor(hitEvent.Damage * lifestealPercent)
-		if healAmount <= 0 then continue end
+		if healAmount < CONFIG.MIN_HEAL_AMOUNT then continue end
 		
 		-- Apply healing using ECSUtils
-		local actualHeal = ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
-		if actualHeal > 0 then
-			Logger.Debug("LifestealSystem", `Plant {sourcePlant} healed {actualHeal} from lifesteal`)
-		end
+		ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
 	end
 end
 
-local function Init(_world)
-	-- No initialization needed
-end
-
-local function Dispose()
-	-- No state to clean up
-end
-
+-- 7. EXPORT
 return {
-	_name = "LifestealSystem",
 	priority = 370,
-	system = LifestealSystem,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }
