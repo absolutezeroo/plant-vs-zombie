@@ -28,6 +28,7 @@ local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local ZombieData = require(Shared.data.ZombieData)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -63,9 +64,18 @@ local function TrapSystem(world)
 		local damage = stats.Damage or 20
 		local hitRadius = TrapConfig.SPIKEWEED_HIT_RADIUS
 		
+		-- O(1) lane lookup instead of O(N) world:query
+		local zombiesInLane = LaneCache.GetEntitiesInLane(trap.Lane)
+		
 		-- Check for zombies walking over
-		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-			if zombie.Lane ~= trap.Lane then continue end
+		for _, zombieId in zombiesInLane do
+			if not world:contains(zombieId) then continue end
+			
+			local zombiePos = world:get(zombieId, PositionComponent)
+			if not zombiePos then continue end
+			
+			local zombie = world:get(zombieId, ZombieTypeComponent)
+			if not zombie then continue end
 			
 			local distance = math.abs(zombiePos.X - trapPos.X)
 			if distance > hitRadius then continue end

@@ -30,6 +30,7 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -150,16 +151,19 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 		-- Jalapeno: Destroy entire lane
 		local plant = world:get(entityId, PlantTypeComponent)
 		if plant then
-			for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-				if zombie.Lane == plant.Lane then
-					local health = world:get(zombieId, HealthComponent)
-					if health then
-						world:insert(zombieId, HealthComponent({
-							Current = 0,
-							Max = health.Max,
-						}))
-						killCount += 1
-					end
+			-- O(1) lane lookup instead of O(N) world:query
+			local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
+			
+			for _, zombieId in zombiesInLane do
+				if not world:contains(zombieId) then continue end
+				
+				local health = world:get(zombieId, HealthComponent)
+				if health then
+					world:insert(zombieId, HealthComponent({
+						Current = 0,
+						Max = health.Max,
+					}))
+					killCount += 1
 				end
 			end
 		end
@@ -257,13 +261,20 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 end
 
 -- Find nearest zombie in range for Chomper/Squash
+-- Uses LaneCache for O(1) lane lookup + O(lane_size) distance check
 local function findNearestZombieInRange(world: any, plantPos: any, lane: number, range: number): (number?, any?)
 	local nearestId = nil
 	local nearestPos = nil
 	local nearestDist = range + 1
 	
-	for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-		if zombie.Lane ~= lane then continue end
+	-- O(1) lane lookup instead of O(N) world:query
+	local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
+	
+	for _, zombieId in zombiesInLane do
+		if not world:contains(zombieId) then continue end
+		
+		local zombiePos = world:get(zombieId, PositionComponent)
+		if not zombiePos then continue end
 		
 		local distance = zombiePos.X - plantPos.X
 		if distance > 0 and distance <= range and distance < nearestDist then
@@ -349,8 +360,15 @@ local function SpecialPlantSystem(world)
 		
 		-- Armed mine - check for zombie contact
 		local triggerRadius = stats.TriggerRadius or SpecialDefaults.TRIGGER_RADIUS
-		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-			if zombie.Lane ~= plant.Lane then continue end
+		
+		-- O(1) lane lookup instead of O(N) world:query
+		local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
+		
+		for _, zombieId in zombiesInLane do
+			if not world:contains(zombieId) then continue end
+			
+			local zombiePos = world:get(zombieId, PositionComponent)
+			if not zombiePos then continue end
 			
 			local distance = math.abs(zombiePos.X - pos.X)
 			if distance <= triggerRadius then
@@ -420,7 +438,15 @@ local function SpecialPlantSystem(world)
 			-- Landed! Kill zombie at target location
 			local plant = world:get(plantId, PlantTypeComponent)
 			if plant then
-				for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+				-- O(1) lane lookup instead of O(N) world:query
+				local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
+				
+				for _, zombieId in zombiesInLane do
+					if not world:contains(zombieId) then continue end
+					
+					local zombiePos = world:get(zombieId, PositionComponent)
+					if not zombiePos then continue end
+					
 					local dx = math.abs(zombiePos.X - jumpData.targetX)
 					local dz = math.abs(zombiePos.Z - jumpData.targetZ)
 					if dx < 3 and dz < 3 then
@@ -432,7 +458,7 @@ local function SpecialPlantSystem(world)
 							}))
 							Logger.Info("SpecialPlant", `Squash {plantId} squashed zombie {zombieId}`)
 							Network.EntityDied.FireAll({ EntityId = zombieId })
-							end
+						end
 						break
 					end
 				end

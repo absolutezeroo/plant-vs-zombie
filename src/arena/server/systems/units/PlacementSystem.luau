@@ -57,7 +57,6 @@ local playerCooldowns: {[Player]: {[string]: number}} = {}
 local STARTING_SUN = 50
 
 -- Trove for cleanup (connections)
-local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages.Trove)
 local _trove = Trove.new()
 
@@ -107,9 +106,10 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	-- Water/Platform validation (DATA-DRIVEN)
 	-- ==============================================
 	
-	-- Get current world config from WaveManager
-	local WaveManagerSystem = require(script.Parent.Parent.wave.WaveManagerSystem)
-	local worldConfig = WaveManagerSystem.GetCurrentWorldConfig()
+	-- Get current world config from WaveManager (lazy require with safety check)
+	local WaveManagerModule = require(script.Parent.Parent.wave.WaveManagerSystem) :: any
+	local WaveManager = WaveManagerModule and WaveManagerModule.WaveManager
+	local worldConfig = WaveManager and WaveManager.GetCurrentWorldConfig and WaveManager.GetCurrentWorldConfig()
 	local waterLanes: {number} = if worldConfig then worldConfig.WaterLanes or {} else {}
 	local isWaterLane = table.find(waterLanes, lane) ~= nil
 	

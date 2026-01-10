@@ -50,6 +50,21 @@ type MutationType = enum {
     Swift, Hasty
 }
 
+type ProjectileVariant = enum {
+    Pea,         -- Standard green pea
+    FrozenPea,   -- Blue ice pea (SnowPea, Winter Melon)
+    FirePea,     -- Flaming pea (Torchwood enhanced)
+    Spore,       -- Mushroom spores (PuffShroom, SeaShroom)
+    Fume,        -- Purple fumes (FumeShroom, GloomShroom)
+    Cabbage,     -- Cabbage lobbed projectile
+    Kernel,      -- Corn kernel
+    Butter,      -- Butter (stun)
+    Melon,       -- Melon slice
+    Star,        -- Star projectile (Starfruit)
+    Spike,       -- Cactus spike
+    Seed         -- Generic seed
+}
+
 -- ==========================
 -- ARENA: CLIENT -> SERVER
 -- ==========================
@@ -347,6 +362,35 @@ event ProjectileSpawned = {
         Lane: Lane,
         StartX: f32,
         TargetEntityId: EntityId?,
+        Variant: ProjectileVariant?,  -- Visual type (default: Pea)
+        IsFrozen: boolean?,           -- Has slow effect
+        IsEnhanced: boolean?,         -- Fire enhanced by Torchwood
+    }
+}
+
+-- Projectile hit a target (for impact VFX)
+event ProjectileHit = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,           -- Projectile entity ID
+        PositionX: f32,               -- Impact position
+        PositionY: f32,
+        PositionZ: f32,
+        Variant: ProjectileVariant?,  -- Visual type for VFX
+        IsFrozen: boolean?,           -- For ice impact VFX
+        IsEnhanced: boolean?,         -- For fire impact VFX
+    }
+}
+
+-- Projectile despawned without hitting (out of bounds, max range)
+event ProjectileDespawned = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
     }
 }
 

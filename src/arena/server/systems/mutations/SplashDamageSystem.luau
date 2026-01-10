@@ -21,6 +21,8 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
+local GridConfig = require(Shared.config.GridConfig)
 
 -- Components
 local SplashDamageComponent = Components.SplashDamageComponent
@@ -31,6 +33,7 @@ local DamageEvent = Components.DamageEvent
 local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- Apply splash damage at a position
+-- Uses LaneCache for O(lane_range) lookup instead of O(N) world:query
 local function applySplashDamage(
 	world, 
 	impactPosition: {X: number, Y: number, Z: number},
@@ -38,19 +41,32 @@ local function applySplashDamage(
 	splashRadius: number,
 	splashDamagePercent: number,
 	sourceEntityId: number?,
-	excludeEntityId: number?
+	excludeEntityId: number?,
+	impactLane: number? -- Lane where the projectile hit
 )
 	local splashDamage = math.floor(baseDamage * splashDamagePercent)
 	if splashDamage <= 0 then return end
 	
 	local hitCount = 0
 	
-	-- Find zombies in splash radius
-	for entityId, pos, health, zombie in world:query(PositionComponent, HealthComponent, ZombieTypeComponent) do
+	-- Calculate how many lanes the splash radius covers
+	local laneRadius = math.ceil(splashRadius / GridConfig.CELL_SIZE)
+	local centerLane = impactLane or 3 -- Default to middle lane if unknown
+	
+	-- O(lane_range) lookup instead of O(N) world:query
+	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
+	
+	for _, entityId in zombiesInRange do
 		-- Skip the primary target if specified
 		if excludeEntityId and entityId == excludeEntityId then
 			continue
 		end
+		
+		if not world:contains(entityId) then continue end
+		
+		local pos = world:get(entityId, PositionComponent)
+		local health = world:get(entityId, HealthComponent)
+		if not pos or not health then continue end
 		
 		-- Calculate distance
 		local dx = pos.X - impactPosition.X
@@ -101,7 +117,8 @@ local function SplashDamageSystem(world)
 				splashDamage.Radius,
 				splashDamage.Percent,
 				sourcePlant,
-				hitEvent.TargetZombie -- Exclude primary target
+				hitEvent.TargetZombie, -- Exclude primary target
+				hitEvent.Lane -- Pass lane for optimized lookup
 			)
 		end
 	end

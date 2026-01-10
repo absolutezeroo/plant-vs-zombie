@@ -22,6 +22,9 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
+local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 
 -- Components
 local PoisonCloudComponent = Components.PoisonCloudComponent
@@ -34,6 +37,7 @@ local DamageEvent = Components.DamageEvent
 -- Active poison clouds (entity has been destroyed but cloud lingers)
 export type ActiveCloud = {
 	Position: {X: number, Y: number, Z: number},
+	Lane: number, -- Cached lane for optimized lookups
 	Radius: number,
 	DamagePerSecond: number,
 	RemainingDuration: number,
@@ -47,14 +51,18 @@ local API = {}
 
 -- Spawn a poison cloud at a position
 function API.SpawnPoisonCloud(position: {X: number, Y: number, Z: number}, radius: number, damagePerSecond: number, duration: number)
+	-- Calculate lane from world position for optimized lookups
+	local _, lane = MapConfig.WorldToGrid(Vector3.new(position.X, position.Y, position.Z))
+	
 	table.insert(activeClouds, {
 		Position = position,
+		Lane = lane or 3, -- Default to middle lane if calculation fails
 		Radius = radius,
 		DamagePerSecond = damagePerSecond,
 		RemainingDuration = duration,
 		LastTickTime = os.clock(),
 	})
-	Logger.Debug("PoisonCloudSystem", `Spawned poison cloud at ({position.X}, {position.Z}) - radius {radius}, {damagePerSecond} dps for {duration}s`)
+	Logger.Debug("PoisonCloudSystem", `Spawned poison cloud at ({position.X}, {position.Z}) lane {lane or 3} - radius {radius}, {damagePerSecond} dps for {duration}s`)
 end
 
 -- Called when a plant with PoisonCloud dies
@@ -92,8 +100,20 @@ local function PoisonCloudSystem(world)
 			if elapsed >= 1 then
 				cloud.LastTickTime = currentTime
 				
+				-- Calculate how many lanes the cloud radius covers
+				local laneRadius = math.ceil(cloud.Radius / GridConfig.CELL_SIZE)
+				
+				-- O(lane_range) lookup instead of O(N) world:query
+				local zombiesInRange = LaneCache.GetEntitiesInLaneRange(cloud.Lane, laneRadius)
+				
 				-- Find zombies in cloud
-				for entityId, pos, health, zombie in world:query(PositionComponent, HealthComponent, ZombieTypeComponent) do
+				for _, entityId in zombiesInRange do
+					if not world:contains(entityId) then continue end
+					
+					local pos = LaneCache.GetPosition(entityId)
+					local health = world:get(entityId, HealthComponent)
+					if not pos or not health then continue end
+					
 					local dx = pos.X - cloud.Position.X
 					local dz = pos.Z - cloud.Position.Z
 					local distance = math.sqrt(dx * dx + dz * dz)

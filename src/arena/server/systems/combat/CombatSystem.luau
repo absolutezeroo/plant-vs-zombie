@@ -325,6 +325,7 @@ local function CombatSystem(world: MatterWorld)
 						PositionX = zombiePos.X,
 						PositionY = zombiePos.Y,
 						PositionZ = zombiePos.Z,
+						Lane = zombie.Lane, -- For optimized AoE lookups
 						WasKill = killed,
 					}))
 				end

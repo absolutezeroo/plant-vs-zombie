@@ -26,6 +26,7 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -216,8 +217,13 @@ local function MushroomSystem(world)
 		
 		-- Check for zombies within hide radius
 		local shouldHide = false
-		for zombieId, zombiePos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-			if zombie.Lane ~= plant.Lane then continue end
+		
+		-- O(1) lane lookup instead of O(N) world:query
+		local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
+		
+		for _, zombieId in zombiesInLane do
+			local zombiePos = LaneCache.GetPosition(zombieId)
+			if not zombiePos then continue end
 			
 			local distance = math.abs(zombiePos.X - pos.X)
 			if distance <= hiding.HideRadius then

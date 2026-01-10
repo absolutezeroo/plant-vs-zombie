@@ -54,6 +54,12 @@ export type PlantStats = {
 	GrowsOverTime: boolean?,      -- Grows larger over time (Sun-shroom)
 	HidesWhenNear: boolean?,      -- Hides when zombies are near (Scaredy-shroom)
 	HideRadius: number?,          -- Distance at which to hide (default 6 studs)
+	
+	-- Stacking behavior (for plants that can be placed on top of others)
+	CanStackOnPlant: boolean?,    -- Can be placed on top of Pumpkin/shell plants
+	CanStackOnMushroom: boolean?, -- Can be placed on sleeping mushrooms (CoffeeBean)
+	WakesMushrooms: boolean?,     -- Wakes sleeping mushrooms when stacked
+	IsShell: boolean?,            -- Is a protective shell plant (Pumpkin)
 }
 
 local PlantData: {[string]: PlantStats} = {

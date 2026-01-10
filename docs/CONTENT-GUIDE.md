@@ -220,3 +220,108 @@ monTrail = {
 Zap utilise des **enums compilés** pour optimiser la bande passante réseau. Au lieu d'envoyer `"Peashooter"` (10 bytes), il envoie `3` (1 byte).
 
 Alternative: Utiliser `string.utf8` au lieu d'enum (plus flexible mais moins performant).
+
+---
+
+## 🎨 Assets Visuels (Modèles & VFX)
+
+Les assets visuels sont dans `ReplicatedStorage/Assets/`. Le code clone ces assets au runtime.
+
+### Structure des Dossiers
+
+```
+ReplicatedStorage/Assets/
+├── Plants/           # Modèles de plantes
+│   ├── Peashooter/
+│   ├── Sunflower/
+│   └── ...
+├── Zombies/          # Modèles de zombies
+│   ├── Basic/
+│   ├── Cone/
+│   └── ...
+├── Projectiles/      # Modèles de projectiles (VFX inclus)
+│   ├── Pea/
+│   ├── FrozenPea/
+│   ├── FirePea/
+│   └── ...
+└── VFX/              # Effets partagés (explosions, etc.)
+```
+
+### Structure d'un Modèle de Plante
+
+```
+Peashooter (Model)
+├── Root (Part) ─────────── PrimaryPart (invisible, anchored)
+│   ├── Muzzle (Attachment)    → Position de tir
+│   ├── Center (Attachment)    → Centre de masse
+│   └── Overhead (Attachment)  → Position barre de vie
+├── Visual (Model) ────────── Toutes les parties visibles
+│   ├── Head (MeshPart)
+│   ├── Body (MeshPart)
+│   └── ...
+├── VFX (Folder) ──────────── Effets visuels de la plante
+│   ├── Shoot (ParticleEmitter)  → Muzzle flash au tir
+│   ├── Idle (ParticleEmitter)   → Effet constant (ex: lueur)
+│   └── Death (ParticleEmitter)  → Effet à la mort
+└── [Attributes]
+    ├── EntityType = "Plant"
+    └── FeetOffset = 0
+```
+
+### Structure d'un Modèle de Projectile
+
+```
+Pea (Model)
+├── Root (Part) ─────────── PrimaryPart (la balle visible)
+│   ├── Attachment0 (Attachment)  → Point arrière du Trail
+│   └── Attachment1 (Attachment)  → Point avant du Trail
+├── Trail (Trail) ──────────── Effet de traînée (optionnel)
+│   ├── Attachment0 → Attachment0
+│   ├── Attachment1 → Attachment1
+│   ├── Color = ColorSequence
+│   ├── Lifetime = 0.2
+│   └── WidthScale = NumberSequence
+└── Particles (ParticleEmitter) ─ Particules additionnelles (optionnel)
+    [Attributes]
+    └── Speed = 15  → Vitesse du projectile (override code)
+```
+
+### Types de Projectiles (Variants)
+
+| Variant | Description | Effet Visuel |
+|---------|-------------|--------------|
+| `Pea` | Pois standard | Vert, trail léger |
+| `FrozenPea` | Pois glacé (SnowPea) | Bleu, trail glacé, particules glace |
+| `FirePea` | Pois enflammé (Torchwood) | Orange/rouge, trail feu, neon |
+| `Spore` | Spore champignon (PuffShroom) | Violet clair, petit |
+| `Fume` | Fumée (FumeShroom) | Violet foncé, ForceField |
+| `Cabbage` | Chou (CabbagePult) | Vert, grosse balle |
+| `Kernel` | Maïs (KernelPult) | Jaune, petit |
+| `Butter` | Beurre - stun (KernelPult) | Jaune vif, carré |
+| `Melon` | Melon (MelonPult) | Vert strié, gros |
+| `Star` | Étoile (Starfruit) | Jaune neon, plat |
+| `Spike` | Épine (Cactus) | Vert foncé, allongé |
+| `Seed` | Graine générique | Marron, petit |
+
+### Fallback Automatique
+
+Si un asset n'existe pas dans `Assets/Projectiles/`, le code crée un **Part simple** avec les propriétés par défaut:
+- Couleur basée sur le variant
+- Material approprié (Ice, Neon, etc.)
+- Pas de Trail
+
+> 💡 **Tip:** Créez d'abord les assets prioritaires (Pea, FrozenPea, FirePea) puis ajoutez les autres progressivement.
+
+### Contrat Spatial (Attachments)
+
+Les Attachments sont le **contrat entre Artistes et Code**:
+
+| Attachment | Usage | Obligatoire |
+|------------|-------|-------------|
+| `Muzzle` | Position de tir des projectiles | Oui (plantes qui tirent) |
+| `Center` | Centre de masse, effets | Oui |
+| `Overhead` | Barre de vie, indicateurs | Oui |
+| `Torso` | Point de ciblage zombie | Zombies uniquement |
+
+> ⚠️ **INTERDIT:** `Position + Vector3.new(0, 2, 0)` dans le code  
+> ✅ **CORRECT:** `AttachmentUtils.GetWorldPosition(model, "Muzzle")`

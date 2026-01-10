@@ -20,6 +20,7 @@ export type ProjectileHitEvent = {
 	PositionX: number,       -- Impact position X
 	PositionY: number,       -- Impact position Y
 	PositionZ: number,       -- Impact position Z
+	Lane: number,            -- Lane where the hit occurred (for optimized AoE lookups)
 	WasKill: boolean,        -- True if this hit killed the zombie
 }
 

@@ -21,6 +21,8 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
+local GridConfig = require(Shared.config.GridConfig)
 
 -- Components
 local PositionComponent = Components.PositionComponent
@@ -31,10 +33,18 @@ local DamageEvent = Components.DamageEvent
 local ProjectileHitEvent = Components.ProjectileHitEvent
 
 -- Find nearby zombies within range (excluding already hit ones)
-local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: number}, range: number, excludeIds: {number}): {number}
+-- Uses LaneCache for O(lane_range) lookup instead of O(N) world:query
+local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: number}, range: number, excludeIds: {number}, centerLane: number?): {number}
 	local nearby = {}
 	
-	for entityId, pos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
+	-- Calculate how many lanes the range covers
+	local laneRadius = math.ceil(range / GridConfig.CELL_SIZE)
+	local lane = centerLane or 3 -- Default to middle lane if unknown
+	
+	-- O(lane_range) lookup instead of O(N) world:query
+	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(lane, laneRadius)
+	
+	for _, entityId in zombiesInRange do
 		-- Check if excluded
 		local isExcluded = false
 		for _, excludeId in excludeIds do
@@ -45,6 +55,11 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 		end
 		
 		if not isExcluded then
+			if not world:contains(entityId) then continue end
+			
+			local pos = LaneCache.GetPosition(entityId)
+			if not pos then continue end
+			
 			-- Calculate distance
 			local dx = pos.X - centerPos.X
 			local dz = pos.Z - centerPos.Z
@@ -71,13 +86,15 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 end
 
 -- Apply chain lightning damage from a source
+-- Uses LaneCache for efficient nearby zombie lookups
 local function applyChainLightning(
 	world, 
 	sourceZombieId: number,
 	baseDamage: number, 
 	chainCount: number, 
 	chainDamagePercent: number, 
-	chainRange: number
+	chainRange: number,
+	sourceLane: number?
 )
 	if not world:contains(sourceZombieId) then return end
 	
@@ -87,10 +104,11 @@ local function applyChainLightning(
 	local hitZombies = {sourceZombieId}
 	local currentPos: {X: number, Y: number, Z: number} = {X = sourcePos.X, Y = sourcePos.Y, Z = sourcePos.Z}
 	local currentDamage = baseDamage * chainDamagePercent
+	local currentLane = sourceLane or 3 -- Track current lane for optimized lookups
 	
 	for i = 1, chainCount do
-		-- Find next target
-		local nearbyZombies = findNearbyZombies(world, currentPos, chainRange, hitZombies)
+		-- Find next target (pass current lane for optimized lookup)
+		local nearbyZombies = findNearbyZombies(world, currentPos, chainRange, hitZombies, currentLane)
 		
 		if #nearbyZombies == 0 then
 			break -- No more targets
@@ -145,7 +163,8 @@ local function ChainLightningSystem(world)
 				hitEvent.Damage,
 				chainLightning.ChainCount,
 				chainLightning.ChainDamage,
-				chainLightning.ChainRange
+				chainLightning.ChainRange,
+				hitEvent.Lane -- Pass lane for optimized lookup
 			)
 		end
 	end

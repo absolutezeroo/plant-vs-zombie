@@ -124,7 +124,7 @@ Cette analyse compare le code source (`src/`) avec la documentation pour identif
 | Fichier | Lignes | Status |
 |---------|--------|--------|
 | `CosmeticData.luau` | 355 | ⚠️ **Aucun `require()`** trouvé |
-| `LaneCache.luau` | ~100 | ⚠️ **Aucun `require()`** trouvé |
+| `LaneCache.luau` | ~160 | ✅ **Câblé** via `SpatialHashingSystem` + systèmes targeting |
 
 ### 🟠 Données Profile JAMAIS LUES EN JEU
 

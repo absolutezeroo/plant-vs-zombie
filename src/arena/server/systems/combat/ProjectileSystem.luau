@@ -32,6 +32,7 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
+local LaneCache = require(Shared.utils.LaneCache)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -66,31 +67,12 @@ local _plantFireTimes: {[number]: number} = {}
 local _pendingMultiShots: {[number]: {shotsRemaining: number, nextShotTime: number, lane: number, startX: number, plantType: string, direction: number}} = {}
 
 -- Check if there are zombies in the lane (optionally behind plant for SplitPea)
+-- Uses LaneCache for O(1) lane lookup + O(lane_size) direction check
 -- Uses MapConfig.GetZombieDirection() to determine "in front" vs "behind"
-local function hasZombiesInLane(world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?): boolean
+local function hasZombiesInLane(_world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?): boolean
 	local zombieDir = MapConfig.GetZombieDirection()
-	
-	for id, pos, zombie in world:query(PositionComponent, ZombieTypeComponent) do
-		if zombie.Lane == lane then
-			-- Calculate if zombie is in front or behind the plant
-			-- Zombie direction points from spawn to base (e.g., -1,0,0 means zombies come from +X)
-			-- "In front" = in the direction zombies come FROM (opposite of zombieDir)
-			local dx = pos.X - plantX
-			local dz = pos.Z - plantZ
-			
-			-- Dot product with zombie direction: negative = zombie is in direction zombies come from
-			local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
-			
-			if checkBehind then
-				-- Behind = same direction as zombie movement (positive dot product)
-				if dotProduct > 0 then return true end
-			else
-				-- In front = opposite of zombie direction (negative dot product)
-				if dotProduct < 0 then return true end
-			end
-		end
-	end
-	return false
+	-- Convert Vector3 to table format expected by LaneCache
+	return LaneCache.HasZombiesInDirection(lane, plantX, plantZ, {X = zombieDir.X, Z = zombieDir.Z}, checkBehind)
 end
 
 -- Check if plant can shoot (not sleeping, not hiding, not chewing)
@@ -190,12 +172,39 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 		}))
 	end
 	
+	-- Determine projectile variant for client VFX
+	local variant = "Pea"
+	if isFrozen then
+		variant = "FrozenPea"
+	elseif isCatapult then
+		if plantType == "CabbagePult" then
+			variant = "Cabbage"
+		elseif plantType == "KernelPult" then
+			variant = if canStun then "Butter" else "Kernel"
+		elseif plantType == "MelonPult" or plantType == "WinterMelon" then
+			variant = "Melon"
+		end
+	elseif plantType:find("Shroom") then
+		if plantType == "FumeShroom" or plantType == "GloomShroom" then
+			variant = "Fume"
+		else
+			variant = "Spore"
+		end
+	elseif plantType == "Starfruit" then
+		variant = "Star"
+	elseif plantType == "Cactus" then
+		variant = "Spike"
+	end
+	
 	-- Broadcast to clients
 	Network.ProjectileSpawned.FireAll({
 		EntityId = entityId,
 		Lane = lane :: any,
 		StartX = startX + (2 * dir),
 		TargetEntityId = nil, -- Non-homing
+		Variant = variant :: any,
+		IsFrozen = isFrozen,
+		IsEnhanced = false, -- Will be set by EnhancementSystem if passes through Torchwood
 	})
 	
 	return entityId
@@ -278,6 +287,9 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 			Lane = lane :: any,
 			StartX = startX + normDx * offsetX,
 			TargetEntityId = nil,
+			Variant = "Star" :: any,
+			IsFrozen = false,
+			IsEnhanced = false,
 		})
 	end
 	
