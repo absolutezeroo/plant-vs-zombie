@@ -159,9 +159,11 @@ local function SunSpawnSystem(world)
 			continue
 		end
 		
-		-- Falling physics
+		-- Falling physics (frame-rate independent)
 		if sun.IsFalling then
-			local newY = pos.Y - SunConfig.FALL_SPEED * (1/60) -- Assume 60 FPS
+			local dtSun = Matter.useDeltaTime()
+			dtSun = math.clamp(dtSun, 1/120, 1/15) -- Clamp to prevent physics issues
+			local newY = pos.Y - SunConfig.FALL_SPEED * dtSun
 			local targetY = sun.TargetY or (getGroundY() + SunConfig.GROUND_OFFSET)
 			
 			if newY <= targetY then

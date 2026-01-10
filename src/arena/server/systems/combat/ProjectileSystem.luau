@@ -299,9 +299,18 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	Logger.Debug("Projectile", `Starfruit {plantId} fired 5 stars`)
 end
 
+-- Movement config
+local MovementConfig = {
+	MIN_DT = 1/120,  -- Minimum deltaTime to prevent physics explosion
+	MAX_DT = 1/15,   -- Maximum deltaTime to prevent teleporting on lag spikes
+}
+
 local function ProjectileSystem(world)
 	local currentTime = os.clock()
-	local dt = 1/60
+	
+	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
+	local dt = Matter.useDeltaTime()
+	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 	
 	-- Process pending multi-shots (Repeater, GatlingPea, etc.)
 	for plantId, shotData in _pendingMultiShots do

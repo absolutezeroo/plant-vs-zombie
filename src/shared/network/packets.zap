@@ -329,10 +329,10 @@ event ZombieSpawned = {
     }
 }
 
--- Entity took damage
+-- Entity took damage (Reliable to ensure UI health bars stay in sync)
 event EntityDamaged = {
     from: Server,
-    type: Unreliable,
+    type: Reliable,
     call: ManyAsync,
     data: struct {
         EntityId: EntityId,

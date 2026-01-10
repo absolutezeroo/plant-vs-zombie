@@ -4,9 +4,13 @@
 	
 	Priority: 150 (Simulation phase - after spawn)
 	
-	Moves zombies towards the house (left).
+	Moves zombies towards the house using frame-rate independent movement.
 	Stops zombie when eating a plant.
 	Checks for game over condition (zombie reaches house).
+	Updates GridPositionComponent as zombie moves through the grid.
+	
+	CRITICAL: Uses Matter.useDeltaTime() for lag-independent movement.
+	Formula: NewPosition = OldPosition + (Velocity * dt)
 	
 	LIFECYCLE:
 	- Init(): No init needed
@@ -18,7 +22,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
-local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -39,12 +42,14 @@ local MovementComponent = Components.MovementComponent
 local ZombieTypeComponent = Components.ZombieTypeComponent
 local TargetComponent = Components.TargetComponent
 local SlowComponent = Components.SlowComponent
+local StunComponent = Components.StunComponent
+local GridPositionComponent = Components.GridPositionComponent
 
 -- Movement config
 local MovementConfig = {
-	HOUSE_X = -5,                    -- X position of house (game over line)
 	BATCH_INTERVAL = 0.1,            -- Seconds between position broadcasts
-	POSITION_TOLERANCE = 0.01,       -- Min movement to trigger update
+	MIN_DT = 1/120,                  -- Minimum deltaTime to prevent physics explosion
+	MAX_DT = 1/15,                   -- Maximum deltaTime to prevent teleporting on lag spikes
 }
 
 -- State for batched position updates
@@ -52,15 +57,52 @@ local _lastBatchTime = 0
 local _positionUpdates: {[number]: number} = {} -- entityId -> positionX
 local _reachedHouse: {[number]: boolean} = {} -- Track zombies that reached house
 
+--[[
+	Convert world X position to grid column
+	Returns the column (1-based) or nil if outside grid
+]]
+local function worldXToGridColumn(worldX: number): number?
+	local config = MapConfig.GetConfig()
+	local gridOriginX = config.GridCornerA.X
+	local cellWidth = config.CellWidth or GridConfig.CELL_SIZE
+	
+	-- Calculate column (1-based)
+	local column = math.floor((worldX - gridOriginX) / cellWidth) + 1
+	
+	-- Clamp to valid range
+	if column < 1 then
+		return 1
+	elseif column > GridConfig.GRID_COLUMNS then
+		return GridConfig.GRID_COLUMNS
+	end
+	
+	return column
+end
+
 local function ZombieMovementSystem(world)
 	local currentTime = os.clock()
-	local dt = 1/60 -- Approximate delta time
 	
-	-- Process all zombies
+	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
+	local dt = Matter.useDeltaTime()
+	
+	-- Clamp deltaTime to prevent physics issues
+	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
+	
+	-- Get base position and zombie direction once per frame
+	local basePos = MapConfig.GetBasePosition()
+	local zombieDir = MapConfig.GetZombieDirection()
+	
+	-- Process all zombies with movement
 	for id, pos, movement, zombie in world:query(PositionComponent, MovementComponent, ZombieTypeComponent) do
-		-- Skip if zombie has a target (eating)
+		-- Skip if zombie has a target (eating a plant)
 		local target = world:get(id, TargetComponent)
 		if target then
+			continue
+		end
+		
+		-- Skip if stunned
+		local stun = world:get(id, StunComponent)
+		if stun then
 			continue
 		end
 		
@@ -69,74 +111,83 @@ local function ZombieMovementSystem(world)
 			continue
 		end
 		
-		-- Check for slow effect
-		local slowMultiplier = 1.0
+		-- Calculate slow effect multiplier
+		local speedMultiplier = 1.0
 		local slow = world:get(id, SlowComponent)
 		if slow then
-			slowMultiplier = 1.0 - slow.SlowPercent
+			speedMultiplier = 1.0 - slow.SlowPercent
 		end
 		
-		-- Apply velocity with slow modifier
-		local newX = pos.X + movement.VelocityX * dt * slowMultiplier
-		local newY = pos.Y + movement.VelocityY * dt * slowMultiplier
-		local newZ = pos.Z + movement.VelocityZ * dt * slowMultiplier
+		-- FRAME-RATE INDEPENDENT MOVEMENT
+		-- Formula: NewPosition = OldPosition + (Velocity * dt * speedMultiplier)
+		local newX = pos.X + (movement.VelocityX * dt * speedMultiplier)
+		local newY = pos.Y + (movement.VelocityY * dt * speedMultiplier)
+		local newZ = pos.Z + (movement.VelocityZ * dt * speedMultiplier)
 		
-		-- Check game over condition (zombie reached house)
-		-- Use MapConfig to get base position and zombie direction
-		local basePos = MapConfig.GetBasePosition()
-		local zombieDir = MapConfig.GetZombieDirection()
-		
-		-- Check if zombie passed the base (direction-aware)
-		-- If zombies go +X, check if newX >= basePos.X
-		-- If zombies go -X, check if newX <= basePos.X
+		-- Check if zombie reached the base (direction-aware)
 		local reachedBase = false
 		if zombieDir.X > 0 then
 			-- Zombies moving toward +X (right)
 			reachedBase = newX >= basePos.X
-		else
-			-- Zombies moving toward -X (left) - original behavior
+		elseif zombieDir.X < 0 then
+			-- Zombies moving toward -X (left)
 			reachedBase = newX <= basePos.X
 		end
+		-- Note: If zombieDir.Z != 0, add Z-axis check here
 		
 		if reachedBase then
 			if not _reachedHouse[id] then
-				Logger.Warn("ZombieMovement", `Zombie {id} reached the house!`)
+				Logger.Warn("ZombieMovement", `Zombie {id} ({zombie.ZombieType}) reached the base!`)
 				_reachedHouse[id] = true
 				
 				-- Deal damage to base
 				BaseHealth.OnZombieReachedHouse()
 				
-				-- Despawn the zombie after dealing damage
+				-- Despawn the zombie
 				world:despawn(id)
 				
 				-- Broadcast zombie death
 				Network.EntityDied.FireAll({
 					EntityId = id,
 				})
-				continue
 			end
-			newX = basePos.X
+			continue
 		end
 		
-		-- Update position using component constructor
+		-- Update PositionComponent (data only, no Workspace touch)
 		world:insert(id, PositionComponent({
 			X = newX,
 			Y = newY,
 			Z = newZ,
 		}))
 		
-		-- Track for batch update
+		-- Update GridPositionComponent if zombie has one
+		local gridPos = world:get(id, GridPositionComponent)
+		if gridPos then
+			local newColumn = worldXToGridColumn(newX)
+			if newColumn and newColumn ~= gridPos.Column then
+				world:insert(id, GridPositionComponent({
+					Row = gridPos.Row,
+					Column = newColumn,
+				}))
+			end
+		end
+		
+		-- Track position for batched network update
 		_positionUpdates[id] = newX
 	end
 	
-	-- Send batched position updates
+	-- Send batched position updates to clients (throttled)
 	if currentTime - _lastBatchTime >= MovementConfig.BATCH_INTERVAL then
 		local entityIds = {}
 		local positionsX = {}
 		
 		for entityId, posX in _positionUpdates do
-			table.insert(entityIds, entityId)
-			table.insert(positionsX, posX)
+			-- Only include zombies that still exist
+			if world:contains(entityId) then
+				table.insert(entityIds, entityId)
+				table.insert(positionsX, posX)
+			end
 		end
 		
 		if #entityIds > 0 then
@@ -159,13 +210,14 @@ local function ZombieMovementSystem(world)
 end
 
 local function Init(_world)
-	-- No initialization needed
+	Logger.Debug("ZombieMovement", "Initialized with frame-rate independent movement")
 end
 
 local function Dispose()
 	_lastBatchTime = 0
 	table.clear(_positionUpdates)
 	table.clear(_reachedHouse)
+	Logger.Debug("ZombieMovement", "Disposed")
 end
 
 return {
