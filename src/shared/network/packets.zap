@@ -35,7 +35,7 @@ type PlantType = enum {
     LilyPad, FlowerPot, TangleKelp, GraveBuster, Plantern, UmbrellaLeaf, CoffeeBean, ExplodeONut
 }
 
-type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football, Imp, Flag }
+type ZombieType = enum { Basic, Cone, Bucket, Pole, Newspaper, Football, Imp, Flag, ScreenDoor, Ladder, Balloon, Gargantuar, MiniGargantuar }
 type GamePhase = enum { Pregame, Wave, Intermission, GameOver }
 
 type MutationType = enum {
@@ -323,6 +323,7 @@ event EntityDamaged = {
         EntityId: EntityId,
         NewHealth: u16,
         DamageAmount: u16,
+        ShieldDestroyed: boolean?,  -- True when zombie shield is destroyed
     }
 }
 
@@ -646,21 +647,6 @@ event GameStarted = {
     }
 }
 
--- Game completion with rewards
-event GameComplete = {
-    from: Server,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        WorldId: string.utf8,
-        Difficulty: string.utf8,
-        Victory: boolean,
-        WavesSurvived: u8,
-        CoinsEarned: u32,
-        XPEarned: u32,
-    }
-}
-
 -- Teleport countdown
 event TeleportCountdown = {
     from: Server,
@@ -897,19 +883,6 @@ event PurchaseMutationResponse = {
         MutationType: MutationType,
         ErrorCode: u8?,  -- 0=None, 1=AlreadyHas, 2=NotEnoughCoins, 3=InvalidMutation, 4=Incompatible, 5=LevelTooLow, 6=PlantNotUnlocked
         NewCoins: u32?,
-    }
-}
-
--- [DEPRECATED] Use UnequipMutationResponse instead - will be removed in next major version
--- Mutation removal response
-event RemoveMutationResponse = {
-    from: Server,
-    type: Reliable,
-    call: ManyAsync,
-    data: struct {
-        Success: boolean,
-        PlantType: PlantType,
-        MutationType: MutationType,
     }
 }
 

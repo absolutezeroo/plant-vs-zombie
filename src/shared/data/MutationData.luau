@@ -90,7 +90,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Fire",
 		Name = "🔥 Feu",
 		Description = "Les attaques infligent des brûlures (5 dps pendant 3s)",
-		Icon = "rbxassetid://0", -- TODO: Add real asset
+		Icon = "🔥",
 		Color = Color3.fromRGB(255, 100, 0),
 		
 		Cost = 500,
@@ -110,7 +110,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Inferno",
 		Name = "🔥 Inferno",
 		Description = "Brûlures intenses (10 dps pendant 4s) et +15% dégâts",
-		Icon = "rbxassetid://0",
+		Icon = "🔥",
 		Color = Color3.fromRGB(255, 50, 0),
 		
 		Cost = 1200,
@@ -135,7 +135,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Ice",
 		Name = "❄️ Glace",
 		Description = "20% de chance de geler les zombies pendant 2s",
-		Icon = "rbxassetid://0",
+		Icon = "❄️",
 		Color = Color3.fromRGB(100, 200, 255),
 		
 		Cost = 500,
@@ -155,7 +155,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Frost",
 		Name = "❄️ Givre",
 		Description = "35% freeze, slow amélioré de 25%",
-		Icon = "rbxassetid://0",
+		Icon = "❄️",
 		Color = Color3.fromRGB(150, 220, 255),
 		
 		Cost = 1100,
@@ -180,7 +180,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Electric",
 		Name = "⚡ Électrique",
 		Description = "Les attaques sautent à 2 zombies proches (50% dégâts)",
-		Icon = "rbxassetid://0",
+		Icon = "⚡",
 		Color = Color3.fromRGB(255, 255, 100),
 		
 		Cost = 750,
@@ -200,7 +200,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Tesla",
 		Name = "⚡ Tesla",
 		Description = "Chain à 4 zombies (75% dégâts) et +20% vitesse d'attaque",
-		Icon = "rbxassetid://0",
+		Icon = "⚡",
 		Color = Color3.fromRGB(200, 255, 50),
 		
 		Cost = 1500,
@@ -226,7 +226,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Toxic",
 		Name = "☠️ Toxique",
 		Description = "Libère un nuage de poison à la mort (3 dps, 4s, rayon 6)",
-		Icon = "rbxassetid://0",
+		Icon = "☠️",
 		Color = Color3.fromRGB(100, 255, 100),
 		
 		Cost = 600,
@@ -246,7 +246,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Venomous",
 		Name = "☠️ Venimeux",
 		Description = "Nuage mortel (8 dps, 5s, rayon 8) et +30% santé",
-		Icon = "rbxassetid://0",
+		Icon = "☠️",
 		Color = Color3.fromRGB(50, 200, 50),
 		
 		Cost = 1300,
@@ -272,7 +272,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Shadow",
 		Name = "🌑 Ombre",
 		Description = "15% des dégâts infligés soignent la plante",
-		Icon = "rbxassetid://0",
+		Icon = "🌑",
 		Color = Color3.fromRGB(80, 40, 120),
 		
 		Cost = 800,
@@ -290,7 +290,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Void",
 		Name = "🌑 Vide",
 		Description = "25% lifesteal et +20% dégâts",
-		Icon = "rbxassetid://0",
+		Icon = "🌑",
 		Color = Color3.fromRGB(40, 20, 80),
 		
 		Cost = 1600,
@@ -314,7 +314,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Solar",
 		Name = "☀️ Solaire",
 		Description = "Génère 10 sun par zombie tué",
-		Icon = "rbxassetid://0",
+		Icon = "☀️",
 		Color = Color3.fromRGB(255, 220, 50),
 		
 		Cost = 700,
@@ -332,7 +332,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Radiant",
 		Name = "☀️ Radiant",
 		Description = "20 sun par kill, +15% vitesse d'attaque",
-		Icon = "rbxassetid://0",
+		Icon = "☀️",
 		Color = Color3.fromRGB(255, 240, 100),
 		
 		Cost = 1400,
@@ -356,7 +356,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Reinforced",
 		Name = "🛡️ Renforcé",
 		Description = "+50% santé et -15% dégâts reçus",
-		Icon = "rbxassetid://0",
+		Icon = "🛡️",
 		Color = Color3.fromRGB(150, 150, 170),
 		
 		Cost = 400,
@@ -374,7 +374,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Fortified",
 		Name = "🛡️ Fortifié",
 		Description = "+100% santé et -30% dégâts reçus",
-		Icon = "rbxassetid://0",
+		Icon = "🛡️",
 		Color = Color3.fromRGB(100, 100, 130),
 		
 		Cost = 1000,
@@ -397,7 +397,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Primal",
 		Name = "🦴 Primitif",
 		Description = "+25% dégâts avec splash (30% dégâts, rayon 4)",
-		Icon = "rbxassetid://0",
+		Icon = "🦴",
 		Color = Color3.fromRGB(180, 140, 100),
 		
 		Cost = 900,
@@ -417,7 +417,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Savage",
 		Name = "🦴 Sauvage",
 		Description = "+40% dégâts, splash (50%, rayon 6) et knockback",
-		Icon = "rbxassetid://0",
+		Icon = "🦴",
 		Color = Color3.fromRGB(140, 100, 60),
 		
 		Cost = 1800,
@@ -443,7 +443,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Swift",
 		Name = "💨 Véloce",
 		Description = "-25% cooldown de placement",
-		Icon = "rbxassetid://0",
+		Icon = "💨",
 		Color = Color3.fromRGB(200, 230, 255),
 		
 		Cost = 350,
@@ -460,7 +460,7 @@ local Mutations: {[string]: MutationInfo} = {
 		Id = "Hasty",
 		Name = "💨 Hâtif",
 		Description = "-40% cooldown et +10% vitesse d'attaque",
-		Icon = "rbxassetid://0",
+		Icon = "💨",
 		Color = Color3.fromRGB(150, 200, 255),
 		
 		Cost = 850,

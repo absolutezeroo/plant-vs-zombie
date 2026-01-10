@@ -29,6 +29,7 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
+local WorldData = require(Shared.data.WorldData)
 local Logger = require(Shared.utils.Logger)
 
 -- Components (via index module)
@@ -102,10 +103,54 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		end
 	end
 	
-	-- Platform requirements (RequiresLilyPad, RequiresWater)
-	-- TODO: Implement water detection based on level type
-	-- For now, skip water validation
+	-- ==============================================
+	-- Water/Platform validation (DATA-DRIVEN)
+	-- ==============================================
 	
+	-- Get current world config from WaveManager
+	local WaveManagerSystem = require(script.Parent.Parent.wave.WaveManagerSystem)
+	local worldConfig = WaveManagerSystem.GetCurrentWorldConfig()
+	local waterLanes: {number} = if worldConfig then worldConfig.WaterLanes or {} else {}
+	local isWaterLane = table.find(waterLanes, lane) ~= nil
+	
+	-- Rule 1: Plants with RequiresWater can ONLY be placed on water lanes
+	if stats.RequiresWater then
+		if not isWaterLane then
+			return false, "This plant requires a water lane"
+		end
+		-- RequiresWater plants go directly in water (no LilyPad needed)
+	end
+	
+	-- Rule 2: LilyPad (IsPlatform with water context) can ONLY be placed on water lanes
+	if stats.IsPlatform and stats.AllowsPlantOnTop then
+		-- Check if this is a water platform (LilyPad) or ground platform (FlowerPot)
+		-- LilyPad can only go on water, FlowerPot can go anywhere except water
+		local isLilyPad = plantType == "LilyPad"
+		local isFlowerPot = plantType == "FlowerPot"
+		
+		if isLilyPad and not isWaterLane then
+			return false, "Lily Pad can only be placed on water lanes"
+		end
+		if isFlowerPot and isWaterLane then
+			return false, "Flower Pot cannot be placed on water"
+		end
+	end
+	
+	-- Rule 3: RequiresLilyPad plants need a LilyPad underneath
+	if stats.RequiresLilyPad then
+		if not existingEntityId or not existingStats or not existingStats.IsPlatform then
+			return false, "This plant requires a Lily Pad"
+		end
+	end
+	
+	-- Rule 4: Normal plants on water lanes MUST have a LilyPad
+	if isWaterLane and not stats.RequiresWater and not stats.IsPlatform then
+		if not existingEntityId or not existingStats or not existingStats.IsPlatform then
+			return false, "Plants on water lanes require a Lily Pad"
+		end
+	end
+	
+	-- ==============================================
 	-- Check stacking rules
 	if stats.CanStackOnPlant then
 		-- Pumpkin can be placed on top of another plant

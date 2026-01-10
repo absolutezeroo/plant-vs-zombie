@@ -51,6 +51,7 @@ return {
 	GhostComponent = require(Units.GhostComponent),
 	JumpingComponent = require(Units.JumpingComponent),
 	PlantTypeComponent = require(Units.PlantTypeComponent),
+	ShieldComponent = require(Units.ShieldComponent),
 	SleepingComponent = require(Units.SleepingComponent),
 	ZombieTypeComponent = require(Units.ZombieTypeComponent),
 	

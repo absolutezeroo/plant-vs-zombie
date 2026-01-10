@@ -41,6 +41,19 @@ export type PlantStats = {
 	FuseTime: number?,       -- Seconds before explosion for ExplodesOnPlace (default 0.5)
 	ArmDuration: number?,    -- Seconds to arm for NeedsArming (default 15)
 	TriggerRadius: number?,  -- Radius to trigger armed explosion (default 2)
+	
+	-- Platform/Water requirements (data-driven placement validation)
+	IsPlatform: boolean?,         -- Is a platform plant (LilyPad, FlowerPot)
+	AllowsPlantOnTop: boolean?,   -- Allows another plant to be placed on top
+	RequiresWater: boolean?,      -- Must be placed on water lane (SeaShroom, TangleKelp)
+	RequiresLilyPad: boolean?,    -- Must be placed on a LilyPad (Cattail)
+	
+	-- Mushroom behavior (data-driven day/night cycle)
+	IsMushroom: boolean?,         -- Is a mushroom plant
+	SleepsDuringDay: boolean?,    -- Sleeps on day maps (needs Coffee Bean to wake)
+	GrowsOverTime: boolean?,      -- Grows larger over time (Sun-shroom)
+	HidesWhenNear: boolean?,      -- Hides when zombies are near (Scaredy-shroom)
+	HideRadius: number?,          -- Distance at which to hide (default 6 studs)
 }
 
 local PlantData: {[string]: PlantStats} = {

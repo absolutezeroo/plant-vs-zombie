@@ -190,17 +190,22 @@ Ces systèmes fonctionnent mais ne sont pas dans la doc :
 
 ## 📋 Checklist Maintenance
 
-- [ ] Supprimer `ZombieSpawnSystem.luau` (deprecated)
-- [ ] Ajouter icônes manquantes (6 mondes + mutations)
-- [ ] Câbler `XPGained.Fire()` et `LevelUp.Fire()` 
-- [ ] Supprimer `RemoveMutationResponse` du schema Zap
-- [ ] Documenter système Mutations dans `game-architecture.md`
-- [ ] Ajouter `LaneCache` dans les imports requis
+- [x] ~~Supprimer `ZombieSpawnSystem.luau` (deprecated)~~ ✅ Supprimé
+- [x] ~~Supprimer `LaneCache.luau` (orphelin)~~ ✅ Supprimé
+- [x] ~~Supprimer `RemoveMutationResponse` du schema Zap~~ ✅ Supprimé
+- [x] ~~Supprimer `GameComplete` du schema Zap (doublon)~~ ✅ Supprimé
+- [x] ~~Implémenter validation zone eau~~ ✅ PlacementSystem data-driven
+- [x] ~~Implémenter bouclier zombie~~ ✅ CombatSystem + ShieldComponent
+- [x] ~~Implémenter cycle jour/nuit~~ ✅ MushroomSystem lit WorldData.IsNight
+- [x] ~~Câbler `XPGained.Fire()` et `LevelUp.Fire()`~~ ✅ Arena + Lobby PlayerDataService
+- [x] ~~Ajouter icônes manquantes (6 mondes + mutations)~~ ✅ Emojis thématiques
+- [x] ~~Documenter système Mutations dans `game-architecture.md`~~ ✅ Section complète ajoutée
 
 ---
 
 ## 📚 Références
 
 - Scan effectué sur : `src/shared/`, `src/arena/`, `src/lobby/`
-- Fichier Zap analysé : `src/shared/network/packets.zap` (969 lignes)
+- Fichier Zap analysé : `src/shared/network/packets.zap`
 - Documentation comparée : `docs/*.md`
+- **Dernière mise à jour:** 10 Janvier 2026

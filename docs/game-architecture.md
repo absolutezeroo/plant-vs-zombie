@@ -2161,6 +2161,266 @@ end
 
 ---
 
+## Mutations System
+
+### Overview
+
+The Mutations system provides plant upgrades that add **new behaviors and effects** rather than simple stat boosts. It is inspired by PvZ2's plant leveling but implements unique mutations with visual effects.
+
+**Architecture Principles:**
+- **Data-Driven:** All mutation definitions in `MutationData.luau`
+- **Server-Authoritative:** Mutations validated and applied on server only
+- **Composable Effects:** Multiple mutations can stack on one plant
+- **ECS-Native:** Each effect type has dedicated Component + System
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         MUTATIONS DATA FLOW                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   LOBBY (Persistence)              ARENA (Runtime)                      │
+│   ────────────────────             ─────────────────                    │
+│                                                                         │
+│   ┌──────────────────┐             ┌────────────────────┐               │
+│   │ PlayerDataService│────────────▶│ MutationApplySystem│               │
+│   │ (OwnedMutations) │  Teleport   │   (Load on join)   │               │
+│   └──────────────────┘             └─────────┬──────────┘               │
+│           │                                  │                          │
+│           ▼                                  ▼                          │
+│   ┌──────────────────┐             ┌────────────────────┐               │
+│   │ MutationHandler  │             │ Plant Entity       │               │
+│   │ (Buy/Equip/Unequip)            │ + MutationsComponent│              │
+│   └──────────────────┘             │ + Effect Components │              │
+│                                    └─────────┬──────────┘               │
+│                                              │                          │
+│                                              ▼                          │
+│                                    ┌────────────────────┐               │
+│                                    │ Effect Systems     │               │
+│                                    │ (Burn, Freeze...)  │               │
+│                                    └────────────────────┘               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration (`MutationData.luau`)
+
+Each mutation is defined with:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Id` | string | Unique identifier (e.g., "Fire", "Ice") |
+| `Name` | string | Display name with emoji (e.g., "🔥 Feu") |
+| `Description` | string | Effect description for UI |
+| `Icon` | string | Emoji icon for UI display |
+| `Color` | Color3 | Theme color for VFX and UI |
+| `Cost` | number | Purchase price in coins |
+| `RequiredLevel` | number | Minimum player level |
+| `Effects` | MutationEffects | Effect configuration (see below) |
+| `CompatibleCategories` | {string} | Plant categories that can use this |
+| `IncompatibleWith` | {string}? | Mutations that conflict |
+
+**MutationEffects Fields:**
+
+```lua
+-- Stat modifiers (multiplicative)
+DamageBonus: number?,        -- 1.2 = +20% damage
+HealthBonus: number?,        -- 1.5 = +50% health
+CooldownReduction: number?,  -- 0.8 = -20% cooldown
+AttackSpeedBonus: number?,   -- 1.3 = +30% attack speed
+
+-- Fire effects
+AddsBurnDamage: boolean?,
+BurnDamagePerSecond: number?,
+BurnDuration: number?,
+
+-- Ice effects
+AddsFreeze: boolean?,
+FreezeChance: number?,       -- 0.2 = 20% chance
+FreezeDuration: number?,
+EnhancedSlow: number?,
+
+-- Electric effects
+AddsChainLightning: boolean?,
+ChainCount: number?,
+ChainDamage: number?,
+ChainRange: number?,
+
+-- Toxic/Poison effects
+AddsPoisonCloud: boolean?,
+PoisonRadius: number?,
+PoisonDamagePerSecond: number?,
+PoisonDuration: number?,
+
+-- Shadow effects
+AddsLifesteal: boolean?,
+LifestealPercent: number?,
+
+-- Solar effects
+AddsSunOnKill: boolean?,
+SunPerKill: number?,
+SunDropChance: number?,
+
+-- Reinforced effects
+ExtraHealth: number?,
+DamageReduction: number?,
+
+-- Primal effects
+SplashDamage: boolean?,
+SplashRadius: number?,
+SplashPercent: number?,
+Knockback: number?,
+```
+
+**Available Mutations (19 total):**
+
+| Category | Mutations |
+|----------|-----------|
+| 🔥 Fire | Fire, Inferno |
+| ❄️ Ice | Ice, Frostbite |
+| ⚡ Electric | Electric, Storm |
+| ☠️ Toxic | Toxic, Venomous |
+| 🌑 Shadow | Shadow, Void |
+| ☀️ Solar | Solar, Radiant |
+| 🛡️ Reinforced | Reinforced, Fortress |
+| 🦴 Primal | Primal, Prehistoric |
+| 💨 Speed | Swift, Lightning |
+| ⚗️ Misc | Alchemist |
+
+### Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `MutationsComponent` | shared/components/mutations/ | Stores equipped mutation IDs on plant |
+| `BurnEffectComponent` | shared/components/mutations/ | Plant has burn attack capability |
+| `BurningComponent` | shared/components/mutations/ | Zombie is currently burning (DoT) |
+| `FreezeEffectComponent` | shared/components/mutations/ | Plant has freeze attack capability |
+| `FrozenComponent` | shared/components/mutations/ | Zombie is currently frozen |
+| `ChainLightningComponent` | shared/components/mutations/ | Plant chains lightning on attack |
+| `LifestealComponent` | shared/components/mutations/ | Plant heals on damage dealt |
+| `PoisonCloudComponent` | shared/components/mutations/ | Plant creates poison clouds |
+| `PoisonedComponent` | shared/components/mutations/ | Zombie is poisoned (DoT) |
+| `SplashDamageComponent` | shared/components/mutations/ | Plant deals AoE damage |
+| `SunOnKillComponent` | shared/components/mutations/ | Plant produces sun on kills |
+| `DamageReductionComponent` | shared/components/mutations/ | Plant takes reduced damage |
+
+### Systems
+
+All mutation systems are in `src/arena/server/systems/mutations/`:
+
+| System | Priority | Purpose |
+|--------|----------|---------|
+| `MutationApplySystem` | 150 | Applies mutations to plants on spawn, manages player mutation state |
+| `BurnDamageSystem` | 200 | Ticks burn DoT on zombies with BurningComponent |
+| `FreezeSystem` | 200 | Ticks freeze duration, applies slow to frozen zombies |
+| `ChainLightningSystem` | 200 | Finds chain targets on attack, applies chain damage |
+| `PoisonCloudSystem` | 200 | Spawns/ticks poison clouds, damages zombies in radius |
+| `SplashDamageSystem` | 200 | Calculates AoE damage on projectile hit |
+| `LifestealSystem` | 200 | Heals plants when they deal damage |
+| `SunOnKillSystem` | 200 | Spawns sun entities when plant gets a kill |
+
+### API Reference
+
+**MutationApplySystem exports:**
+
+```lua
+-- Load mutations for a player when they join Arena
+MutationApplySystem.LoadPlayerMutations(player: Player, equippedMutations: {[string]: {string}})
+
+-- Clear mutations when player leaves
+MutationApplySystem.ClearPlayerMutations(player: Player)
+
+-- Get player's loaded mutations (for validation)
+MutationApplySystem.GetPlayerMutations(player: Player): {[string]: {string}}?
+
+-- Get mutations for a specific plant entity
+MutationApplySystem.GetPlantMutations(plantEntity: number): {string}?
+```
+
+**MutationHandler (Lobby) exports:**
+
+```lua
+-- Sync all mutation data to player client
+MutationHandler.SyncMutationsToPlayer(player: Player)
+
+-- Sync mutations for a specific plant type
+MutationHandler.SyncPlantMutations(player: Player, plantType: string)
+
+-- Initialize network handlers (called on server start)
+MutationHandler.Initialize()
+```
+
+### Network Events (Zap)
+
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `BuyMutation` | Client → Server | Purchase a new mutation |
+| `EquipMutation` | Client → Server | Equip mutation to a plant |
+| `UnequipMutation` | Client → Server | Remove mutation from plant |
+| `SyncOwnedMutations` | Server → Client | Send owned mutations list |
+| `SyncEquippedMutations` | Server → Client | Send equipped mutations per plant |
+| `MutationPurchased` | Server → Client | Confirm purchase success |
+| `MutationEquipped` | Server → Client | Confirm equip success |
+| `MutationError` | Server → Client | Error feedback (insufficient coins, etc.) |
+
+### Integration with Combat
+
+When a plant with mutations attacks:
+
+1. **CombatSystem** deals base damage
+2. **Effect Components** are checked on the plant entity
+3. **Effect Systems** apply additional effects:
+   - `BurnEffectComponent` → Add `BurningComponent` to target
+   - `FreezeEffectComponent` → Roll freeze chance, add `FrozenComponent`
+   - `ChainLightningComponent` → Find nearby targets, deal chain damage
+   - `SplashDamageComponent` → Find targets in radius, deal AoE damage
+   - `LifestealComponent` → Heal plant for % of damage dealt
+   - `SunOnKillComponent` → If kill, spawn sun entity
+
+### Example: Adding a New Mutation
+
+**1. Define in MutationData.luau:**
+
+```lua
+Explosive = {
+    Id = "Explosive",
+    Name = "💥 Explosive",
+    Description = "Attacks have 15% chance to explode for 50% splash",
+    Icon = "💥",
+    Color = Color3.fromRGB(255, 150, 0),
+    
+    Cost = 800,
+    RequiredLevel = 15,
+    
+    Effects = {
+        SplashDamage = true,
+        SplashRadius = 3,
+        SplashPercent = 0.5,
+        ExplosionChance = 0.15, -- New field
+    },
+    
+    CompatibleCategories = {"Attacker"},
+},
+```
+
+**2. Create Component (if new effect type):**
+
+```lua
+-- src/shared/components/mutations/ExplosiveComponent.luau
+return {
+    Chance = 0.15,
+    Radius = 3,
+    DamagePercent = 0.5,
+}
+```
+
+**3. Update MutationApplySystem** to add component when mutation equipped.
+
+**4. Create/Update Effect System** to handle the new component.
+
+---
+
 ## Architecture Validation
 
 ### Validation Summary

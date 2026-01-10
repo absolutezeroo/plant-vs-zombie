@@ -28,6 +28,10 @@ export type ZombieStats = {
 	RageAttackSpeed: number?, -- Attack speed when enraged
 	ArmorHealth: number?,   -- Health of removable armor (newspaper, cone, bucket)
 	
+	-- Shield stats (for HasShield zombies - blocks projectiles, pierced by Fume-shroom)
+	HasShield: boolean?,    -- Has a shield that blocks projectiles (Screen-Door, Ladder)
+	ShieldHealth: number?,  -- Health of the shield (damage goes to shield first)
+	
 	-- Flying stats (for IsFlying zombies)
 	FlyHeight: number?,     -- Y offset when flying (default 3)
 	
@@ -105,6 +109,32 @@ local ZombieData: {[string]: ZombieStats} = {
 		Category = "Armored",
 		SpawnCost = 50,
 		ArmorHealth = 400,  -- Helmet HP
+	},
+	
+	-- Screen-Door zombie - shield blocks projectiles (pierced by Fume-shroom)
+	ScreenDoor = {
+		Health = 100,       -- Base zombie health
+		Speed = 1.5,
+		Damage = 20,
+		AttackSpeed = 1.0,
+		Category = "Armored",
+		SpawnCost = 35,
+		-- Shield behavior
+		HasShield = true,
+		ShieldHealth = 400, -- Door absorbs damage until destroyed
+	},
+	
+	-- Ladder zombie - places ladder over Wall-nuts (shield while carrying)
+	Ladder = {
+		Health = 100,
+		Speed = 1.8,
+		Damage = 20,
+		AttackSpeed = 1.0,
+		Category = "Special",
+		SpawnCost = 40,
+		-- Shield while carrying ladder
+		HasShield = true,
+		ShieldHealth = 300, -- Ladder absorbs damage
 	},
 	
 	-- Imp - small, fast, weak

@@ -54,14 +54,36 @@ local MushroomConfig = {
 -- Track SunShroom growth timers
 local _sunShroomPlanted: {[number]: number} = {} -- entityId -> plantTime
 
+-- Lazy-load WaveManagerSystem to avoid circular dependencies
+local _waveManager: any = nil
+local function getWaveManager()
+	if not _waveManager then
+		_waveManager = require(script.Parent.Parent.wave.WaveManagerSystem)
+	end
+	return _waveManager
+end
+
 -- API for other systems
 local MushroomAPI = {}
 
--- Check if it's currently day or night (for now always day - can be expanded later)
+-- Check if it's currently day or night based on WorldData.IsNight
 function MushroomAPI.IsDay(): boolean
-	-- TODO: Implement day/night cycle from WaveManager or GameState
-	-- For now, return true (always day) - mushrooms need Coffee Bean
-	return true
+	local waveManager = getWaveManager()
+	local worldConfig = waveManager.GetCurrentWorldConfig()
+	
+	-- If no world loaded yet, default to day (mushrooms sleep)
+	if not worldConfig then
+		return true
+	end
+	
+	-- IsNight = true means it's night (mushrooms awake)
+	-- IsNight = false or nil means it's day (mushrooms sleep)
+	return not worldConfig.IsNight
+end
+
+-- Check if current world is a night world (for UI/feedback)
+function MushroomAPI.IsNightWorld(): boolean
+	return not MushroomAPI.IsDay()
 end
 
 -- Called when a mushroom is placed

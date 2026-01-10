@@ -112,10 +112,50 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 
 	if zombie and not piercesShields then
 		local zombieStats = ZombieData[zombie.ZombieType]
-		if zombieStats and zombieStats.HasShield and zombieStats.ShieldHealth then
-			-- TODO: Implement shield damage reduction
-			-- For now, shields just reduce damage by 50%
-			damage = math.floor(damage * 0.5)
+		if zombieStats and zombieStats.HasShield then
+			-- Shield absorbs ALL damage until destroyed (blocks projectiles)
+			-- Projectiles with PiercesShields bypass this entirely
+			-- Shield health is tracked separately from zombie health
+			
+			-- Get current shield health from component or initialize from data
+			local ShieldComponent = Components.ShieldComponent
+			local shield = world:get(entityId, ShieldComponent)
+			
+			if not shield then
+				-- First hit: initialize shield from ZombieData
+				shield = { Current = zombieStats.ShieldHealth or 0, Max = zombieStats.ShieldHealth or 0 }
+				world:insert(entityId, ShieldComponent(shield))
+			end
+			
+			if shield.Current > 0 then
+				-- Shield absorbs damage
+				local remainingDamage = math.max(0, damage - shield.Current)
+				local newShieldHealth = math.max(0, shield.Current - damage)
+				
+				world:insert(entityId, ShieldComponent({
+					Current = newShieldHealth,
+					Max = shield.Max,
+				}))
+				
+				if newShieldHealth <= 0 then
+					Logger.Debug("Combat", `Shield destroyed on zombie {entityId}`)
+					-- Broadcast shield destroyed event
+					Network.EntityDamaged.FireAll({
+						EntityId = entityId,
+						NewHealth = health.Current, -- Health unchanged
+						DamageAmount = 0, -- Shield took all damage
+						ShieldDestroyed = true,
+					})
+				end
+				
+				-- If shield absorbed all damage, no health damage
+				if remainingDamage <= 0 then
+					return false -- Not dead
+				end
+				
+				-- Overflow damage goes to health
+				damage = remainingDamage
+			end
 		end
 	end
 	

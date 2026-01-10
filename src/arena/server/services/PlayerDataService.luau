@@ -28,6 +28,9 @@ local Logger = require(Shared.utils.Logger)
 local ProfileTemplate = require(Shared.data.ProfileTemplate) :: any
 local PlayerDataCore = require(Shared.services.PlayerDataCore) :: any
 
+-- Network for XP/LevelUp events
+local Network = require(Shared.network.generated.server)
+
 -- Use shared profile template (single source of truth)
 local PROFILE_TEMPLATE = ProfileTemplate.PROFILE_TEMPLATE
 
@@ -209,6 +212,33 @@ function PlayerDataService.AddXP(player: Player, amount: number): number
 	if levelsGained > 0 or amount > 0 then
 		Logger.Debug("PlayerData", `{player.Name} +{amount} XP (Level {profile.Data.Level}, Total: {profile.Data.XP})`)
 		PlayerDataService._notifyDataChanged(player)
+		
+		-- Fire XPGained event to client
+		local levelProgress = PlayerDataService.GetLevelProgress(player)
+		Network.XPGained.Fire(player, {
+			Amount = amount,
+			TotalXP = profile.Data.XP,
+			CurrentLevel = profile.Data.Level,
+			LevelProgress = levelProgress,
+		})
+		
+		-- Fire LevelUp event for each level gained
+		if levelsGained > 0 then
+			-- Get rewards for the new level
+			local reward = ProgressionData.LevelRewards[profile.Data.Level]
+			local rewardCoins = if reward and reward.Coins then reward.Coins else nil
+			local rewardGems = if reward and reward.Gems then reward.Gems else ProgressionData.GEMS_PER_LEVEL_UP
+			local unlockedPlant = if reward and reward.UnlockPlant then reward.UnlockPlant else nil
+			
+			Network.LevelUp.Fire(player, {
+				NewLevel = profile.Data.Level,
+				RewardCoins = rewardCoins,
+				RewardGems = rewardGems,
+				UnlockedPlant = unlockedPlant,
+			})
+			
+			Logger.Info("PlayerData", `📣 Sent LevelUp event to {player.Name}: Level {profile.Data.Level}`)
+		end
 	end
 	
 	return levelsGained

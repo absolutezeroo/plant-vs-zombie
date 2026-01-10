@@ -59,7 +59,7 @@ local Worlds: {[string]: WorldConfig} = {
 		
 		MapId = "Map_Day",
 		Theme = "day",
-		Icon = "rbxassetid://0", -- TODO: Add icon
+		Icon = "☀️", -- Sunny day
 		
 		-- Mechanics
 		IsNight = false,
@@ -86,7 +86,7 @@ local Worlds: {[string]: WorldConfig} = {
 		
 		MapId = "Map_Night",
 		Theme = "night",
-		Icon = "rbxassetid://0", -- TODO: Add icon
+		Icon = "🌙", -- Night moon
 		
 		-- Mechanics
 		IsNight = true,  -- Mushrooms awake, reduced sky sun
@@ -113,7 +113,7 @@ local Worlds: {[string]: WorldConfig} = {
 		
 		MapId = "Map_Pool",
 		Theme = "pool",
-		Icon = "rbxassetid://0", -- TODO: Add icon
+		Icon = "🌊", -- Pool waves
 		
 		-- Mechanics
 		IsNight = false,
@@ -144,7 +144,7 @@ local Worlds: {[string]: WorldConfig} = {
 		
 		MapId = "Map_Fog",
 		Theme = "fog",
-		Icon = "rbxassetid://0", -- TODO: Add icon
+		Icon = "🌫️", -- Fog cloud
 		
 		-- Mechanics
 		IsNight = true,   -- Also night time
@@ -175,7 +175,7 @@ local Worlds: {[string]: WorldConfig} = {
 		
 		MapId = "Map_Roof",
 		Theme = "roof",
-		Icon = "rbxassetid://0", -- TODO: Add icon
+		Icon = "🏠", -- Roof/House
 		
 		-- Mechanics
 		IsNight = false,
@@ -202,7 +202,7 @@ local Worlds: {[string]: WorldConfig} = {
 		
 		MapId = "Map_Day", -- Uses day map
 		Theme = "boss",
-		Icon = "rbxassetid://0", -- TODO: Add icon
+		Icon = "💀", -- Boss skull
 		
 		-- Mechanics
 		IsNight = false,
