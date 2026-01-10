@@ -246,6 +246,9 @@ local function setupNetworkListeners()
 			local animService = getAnimService()
 			local vfx = getVFXService()
 			
+			-- Remove from tracking immediately to prevent double-processing
+			_plantVisuals[entityId] = nil
+			
 			if visual.Model then
 				-- Stop idle animation and VFX
 				if animService then animService.StopIdle(visual.Model) end
@@ -262,10 +265,14 @@ local function setupNetworkListeners()
 				if animService then
 					task.spawn(function()
 						animService.PlayDeath(visual.Model)
-						destroyPlantVisual(entityId)
+						-- Destroy the model directly (visual already removed from tracking)
+						if visual.Model then
+							visual.Model:Destroy()
+						end
 					end)
 				else
-					destroyPlantVisual(entityId)
+					-- No animation service, destroy immediately
+					visual.Model:Destroy()
 				end
 			elseif visual.Part then
 				-- Fallback cube death animation
@@ -277,12 +284,11 @@ local function setupNetworkListeners()
 				
 				tween:Play()
 				tween.Completed:Connect(function()
-					destroyPlantVisual(entityId)
+					if visual.Part then
+						visual.Part:Destroy()
+					end
 				end)
 			end
-			
-			-- Remove from tracking immediately
-			_plantVisuals[entityId] = nil
 			
 			Logger.Debug("PlantRender", `Plant {entityId} died`)
 		end

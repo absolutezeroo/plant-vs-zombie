@@ -86,25 +86,24 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 
 ### 3. System Lifecycle (SystemManager Pipeline)
 * **Pattern:** Systems have `Init` (can yield) and `OnStep` (cannot yield).
-    ```lua
-    local MySystem = {}
-    MySystem.priority = 100
-
-    function MySystem.Init(world)
-        -- Safe to WaitForChild or require configs here
-        MySystem.Config = require(Shared.config.SomeConfig)
-    end
-
-    function MySystem.OnStep(world, dt)
-        -- PURE LOGIC ONLY. No yields.
-    end
-
-    return MySystem
-    ```
+* **Reference:** See `src/shared/utils/SystemManager.luau` for implementation details.
 
 ### 4. Data-Driven Content
 * **Rule:** Never hardcode stats (Damage, Health, Speed).
 * **Source:** Always require from `src/shared/data/` (e.g., `PlantData`, `ZombieData`, `DifficultyData`).
+
+### 5. Asset-First Visuals (NO `Instance.new` for Art)
+* **STRICT:** Never create visual elements (Parts, ParticleEmitters, Beams, Lights, Models) using `Instance.new()` in code.
+* **✅ GOOD:** Create the asset in Roblox Studio, store it in `ReplicatedStorage.Assets`, and `Clone()` it.
+    ```lua
+    -- ❌ BAD:
+    local p = Instance.new("Part")
+    p.Color = Color3.new(1,0,0)
+
+    -- ✅ GOOD:
+    local p = ReplicatedStorage.Assets.Projectiles.Pea:Clone()
+    ```
+* **Why:** Artists must be able to change visuals without touching code.
 
 ---
 

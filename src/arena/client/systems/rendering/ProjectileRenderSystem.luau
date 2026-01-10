@@ -307,24 +307,23 @@ local function setupNetworkListeners()
 		end
 	end))
 	
-	-- Clean up on EntityDied (for any entity)
-	_trove:Add(Network.EntityDied.On(function(data)
-		-- Check if this was a projectile we're tracking
-		if _projectileVisuals[data.EntityId] then
-			local visual = _projectileVisuals[data.EntityId]
+	-- Projectile hit a target - play impact VFX
+	_trove:Add(Network.ProjectileHit.On(function(data)
+		local visual = _projectileVisuals[data.EntityId]
+		if visual then
 			local part = getVisualPart(visual)
+			local pos = if part then part.Position else Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
 			
+			-- Fire signal for VFX/Audio (decoupled)
+			GameSignals.OnProjectileImpact:Fire({
+				Position = pos,
+				ProjectileType = visual.Variant,
+				IsFrozen = visual.IsFrozen or data.IsFrozen,
+				IsEnhanced = visual.IsEnhanced or data.IsEnhanced,
+			})
+			
+			-- Hit animation (quick scale down)
 			if part then
-				local pos = part.Position
-				
-				-- Fire signal for VFX/Audio (decoupled)
-				GameSignals.OnProjectileImpact:Fire({
-					Position = pos,
-					ProjectileType = visual.Variant,
-					IsFrozen = visual.IsFrozen,
-				})
-				
-				-- Hit animation (quick scale down)
 				local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
 				local tween = TweenService:Create(part, tweenInfo, {
 					Size = Vector3.new(0.1, 0.1, 0.1),
@@ -334,9 +333,16 @@ local function setupNetworkListeners()
 				tween.Completed:Connect(function()
 					destroyProjectileVisual(data.EntityId)
 				end)
+			else
+				destroyProjectileVisual(data.EntityId)
 			end
-			_projectileVisuals[data.EntityId] = nil
 		end
+		_projectileVisuals[data.EntityId] = nil
+	end))
+	
+	-- Projectile despawned without hitting - just remove (no VFX)
+	_trove:Add(Network.ProjectileDespawned.On(function(data)
+		destroyProjectileVisual(data.EntityId)
 	end))
 end
 

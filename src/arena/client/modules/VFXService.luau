@@ -54,7 +54,7 @@ function VFXService.Initialize()
 	end)
 	
 	_trove:Connect(GameSignals.OnProjectileImpact, function(data)
-		VFXService.PlayPeaImpact(data.Position, data.IsFrozen)
+		VFXService.PlayProjectileImpact(data.Position, data.ProjectileType, data.IsFrozen, data.IsEnhanced)
 	end)
 	
 	_trove:Connect(GameSignals.OnSunCollected, function(data)
@@ -62,31 +62,6 @@ function VFXService.Initialize()
 	end)
 	
 	Logger.Info("VFX", "VFXService initialized with signal listeners")
-end
-
--- Helper: Create a simple particle emitter
-local function createEmitter(config: {
-	Color: ColorSequence?,
-	Size: NumberSequence?,
-	Lifetime: NumberRange?,
-	Speed: NumberRange?,
-	SpreadAngle: Vector2?,
-	Rate: number?,
-	Drag: number?,
-	Acceleration: Vector3?,
-}): ParticleEmitter
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Color = config.Color or ColorSequence.new(Color3.new(1, 1, 1))
-	emitter.Size = config.Size or NumberSequence.new(0.5)
-	emitter.Lifetime = config.Lifetime or NumberRange.new(0.5, 1)
-	emitter.Speed = config.Speed or NumberRange.new(5, 10)
-	emitter.SpreadAngle = config.SpreadAngle or Vector2.new(180, 180)
-	emitter.Rate = config.Rate or 0 -- Burst mode by default
-	emitter.Drag = config.Drag or 2
-	emitter.Acceleration = config.Acceleration or Vector3.new(0, -20, 0)
-	emitter.RotSpeed = NumberRange.new(-180, 180)
-	emitter.Rotation = NumberRange.new(0, 360)
-	return emitter
 end
 
 -- Helper: Create a part for VFX attachment
@@ -104,54 +79,77 @@ local function createVFXPart(position: Vector3): Part
 	return part
 end
 
+-- VFX Assets folder (lazy loaded)
+local _vfxAssets: Folder? = nil
+
+local function getVFXAssets(): Folder?
+	if _vfxAssets then return _vfxAssets end
+	local Assets = ReplicatedStorage:FindFirstChild("Assets")
+	_vfxAssets = Assets and Assets:FindFirstChild("VFX") :: Folder?
+	return _vfxAssets
+end
+
+--[[
+	Generic VFX player from Assets/VFX/{name}
+	Returns true if asset was found and played, false otherwise
+]]
+local function playVFXFromAsset(position: Vector3, vfxName: string, fallbackColor: Color3?): boolean
+	local vfxAssets = getVFXAssets()
+	local vfxTemplate = vfxAssets and vfxAssets:FindFirstChild(vfxName)
+	
+	local part = createVFXPart(position)
+	
+	if vfxTemplate then
+		-- Clone and play all ParticleEmitters from the asset
+		for _, child in vfxTemplate:GetChildren() do
+			if child:IsA("ParticleEmitter") then
+				local clone = child:Clone()
+				clone.Parent = part
+				local emitCount = clone:GetAttribute("EmitCount")
+				clone:Emit(if type(emitCount) == "number" then emitCount else 8)
+			elseif child:IsA("PointLight") or child:IsA("SpotLight") then
+				local clone = child:Clone() :: Light
+				clone.Parent = part
+				-- Fade out light
+				TweenService:Create(clone, TweenInfo.new(0.5), { Brightness = 0 }):Play()
+			end
+		end
+		Debris:AddItem(part, 2)
+		Logger.Debug("VFX", `{vfxName} played from asset`)
+		return true
+	else
+		-- Fallback: Use Generic_Fallback asset with color tinting
+		local fallbackTemplate = vfxAssets and vfxAssets:FindFirstChild("Generic_Fallback")
+		if fallbackTemplate then
+			for _, child in fallbackTemplate:GetChildren() do
+				if child:IsA("ParticleEmitter") then
+					local clone = child:Clone()
+					if fallbackColor then
+						clone.Color = ColorSequence.new(fallbackColor)
+					end
+					clone.Parent = part
+					local emitCount = clone:GetAttribute("EmitCount")
+					clone:Emit(if type(emitCount) == "number" then emitCount else 8)
+				end
+			end
+		end
+		Debris:AddItem(part, 1)
+		Logger.Debug("VFX", `{vfxName} not found, using fallback`)
+		return false
+	end
+end
+
 --[[
 	🔥 EXPLOSION EFFECT - CherryBomb/PotatoMine
+	ASSET-BASED: Looks for Assets/VFX/Explosion
 ]]
 function VFXService.PlayExplosion(position: Vector3, radius: number?)
 	local actualRadius = radius or 9
-	local part = createVFXPart(position)
 	
-	-- Fire particles
-	local fireEmitter = createEmitter({
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 50)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 100, 0)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 50, 50)),
-		}),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 2),
-			NumberSequenceKeypoint.new(0.3, 4),
-			NumberSequenceKeypoint.new(1, 0),
-		}),
-		Lifetime = NumberRange.new(0.3, 0.6),
-		Speed = NumberRange.new(20, 40),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 5,
-	})
-	fireEmitter.Parent = part
-	fireEmitter:Emit(30)
+	-- Try asset-based VFX
+	local played = playVFXFromAsset(position, "Explosion", Color3.fromRGB(255, 150, 50))
 	
-	-- Smoke particles
-	local smokeEmitter = createEmitter({
-		Color = ColorSequence.new(Color3.fromRGB(50, 50, 50)),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(1, 5),
-		}),
-		Lifetime = NumberRange.new(0.8, 1.5),
-		Speed = NumberRange.new(5, 15),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 1,
-		Acceleration = Vector3.new(0, 10, 0),
-	})
-	smokeEmitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.3),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	smokeEmitter.Parent = part
-	smokeEmitter:Emit(15)
-	
-	-- Shockwave ring (using a Part with tween)
+	-- Always add shockwave ring (procedural - hard to do in particle editor)
 	local ring = Instance.new("Part")
 	ring.Name = "Shockwave"
 	ring.Anchored = true
@@ -171,197 +169,88 @@ function VFXService.PlayExplosion(position: Vector3, radius: number?)
 	})
 	ringTween:Play()
 	
-	-- Cleanup
-	Debris:AddItem(part, 2)
 	Debris:AddItem(ring, 0.5)
 	
-	Logger.Debug("VFX", `Explosion at {position}`)
+	if not played then
+		Logger.Debug("VFX", `Explosion fallback at {position}`)
+	end
 end
 
 --[[
-	🟢 PEA IMPACT - When pea hits zombie
+	🎯 PROJECTILE IMPACT - When any projectile hits zombie
+	ASSET-BASED: Looks for VFX in Assets/VFX/{Variant}_Impact
+	Falls back to generic VFX if not found
 ]]
-function VFXService.PlayPeaImpact(position: Vector3, isFrozen: boolean?)
-	local part = createVFXPart(position)
+function VFXService.PlayProjectileImpact(position: Vector3, projectileType: string?, isFrozen: boolean?, isEnhanced: boolean?)
+	local variant = projectileType or "Pea"
 	
-	local color = if isFrozen 
-		then ColorSequence.new(Color3.fromRGB(150, 220, 255))
-		else ColorSequence.new(Color3.fromRGB(100, 200, 50))
-	
-	local emitter = createEmitter({
-		Color = color,
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.5),
-			NumberSequenceKeypoint.new(1, 0),
-		}),
-		Lifetime = NumberRange.new(0.2, 0.4),
-		Speed = NumberRange.new(8, 15),
-		SpreadAngle = Vector2.new(90, 90),
-		Drag = 8,
-	})
-	emitter.Parent = part
-	emitter:Emit(8)
-	
-	-- Frozen peas leave ice sparkles
-	if isFrozen then
-		local iceEmitter = createEmitter({
-			Color = ColorSequence.new(Color3.fromRGB(200, 240, 255)),
-			Size = NumberSequence.new(0.2, 0),
-			Lifetime = NumberRange.new(0.5, 1),
-			Speed = NumberRange.new(2, 5),
-			SpreadAngle = Vector2.new(180, 180),
-			Drag = 1,
-			Acceleration = Vector3.new(0, -5, 0),
-		})
-		iceEmitter.LightEmission = 0.5
-		iceEmitter.Parent = part
-		iceEmitter:Emit(5)
+	-- Determine which VFX asset to use
+	local vfxName: string
+	if isEnhanced or variant == "FirePea" then
+		vfxName = "FirePea_Impact"
+	elseif isFrozen or variant == "FrozenPea" then
+		vfxName = "FrozenPea_Impact"
+	else
+		vfxName = variant .. "_Impact"
 	end
 	
-	Debris:AddItem(part, 1)
+	-- Determine fallback color
+	local fallbackColor = if isFrozen or variant == "FrozenPea" 
+		then Color3.fromRGB(150, 220, 255)
+		elseif isEnhanced or variant == "FirePea"
+		then Color3.fromRGB(255, 150, 50)
+		else Color3.fromRGB(100, 200, 50)
+	
+	-- Try asset, fallback to Pea_Impact, then fallback to code
+	local played = playVFXFromAsset(position, vfxName, nil)
+	if not played then
+		played = playVFXFromAsset(position, "Pea_Impact", fallbackColor)
+	end
+end
+
+-- Legacy alias for backward compatibility
+function VFXService.PlayPeaImpact(position: Vector3, isFrozen: boolean?)
+	VFXService.PlayProjectileImpact(position, "Pea", isFrozen, false)
 end
 
 --[[
 	💀 ZOMBIE DEATH - When zombie dies
+	ASSET-BASED: Looks for Assets/VFX/Zombie_Death
 ]]
 function VFXService.PlayZombieDeath(position: Vector3)
-	local part = createVFXPart(position)
-	
-	-- Green/grey particles
-	local emitter = createEmitter({
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 150, 100)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 80, 80)),
-		}),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.8),
-			NumberSequenceKeypoint.new(1, 0.2),
-		}),
-		Lifetime = NumberRange.new(0.5, 1),
-		Speed = NumberRange.new(5, 15),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 3,
-	})
-	emitter.Parent = part
-	emitter:Emit(12)
-	
-	Debris:AddItem(part, 1.5)
-	
-	Logger.Debug("VFX", `Zombie death at {position}`)
+	playVFXFromAsset(position, "Zombie_Death", Color3.fromRGB(100, 150, 100))
 end
 
 --[[
 	☀️ SUN COLLECTION - When sun is collected
+	ASSET-BASED: Looks for Assets/VFX/Sun_Collect
 ]]
 function VFXService.PlaySunCollect(position: Vector3)
-	local part = createVFXPart(position)
-	
-	local emitter = createEmitter({
-		Color = ColorSequence.new(Color3.fromRGB(255, 220, 50)),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.6),
-			NumberSequenceKeypoint.new(1, 0),
-		}),
-		Lifetime = NumberRange.new(0.3, 0.6),
-		Speed = NumberRange.new(10, 20),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 5,
-	})
-	emitter.LightEmission = 0.8
-	emitter.Parent = part
-	emitter:Emit(10)
-	
-	Debris:AddItem(part, 1)
+	playVFXFromAsset(position, "Sun_Collect", Color3.fromRGB(255, 220, 50))
 end
 
 --[[
 	💴 COIN COLLECTION - When coin is gained
+	ASSET-BASED: Looks for Assets/VFX/Coin_Collect
 ]]
 function VFXService.PlayCoinCollect(position: Vector3)
-	local part = createVFXPart(position)
-	
-	local emitter = createEmitter({
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 50)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 150, 50)),
-		}),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.4),
-			NumberSequenceKeypoint.new(1, 0),
-		}),
-		Lifetime = NumberRange.new(0.4, 0.8),
-		Speed = NumberRange.new(8, 15),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 4,
-	})
-	emitter.LightEmission = 0.5
-	emitter.Parent = part
-	emitter:Emit(8)
-	
-	Debris:AddItem(part, 1)
+	playVFXFromAsset(position, "Coin_Collect", Color3.fromRGB(255, 200, 50))
 end
 
 --[[
 	🌱 PLANT PLACED - When plant is placed
+	ASSET-BASED: Looks for Assets/VFX/Plant_Placed
 ]]
 function VFXService.PlayPlantPlaced(position: Vector3)
-	local part = createVFXPart(position)
-	
-	-- Dirt/earth particles
-	local emitter = createEmitter({
-		Color = ColorSequence.new(Color3.fromRGB(120, 80, 40)),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.4),
-			NumberSequenceKeypoint.new(1, 0),
-		}),
-		Lifetime = NumberRange.new(0.3, 0.6),
-		Speed = NumberRange.new(5, 12),
-		SpreadAngle = Vector2.new(60, 60),
-		Drag = 6,
-		Acceleration = Vector3.new(0, -30, 0),
-	})
-	emitter.Parent = part
-	emitter:Emit(10)
-	
-	-- Green sparkle
-	local greenEmitter = createEmitter({
-		Color = ColorSequence.new(Color3.fromRGB(100, 255, 100)),
-		Size = NumberSequence.new(0.3, 0),
-		Lifetime = NumberRange.new(0.4, 0.8),
-		Speed = NumberRange.new(3, 8),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 2,
-	})
-	greenEmitter.LightEmission = 0.6
-	greenEmitter.Parent = part
-	greenEmitter:Emit(6)
-	
-	Debris:AddItem(part, 1)
+	playVFXFromAsset(position, "Plant_Placed", Color3.fromRGB(120, 100, 60))
 end
 
 --[[
 	❄️ SLOW EFFECT - Applied to zombie when hit by frozen pea
+	ASSET-BASED: Looks for Assets/VFX/Slow_Applied
 ]]
 function VFXService.PlaySlowApplied(position: Vector3)
-	local part = createVFXPart(position)
-	
-	local emitter = createEmitter({
-		Color = ColorSequence.new(Color3.fromRGB(180, 220, 255)),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.3),
-			NumberSequenceKeypoint.new(1, 0.1),
-		}),
-		Lifetime = NumberRange.new(1, 2),
-		Speed = NumberRange.new(1, 3),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 0.5,
-		Acceleration = Vector3.new(0, 2, 0),
-	})
-	emitter.LightEmission = 0.3
-	emitter.Parent = part
-	emitter:Emit(8)
-	
-	Debris:AddItem(part, 2.5)
+	playVFXFromAsset(position, "Slow_Applied", Color3.fromRGB(180, 220, 255))
 end
 
 --[[
@@ -437,28 +326,18 @@ function VFXService.PlayPlantShootFromModel(model: Model, isFrozen: boolean?)
 		local part = createVFXPart(position)
 		local clone = shootVFX:Clone()
 		clone.Parent = part
-		clone:Emit(clone:GetAttribute("EmitCount") or 8)
+		local emitCount = clone:GetAttribute("EmitCount")
+		clone:Emit(if type(emitCount) == "number" then emitCount else 8)
 		Debris:AddItem(part, clone.Lifetime.Max + 0.5)
 		return
 	end
 	
-	-- Fallback: Generic pea shoot
-	local part = createVFXPart(position)
-	local color = if isFrozen 
-		then ColorSequence.new(Color3.fromRGB(150, 220, 255))
-		else ColorSequence.new(Color3.fromRGB(100, 200, 50))
-	
-	local emitter = createEmitter({
-		Color = color,
-		Size = NumberSequence.new(0.3, 0),
-		Lifetime = NumberRange.new(0.1, 0.2),
-		Speed = NumberRange.new(5, 10),
-		SpreadAngle = Vector2.new(30, 30),
-		Drag = 5,
-	})
-	emitter.Parent = part
-	emitter:Emit(5)
-	Debris:AddItem(part, 0.5)
+	-- Fallback: Asset-based generic shoot
+	local vfxName = if isFrozen then "FrozenPlant_Shoot" else "Plant_Shoot"
+	local fallbackColor = if isFrozen 
+		then Color3.fromRGB(150, 220, 255)
+		else Color3.fromRGB(100, 200, 50)
+	playVFXFromAsset(position, vfxName, fallbackColor)
 end
 
 --[[
@@ -481,29 +360,19 @@ function VFXService.PlayPlantShoot(model: Model?, position: Vector3, isFrozen: b
 			local part = createVFXPart(position)
 			local clone = shootVFX:Clone()
 			clone.Parent = part
-			clone:Emit(clone:GetAttribute("EmitCount") or 8)
+			local emitCount = clone:GetAttribute("EmitCount")
+			clone:Emit(if type(emitCount) == "number" then emitCount else 8)
 			Debris:AddItem(part, clone.Lifetime.Max + 0.5)
 			return
 		end
 	end
 	
-	-- Fallback: Generic pea shoot
-	local part = createVFXPart(position)
-	local color = if isFrozen 
-		then ColorSequence.new(Color3.fromRGB(150, 220, 255))
-		else ColorSequence.new(Color3.fromRGB(100, 200, 50))
-	
-	local emitter = createEmitter({
-		Color = color,
-		Size = NumberSequence.new(0.3, 0),
-		Lifetime = NumberRange.new(0.1, 0.2),
-		Speed = NumberRange.new(5, 10),
-		SpreadAngle = Vector2.new(30, 30),
-		Drag = 5,
-	})
-	emitter.Parent = part
-	emitter:Emit(5)
-	Debris:AddItem(part, 0.5)
+	-- Fallback: Asset-based generic shoot
+	local vfxName = if isFrozen then "FrozenPlant_Shoot" else "Plant_Shoot"
+	local fallbackColor = if isFrozen 
+		then Color3.fromRGB(150, 220, 255)
+		else Color3.fromRGB(100, 200, 50)
+	playVFXFromAsset(position, vfxName, fallbackColor)
 end
 
 --[[
@@ -522,27 +391,14 @@ function VFXService.PlayPlantDeathFromModel(model: Model)
 		local part = createVFXPart(position)
 		local clone = deathVFX:Clone()
 		clone.Parent = part
-		clone:Emit(clone:GetAttribute("EmitCount") or 15)
+		local emitCount = clone:GetAttribute("EmitCount")
+		clone:Emit(if type(emitCount) == "number" then emitCount else 15)
 		Debris:AddItem(part, clone.Lifetime.Max + 0.5)
 		return
 	end
 	
-	-- Fallback: Generic plant death
-	local part = createVFXPart(position)
-	local emitter = createEmitter({
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 100)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 120, 80)),
-		}),
-		Size = NumberSequence.new(0.5, 0),
-		Lifetime = NumberRange.new(0.4, 0.8),
-		Speed = NumberRange.new(5, 12),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 4,
-	})
-	emitter.Parent = part
-	emitter:Emit(12)
-	Debris:AddItem(part, 1)
+	-- Fallback: Asset-based generic plant death
+	playVFXFromAsset(position, "Plant_Death", Color3.fromRGB(100, 180, 100))
 end
 
 --[[
@@ -565,28 +421,15 @@ function VFXService.PlayPlantDeath(model: Model?, position: Vector3)
 			local part = createVFXPart(position)
 			local clone = deathVFX:Clone()
 			clone.Parent = part
-			clone:Emit(clone:GetAttribute("EmitCount") or 15)
+			local emitCount = clone:GetAttribute("EmitCount")
+			clone:Emit(if type(emitCount) == "number" then emitCount else 15)
 			Debris:AddItem(part, clone.Lifetime.Max + 0.5)
 			return
 		end
 	end
 	
-	-- Fallback: Generic plant death
-	local part = createVFXPart(position)
-	local emitter = createEmitter({
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 100)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 120, 80)),
-		}),
-		Size = NumberSequence.new(0.5, 0),
-		Lifetime = NumberRange.new(0.4, 0.8),
-		Speed = NumberRange.new(5, 12),
-		SpreadAngle = Vector2.new(180, 180),
-		Drag = 4,
-	})
-	emitter.Parent = part
-	emitter:Emit(12)
-	Debris:AddItem(part, 1)
+	-- Fallback: Asset-based generic plant death
+	playVFXFromAsset(position, "Plant_Death", Color3.fromRGB(100, 180, 100))
 end
 
 --[[

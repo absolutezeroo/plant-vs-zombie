@@ -93,16 +93,19 @@ end
 	@param plantZ - Plant's Z position  
 	@param zombieDir - Zombie direction vector (from MapConfig.GetZombieDirection())
 	@param checkBehind - If true, check behind plant; otherwise check in front
-	@return true if zombies exist in the specified direction
+	@param maxRange - Maximum distance to check (0 or nil = unlimited)
+	@return true if zombies exist in the specified direction within range
 ]]
 function LaneCache.HasZombiesInDirection(
 	laneIndex: number, 
 	plantX: number, 
 	plantZ: number, 
 	zombieDir: {X: number, Z: number},
-	checkBehind: boolean?
+	checkBehind: boolean?,
+	maxRange: number?
 ): boolean
 	local entities = LaneCache.GetEntitiesInLane(laneIndex)
+	local rangeLimit = maxRange or 0
 	
 	for _, entityId in entities do
 		local pos = _positions[entityId]
@@ -111,15 +114,32 @@ function LaneCache.HasZombiesInDirection(
 			local dz = pos.Z - plantZ
 			
 			-- Dot product with zombie direction
+			-- Negative = zombie is in front of plant (coming towards it)
+			-- Positive = zombie is behind plant (already passed)
 			local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
 			
+			-- First check direction
+			local isInCorrectDirection = false
 			if checkBehind then
 				-- Behind = same direction as zombie movement (positive dot product)
-				if dotProduct > 0 then return true end
+				isInCorrectDirection = dotProduct > 0
 			else
 				-- In front = opposite of zombie direction (negative dot product)
-				if dotProduct < 0 then return true end
+				isInCorrectDirection = dotProduct < 0
 			end
+			
+			if not isInCorrectDirection then
+				continue
+			end
+			
+			-- Then check range (only for zombies in correct direction)
+			local distance = math.abs(dotProduct)
+			if rangeLimit > 0 and distance > rangeLimit then
+				continue
+			end
+			
+			-- Found a valid zombie in range and correct direction
+			return true
 		end
 	end
 	

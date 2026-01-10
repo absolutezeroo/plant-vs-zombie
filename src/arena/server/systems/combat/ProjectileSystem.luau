@@ -59,6 +59,7 @@ local ProjectileDefaults = {
 	CATAPULT_SPEED = 10,     -- Slower for arcing projectiles
 	SPAWN_OFFSET_X = 2,      -- Default X offset from plant center
 	SPAWN_OFFSET_Y = 2.5,    -- Default Y (height) of projectile spawn
+	SHOOT_RANGE = 54,
 }
 
 -- Track last fire time per plant
@@ -66,13 +67,15 @@ local _plantFireTimes: {[number]: number} = {}
 -- Track pending multi-shot plants: { plantId -> { shotsRemaining, nextShotTime, lane, startX, plantType } }
 local _pendingMultiShots: {[number]: {shotsRemaining: number, nextShotTime: number, lane: number, startX: number, plantType: string, direction: number}} = {}
 
--- Check if there are zombies in the lane (optionally behind plant for SplitPea)
+-- Check if there are zombies in the lane within shoot range (optionally behind plant for SplitPea)
 -- Uses LaneCache for O(1) lane lookup + O(lane_size) direction check
 -- Uses MapConfig.GetZombieDirection() to determine "in front" vs "behind"
-local function hasZombiesInLane(_world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?): boolean
+-- ROBLOX ADAPTATION: Uses SHOOT_RANGE to only detect zombies that have entered the playable area
+local function hasZombiesInLane(_world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?, customRange: number?): boolean
 	local zombieDir = MapConfig.GetZombieDirection()
-	-- Convert Vector3 to table format expected by LaneCache
-	return LaneCache.HasZombiesInDirection(lane, plantX, plantZ, {X = zombieDir.X, Z = zombieDir.Z}, checkBehind)
+	local shootRange = customRange or ProjectileDefaults.SHOOT_RANGE
+	-- Convert Vector3 to table format expected by LaneCache, with range limit
+	return LaneCache.HasZombiesInDirection(lane, plantX, plantZ, {X = zombieDir.X, Z = zombieDir.Z}, checkBehind, shootRange)
 end
 
 -- Check if plant can shoot (not sleeping, not hiding, not chewing)
@@ -123,7 +126,7 @@ local function spawnProjectile(world: any, plantId: number, lane: number, startX
 	local canStun = (stats and stats.CanStun) or false
 	local stunChance = (stats and stats.StunChance) or 0
 	local stunDuration = (stats and stats.StunDuration) or 0
-	local range = (stats and stats.Range) or 0 -- 0 = unlimited
+	local range = (stats and stats.Range) or 0 -- Short-range plants only (PuffShroom, FumeShroom)
 	local canHitFlying = (stats and stats.CanHitFlying) or false
 	
 	-- Projectile spawn offset (data-driven with defaults)
@@ -456,16 +459,8 @@ local function ProjectileSystem(world)
 		local maxRange = proj.MaxRange or ProjectileDefaults.MAX_RANGE
 		
 		if distanceTraveled > maxRange then
-			world:despawn(projId)
-			continue
-		end
-		
-		-- Check out of bounds (using MapConfig for dynamic grid bounds)
-		local config = MapConfig.GetConfig()
-		local minX = config.GridCornerA.X - 10
-		local maxX = config.GridCornerB.X + 10
-
-		if newX < minX or newX > maxX then
+			-- Notify client to remove visual (no impact VFX)
+			Network.ProjectileDespawned.FireAll({ EntityId = projId })
 			world:despawn(projId)
 			continue
 		end

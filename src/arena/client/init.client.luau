@@ -138,6 +138,7 @@ local function setupNetworkListeners()
         else
             -- Reset intermission when new wave starts
             intermissionStartTime = 0
+            hud:SetIntermissionTime(0) -- Clear intermission display
             Logger.Info("ArenaClient", `Wave {data.WaveNumber} started`)
         end
     end)
@@ -245,7 +246,12 @@ local function startCountdownLoop()
         end
         
         -- Intermission countdown
-        if intermissionTime > 0 and intermissionStartTime > 0 then
+        if intermissionTime > 0 then
+            -- Initialize start time if not set (late join or missed event)
+            if intermissionStartTime == 0 then
+                intermissionStartTime = tick()
+            end
+            
             local elapsed = tick() - intermissionStartTime
             local remaining = intermissionDuration - elapsed
             

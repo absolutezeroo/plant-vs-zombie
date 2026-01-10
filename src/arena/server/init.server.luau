@@ -110,10 +110,15 @@ Logger.Info("Server", "All systems initialized")
 -- Schedule systems in the loop
 loop:scheduleSystems(SystemManager.GetMatterSystems())
 
--- Start the loop at 60 Hz
-loop:begin({
+-- Start the loop at 60 Hz - store connections for cleanup
+local loopConnections = loop:begin({
 	default = RunService.Heartbeat,
 })
+
+-- Add loop connections to trove for proper cleanup
+for _, connection in loopConnections do
+	_serverTrove:Add(connection)
+end
 
 Logger.Info("Server", `ECS loop started at {NetworkConfig.TICK_RATE} Hz`)
 
@@ -249,6 +254,15 @@ local function onPlayerRemoving(player: Player)
 	
 	MutationApplySystemModule.API.ClearPlayerMutations(player.UserId)
 	ArenaService.OnPlayerRemoving(player)
+	
+	-- Check if this was the last player (after a short delay to let other systems process)
+	task.defer(function()
+		if #Players:GetPlayers() == 0 then
+			Logger.Info("Server", "Last player left - stopping game loop")
+			_serverTrove:Clean() -- This will disconnect the Matter loop
+			SystemManager.DisposeAll()
+		end
+	end)
 end
 
 _serverTrove:Connect(Players.PlayerRemoving, onPlayerRemoving)
@@ -340,9 +354,10 @@ _G.ArenaSendPlayerToLobby = sendPlayerToLobby
 -- Cleanup when server shuts down
 game:BindToClose(function()
 	Logger.Info("Server", "Server shutting down - disposing all systems")
-	_serverTrove:Clean() -- Clean up all server-level connections
+	_serverTrove:Clean() -- Clean up all server-level connections (including Matter loop)
 	TeleportDataHandler.Dispose() -- Clean up TeleportDataHandler
 	SystemManager.DisposeAll()
+	Logger.Info("Server", "Matter loop stopped")
 end)
 
 Logger.Info("Server", "Server bootstrap complete")

@@ -37,6 +37,20 @@ export type PlantStats = {
 	ShotDelay: number?,      -- Delay between multi-shots for IsRepeater (default 0.1)
 	ProjectileSpawnOffset: Vector3?, -- Offset from plant center for projectile spawn (default Vector3.new(2, 2.5, 0))
 	
+	-- Advanced projectile stats
+	IsCatapult: boolean?,    -- Lobs projectiles in an arc (Cabbage-pult, Melon-pult)
+	HasSplash: boolean?,     -- Projectile deals splash damage
+	SplashRadius: number?,   -- Radius of splash damage
+	PiercesShields: boolean?, -- Projectile ignores shields (Fume-shroom)
+	CanStun: boolean?,       -- Can stun zombies (Kernel-pult butter)
+	StunChance: number?,     -- Chance to stun (0-1)
+	StunDuration: number?,   -- Stun duration in seconds
+	CanHitFlying: boolean?,  -- Can hit flying zombies (Cactus, Cattail)
+	ShotsPerBurst: number?,  -- Number of shots per attack (Repeater=2, GatlingPea=4)
+	ShootsMultiDirection: boolean?, -- Shoots in multiple directions (Starfruit)
+	IsThreeLane: boolean?,   -- Shoots in 3 lanes (Threepeater)
+	ShootsBehind: boolean?,  -- Also shoots behind (Split Pea)
+	
 	-- Explosive stats (for IsExplosive plants)
 	FuseTime: number?,       -- Seconds before explosion for ExplodesOnPlace (default 0.5)
 	ArmDuration: number?,    -- Seconds to arm for NeedsArming (default 15)
@@ -181,6 +195,7 @@ local PlantData: {[string]: PlantStats} = {
 		CanShoot = true,
 		IsRepeater = true,
 		-- Multi-shot stats
+		ShotsPerBurst = 2,
 		ShotDelay = 0.1,
 	},
 	

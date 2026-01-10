@@ -362,6 +362,18 @@ local function CombatSystem(world: MatterWorld)
 				applySplashDamage(world, projPos.X, projPos.Z, splash, proj)
 			end
 			
+			-- Notify client of impact for VFX
+			local enhanced = world:get(projId, EnhancedProjectileComponent)
+			Network.ProjectileHit.FireAll({
+				EntityId = projId,
+				PositionX = projPos.X,
+				PositionY = projPos.Y,
+				PositionZ = projPos.Z,
+				Variant = nil, -- TODO: Could send variant for variant-specific VFX
+				IsFrozen = proj.IsFrozen,
+				IsEnhanced = if enhanced then enhanced.IsFirePea else false,
+			})
+			
 			-- Despawn projectile
 			world:despawn(projId)
 		end

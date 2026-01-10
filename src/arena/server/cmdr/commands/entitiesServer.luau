@@ -15,10 +15,10 @@ return function(context)
 	
 	local lines = {
 		"=== Entity Stats ===",
-		`Total Pool: {stats.total}`,
-		`Available: {stats.available}`,
-		`In Use: {stats.inUse}`,
-		`Usage: {math.floor((stats.inUse / stats.total) * 100)}%`,
+		`Total Pool: {stats.Total}`,
+		`Available: {stats.Available}`,
+		`In Use: {stats.InUse}`,
+		`Usage: {math.floor((stats.InUse / math.max(stats.Total, 1)) * 100)}%`,
 	}
 	
 	return table.concat(lines, "\n")
