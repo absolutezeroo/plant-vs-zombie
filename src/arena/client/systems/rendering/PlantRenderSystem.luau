@@ -111,14 +111,13 @@ local function createPlantVisual(entityId: number, plantType: string, column: nu
 		model.Name = `Plant_{entityId}_{plantType}`
 		
 		-- Position using PrimaryPart (Root)
-		-- Rotate to face toward zombie spawns (opposite of zombie direction)
+		-- Model front = +Z, but lookAt points -Z toward target
+		-- Add 180° rotation to flip so +Z faces the intended direction
 		if model.PrimaryPart then
 			local zombieDir = MapConfig.GetZombieDirection()
-			-- Plants face OPPOSITE of zombie movement (toward where zombies come from)
-			local facingDir = Vector3.new(-zombieDir.X, 0, -zombieDir.Z)
-			local facingCFrame = CFrame.lookAt(worldPos, worldPos + facingDir)
-			-- Add 90° rotation to correct model orientation
-			model:SetPrimaryPartCFrame(facingCFrame * CFrame.Angles(0, math.rad(-90), 0))
+			-- Plants face toward zombie spawns (-zombieDir)
+			local facingCFrame = CFrame.lookAt(worldPos, worldPos - zombieDir) * CFrame.fromEulerAnglesXYZ(0, -math.pi / 2, 0)
+			model:PivotTo(facingCFrame)
 		else
 			Logger.Warn("PlantRender", `Model {plantType} has no PrimaryPart`)
 		end

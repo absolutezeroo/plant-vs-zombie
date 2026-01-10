@@ -6,7 +6,7 @@
 	
 	Receives zombie spawn/position events from server via Zap.
 	Creates and updates visual zombie representations.
-	Uses simple Part-based visuals for MVP (no Humanoid).
+	Uses real models from Assets/Zombies, falls back to colored cubes.
 	
 	LIFECYCLE:
 	- Init(): Setup network listeners (CAN yield)
@@ -16,7 +16,6 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
@@ -34,30 +33,43 @@ local GameSignals = require(Shared.signals.GameSignals)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
+local Modules = Client:FindFirstChild("modules")
 local Network = require(Shared.network.generated.client)
+
+-- Assets folder (optional - fallback to cubes if missing)
+local Assets = ReplicatedStorage:FindFirstChild("Assets")
+local ZombieAssets = Assets and Assets:FindFirstChild("Zombies")
+
+if not ZombieAssets then
+	Logger.Warn("ZombieRender", "Zombie assets not found - using fallback cubes")
+end
+
+-- Services (lazy loaded)
+local _animService: any = nil
+
+local function getAnimService()
+	if not _animService and Modules then
+		local success, result = pcall(function()
+			return require(Modules.AnimationService)
+		end)
+		if success then _animService = result end
+	end
+	return _animService
+end
 
 -- Zombie visual cache: entityId -> visual data
 type ZombieVisual = {
-	Part: Part,
+	Model: Model,
 	ZombieType: string,
 	Lane: number,
 	TargetX: number,
+	FeetOffset: number, -- Distance from root to feet for ground alignment
 }
 local _zombieVisuals: {[number]: ZombieVisual} = {}
 
 -- Trove for cleanup
 local _trove = Trove.new()
 
--- Visual config
-local ZOMBIE_SIZE = Vector3.new(3, 5, 3)
-local ZOMBIE_COLORS = {
-	Basic = Color3.fromRGB(100, 150, 100),    -- Green-ish
-	Cone = Color3.fromRGB(255, 150, 50),      -- Orange cone
-	Bucket = Color3.fromRGB(150, 150, 150),   -- Gray bucket
-	Pole = Color3.fromRGB(100, 100, 200),     -- Blue-ish
-	Newspaper = Color3.fromRGB(200, 200, 150),-- Tan
-	Football = Color3.fromRGB(50, 50, 50),    -- Dark
-}
 local INTERPOLATION_SPEED = 10 -- How fast to interpolate to target position
 
 local function getLaneZ(lane: number): number
@@ -69,49 +81,80 @@ local function getLaneZ(lane: number): number
 	return laneCenter.Z
 end
 
+-- Model fallback mapping (when specific model doesn't exist, use Basic)
+local MODEL_FALLBACKS: {[string]: string} = {
+	Flag = "Basic",
+	Imp = "Basic",
+	MiniGargantuar = "Gargantuar",
+}
+
 local function createZombieVisual(entityId: number, zombieType: string, lane: number, positionX: number): ZombieVisual
-	local part = Instance.new("Part")
-	part.Name = `Zombie_{entityId}`
-	part.Size = ZOMBIE_SIZE
-	part.Color = ZOMBIE_COLORS[zombieType] or ZOMBIE_COLORS.Basic
-	part.Material = Enum.Material.SmoothPlastic
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = true
-	part.CastShadow = true
-	
 	local z = getLaneZ(lane)
-	-- Use default Y if MapConfig not ready
 	local groundY = if MapConfig.IsInitialized() then MapConfig.GetConfig().GridY else 0
-	part.Position = Vector3.new(positionX, groundY + ZOMBIE_SIZE.Y / 2, z)
 	
-	-- Add attribute for entity tracking
-	part:SetAttribute("EntityId", entityId)
-	part:SetAttribute("ZombieType", zombieType)
+	-- Try to get real model from Assets (with fallback)
+	local modelName = zombieType
+	local modelTemplate = ZombieAssets and ZombieAssets:FindFirstChild(modelName)
 	
-	-- Add face decal (simple eyes)
-	local face = Instance.new("Decal")
-	face.Name = "Face"
-	face.Face = Enum.NormalId.Left -- Facing left towards house
-	face.Color3 = Color3.new(1, 1, 1)
-	face.Transparency = 0.5
-	face.Parent = part
+	-- Try specific fallback first, then default to Basic
+	if not modelTemplate then
+		modelName = MODEL_FALLBACKS[zombieType] or "Basic"
+		modelTemplate = ZombieAssets and ZombieAssets:FindFirstChild(modelName)
+	end
 	
-	part.Parent = Workspace
+	if not modelTemplate or not modelTemplate:IsA("Model") then
+		Logger.Error("ZombieRender", `No model found for zombie {zombieType} (tried {modelName})`)
+		return nil :: any
+	end
+	
+	-- Clone real model
+	local model = modelTemplate:Clone()
+	model.Name = `Zombie_{entityId}_{zombieType}`
+	
+	-- Ensure PrimaryPart is set (required for animations)
+	if not model.PrimaryPart then
+		local humanoidRoot = model:FindFirstChild("HumanoidRootPart")
+		local torso = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
+		local firstPart = model:FindFirstChildWhichIsA("BasePart")
+		model.PrimaryPart = humanoidRoot or torso or firstPart
+	end
+	
+	-- Calculate spawn position with feet offset
+	-- FeetOffset = distance from root to feet (so we add it to put feet at ground level)
+	local feetOffset = model:GetAttribute("FeetOffset") or 0
+	local spawnY = groundY + feetOffset
+	local worldPos = Vector3.new(positionX, spawnY, z)
+	
+	-- Position and rotate to face toward the house
+	local zombieDir = MapConfig.GetZombieDirection()
+	local facingCFrame = CFrame.lookAt(worldPos, worldPos + zombieDir) * CFrame.fromEulerAnglesXYZ(0, math.pi / 2, 0)
+	model:PivotTo(facingCFrame)
+	
+	model:SetAttribute("EntityId", entityId)
+	model.Parent = Workspace
+	
+	-- Play spawn/idle animations
+	local animService = getAnimService()
+	if animService then
+		animService.PlaySpawn(model)
+		animService.StartIdle(model)
+	end
+	
+	Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned at Y={spawnY}`)
 	
 	return {
-		Part = part,
+		Model = model,
 		ZombieType = zombieType,
 		Lane = lane,
 		TargetX = positionX,
+		FeetOffset = feetOffset, -- Store for movement updates
 	}
 end
 
 local function destroyZombieVisual(entityId: number)
 	local visual = _zombieVisuals[entityId]
 	if visual then
-		visual.Part:Destroy()
+		visual.Model:Destroy()
 		_zombieVisuals[entityId] = nil
 	end
 end
@@ -155,29 +198,24 @@ local function setupNetworkListeners()
 			-- Remove from active tracking FIRST to prevent duplicate processing
 			_zombieVisuals[entityId] = nil
 			
-			-- Keep reference to part for animation
-			local part = visual.Part
+			local pos = visual.Model:GetPivot().Position
 			
 			-- Fire signal for VFX/Audio (decoupled)
-			local pos = part.Position
 			GameSignals.OnZombieDeath:Fire({
 				Position = pos,
 				ZombieType = visual.ZombieType,
 			})
 			
-			-- Death animation
-			local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			local tween = TweenService:Create(part, tweenInfo, {
-				Size = Vector3.new(ZOMBIE_SIZE.X, 0.5, ZOMBIE_SIZE.Z),
-				Position = part.Position - Vector3.new(0, ZOMBIE_SIZE.Y / 2 - 0.25, 0),
-				Transparency = 1
-			})
+			-- Play death animation then destroy
+			local animService = getAnimService()
+			if animService then
+				animService.PlayDeath(visual.Model)
+			end
 			
-			tween:Play()
-			tween.Completed:Connect(function()
-				-- Destroy the part directly since it's no longer in _zombieVisuals
-				if part and part.Parent then
-					part:Destroy()
+			-- Fade out and destroy after delay
+			task.delay(0.5, function()
+				if visual.Model and visual.Model.Parent then
+					visual.Model:Destroy()
 				end
 			end)
 			
@@ -189,24 +227,17 @@ local function setupNetworkListeners()
 	_trove:Add(Network.EntityDamaged.On(function(data)
 		local visual = _zombieVisuals[data.EntityId]
 		if visual then
-			-- Flash red
-			local originalColor = visual.Part.Color
-			visual.Part.Color = Color3.fromRGB(255, 100, 100)
-			task.delay(0.1, function()
-				if visual.Part and visual.Part.Parent then
-					visual.Part.Color = originalColor
-				end
-			end)
+			local pos = visual.Model:GetPivot().Position
 			
 			-- Show floating damage number via signal
 			if data.DamageAmount > 0 then
-				local pos = visual.Part.Position + Vector3.new(
+				local floatPos = pos + Vector3.new(
 					(math.random() - 0.5) * 2, -- Random X offset
 					1, -- Above zombie
 					0
 				)
 				GameSignals.OnDamageDealt:Fire({
-					Position = pos,
+					Position = floatPos,
 					Amount = data.DamageAmount,
 				})
 			end
@@ -233,23 +264,27 @@ local function ZombieRenderSystem(_world)
 	
 	local dt = 1/60
 	local groundY = MapConfig.GetConfig().GridY
+	local zombieDir = MapConfig.GetZombieDirection()
 	
 	-- Interpolate zombie positions
 	for entityId, visual in _zombieVisuals do
-		-- Skip if part was destroyed
-		if not visual.Part or not visual.Part.Parent then
+		if not visual.Model.Parent then
 			_zombieVisuals[entityId] = nil
 			continue
 		end
 		
-		local currentX = visual.Part.Position.X
+		local currentPos = visual.Model:GetPivot().Position
+		local currentX = currentPos.X
 		local targetX = visual.TargetX
-		
-		-- Smooth interpolation
 		local newX = currentX + (targetX - currentX) * math.min(1, INTERPOLATION_SPEED * dt)
 		
 		local z = getLaneZ(visual.Lane)
-		visual.Part.Position = Vector3.new(newX, groundY + ZOMBIE_SIZE.Y / 2, z)
+		local spawnY = groundY + visual.FeetOffset -- Add feet offset for ground alignment
+		local newPos = Vector3.new(newX, spawnY, z)
+		
+		-- Update position with 90° rotation
+		local facingCFrame = CFrame.lookAt(newPos, newPos + zombieDir) * CFrame.Angles(0, math.pi / 2, 0)
+		visual.Model:PivotTo(facingCFrame)
 	end
 end
 

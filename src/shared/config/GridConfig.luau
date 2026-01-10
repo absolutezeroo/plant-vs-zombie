@@ -23,7 +23,7 @@ local GridConfig = {
 	-- Grid World Position (center of lawn)
 	GRID_ORIGIN_X = 0,    -- World X offset
 	GRID_ORIGIN_Z = 0,    -- World Z offset (Y in grid = Z in world)
-	GRID_ORIGIN_Y = 0,    -- Ground level
+	GRID_ORIGIN_Y = 1,    -- Ground level (top of ground Part)
 	
 	-- Maximum plants (full grid occupation)
 	MAX_PLANTS = 9 * 5,   -- 45 plants maximum

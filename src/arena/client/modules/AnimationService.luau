@@ -1,19 +1,29 @@
 --!strict
 --[[
-	AnimationService.luau - Client-side TweenService-based animations
+	AnimationService.luau - Client-side animations
 	
-	Handles plant animations WITHOUT Humanoid:
-	- Idle: Continuous bob/pulse loop
-	- Spawn: Scale up from zero
-	- Shoot: Recoil animation
-	- Death: Shrink and fade
+	Supports TWO animation modes (auto-detected):
 	
-	Reads animation parameters from model attributes:
+	1. TWEEN MODE (Plants - no Humanoid):
+	   - Idle: Continuous bob/pulse loop
+	   - Spawn: Scale up from zero
+	   - Shoot: Recoil animation
+	   - Death: Shrink and fade
+	
+	2. HUMANOID MODE (Zombies - with Humanoid):
+	   - Walk: Looping walk cycle
+	   - Attack: One-shot attack animation
+	   - Death: Death animation
+	   
+	Model attributes (Tween mode):
 	- Anim_IdleBobHeight (default 0.2)
 	- Anim_IdleBobSpeed (default 1.5)
 	- Anim_ShootRecoil (default 0.3)
 	
-	Supports custom Poses folder for complex animations.
+	Expected zombie structure:
+	- Model with HumanoidRootPart as PrimaryPart
+	- Humanoid with Animator inside
+	- Animations folder with Animation instances (Walk, Attack, Death)
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -22,7 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
--- Track active idle animations for cleanup
+-- Track active idle animations for cleanup (Tween mode)
 type IdleAnimation = {
 	Model: Model,
 	Tween: Tween,
@@ -30,6 +40,15 @@ type IdleAnimation = {
 	Playing: boolean,
 }
 local _idleAnimations: {[Model]: IdleAnimation} = {}
+
+-- Track active Humanoid animations for cleanup
+type HumanoidAnimData = {
+	Animator: Animator,
+	WalkTrack: AnimationTrack?,
+	AttackTrack: AnimationTrack?,
+	DeathTrack: AnimationTrack?,
+}
+local _humanoidAnimations: {[Model]: HumanoidAnimData} = {}
 
 -- Default animation values
 local DEFAULTS = {
@@ -41,6 +60,97 @@ local DEFAULTS = {
 }
 
 local AnimationService = {}
+
+--[[
+	Check if model uses Humanoid (zombie) or Tween (plant) mode
+]]
+local function hasHumanoid(model: Model): boolean
+	return model:FindFirstChildOfClass("Humanoid") ~= nil
+end
+
+--[[
+	Get or create Animator from Humanoid
+]]
+local function getAnimator(model: Model): Animator?
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return nil end
+	
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		local newAnimator = Instance.new("Animator")
+		newAnimator.Parent = humanoid
+		return newAnimator
+	end
+	return animator
+end
+
+--[[
+	Load animation tracks for a zombie model
+]]
+local function loadZombieAnimations(model: Model): HumanoidAnimData?
+	local animator = getAnimator(model)
+	if not animator then return nil end
+	
+	local animFolder = model:FindFirstChild("Animations")
+	if not animFolder then
+		Logger.Warn("Animation", `No Animations folder in {model.Name}`)
+		return nil
+	end
+	
+	local data: HumanoidAnimData = {
+		Animator = animator,
+		WalkTrack = nil,
+		AttackTrack = nil,
+		DeathTrack = nil,
+	}
+	
+	-- Helper to check if Animation has valid ID
+	local function isValidAnimation(anim: Animation?): boolean
+		if not anim or not anim:IsA("Animation") then
+			return false
+		end
+		local id = anim.AnimationId
+		return id ~= nil and id ~= ""
+	end
+	
+	-- Load each animation if it exists and has a valid ID
+	local walkAnim = animFolder:FindFirstChild("Walk")
+	if isValidAnimation(walkAnim) then
+		local track = animator:LoadAnimation(walkAnim)
+		track.Looped = true
+		track.Priority = Enum.AnimationPriority.Movement
+		data.WalkTrack = track
+	end
+	
+	local attackAnim = animFolder:FindFirstChild("Attack")
+	if isValidAnimation(attackAnim) then
+		local track = animator:LoadAnimation(attackAnim)
+		track.Looped = false
+		track.Priority = Enum.AnimationPriority.Action
+		data.AttackTrack = track
+	end
+	
+	local deathAnim = animFolder:FindFirstChild("Death")
+	if isValidAnimation(deathAnim) then
+		local track = animator:LoadAnimation(deathAnim)
+		track.Looped = false
+		track.Priority = Enum.AnimationPriority.Action4
+		data.DeathTrack = track
+	end
+	
+	_humanoidAnimations[model] = data
+	return data
+end
+
+--[[
+	Get cached animation data or load new
+]]
+local function getZombieAnimData(model: Model): HumanoidAnimData?
+	if _humanoidAnimations[model] then
+		return _humanoidAnimations[model]
+	end
+	return loadZombieAnimations(model)
+end
 
 --[[
 	Get animation parameter from model attribute or default
@@ -55,10 +165,21 @@ local function getAnimParam(model: Model, param: string): number
 end
 
 --[[
-	🌿 IDLE ANIMATION - Continuous bob loop
-	Call once when plant spawns, runs until StopIdle is called
+	🌿 START IDLE - Works for both Plants (bob) and Zombies (walk)
+	Call once when entity spawns, runs until StopIdle is called
 ]]
 function AnimationService.StartIdle(model: Model)
+	-- HUMANOID MODE: Play walk animation
+	if hasHumanoid(model) then
+		local animData = getZombieAnimData(model)
+		if animData and animData.WalkTrack then
+			animData.WalkTrack:Play()
+			Logger.Debug("Animation", `Started walk animation on {model.Name}`)
+		end
+		return
+	end
+	
+	-- TWEEN MODE: Bob animation for plants
 	if _idleAnimations[model] then
 		return -- Already playing
 	end
@@ -121,9 +242,16 @@ function AnimationService.StartIdle(model: Model)
 end
 
 --[[
-	Stop idle animation
+	Stop idle/walk animation
 ]]
 function AnimationService.StopIdle(model: Model)
+	-- HUMANOID MODE: Stop walk animation
+	local animData = _humanoidAnimations[model]
+	if animData and animData.WalkTrack then
+		animData.WalkTrack:Stop()
+	end
+	
+	-- TWEEN MODE: Stop bob animation
 	local idleData = _idleAnimations[model]
 	if idleData then
 		idleData.Playing = false
@@ -135,10 +263,15 @@ function AnimationService.StopIdle(model: Model)
 end
 
 --[[
-	🌱 SPAWN ANIMATION - Scale up from zero
-	Returns when animation completes
+	🌱 SPAWN ANIMATION - Scale up from zero (Plants only)
+	Zombies don't use spawn animation (they walk in)
 ]]
 function AnimationService.PlaySpawn(model: Model): ()
+	-- Skip for Humanoid models (zombies just walk in)
+	if hasHumanoid(model) then
+		return
+	end
+	
 	local visual = model:FindFirstChild("Visual")
 	if not visual or not visual:IsA("Model") then
 		return
@@ -225,13 +358,25 @@ function AnimationService.PlayShoot(model: Model)
 end
 
 --[[
-	💀 DEATH ANIMATION - Shrink and fade
-	Returns when animation completes
+	💀 DEATH ANIMATION - Works for both Plants and Zombies
 ]]
 function AnimationService.PlayDeath(model: Model): ()
-	-- Stop idle first
+	-- Stop idle/walk first
 	AnimationService.StopIdle(model)
 	
+	-- HUMANOID MODE: Play death animation
+	if hasHumanoid(model) then
+		local animData = _humanoidAnimations[model]
+		if animData and animData.DeathTrack then
+			animData.DeathTrack:Play()
+			Logger.Debug("Animation", `Started death animation on {model.Name}`)
+		end
+		-- Cleanup animation data
+		_humanoidAnimations[model] = nil
+		return
+	end
+	
+	-- TWEEN MODE: Shrink and fade for plants
 	local visual = model:FindFirstChild("Visual")
 	if not visual then
 		return
@@ -255,6 +400,20 @@ function AnimationService.PlayDeath(model: Model): ()
 	
 	if lastTween then
 		lastTween.Completed:Wait()
+	end
+end
+
+--[[
+	🧟 ATTACK ANIMATION - Zombies only
+]]
+function AnimationService.PlayAttack(model: Model)
+	if not hasHumanoid(model) then
+		return -- Plants don't attack
+	end
+	
+	local animData = getZombieAnimData(model)
+	if animData and animData.AttackTrack then
+		animData.AttackTrack:Play()
 	end
 end
 
@@ -321,9 +480,19 @@ end
 	Cleanup all animations (call on game end)
 ]]
 function AnimationService.Cleanup()
+	-- Cleanup tween animations (plants)
 	for model, _ in _idleAnimations do
 		AnimationService.StopIdle(model)
 	end
+	
+	-- Cleanup humanoid animations (zombies)
+	for model, animData in _humanoidAnimations do
+		if animData.WalkTrack then animData.WalkTrack:Stop() end
+		if animData.AttackTrack then animData.AttackTrack:Stop() end
+		if animData.DeathTrack then animData.DeathTrack:Stop() end
+	end
+	table.clear(_humanoidAnimations)
+	
 	Logger.Info("Animation", "AnimationService cleaned up")
 end
 
