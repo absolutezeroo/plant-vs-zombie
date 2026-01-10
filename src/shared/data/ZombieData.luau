@@ -303,4 +303,22 @@ function ZombieDataModule.Exists(zombieType: string): boolean
 	return ZombieData[zombieType] ~= nil
 end
 
-return table.freeze(ZombieDataModule)
+-- ============================================
+-- METATABLE FOR BACKWARDS COMPATIBILITY
+-- ============================================
+-- Allows ZombieData.Basic syntax to still work
+-- Redirects to GetStats() for live config support
+
+setmetatable(ZombieDataModule :: any, {
+	__index = function(_, key: string): ZombieStats?
+		-- Skip known function names
+		if key == "GetStats" or key == "GetStatsRaw" or key == "GetAllTypes" 
+			or key == "Exists" or key == "RawData" then
+			return nil
+		end
+		-- Redirect to GetStats for any zombie type access
+		return ZombieDataModule.GetStats(key)
+	end,
+})
+
+return ZombieDataModule

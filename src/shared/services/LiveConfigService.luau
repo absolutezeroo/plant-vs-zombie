@@ -42,6 +42,7 @@ export type ConfigKey = string
 -- Global: "Global_ZombieHealth", "Global_ZombieSpeed", "Global_ZombieDamage", etc.
 -- Difficulty: "Difficulty_Easy_ZombieHealthMult", "Difficulty_Hard_CoinReward", etc.
 -- Zombie: "Zombie_Basic_HealthMult", "Zombie_Gargantuar_DamageMult", etc.
+-- Plant: "Plant_Peashooter_Cost", "Plant_Sunflower_Damage", etc.
 
 -- Default values for all known config keys
 local DEFAULT_VALUES: {[string]: number} = {
@@ -50,6 +51,7 @@ local DEFAULT_VALUES: {[string]: number} = {
 	Global_ZombieSpeed = 1.0,
 	Global_ZombieDamage = 1.0,
 	Global_PlantDamage = 1.0,
+	Global_PlantHealth = 1.0,
 	Global_SunDropRate = 1.0,
 	Global_CoinDropRate = 1.0,
 	
@@ -72,6 +74,18 @@ local DEFAULT_VALUES: {[string]: number} = {
 	Zombie_Gargantuar_HealthMult = 1.0,
 	Zombie_Gargantuar_SpeedMult = 1.0,
 	Zombie_Gargantuar_DamageMult = 1.0,
+	
+	-- Plant-specific overrides (0 = use base value)
+	-- Format: Plant_{Type}_{Stat} where Stat = Cost, Damage, Cooldown, Health
+	Plant_Peashooter_Cost = 0,
+	Plant_Peashooter_Damage = 0,
+	Plant_Peashooter_Cooldown = 0,
+	Plant_Peashooter_Health = 0,
+	Plant_Sunflower_Cost = 0,
+	Plant_Sunflower_Cooldown = 0,
+	Plant_WallNut_Cost = 0,
+	Plant_WallNut_Health = 0,
+	Plant_WallNut_Cooldown = 0,
 }
 
 -- ============================================

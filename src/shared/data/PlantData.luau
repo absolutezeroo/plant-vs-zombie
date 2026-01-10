@@ -4,7 +4,16 @@
 	
 	Central lookup table for all plant properties.
 	Used by PlacementSystem (cost validation) and UI (card display).
+	
+	NOTE: Access via PlantData.Peashooter or PlantData.GetStats("Peashooter")
+	Both apply LiveConfigService overrides for live tuning.
+	Use PlantData.GetStatsRaw("Peashooter") for factory defaults.
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Sift = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Sift"))
+local LiveConfigService = require(Shared.services.LiveConfigService)
 
 export type PlantStats = {
 	Name: string,
@@ -844,10 +853,116 @@ local PlantData: {[string]: PlantStats} = {
 	},
 }
 
--- Freeze to prevent runtime modification
+-- Freeze raw data to prevent runtime modification
 table.freeze(PlantData)
 for _, stats in PlantData do
 	table.freeze(stats)
 end
 
-return PlantData
+-- ============================================
+-- API MODULE
+-- ============================================
+
+local PlantDataModule = {}
+
+-- Raw data table (factory defaults, frozen)
+PlantDataModule.RawData = PlantData
+
+--[[
+	Get all plant types (factory defaults).
+	@return Array of plant type names
+]]
+function PlantDataModule.GetAllTypes(): {string}
+	local types: {string} = {}
+	for plantType, _ in PlantData do
+		table.insert(types, plantType)
+	end
+	return types
+end
+
+--[[
+	Get stats for a specific plant type with LiveConfigService overrides applied.
+	
+	@param plantType The plant type (e.g., "Peashooter", "Sunflower")
+	@return The effective stats with cloud config applied, or nil if not found
+]]
+function PlantDataModule.GetStats(plantType: string): PlantStats?
+	local baseStats = PlantData[plantType]
+	if not baseStats then
+		return nil
+	end
+	
+	-- Get plant-specific overrides (0 = use base value)
+	local costOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Cost`, 0)
+	local damageOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Damage`, 0)
+	local cooldownOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Cooldown`, 0)
+	local healthOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Health`, 0)
+	
+	-- Get global plant multiplier
+	local globalDamageMult = LiveConfigService.GetMultiplier("Global_PlantDamage")
+	
+	-- Build overrides table only for non-zero values
+	local overrides: {[string]: any} = {}
+	
+	-- Apply cost override (direct replacement if set)
+	if costOverride > 0 then
+		overrides.Cost = math.floor(costOverride)
+	end
+	
+	-- Apply cooldown override (direct replacement if set)
+	if cooldownOverride > 0 then
+		overrides.Cooldown = cooldownOverride
+	end
+	
+	-- Apply health override (direct replacement if set)
+	if healthOverride > 0 then
+		overrides.Health = math.floor(healthOverride)
+	end
+	
+	-- Apply damage: combine override with global multiplier
+	local effectiveDamage = if damageOverride > 0 then damageOverride else baseStats.Damage
+	overrides.Damage = math.floor(effectiveDamage * globalDamageMult)
+	
+	-- Merge with base stats (immutable)
+	return Sift.Dictionary.merge(baseStats, overrides)
+end
+
+--[[
+	Get raw stats for a specific plant type WITHOUT LiveConfigService overrides.
+	
+	@param plantType The plant type (e.g., "Peashooter", "Sunflower")
+	@return The factory default stats, or nil if not found
+]]
+function PlantDataModule.GetStatsRaw(plantType: string): PlantStats?
+	return PlantData[plantType]
+end
+
+--[[
+	Check if a plant type exists.
+	
+	@param plantType The plant type to check
+	@return true if the plant type exists
+]]
+function PlantDataModule.Exists(plantType: string): boolean
+	return PlantData[plantType] ~= nil
+end
+
+-- ============================================
+-- METATABLE FOR BACKWARDS COMPATIBILITY
+-- ============================================
+-- Allows PlantData.Peashooter syntax to still work
+-- Redirects to GetStats() for live config support
+
+setmetatable(PlantDataModule :: any, {
+	__index = function(_, key: string): PlantStats?
+		-- Skip known function/property names
+		if key == "GetStats" or key == "GetStatsRaw" or key == "GetAllTypes" 
+			or key == "Exists" or key == "RawData" then
+			return nil
+		end
+		-- Redirect to GetStats for any plant type access
+		return PlantDataModule.GetStats(key)
+	end,
+})
+
+return PlantDataModule
