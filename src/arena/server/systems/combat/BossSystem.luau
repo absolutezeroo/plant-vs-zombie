@@ -30,18 +30,29 @@ local CONFIG = table.freeze({
 -- 3. STATE
 local State = {
 	IsInitialized = false,
-	HasSpawnedMinion = {} :: {[number]: boolean}, -- Track bosses that spawned minions
+	HasSpawnedMinion = {} :: {[number]: boolean},
+	CachedZombieDir = Vector3.new(-1, 0, 0),
 }
 
 -- 4. INIT
 local function Init(_world)
 	if State.IsInitialized then return end
+	
+	-- Pre-cache MapConfig values to avoid yield in OnStep
+	if MapConfig.IsInitialized() then
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	else
+		-- Fallback: force init (should not happen if bootstrap is correct)
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
+	
 	State.IsInitialized = true
 end
 
 -- 5. DISPOSE
 local function Dispose()
 	State.IsInitialized = false
+	State.CachedZombieDir = Vector3.new(-1, 0, 0)
 	table.clear(State.HasSpawnedMinion)
 end
 
@@ -50,7 +61,7 @@ local function spawnMinion(world, bossId: number, minionType: string, lane: numb
 	local minionStats = ZombieData[minionType]
 	if not minionStats then return end
 	
-	local direction = MapConfig.GetZombieDirection()
+	local direction = State.CachedZombieDir
 	
 	local minionId = EntityPool.Spawn(
 		Components.PositionComponent({

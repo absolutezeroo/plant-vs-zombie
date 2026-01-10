@@ -30,6 +30,7 @@ local Types = require(Shared.Types)
 local EntityPool = require(Shared.utils.EntityPool)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
 local ECSUtils = require(Shared.utils.ECSUtils)
+local LaneCache = require(Shared.utils.LaneCache)
 
 type MatterWorld = Types.MatterWorld
 
@@ -61,6 +62,10 @@ local State = {
 		zombieBites = 0,
 		plantsDestroyed = 0,
 	},
+	CachedGridOrigin = Vector3.zero,
+	CachedCellWidth = 6,
+	CachedZombieDir = Vector3.new(-1, 0, 0),
+	IsInitialized = false,
 }
 
 --------------------------------------------------------------------------------
@@ -214,10 +219,10 @@ local function findPlantAtPosition(world: MatterWorld, column: number, lane: num
 	return nil
 end
 
--- Get grid column from world X position
+-- Get grid column from world X position (uses cached values from Init)
 local function getColumnFromX(x: number): number
-	local origin = MapConfig.GetGridOrigin()
-	local cellW, _ = MapConfig.GetCellSize()
+	local origin = State.CachedGridOrigin
+	local cellW = State.CachedCellWidth
 	local localX = x - origin.X
 	return math.floor(localX / cellW) + 1
 end
@@ -240,6 +245,7 @@ local function OnStep(world: MatterWorld)
 	end
 	
 	-- Process projectile-zombie collisions
+	-- OPTIMIZED: Uses LaneCache for O(lane_size) instead of O(all_zombies)
 	for projId, projPos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		local hitZombie = false
 		local hitZombieId = nil
@@ -250,7 +256,25 @@ local function OnStep(world: MatterWorld)
 		-- Check if projectile can hit flying zombies
 		local canHitFlying = proj.CanHitFlying or false
 		
-		for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
+		-- Get zombies to check based on projectile type
+		local zombiesToCheck: {number}
+		if isMultiDir then
+			-- Multi-directional: check nearby lanes (±1 lane radius)
+			zombiesToCheck = LaneCache.GetEntitiesInLaneRange(proj.Lane or 3, 1)
+		else
+			-- Normal: only check same lane (O(1) lookup)
+			zombiesToCheck = LaneCache.GetEntitiesInLane(proj.Lane)
+		end
+		
+		for _, zombieId in zombiesToCheck do
+			-- Get zombie components (already filtered by lane)
+			local zombiePos = world:get(zombieId, Components.PositionComponent)
+			local zombie = world:get(zombieId, Components.ZombieTypeComponent)
+			
+			if not zombiePos or not zombie then
+				continue
+			end
+			
 			-- Check if zombie is flying and projectile can't hit flying
 			local zombieStats = ZombieData[zombie.ZombieType]
 			if zombieStats and zombieStats.IsFlying and not canHitFlying then
@@ -266,10 +290,7 @@ local function OnStep(world: MatterWorld)
 				local distance = math.sqrt(dx * dx + dz * dz)
 				inRange = distance <= CONFIG.PROJECTILE_HIT_RADIUS * CONFIG.MULTI_DIR_RADIUS_MULT
 			else
-				-- Normal: check same lane and X distance
-				if zombie.Lane ~= proj.Lane then
-					continue
-				end
+				-- Normal: check X distance only (lane already filtered)
 				local distance = math.abs(projPos.X - zombiePos.X)
 				inRange = distance <= CONFIG.PROJECTILE_HIT_RADIUS
 			end
@@ -390,7 +411,7 @@ local function OnStep(world: MatterWorld)
 			-- Already eating - check if target still exists
 			if not world:contains(target.TargetEntity) then
 				-- Target destroyed, resume moving
-				local direction = MapConfig.GetZombieDirection()
+				local direction = State.CachedZombieDir
 				world:remove(zombieId, Components.TargetComponent)
 				world:insert(zombieId, Components.MovementComponent({
 					VelocityX = direction.X * stats.Speed,
@@ -411,7 +432,7 @@ local function OnStep(world: MatterWorld)
 				
 				if killed then
 					-- Plant destroyed, resume moving
-					local direction = MapConfig.GetZombieDirection()
+					local direction = State.CachedZombieDir
 					world:remove(zombieId, Components.TargetComponent)
 					world:insert(zombieId, Components.MovementComponent({
 						VelocityX = direction.X * stats.Speed,
@@ -425,7 +446,7 @@ local function OnStep(world: MatterWorld)
 		else
 			-- No target - check if there's a plant in our path
 			local column = getColumnFromX(zombiePos.X)
-			local zombieDir = MapConfig.GetZombieDirection()
+			local zombieDir = State.CachedZombieDir
 			
 			-- Check current column and columns ahead of zombie (in its movement direction)
 			-- If zombie moves -X, check column and column-1; if +X, check column and column+1
@@ -481,10 +502,28 @@ end
 -- [6] INIT / DISPOSE
 --------------------------------------------------------------------------------
 local function Init(_world)
-	-- No initialization needed
+	if State.IsInitialized then return end
+	
+	-- Pre-cache MapConfig values to avoid yield in OnStep
+	if MapConfig.IsInitialized() then
+		State.CachedGridOrigin = MapConfig.GetGridOrigin()
+		State.CachedCellWidth = MapConfig.GetCellSize()
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	else
+		-- Fallback: force init (should not happen if bootstrap is correct)
+		State.CachedGridOrigin = MapConfig.GetGridOrigin()
+		State.CachedCellWidth = MapConfig.GetCellSize()
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
+	
+	State.IsInitialized = true
 end
 
 local function Dispose()
+	State.IsInitialized = false
+	State.CachedGridOrigin = Vector3.zero
+	State.CachedCellWidth = 6
+	State.CachedZombieDir = Vector3.new(-1, 0, 0)
 	table.clear(State.ZombieAttackTimes)
 	resetFrameStats()
 end

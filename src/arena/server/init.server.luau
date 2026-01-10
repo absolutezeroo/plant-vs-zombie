@@ -33,6 +33,7 @@ local ErrorHandler = require(Shared.utils.ErrorHandler)
 local EntityPool = require(Shared.utils.EntityPool)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local TeleportData = require(Shared.data.TeleportData)
 local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
 local SystemManager = require(Shared.utils.SystemManager)
@@ -69,6 +70,11 @@ Logger.Info("Server", "StatsService initialized")
 -- Initialize handlers
 ProgressionHandler.Initialize()
 Logger.Info("Server", "ProgressionHandler initialized")
+
+-- CRITICAL: Initialize MapConfig BEFORE Matter loop starts
+-- This prevents yield errors in ECS systems that call MapConfig functions
+MapConfig.Initialize()
+Logger.Info("Server", "MapConfig initialized (pre-cached for ECS systems)")
 
 -- Create Matter World
 local world = Matter.World.new()

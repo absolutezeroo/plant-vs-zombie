@@ -46,6 +46,9 @@ local State = {
 	LastSpawnTime = 0,
 	NextSpawnDelay = 0,
 	WaveService = nil :: any,
+	CachedGridY = 0 :: number,
+	CachedCellWidth = 0 :: number,
+	CachedCellDepth = 0 :: number,
 }
 
 -- Helper: Get WaveService (lazy load)
@@ -56,9 +59,9 @@ local function getWaveService()
 	return State.WaveService
 end
 
--- Helper: Get ground Y from MapConfig
+-- Helper: Get ground Y from cached config
 local function getGroundY(): number
-	return MapConfig.GetConfig().GridY
+	return State.CachedGridY
 end
 
 -- Helper: Get spawn height for sky suns
@@ -69,8 +72,9 @@ end
 -- Helper: Get random grid position
 local function getRandomGridPosition(): (number, number, number)
 	local column, lane = ChanceUtils.RandomGridCell()
-	local cellCenter = MapConfig.GridToWorld(column, lane)
-	local cellW, cellD = MapConfig.GetCellSize()
+	local cellCenter = MapConfig.GridToWorld(column, lane) -- Safe: MapConfig initialized at bootstrap
+	local cellW = State.CachedCellWidth
+	local cellD = State.CachedCellDepth
 	
 	local offsetX = ChanceUtils.RandomOffset(cellW * 0.3)
 	local offsetZ = ChanceUtils.RandomOffset(cellD * 0.3)
@@ -116,6 +120,21 @@ end
 -- 4. INIT
 local function Init(_world)
 	if State.IsInitialized then return end
+	
+	-- Pre-cache config values to avoid yield in OnStep
+	if MapConfig.IsInitialized() then
+		local config = MapConfig.GetConfigIfReady()
+		State.CachedGridY = if config then config.GridY else 0
+	else
+		-- Fallback: force init (should not happen if bootstrap is correct)
+		State.CachedGridY = MapConfig.GetConfig().GridY
+	end
+	
+	-- Cache cell size
+	local cellW, cellD = MapConfig.GetCellSize()
+	State.CachedCellWidth = cellW
+	State.CachedCellDepth = cellD
+	
 	State.IsInitialized = true
 end
 
@@ -124,7 +143,10 @@ local function Dispose()
 	State.IsInitialized = false
 	State.LastSpawnTime = 0
 	State.NextSpawnDelay = 0
-	State.WaveManager = nil
+	State.WaveService = nil
+	State.CachedGridY = 0
+	State.CachedCellWidth = 0
+	State.CachedCellDepth = 0
 end
 
 -- 6. MAIN LOOP

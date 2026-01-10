@@ -2,7 +2,7 @@
 --[[
 	skip Command (Server)
 	
-	Skips the preparation phase or advances to next wave.
+	Skips the preparation phase and starts waves.
 	Usage: skip
 ]]
 
@@ -10,35 +10,32 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = script.Parent.Parent.Parent
 local Logger = require(ReplicatedStorage.Shared.utils.Logger)
 
-return function(context)
-	-- Get WaveManager
-	local managers = Server:FindFirstChild("managers")
-	if not managers then
-		return "Managers folder not found"
+local WaveService = require(Server.services.WaveService)
+
+return function(_context)
+	-- Check if game is in a skippable state
+	local currentState = WaveService.GetGameState()
+	
+	if currentState == "Waiting" then
+		return "Game not started yet. Use 'startgame' first."
 	end
 	
-	local waveFolder = managers:FindFirstChild("wave")
-	if not waveFolder then
-		return "Wave manager not found"
+	if currentState == "Playing" then
+		return "Already playing! No preparation to skip."
 	end
 	
-	local WaveManagerModule = waveFolder:FindFirstChild("WaveManager")
-	if not WaveManagerModule then
-		return "WaveManager module not found"
+	if currentState == "Victory" or currentState == "Defeat" then
+		return `Game is over ({currentState}). Use 'reset' first.`
 	end
 	
-	local WaveManager = require(WaveManagerModule)
-	local manager = WaveManager.GetInstance()
-	
-	if not manager then
-		return "WaveManager instance not initialized"
-	end
-	
+	-- Start waves (skip preparation)
 	Logger.Info("Cmdr", "Skipping preparation phase")
 	
-	task.spawn(function()
-		manager:SkipPreparation()
-	end)
+	local success = WaveService.StartWaves()
 	
-	return "Skipped preparation phase"
+	if success then
+		return "⏩ Skipped preparation - waves starting!"
+	else
+		return "Failed to skip preparation phase"
+	end
 end

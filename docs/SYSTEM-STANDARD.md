@@ -118,3 +118,53 @@ SystemManager.Register(system, moduleScript.Name)
 | `StatsService` | Session statistics |
 | `GridService` | Grid occupancy |
 | `PlayerDataService` | Player profiles/persistence |
+
+---
+
+## 5. MapConfig Caching Pattern (CRITICAL)
+
+**Problem:** `MapConfig.GetConfig()`, `MapConfig.GetZombieDirection()`, etc. can trigger `Initialize()` which uses `WaitForChild()` → **yields in OnStep = CRASH**.
+
+**Solution:** Cache MapConfig values in `State` during `Init()`, use cached values in `OnStep()`.
+
+```lua
+-- 3. STATE
+local State = {
+    IsInitialized = false,
+    -- Cache MapConfig values to avoid yield in OnStep
+    CachedZombieDir = Vector3.zero,
+    CachedGridOrigin = Vector3.zero,
+    CachedCellWidth = 0,
+}
+
+-- 4. INIT (can yield)
+local function Init(_world)
+    if State.IsInitialized then return end
+    
+    -- Safe: Init phase can yield
+    State.CachedZombieDir = MapConfig.GetZombieDirection()
+    State.CachedGridOrigin = MapConfig.GetGridOrigin()
+    State.CachedCellWidth = MapConfig.GetCellSize()
+    
+    State.IsInitialized = true
+end
+
+-- 5. DISPOSE
+local function Dispose()
+    State.IsInitialized = false
+    State.CachedZombieDir = Vector3.zero
+    State.CachedGridOrigin = Vector3.zero
+    State.CachedCellWidth = 0
+end
+
+-- 6. ONSTEP (CANNOT yield)
+local function OnStep(world)
+    -- ✅ GOOD: Use cached value
+    local zombieDir = State.CachedZombieDir
+    
+    -- ❌ BAD: This could yield if MapConfig not initialized!
+    -- local zombieDir = MapConfig.GetZombieDirection()
+end
+```
+
+**Note:** `MapConfig.Initialize()` is called in server bootstrap (`init.server.luau`) before the Matter loop. Functions like `MapConfig.GridToWorld()` are safe to call in OnStep after bootstrap, but caching is still preferred for consistency.

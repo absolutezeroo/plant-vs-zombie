@@ -68,6 +68,8 @@ local State = {
 		plantType: string,
 		direction: number,
 	}},
+	CachedZombieDir = Vector3.zero,
+	IsInitialized = false,
 }
 
 --------------------------------------------------------------------------------
@@ -76,7 +78,7 @@ local State = {
 -- Check if there are zombies in the lane within shoot range
 -- Uses LaneCache for O(1) lane lookup + O(lane_size) direction check
 local function hasZombiesInLane(_world: any, lane: number, plantX: number, plantZ: number, checkBehind: boolean?, customRange: number?): boolean
-	local zombieDir = MapConfig.GetZombieDirection()
+	local zombieDir = State.CachedZombieDir
 	local shootRange = customRange or CONFIG.SHOOT_RANGE
 	return LaneCache.HasZombiesInDirection(lane, plantX, plantZ, {X = zombieDir.X, Z = zombieDir.Z}, checkBehind, shootRange)
 end
@@ -107,13 +109,13 @@ end
 -- Spawn a projectile (data-driven from PlantData)
 local function spawnProjectile(world: any, plantId: number, lane: number, startX: number, plantType: string, direction: number?)
 	-- Get the direction plants should shoot (opposite of zombie direction)
-	local zombieDir = MapConfig.GetZombieDirection()
+	local zombieDir = State.CachedZombieDir
 	-- Plants shoot in the opposite direction (toward zombie spawns)
 	local forwardDirX = -zombieDir.X
 	local forwardDirZ = -zombieDir.Z
 	
 	local dir = direction or 1 -- 1 = forward (toward zombies), -1 = backward (toward base)
-	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local laneCenter = MapConfig.GridToWorld(1, lane) -- Safe: MapConfig initialized at bootstrap
 	local z = laneCenter.Z
 	
 	-- Read stats from PlantData (data-driven)
@@ -228,7 +230,7 @@ end
 local function fireMultiDirection(world: any, plantId: number, lane: number, startX: number, plantType: string)
 	-- Starfruit fires 5 stars in relative directions
 	-- "Forward" = toward zombie spawns, "Backward" = toward base
-	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local laneCenter = MapConfig.GridToWorld(1, lane) -- Safe: MapConfig initialized at bootstrap
 	local z = laneCenter.Z
 	
 	local stats = PlantData[plantType]
@@ -240,7 +242,7 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
 	
 	-- Get forward direction (opposite of zombie movement)
-	local zombieDir = MapConfig.GetZombieDirection()
+	local zombieDir = State.CachedZombieDir
 	local fwdX, fwdZ = -zombieDir.X, -zombieDir.Z
 	-- Perpendicular direction (for "up/down" relative to forward)
 	local perpX, perpZ = -fwdZ, fwdX
@@ -377,7 +379,7 @@ local function OnStep(world)
 		-- Range check for short-range mushrooms (PuffShroom, SeaShroom, etc.)
 		if stats.Range and stats.Range > 0 then
 			local hasInRange = false
-			local zombieDir = MapConfig.GetZombieDirection()
+			local zombieDir = State.CachedZombieDir
 			
 			for _, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
 				if zombie.Lane == plant.Lane then
@@ -488,10 +490,22 @@ end
 -- [6] INIT / DISPOSE
 --------------------------------------------------------------------------------
 local function Init(_world)
-	-- No initialization needed
+	if State.IsInitialized then return end
+	
+	-- Pre-cache MapConfig values to avoid yield in OnStep
+	if MapConfig.IsInitialized() then
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	else
+		-- Fallback: force init (should not happen if bootstrap is correct)
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
+	
+	State.IsInitialized = true
 end
 
 local function Dispose()
+	State.IsInitialized = false
+	State.CachedZombieDir = Vector3.zero
 	table.clear(State.PlantFireTimes)
 	table.clear(State.PendingMultiShots)
 end

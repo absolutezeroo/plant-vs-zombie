@@ -641,18 +641,6 @@ event LevelUp = {
     }
 }
 
--- Gems earned notification
-event GemsEarned = {
-    from: Server,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        Amount: u8,
-        TotalGems: u32,
-        Reason: u8,  -- 0=LevelUp, 1=3StarVictory, 2=FirstClear
-    }
-}
-
 -- Deck saved confirmation
 event DeckSaved = {
     from: Server,

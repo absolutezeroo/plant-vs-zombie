@@ -13,42 +13,20 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
 local Server = script.Parent.Parent.Parent
+local WaveService = require(Server.services.WaveService)
 
 return function(_context, worldId: string?, difficulty: string?)
 	local world = worldId or "day"
 	local diff = difficulty or "normal"
 	
-	-- Get WaveManagerSystem
-	local systems = Server:FindFirstChild("systems")
-	if not systems then
-		return "Systems folder not found"
-	end
-	
-	local waveFolder = systems:FindFirstChild("wave")
-	if not waveFolder then
-		return "Wave systems folder not found"
-	end
-	
-	local WaveManagerSystemModule = waveFolder:FindFirstChild("WaveManagerSystem")
-	if not WaveManagerSystemModule then
-		return "WaveManagerSystem not found"
-	end
-	
-	local WaveManagerSystem = require(WaveManagerSystemModule)
-	local WaveManager = WaveManagerSystem.WaveManager
-	
-	if not WaveManager then
-		return "WaveManager API not available"
-	end
-	
 	-- Check if game already running
-	local currentState = WaveManager.GetGameState()
+	local currentState = WaveService.GetGameState()
 	if currentState ~= "Waiting" and currentState ~= nil then
 		return `Game already running! State: {currentState}. Use 'reset' command first.`
 	end
 	
-	-- Start the game
-	local success = WaveManager.StartGame(world, diff)
+	-- Start the game using WaveService
+	local success = WaveService.StartGame(world, diff)
 	
 	if success then
 		Logger.Info("Cmdr", `Game started: {world}/{diff}`)

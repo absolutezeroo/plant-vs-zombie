@@ -54,6 +54,7 @@ export type ActiveCloud = {
 
 local State = {
 	ActiveClouds = {} :: {ActiveCloud},
+	IsInitialized = false,
 }
 
 -- ============================================================
@@ -61,6 +62,7 @@ local State = {
 -- ============================================================
 
 -- Spawn a poison cloud at a position
+-- NOTE: MapConfig.WorldToGrid is safe to call - MapConfig.Initialize() is called at server bootstrap
 local function spawnPoisonCloud(position: {X: number, Y: number, Z: number}, radius: number, damagePerSecond: number, duration: number)
 	local _, lane = MapConfig.WorldToGrid(Vector3.new(position.X, position.Y, position.Z))
 	
@@ -156,10 +158,13 @@ end
 -- SECTION 6: INIT / DISPOSE
 -- ============================================================
 local function Init(_world)
+	if State.IsInitialized then return end
+	State.IsInitialized = true
 	Logger.Debug("PoisonCloudSystem", "Initialized")
 end
 
 local function Dispose()
+	State.IsInitialized = false
 	table.clear(State.ActiveClouds)
 	Logger.Debug("PoisonCloudSystem", "Disposed")
 end

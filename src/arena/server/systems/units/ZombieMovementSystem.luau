@@ -41,13 +41,30 @@ local CONFIG = table.freeze({
 local State = {
 	IsInitialized = false,
 	LastBatchTime = 0,
-	PositionUpdates = {} :: {[number]: number}, -- entityId -> positionX
-	ReachedHouse = {} :: {[number]: boolean},   -- Track zombies that reached house
+	PositionUpdates = {} :: {[number]: number},
+	ReachedHouse = {} :: {[number]: boolean},
+	CachedConfig = nil :: MapConfig.MapConfigType?,
+	CachedBasePos = Vector3.zero,
+	CachedZombieDir = Vector3.zero,
 }
 
 -- 4. INIT
 local function Init(_world)
 	if State.IsInitialized then return end
+	
+	-- Pre-cache MapConfig to avoid yield in OnStep
+	-- MapConfig.Initialize() is called during server bootstrap
+	if MapConfig.IsInitialized() then
+		State.CachedConfig = MapConfig.GetConfigIfReady()
+	else
+		-- Fallback: force init (should not happen if bootstrap is correct)
+		State.CachedConfig = MapConfig.GetConfig()
+	end
+	
+	-- Cache frequently used values
+	State.CachedBasePos = MapConfig.GetBasePosition()
+	State.CachedZombieDir = MapConfig.GetZombieDirection()
+	
 	State.IsInitialized = true
 end
 
@@ -55,13 +72,20 @@ end
 local function Dispose()
 	State.IsInitialized = false
 	State.LastBatchTime = 0
+	State.CachedConfig = nil
+	State.CachedBasePos = Vector3.zero
+	State.CachedZombieDir = Vector3.zero
 	table.clear(State.PositionUpdates)
 	table.clear(State.ReachedHouse)
 end
 
 -- Helper: Convert world X position to grid column
 local function worldXToGridColumn(worldX: number): number?
-	local config = MapConfig.GetConfig()
+	local config = State.CachedConfig
+	if not config then
+		return nil
+	end
+	
 	local gridOriginX = config.GridCornerA.X
 	local cellWidth = config.CellWidth or GridConfig.CELL_SIZE
 	
@@ -84,9 +108,9 @@ local function OnStep(world)
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, CONFIG.MIN_DT, CONFIG.MAX_DT)
 	
-	-- Get base position and zombie direction once per frame
-	local basePos = MapConfig.GetBasePosition()
-	local zombieDir = MapConfig.GetZombieDirection()
+	-- Get base position and zombie direction from cache (set in Init)
+	local basePos = State.CachedBasePos
+	local zombieDir = State.CachedZombieDir
 	
 	-- Process all zombies with movement
 	for id, pos, movement, zombie in world:query(Components.PositionComponent, Components.MovementComponent, Components.ZombieTypeComponent) do

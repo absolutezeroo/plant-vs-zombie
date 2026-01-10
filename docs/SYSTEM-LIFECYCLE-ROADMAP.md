@@ -14,12 +14,14 @@
 | Docs obsolètes nettoyées | ✅ |
 | Mode Endless supprimé (non prévu V1) | ✅ |
 
-### 🔄 En Cours (Analyse WIP 2026-01-10)
+### 🔄 En Cours (Analyse WIP 2026-01-11)
 
 | Fonctionnalité | Status | Impact |
 |----------------|--------|--------|
 | Système Mutations | ✅ Backend 100% | UI à intégrer dans Lobby |
 | Système Plant Food | ✅ Fonctionnel | Documenté |
+| MapConfig Caching | ✅ Appliqué | Tous systèmes sécurisés |
+| LaneCache Integration | ✅ Appliqué | CombatSystem O(N²) → O(lane) |
 | Cycle Jour/Nuit | ⚠️ TODO | 30 min de travail |
 | Validation Zone Eau | ⚠️ TODO | PlacementSystem |
 | Bouclier Zombie | ⚠️ TODO | CombatSystem |
@@ -285,15 +287,15 @@ end)
 | `GhostPreviewSystem.luau` | `_getVFXService()` | Défini mais jamais appelé |
 | `ZombieSpawnSystem.luau` | **Tout le fichier** | @deprecated, WaveManagerSystem le remplace |
 | `CosmeticData.luau` | Non prioritaire | Data prête mais jamais require() - V2 |
-| `LaneCache.luau` | **Jamais utilisé** | 100 lignes orphelines |
+| ~~`LaneCache.luau`~~ | ✅ Intégré | Utilisé par CombatSystem, ProjectileSystem |
 
 ### Paquets Zap Orphelins
 
 | Paquet | Raison | Action |
 |--------|--------|--------|
-| `XPGained` | Jamais `.Fire()` | Implémenter ou supprimer |
-| `LevelUp` | Jamais `.Fire()` | Implémenter ou supprimer |
-| `GemsEarned` | Jamais `.Fire()` | Implémenter ou supprimer |
+| `XPGained` | Utilisé par XPService | ✅ Conservé |
+| `LevelUp` | Utilisé par XPService | ✅ Conservé |
+| ~~`GemsEarned`~~ | Jamais `.Fire()` | ✅ Supprimé (2026-01-11) |
 | `GameComplete` | Doublon avec `GameEndRewards` | Supprimer |
 | `RemoveMutationResponse` | Marqué DEPRECATED | Supprimer |
 
