@@ -27,6 +27,7 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 - **Trove** v1.8.0+ — Connection/instance cleanup manager
 - **Sift** v0.0.11+ — Immutable table utilities (required by Matter)
 - **Signal** v2.0.3+ — Custom event emitter (UI/Manager communication)
+- **Cmdr** v1.12.0+ — Developer console & command framework (replaces custom debug console)
 
 **Development Toolchain:**
 - **Rojo** v7.4.0+ — Filesystem-to-Studio sync
@@ -386,6 +387,56 @@ BANDWIDTH_CAP = 50000  -- Bytes per second average
 
 ## Code Organization & Naming Rules
 
+### Project Architecture (Multi-Place)
+
+**Pattern:** Monorepo Multi-Place (Lobby + Arena) with Domain-Driven organization.
+
+```
+src/
+├── arena/              # Arena place (gameplay)
+│   ├── server/         # Server-authoritative systems
+│   │   └── systems/    # Domain-organized systems
+│   │       ├── combat/     # BossSystem, CombatSystem, ProjectileSystem, etc.
+│   │       ├── core/       # SafetySystem, PerformanceMonitor, EventCleanup
+│   │       ├── economy/    # SunCollection, SunflowerProduction, SunSpawn
+│   │       ├── mutations/  # Burn, Freeze, Poison, Lightning, etc. (8 systems)
+│   │       ├── units/      # Placement, Movement, Death, Mushroom
+│   │       └── wave/       # WaveManagerSystem
+│   └── client/         # Client presentation
+│       └── systems/    # Domain-organized systems
+│           ├── input/      # GhostPreviewSystem
+│           ├── presentation/ # VFXAudioSystem
+│           └── rendering/  # PlantRender, ZombieRender, Projectile, Sun, Grid
+├── lobby/              # Lobby place (menus, deck builder)
+│   ├── server/
+│   └── client/
+└── shared/             # Cross-realm shared code
+    ├── components/     # Domain-organized components (init.luau as registry)
+    │   ├── core/       # Position, Health, Movement, Owner, Tags
+    │   ├── combat/     # Armed, Projectile, Slow, Target, Splash, Stun, etc.
+    │   ├── units/      # PlantType, ZombieType, Ghost, Jumping, Sleeping
+    │   ├── economy/    # Sun, Coin
+    │   ├── events/     # DamageEvent, DeathEvent, SpawnEvent, etc.
+    │   └── mutations/  # Burn, Freeze, Poison, Lightning, Lifesteal, etc.
+    ├── config/         # Configuration modules (GridConfig, PerformanceConfig)
+    ├── data/           # Game data (PlantData, ZombieData, MutationData, etc.)
+    ├── network/        # Zap schema (packets.zap + generated/)
+    ├── services/       # PlayerDataCore, TeleportDataHandler
+    ├── signals/        # Custom Signal events
+    ├── ui/             # Shared Fusion components (LoaderUI)
+    ├── utils/          # Utilities (NEW)
+    │   ├── SystemManager.luau      # System lifecycle management
+    │   ├── Logger.luau             # Structured logging with throttling
+    │   ├── ErrorHandler.luau       # Hybrid error handling
+    │   ├── EntityPool.luau         # Pre-spawned entity pool
+    │   ├── ServiceLoader.luau      # Service initialization orchestration
+    │   ├── AttachmentUtils.luau    # Attachment-based positioning
+    │   ├── GridUtils.luau          # Grid coordinate calculations
+    │   ├── LaneCache.luau          # Lane-based spatial hashing
+    │   └── MathUtils.luau          # Math helpers
+    └── Types.luau      # Shared type definitions
+```
+
 ### File Location Rules (Non-Negotiable)
 
 - **Server-Only Code:** `src/server/` — authority validation, ProfileStore operations, wave generation
@@ -447,6 +498,37 @@ return function()
 end
 ```
 
+### Component Registry Pattern (NEW - Central Import)
+
+**File:** `src/shared/components/init.luau`
+
+All components are registered in the central init.luau file:
+
+```lua
+-- Import from registry
+local Components = require(Shared.components)
+
+-- Access components directly
+local HealthComponent = Components.HealthComponent
+local PositionComponent = Components.PositionComponent
+local Tags = Components.Tags
+
+-- Tag usage
+world:spawn(
+    Tags.PlantTag(),
+    HealthComponent({ Current = 100, Max = 100 }),
+    PositionComponent({ X = 0, Y = 0 })
+)
+```
+
+**Available Tags (from Tags.luau):**
+- `PlantTag` - marks entity as a plant
+- `ZombieTag` - marks entity as a zombie
+- `ProjectileTag` - marks entity as a projectile
+- `ResourceTag` - marks entity as a resource (sun drop)
+- `InactiveTag` - marks entity as pooled/inactive
+- `ReplicatedTag` - marks entity for network replication
+
 ### Config Module Pattern (Frozen/Immutable)
 
 ```lua
@@ -494,7 +576,31 @@ MySystem.priority = 100 -- WHY: Rebuilds spatial cache before targeting
 ---
 
 ## Critical Don't-Miss Rules (Anti-Patterns & Gotchas)
+### ⚔️ MUTATION SYSTEM ARCHITECTURE (NEW)
 
+**19 mutations defined in `MutationData.luau`**, processed by 8 specialized systems:
+
+| System | Component | Effect |
+|--------|-----------|--------|
+| BurnDamageSystem | BurningComponent | DoT damage over time |
+| ChainLightningSystem | ChainLightningComponent | Chain to nearby enemies |
+| FreezeSystem | FrozenComponent | Slow/freeze movement |
+| LifestealSystem | LifestealComponent | Heal on damage dealt |
+| MutationApplySystem | MutationsComponent | Apply mutations from data |
+| PoisonCloudSystem | PoisonCloudComponent | AoE poison damage |
+| SplashDamageSystem | SplashDamageComponent | AoE splash on hit |
+| SunOnKillSystem | SunOnKillComponent | Generate sun on kill |
+
+**Mutation Application Pattern:**
+```lua
+-- Mutations are applied via MutationsComponent
+world:insert(plantId, MutationsComponent({
+    ActiveMutations = { "Burn", "Splash" },
+    MutationData = MutationData.Burn,
+}))
+```
+
+---
 ### ❌ FATAL MISTAKES (Will Break "The Swarm" Performance)
 
 1. **Using Humanoid/HumanoidRootPart for Plants or Zombies**

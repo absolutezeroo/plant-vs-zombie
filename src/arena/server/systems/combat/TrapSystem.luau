@@ -75,12 +75,13 @@ local function TrapSystem(world)
 			local lastDamage = _trapDamageTimes[key] or 0
 			if currentTime - lastDamage < TrapConfig.SPIKEWEED_DAMAGE_INTERVAL then continue end
 			
-			-- Apply damage (immutable via Sift)
+			-- Apply damage
 			local health = world:get(zombieId, HealthComponent)
 			if health then
 				local newHealth = math.max(0, health.Current - damage)
-				world:insert(zombieId, Sift.Dictionary.merge(health, {
+				world:insert(zombieId, HealthComponent({
 					Current = newHealth,
+					Max = health.Max,
 				}))
 				
 				_trapDamageTimes[key] = currentTime
@@ -97,9 +98,10 @@ local function TrapSystem(world)
 				if stats.PopsTires then
 					local zombieStats = ZombieData[zombie.ZombieType]
 					if zombieStats and zombieStats.IsVehicle then
-						-- Instant kill vehicle (immutable via Sift)
-						world:insert(zombieId, Sift.Dictionary.merge(health, {
+						-- Instant kill vehicle
+						world:insert(zombieId, HealthComponent({
 							Current = 0,
+							Max = health.Max,
 						}))
 						Logger.Info("Trap", `Spikeweed {trapId} popped tires of vehicle zombie {zombieId}`)
 					end

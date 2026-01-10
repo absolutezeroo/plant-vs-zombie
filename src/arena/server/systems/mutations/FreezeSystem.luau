@@ -38,8 +38,8 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 	-- Check if already frozen
 	local existingFreeze = world:get(zombieEntityId, FrozenComponent)
 	if existingFreeze then
-		-- Refresh duration (immutable via Sift)
-		world:insert(zombieEntityId, Sift.Dictionary.merge(existingFreeze, {
+		-- Refresh duration
+		world:insert(zombieEntityId, FrozenComponent({
 			RemainingDuration = math.max(existingFreeze.RemainingDuration, freezeDuration),
 			AppliedAt = os.clock(),
 		}))

@@ -66,7 +66,7 @@ local victoryScreen: any
 local preparationStartTime = 0
 local preparationDuration = 20
 local intermissionStartTime = 0
-local intermissionDuration = 30
+local intermissionDuration = 10 -- Must match WaveConfig.WAVE_DELAY on server
 
 -- Create a scope for Fusion cleanup
 local scope = Fusion.scoped(Fusion)
@@ -185,6 +185,9 @@ local function setupNetworkListeners()
     Network.WaveCompleted.On(function(data)
         Logger.Info("ArenaClient", `Wave {data.WaveNumber} completed!`)
         intermissionStartTime = tick()
+        
+        -- Initialize intermission timer in HUD
+        hud:SetIntermissionTime(intermissionDuration)
         
         -- Fire signal for HUD intermission
         GameSignals.OnWaveCompleted:Fire({

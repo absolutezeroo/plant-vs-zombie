@@ -99,7 +99,6 @@ function RewardCalculator:CalculateRewards(params: RewardParams): RewardResult
             result.TotalCoins += result.CompletionCoins
         end
     elseif params.BaseCoins then
-        -- Use BaseCoins directly if provided (e.g., endless mode)
         result.CompletionCoins = params.BaseCoins
         result.TotalCoins += result.CompletionCoins
     end

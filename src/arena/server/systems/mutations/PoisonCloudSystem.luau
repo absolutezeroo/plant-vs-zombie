@@ -99,9 +99,10 @@ local function PoisonCloudSystem(world)
 					local distance = math.sqrt(dx * dx + dz * dz)
 					
 					if distance <= cloud.Radius then
-						-- Apply poison damage (immutable via Sift)
-						world:insert(entityId, Sift.Dictionary.merge(health, {
+						-- Apply poison damage
+						world:insert(entityId, HealthComponent({
 							Current = math.max(0, health.Current - cloud.DamagePerSecond),
+							Max = health.Max,
 						}))
 						
 						world:insert(entityId, DamageEvent({

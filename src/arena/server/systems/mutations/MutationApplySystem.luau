@@ -97,8 +97,7 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 		local healthCurrent = health.Current :: number
 		local newMax = math.floor(healthMax * effects.HealthBonus)
 		local newCurrent = math.floor(healthCurrent * effects.HealthBonus)
-		-- Immutable component update via Sift
-		world:insert(entityId, Sift.Dictionary.merge(health, {
+		world:insert(entityId, HealthComponent({
 			Current = newCurrent,
 			Max = newMax,
 		}))

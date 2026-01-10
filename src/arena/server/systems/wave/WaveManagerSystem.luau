@@ -480,6 +480,10 @@ function WaveManager.ResetGameState()
     _currentDifficulty = ""
     _currentWorldConfig = nil
     _currentDifficultyConfig = nil
+    
+    -- Reset base health for new game
+    BaseHealth.Reset()
+    
     Logger.Info("WaveManager", "Game state reset")
 end
 
@@ -512,8 +516,8 @@ local function WaveManagerSystem(world)
         return
     end
     
-    -- Check defeat condition
-    if BaseHealth.IsDefeated() and state ~= "Defeat" then
+    -- Check defeat condition (only during active gameplay)
+    if _stateManager:IsPlaying() and BaseHealth.IsDefeated() and state ~= "Defeat" then
         WaveManager.SetGameState("Defeat")
         Logger.Info("WaveManager", "💀 DEFEAT - Base destroyed!")
         return

@@ -1,5 +1,7 @@
 {
   "name": "garden-swarm-arena",
+  "servePort": 34873,
+  "servePlaceIds": [105231625317605],
   "tree": {
     "$className": "DataModel",
 

@@ -207,8 +207,7 @@ local function executeAbility(world: MatterWorld, plantId: number, plantType: st
 	if ability.ArmorBoost then
 		local health = world:get(plantId, HealthComponent)
 		if health then
-			-- Immutable component update via Sift
-			world:insert(plantId, Sift.Dictionary.merge(health, {
+			world:insert(plantId, HealthComponent({
 				Current = health.Current + ability.ArmorBoost,
 				Max = health.Max + ability.ArmorBoost,
 			}))

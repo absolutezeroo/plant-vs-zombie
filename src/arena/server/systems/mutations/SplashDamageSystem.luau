@@ -63,9 +63,9 @@ local function applySplashDamage(
 			local finalDamage = math.floor(splashDamage * distanceMultiplier)
 			
 			if finalDamage > 0 then
-				-- Immutable component update via Sift
-				world:insert(entityId, Sift.Dictionary.merge(health, {
+				world:insert(entityId, HealthComponent({
 					Current = math.max(0, health.Current - finalDamage),
+					Max = health.Max,
 				}))
 				
 				world:spawn(DamageEvent({

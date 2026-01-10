@@ -50,8 +50,9 @@ local function LifestealSystem(world)
 		local healthMax = health.Max :: number
 		local newHealth = math.min(healthMax, healthCurrent + healAmount)
 		if newHealth > healthCurrent then
-			world:insert(sourcePlant, Sift.Dictionary.merge(health, {
+			world:insert(sourcePlant, HealthComponent({
 				Current = newHealth,
+				Max = healthMax,
 			}))
 			
 			Logger.Debug("LifestealSystem", `Plant {sourcePlant} healed {healAmount} from lifesteal`)

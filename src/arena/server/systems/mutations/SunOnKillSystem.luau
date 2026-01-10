@@ -55,9 +55,10 @@ local function SunOnKillSystem(world)
 			}),
 			SunComponent({
 				Value = sunAmount,
-				OwnerId = owner.PlayerId,
 				SpawnTime = os.clock(),
-				AutoCollect = true, -- Auto-collect after delay
+				Lifetime = 15, -- 15 seconds to collect
+				IsFalling = false, -- Spawned in place
+				SourceType = "KillBonus",
 			})
 		)
 		

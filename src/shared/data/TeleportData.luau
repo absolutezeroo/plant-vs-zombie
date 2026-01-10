@@ -22,7 +22,7 @@ local TeleportData = {}
 -- Place IDs (à configurer avec les vrais IDs après publication)
 TeleportData.PlaceIds = {
     Lobby = 74774650768633,
-    Arena = 89747004814506,
+    Arena = 105231625317605,
 }
 
 -- ============================================
@@ -44,7 +44,7 @@ export type LobbyReturnData = {
     Difficulty: string,        -- Difficulté jouée
     Victory: boolean,          -- Résultat du match
     Stars: number,             -- Star rating (0-3)
-    WavesSurvived: number,     -- Vagues survivées (pour endless et stats)
+    WavesSurvived: number,     -- Vagues survivées (pour les stats)
     CoinsEarned: number,       -- Coins gagnés durant le match
     XPEarned: number,          -- XP gagnée
     Timestamp: number,

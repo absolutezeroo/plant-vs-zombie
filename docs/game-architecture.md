@@ -201,7 +201,7 @@ MEMORY_LIMIT = 600     -- MB, emergency protocols at thresholds
   - Repository: [Elttob/Fusion](https://github.com/Elttob/Fusion)
   - Use Case: All menus, HUD elements, reactive card selection
   
-- **ProfileStore** - Session-locked DataStore wrapper\n  - Repository: [MadStudioRoblox/ProfileStore](https://github.com/MadStudioRoblox/ProfileStore)\n  - Use Case: Player profiles (prevents duplication exploits, safe for trading V2)\n\n- **Promise** - Async/await for Luau\n  - Repository: [evaera/roblox-lua-promise](https://github.com/evaera/roblox-lua-promise)\n  - Use Case: Data loading, teleports, HTTP requests, retry logic\n\n- **Trove** - Connection/instance cleanup manager\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: All :Connect() calls in Services/Controllers (prevents memory leaks)\n\n- **Sift** - Immutable table utilities\n  - Repository: [csqrl/sift](https://github.com/csqrl/sift)\n  - Use Case: Component updates in Matter (immutability required)\n\n- **Signal** - Custom event emitter\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: UI Controller ↔ Manager communication (replaces BindableEvent)\n\n**Development Toolchain:**
+- **ProfileStore** - Session-locked DataStore wrapper\n  - Repository: [MadStudioRoblox/ProfileStore](https://github.com/MadStudioRoblox/ProfileStore)\n  - Use Case: Player profiles (prevents duplication exploits, safe for trading V2)\n\n- **Promise** - Async/await for Luau\n  - Repository: [evaera/roblox-lua-promise](https://github.com/evaera/roblox-lua-promise)\n  - Use Case: Data loading, teleports, HTTP requests, retry logic\n\n- **Trove** - Connection/instance cleanup manager\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: All :Connect() calls in Services/Controllers (prevents memory leaks)\n\n- **Sift** - Immutable table utilities\n  - Repository: [csqrl/sift](https://github.com/csqrl/sift)\n  - Use Case: Component updates in Matter (immutability required)\n\n- **Signal** - Custom event emitter\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: UI Controller ↔ Manager communication (replaces BindableEvent)\n\n- **Cmdr** - Developer console & command framework\n  - Repository: [evaera/Cmdr](https://github.com/evaera/Cmdr)\n  - Use Case: In-game developer console, debug commands, admin tools\n\n**Development Toolchain:**
 - **Rojo** - Filesystem-to-Roblox sync (enables VS Code workflow)
 - **Wally** - Package manager (Rust-like dependency management)
 - **GitHub Actions** - CI/CD pipeline (StyLua, Luau type checking, Rojo build validation)
@@ -870,75 +870,156 @@ These decisions are NOT provided by the engine or frameworks—they must be desi
 
 ### Directory Structure
 
+**Organization Pattern:** Domain-Driven (systems and components organized by gameplay domain)
+
 ```
 plant-vs-zombie/
 ├── src/
-│   ├── server/                    # Server-authoritative logic
-│   │   ├── systems/               # ECS systems (Matter loop)
-│   │   │   ├── GridSystem.lua
-│   │   │   ├── PlacementSystem.lua
-│   │   │   ├── WaveSystem.lua
-│   │   │   ├── CombatSystem.lua
-│   │   │   ├── ProjectileSystem.lua
-│   │   │   ├── ResourceSystem.lua
-│   │   │   ├── ReplicationSystem.lua
-│   │   │   ├── SafetySystem.lua
-│   │   │   └── PerformanceMonitorSystem.lua
-│   │   ├── services/              # Singleton managers
-│   │   │   ├── DataService.lua    # ProfileStore wrapper
-│   │   │   ├── NetworkService.lua # Zap server dispatcher
-│   │   │   └── WaveQueueService.lua
-│   │   └── init.server.lua        # Server bootstrap
+│   ├── arena/                     # Arena place (gameplay)
+│   │   ├── server/
+│   │   │   ├── systems/           # ECS systems (Domain-Driven)
+│   │   │   │   ├── combat/        # Combat-related systems
+│   │   │   │   │   ├── BossSystem.luau
+│   │   │   │   │   ├── CombatSystem.luau
+│   │   │   │   │   ├── EnhancementSystem.luau
+│   │   │   │   │   ├── PlantFoodSystem.luau
+│   │   │   │   │   ├── ProjectileSystem.luau
+│   │   │   │   │   ├── SpecialPlantSystem.luau
+│   │   │   │   │   └── TrapSystem.luau
+│   │   │   │   ├── core/          # Core framework systems
+│   │   │   │   │   ├── EventCleanupSystem.luau
+│   │   │   │   │   ├── FullStateSyncSystem.luau
+│   │   │   │   │   ├── PerformanceMonitorSystem.luau
+│   │   │   │   │   └── SafetySystem.luau
+│   │   │   │   ├── economy/       # Resource management
+│   │   │   │   │   ├── SunCollectionSystem.luau
+│   │   │   │   │   ├── SunflowerProductionSystem.luau
+│   │   │   │   │   └── SunSpawnSystem.luau
+│   │   │   │   ├── mutations/     # Mutation effect systems
+│   │   │   │   │   ├── BurnDamageSystem.luau
+│   │   │   │   │   ├── ChainLightningSystem.luau
+│   │   │   │   │   ├── FreezeSystem.luau
+│   │   │   │   │   ├── LifestealSystem.luau
+│   │   │   │   │   ├── MutationApplySystem.luau
+│   │   │   │   │   ├── PoisonCloudSystem.luau
+│   │   │   │   │   ├── SplashDamageSystem.luau
+│   │   │   │   │   └── SunOnKillSystem.luau
+│   │   │   │   ├── units/         # Entity lifecycle systems
+│   │   │   │   │   ├── EntityDeathSystem.luau
+│   │   │   │   │   ├── MushroomSystem.luau
+│   │   │   │   │   ├── PlacementSystem.luau
+│   │   │   │   │   ├── ZombieMovementSystem.luau
+│   │   │   │   │   └── ZombieSpawnSystem.luau  # @deprecated
+│   │   │   │   └── wave/          # Wave management
+│   │   │   │       └── WaveManagerSystem.luau
+│   │   │   └── init.server.luau   # Server bootstrap
+│   │   │
+│   │   └── client/
+│   │       ├── systems/           # Client ECS systems
+│   │       │   ├── input/
+│   │       │   │   └── GhostPreviewSystem.luau
+│   │       │   ├── presentation/
+│   │       │   │   └── VFXAudioSystem.luau
+│   │       │   └── rendering/
+│   │       │       ├── GridVisualizationSystem.luau
+│   │       │       ├── PlantRenderSystem.luau
+│   │       │       ├── ProjectileRenderSystem.luau
+│   │       │       ├── SunRenderSystem.luau
+│   │       │       └── ZombieRenderSystem.luau
+│   │       └── init.client.luau   # Client bootstrap
 │   │
-│   ├── client/                    # Client-side rendering & input
-│   │   ├── systems/               # Client-only ECS systems
-│   │   │   ├── InputSystem.lua
-│   │   │   ├── VFXSystem.lua
-│   │   │   ├── AudioSystem.lua
-│   │   │   ├── LODSystem.lua
-│   │   │   └── PredictionSystem.lua
-│   │   ├── controllers/           # UI controllers (Fusion)
-│   │   │   ├── HUDController.lua
-│   │   │   ├── DeckController.lua
-│   │   │   ├── PlacementController.lua
-│   │   │   └── DebugConsole.lua
-│   │   ├── ui/                    # Fusion UI components
-│   │   │   ├── components/
-│   │   │   │   ├── PlantCard.lua
-│   │   │   │   ├── SunDisplay.lua
-│   │   │   │   └── HealthBar.lua
-│   │   │   └── screens/
-│   │   │       ├── MainMenuScreen.lua
-│   │   │       └── MatchHUDScreen.lua
-│   │   └── init.client.lua        # Client bootstrap
+│   ├── lobby/                     # Lobby place (menus, deck builder)
+│   │   ├── server/
+│   │   └── client/
 │   │
 │   └── shared/                    # Cross-realm code
-│       ├── components/            # Matter components (pure data)
-│       │   ├── GridPositionComponent.lua
-│       │   ├── HealthComponent.lua
-│       │   ├── TargetComponent.lua
-│       │   ├── ProjectileComponent.lua
-│       │   ├── ResourceComponent.lua
-│       │   └── EventComponents/   # Ephemeral event components
-│       │       ├── DamageEvent.lua
-│       │       └── DeathEvent.lua
-│       ├── config/                # Categorized config modules
-│       │   ├── GridConfig.lua     # SACRED: 9×5 grid, 6-stud cells
-│       │   ├── PerformanceConfig.lua # Caps, budgets, thresholds
-│       │   ├── BalanceConfig.lua  # Plant/zombie stats
-│       │   ├── WaveConfig.lua     # Wave formula parameters
-│       │   └── NetworkConfig.lua  # Tick rate, buffer sizes
+│       ├── components/            # Matter components (Domain-Driven)
+│       │   ├── init.luau          # Central registry
+│       │   ├── core/              # Core components
+│       │   │   ├── GridPositionComponent.luau
+│       │   │   ├── HealthComponent.luau
+│       │   │   ├── MovementComponent.luau
+│       │   │   ├── OwnerComponent.luau
+│       │   │   ├── PositionComponent.luau
+│       │   │   └── Tags.luau      # PlantTag, ZombieTag, etc.
+│       │   ├── combat/            # Combat components
+│       │   │   ├── ArmedComponent.luau
+│       │   │   ├── ChewingComponent.luau
+│       │   │   ├── EnhancedProjectileComponent.luau
+│       │   │   ├── HidingComponent.luau
+│       │   │   ├── PlantFoodComponent.luau
+│       │   │   ├── ProjectileComponent.luau
+│       │   │   ├── SlowComponent.luau
+│       │   │   ├── SplashComponent.luau
+│       │   │   ├── StunComponent.luau
+│       │   │   └── TargetComponent.luau
+│       │   ├── units/             # Unit type components
+│       │   │   ├── GhostComponent.luau
+│       │   │   ├── JumpingComponent.luau
+│       │   │   ├── PlantTypeComponent.luau
+│       │   │   ├── SleepingComponent.luau
+│       │   │   └── ZombieTypeComponent.luau
+│       │   ├── economy/           # Economy components
+│       │   │   ├── CoinComponent.luau
+│       │   │   └── SunComponent.luau
+│       │   ├── events/            # Ephemeral event components
+│       │   │   ├── CoinDropEvent.luau
+│       │   │   ├── DamageEvent.luau
+│       │   │   ├── DeathEvent.luau
+│       │   │   ├── PlantActionEvent.luau
+│       │   │   ├── ProjectileHitEvent.luau
+│       │   │   ├── SpawnEvent.luau
+│       │   │   └── WaveStateEvent.luau
+│       │   └── mutations/         # Mutation effect components
+│       │       ├── BurnEffectComponent.luau
+│       │       ├── BurningComponent.luau
+│       │       ├── ChainLightningComponent.luau
+│       │       ├── DamageReductionComponent.luau
+│       │       ├── FreezeEffectComponent.luau
+│       │       ├── FrozenComponent.luau
+│       │       ├── LifestealComponent.luau
+│       │       ├── MutationsComponent.luau
+│       │       ├── PoisonCloudComponent.luau
+│       │       ├── PoisonedComponent.luau
+│       │       ├── SplashDamageComponent.luau
+│       │       └── SunOnKillComponent.luau
+│       ├── config/                # Configuration modules
+│       │   ├── GridConfig.luau    # SACRED: 9×5 grid, 6-stud cells
+│       │   ├── LobbyConfig.luau   # Lobby place settings
+│       │   ├── MapConfig.luau     # Map-specific settings
+│       │   ├── NetworkConfig.luau # Tick rate, buffer sizes
+│       │   └── PerformanceConfig.luau # Caps, budgets, thresholds
+│       ├── data/                  # Game data definitions
+│       │   ├── CosmeticData.luau  # Skin definitions (WIP)
+│       │   ├── DifficultyData.luau
+│       │   ├── MutationData.luau  # 19 mutations defined
+│       │   ├── PlantData.luau     # Plant stats & abilities
+│       │   ├── PlantFoodData.luau # Plant Food abilities
+│       │   ├── ProfileTemplate.luau # ProfileStore schema
+│       │   ├── ProgressionData.luau
+│       │   ├── TeleportData.luau  # Arena teleport config
+│       │   ├── WorldData.luau     # 6 worlds defined
+│       │   └── ZombieData.luau    # Zombie stats
 │       ├── network/               # Zap schema definitions
-│       │   ├── packets.zap        # Network packet IDL
-│       │   └── NetworkTypes.lua   # Type aliases
-│       ├── utils/                 # Pure utility functions
-│       │   ├── ErrorHandler.lua
-│       │   ├── Logger.lua
-│       │   ├── MathUtils.lua
-│       │   └── TableUtils.lua
-│       └── types/                 # Luau type definitions
-│           ├── GameTypes.lua      # Plant, Zombie, Projectile
-│           └── DataTypes.lua      # ProfileStore schemas
+│       │   ├── packets.zap        # Unified network IDL (969 lines)
+│       │   └── generated/         # Auto-generated Zap code
+│       ├── services/              # Shared services
+│       │   ├── PlayerDataCore.luau
+│       │   └── TeleportDataHandler.luau
+│       ├── signals/               # Custom Signal events
+│       ├── ui/                    # Fusion UI components
+│       │   └── LoaderUI.luau
+│       ├── utils/                 # Utility modules (NEW)
+│       │   ├── AttachmentUtils.luau   # Attachment-based positioning
+│       │   ├── EntityPool.luau        # Pre-spawned entity pool
+│       │   ├── ErrorHandler.luau      # Hybrid error handling
+│       │   ├── GridUtils.luau         # Grid calculations
+│       │   ├── LaneCache.luau         # Lane-based spatial hashing
+│       │   ├── Logger.luau            # Structured logging
+│       │   ├── MathUtils.luau         # Math helpers
+│       │   ├── ServiceLoader.luau     # Service initialization
+│       │   └── SystemManager.luau     # System lifecycle management
+│       └── Types.luau             # Shared type definitions
 │
 ├── assets/                        # Roblox Studio assets
 │   ├── models/                    # MeshParts, Models
@@ -967,26 +1048,72 @@ plant-vs-zombie/
 
 ### System Location Mapping
 
-| System | File Location | Responsibility |
-|--------|--------------|----------------|
-| **Grid & Placement** | `src/server/systems/GridSystem.lua` | Grid state management, cell occupancy |
-| | `src/server/systems/PlacementSystem.lua` | Plant placement validation, replication |
-| | `src/client/controllers/PlacementController.lua` | Ghost unit preview, input handling |
-| **Wave Generator** | `src/server/systems/WaveSystem.lua` | Budget formula, zombie spawning |
-| | `src/server/services/WaveQueueService.lua` | Wave queue management, scheduling |
-| **Combat** | `src/server/systems/CombatSystem.lua` | Damage calculation, death resolution |
-| | `src/server/systems/ProjectileSystem.lua` | Projectile lifecycle, hit detection |
-| **Resource Management** | `src/server/systems/ResourceSystem.lua` | Sun production, player account updates |
-| **Replication** | `src/server/systems/ReplicationSystem.lua` | Zap packet broadcasting, priority queues |
-| | `src/client/systems/PredictionSystem.lua` | Client-side prediction, rollback |
-| **VFX/Audio** | `src/client/systems/VFXSystem.lua` | Particle effects, dynamic LOD |
-| | `src/client/systems/AudioSystem.lua` | Sound prioritization, 16-channel management |
-| **Fusion UI** | `src/client/ui/` (all files) | Reactive UI components, HUD screens |
-| | `src/client/controllers/HUDController.lua` | State management, Fusion bindings |
-| **ProfileStore** | `src/server/services/DataService.lua` | Profile loading, auto-save, session locking |
-| **Input Abstraction** | `src/client/systems/InputSystem.lua` | ContextActionService bindings, unified API |
-| **Safety System** | `src/server/systems/SafetySystem.lua` | Entity cap enforcement, memory monitoring |
-| | `src/server/systems/PerformanceMonitorSystem.lua` | Performance logging, emergency protocols |
+**Architecture:** Multi-Place (Lobby + Arena) with Domain-Driven system organization.
+
+#### Arena Server Systems
+
+| Domain | System | File Location | Responsibility |
+|--------|--------|---------------|----------------|
+| **Combat** | BossSystem | `arena/server/systems/combat/` | Boss zombie AI & phases |
+| | CombatSystem | | Damage calculation, death resolution |
+| | EnhancementSystem | | Plant enhancement effects |
+| | PlantFoodSystem | | Plant Food ability activation |
+| | ProjectileSystem | | Projectile lifecycle, hit detection |
+| | SpecialPlantSystem | | Special plant behaviors |
+| | TrapSystem | | Trap plant mechanics |
+| **Core** | EventCleanupSystem | `arena/server/systems/core/` | Ephemeral event entity cleanup |
+| | FullStateSyncSystem | | Full state replication for late joins |
+| | PerformanceMonitorSystem | | FPS/memory monitoring, emergency protocols |
+| | SafetySystem | | Entity cap enforcement |
+| **Economy** | SunCollectionSystem | `arena/server/systems/economy/` | Sun pickup validation |
+| | SunflowerProductionSystem | | Sun production from Sunflowers |
+| | SunSpawnSystem | | Natural sun drops |
+| **Mutations** | BurnDamageSystem | `arena/server/systems/mutations/` | Burn DoT effect |
+| | ChainLightningSystem | | Lightning chain to nearby enemies |
+| | FreezeSystem | | Freeze/slow effect |
+| | LifestealSystem | | Health steal on damage |
+| | MutationApplySystem | | Apply mutations from MutationData |
+| | PoisonCloudSystem | | Poison AoE damage |
+| | SplashDamageSystem | | Splash damage to nearby targets |
+| | SunOnKillSystem | | Sun generation on kill |
+| **Units** | EntityDeathSystem | `arena/server/systems/units/` | Death handling, pool release |
+| | MushroomSystem | | Mushroom sleep/wake cycle |
+| | PlacementSystem | | Plant placement validation |
+| | ZombieMovementSystem | | Zombie pathfinding & movement |
+| **Wave** | WaveManagerSystem | `arena/server/systems/wave/` | Wave budget, spawn scheduling |
+
+#### Arena Client Systems
+
+| Domain | System | File Location | Responsibility |
+|--------|--------|---------------|----------------|
+| **Input** | GhostPreviewSystem | `arena/client/systems/input/` | Ghost unit preview during placement |
+| **Presentation** | VFXAudioSystem | `arena/client/systems/presentation/` | Particle effects, audio playback |
+| **Rendering** | GridVisualizationSystem | `arena/client/systems/rendering/` | Grid cell highlighting |
+| | PlantRenderSystem | | Plant model spawning/updates |
+| | ProjectileRenderSystem | | Projectile visuals |
+| | SunRenderSystem | | Sun resource visuals |
+| | ZombieRenderSystem | | Zombie model spawning/updates |
+
+#### Shared Services
+
+| Service | File Location | Responsibility |
+|---------|---------------|----------------|
+| PlayerDataCore | `shared/services/` | ProfileStore wrapper, session management |
+| TeleportDataHandler | | Lobby ↔ Arena data passing |
+
+#### Shared Utilities (NEW)
+
+| Utility | File Location | Responsibility |
+|---------|---------------|----------------|
+| SystemManager | `shared/utils/` | System lifecycle (Init/Runtime/Dispose phases) |
+| Logger | | Structured logging with throttling |
+| ErrorHandler | | Hybrid fail-fast (dev) + graceful (prod) |
+| EntityPool | | Pre-spawned entity pool (200 cap) |
+| ServiceLoader | | Service initialization with loading UI |
+| AttachmentUtils | | Attachment-based spatial positioning |
+| GridUtils | | Grid coordinate calculations |
+| LaneCache | | Lane-based spatial hashing |
+| MathUtils | | Math helper functions |
 
 ### Naming Conventions
 

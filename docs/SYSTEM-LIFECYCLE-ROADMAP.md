@@ -12,6 +12,19 @@
 | Suppression `arena/packets.zap` | ✅ |
 | Suppression `lobby/server/network/`, `lobby/client/network/` | ✅ |
 | Docs obsolètes nettoyées | ✅ |
+| Mode Endless supprimé (non prévu V1) | ✅ |
+
+### 🔄 En Cours (Analyse WIP 2026-01-10)
+
+| Fonctionnalité | Status | Impact |
+|----------------|--------|--------|
+| Système Mutations | ✅ Backend 100% | UI à intégrer dans Lobby |
+| Système Plant Food | ✅ Fonctionnel | Documenté |
+| Cycle Jour/Nuit | ⚠️ TODO | 30 min de travail |
+| Validation Zone Eau | ⚠️ TODO | PlacementSystem |
+| Bouclier Zombie | ⚠️ TODO | CombatSystem |
+| Système Cosmétiques | 📦 Data prête | Non prioritaire V1 |
+| Plant Mastery | 📦 Data prête | Non prioritaire V1 |
 
 ### 📁 Architecture Réseau Unifiée
 
@@ -270,13 +283,35 @@ end)
 | `init.server.luau` (Arena) | `_GridPositionComponent`, `_HealthComponent` | Réservés, jamais utilisés |
 | `GhostPreviewSystem.luau` | `_Players` | Réservé, jamais utilisé |
 | `GhostPreviewSystem.luau` | `_getVFXService()` | Défini mais jamais appelé |
-| `ZombieSpawnSystem.luau` | Tout le système | ENABLED = false, WaveManagerSystem le remplace |
+| `ZombieSpawnSystem.luau` | **Tout le fichier** | @deprecated, WaveManagerSystem le remplace |
+| `CosmeticData.luau` | Non prioritaire | Data prête mais jamais require() - V2 |
+| `LaneCache.luau` | **Jamais utilisé** | 100 lignes orphelines |
+
+### Paquets Zap Orphelins
+
+| Paquet | Raison | Action |
+|--------|--------|--------|
+| `XPGained` | Jamais `.Fire()` | Implémenter ou supprimer |
+| `LevelUp` | Jamais `.Fire()` | Implémenter ou supprimer |
+| `GemsEarned` | Jamais `.Fire()` | Implémenter ou supprimer |
+| `GameComplete` | Doublon avec `GameEndRewards` | Supprimer |
+| `RemoveMutationResponse` | Marqué DEPRECATED | Supprimer |
 
 ### À Marquer Deprecated
 
 | Module | Note |
 |--------|------|
-| `ZombieSpawnSystem.luau` | Garder pour API.SpawnZombie(), ajouter @deprecated |
+| `ZombieSpawnSystem.luau` | Déjà marqué @deprecated - **À SUPPRIMER** |
+
+### TODOs Critiques Découverts
+
+| Fichier | Ligne | TODO |
+|---------|-------|------|
+| `MushroomSystem.luau` | 62 | Cycle jour/nuit |
+| `PlacementSystem.luau` | 106 | Validation zone eau |
+| `CombatSystem.luau` | 116 | Bouclier damage reduction |
+| `WorldData.luau` | 62+ | 6 icônes mondes manquantes |
+| `MutationData.luau` | 93 | Icône mutation manquante |
 
 ---
 

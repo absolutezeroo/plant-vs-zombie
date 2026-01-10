@@ -103,9 +103,9 @@ local function applyChainLightning(
 		local targetHealth = world:get(nextTarget, HealthComponent)
 		if targetHealth then
 			local healthCurrent = targetHealth.Current :: number
-			-- Immutable component update via Sift
-			world:insert(nextTarget, Sift.Dictionary.merge(targetHealth, {
+			world:insert(nextTarget, HealthComponent({
 				Current = math.max(0, healthCurrent - currentDamage),
+				Max = targetHealth.Max,
 			}))
 			
 			-- Emit damage event

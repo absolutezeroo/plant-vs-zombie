@@ -84,13 +84,14 @@ local function BurnDamageSystem(world)
 			world:remove(entityId, BurningComponent)
 			Logger.Debug("BurnDamageSystem", `Burn expired on entity {entityId}`)
 		else
-			-- Apply tick damage (every second)
+			-- Tick damage every second
 			if elapsed >= 1 then
 				local damage = burning.DamagePerSecond
 				
-				-- Apply damage (immutable via Sift)
-				world:insert(entityId, Sift.Dictionary.merge(health, {
+				-- Apply damage
+				world:insert(entityId, HealthComponent({
 					Current = math.max(0, health.Current - damage),
+					Max = health.Max,
 				}))
 				
 				-- Emit damage event for visual feedback
@@ -101,8 +102,9 @@ local function BurnDamageSystem(world)
 					Source = 0,
 				}))
 				
-				-- Update burn timer (immutable via Sift)
-				world:insert(entityId, Sift.Dictionary.merge(burning, {
+				-- Update burn timer
+				world:insert(entityId, BurningComponent({
+					DamagePerSecond = burning.DamagePerSecond,
 					RemainingDuration = newRemaining,
 					LastTickTime = currentTime,
 				}))
