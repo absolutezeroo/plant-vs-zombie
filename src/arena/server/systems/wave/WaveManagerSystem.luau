@@ -300,6 +300,4 @@ return {
 	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
-	-- Legacy compatibility: expose WaveManager API via WaveService
-	WaveManager = WaveService,
 }
