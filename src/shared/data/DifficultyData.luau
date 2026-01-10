@@ -4,7 +4,15 @@
 	
 	Players can freely choose any difficulty for any world.
 	Higher difficulty = more waves, tougher zombies, better rewards.
+	
+	NOTE: GetDifficulty() applies LiveConfigService overrides for live tuning.
+	The raw frozen tables are the "factory defaults".
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Sift = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Sift"))
+local LiveConfigService = require(Shared.services.LiveConfigService)
 
 export type DifficultyConfig = {
 	Id: string,                -- "easy", "normal", "hard", "nightmare"
@@ -201,8 +209,23 @@ local Difficulties: {[string]: DifficultyConfig} = {
 
 local DifficultyData = {}
 
--- Get all difficulties sorted by order
+-- Get all difficulties sorted by order (with live config applied)
 function DifficultyData.GetAll(): {DifficultyConfig}
+	local result: {DifficultyConfig} = {}
+	for id, _ in Difficulties do
+		local config = DifficultyData.GetDifficulty(id)
+		if config then
+			table.insert(result, config)
+		end
+	end
+	table.sort(result, function(a, b)
+		return a.Order < b.Order
+	end)
+	return result
+end
+
+-- Get all difficulties WITHOUT live config (factory defaults)
+function DifficultyData.GetAllRaw(): {DifficultyConfig}
 	local result: {DifficultyConfig} = {}
 	for _, difficulty in Difficulties do
 		table.insert(result, difficulty)
@@ -213,8 +236,46 @@ function DifficultyData.GetAll(): {DifficultyConfig}
 	return result
 end
 
--- Get a specific difficulty by ID
+-- Get a specific difficulty by ID (with live config overrides applied)
 function DifficultyData.GetDifficulty(difficultyId: string): DifficultyConfig?
+	local baseConfig = Difficulties[difficultyId]
+	if not baseConfig then
+		return nil
+	end
+	
+	-- Apply LiveConfigService overrides using Sift for immutability
+	-- Global zombie multipliers stack with difficulty-specific multipliers
+	local globalHealthMult = LiveConfigService.GetGlobalZombieMult("Health")
+	local globalSpeedMult = LiveConfigService.GetGlobalZombieMult("Speed")
+	local globalDamageMult = LiveConfigService.GetGlobalZombieMult("Damage")
+	
+	-- Get difficulty-specific overrides
+	local healthMultOverride = LiveConfigService.GetDifficultyOverride(
+		difficultyId, "ZombieHealthMult", baseConfig.ZombieHealthMult
+	)
+	local speedMultOverride = LiveConfigService.GetDifficultyOverride(
+		difficultyId, "ZombieSpeedMult", baseConfig.ZombieSpeedMult
+	)
+	local damageMultOverride = LiveConfigService.GetDifficultyOverride(
+		difficultyId, "ZombieDamageMult", baseConfig.ZombieDamageMult
+	)
+	local coinRewardOverride = LiveConfigService.GetDifficultyOverride(
+		difficultyId, "CoinReward", baseConfig.CoinReward
+	)
+	
+	-- Create new config with overrides (immutable pattern)
+	local effectiveConfig = Sift.Dictionary.merge(baseConfig, {
+		ZombieHealthMult = healthMultOverride * globalHealthMult,
+		ZombieSpeedMult = speedMultOverride * globalSpeedMult,
+		ZombieDamageMult = damageMultOverride * globalDamageMult,
+		CoinReward = coinRewardOverride,
+	})
+	
+	return effectiveConfig
+end
+
+-- Get a specific difficulty by ID WITHOUT live config (factory default)
+function DifficultyData.GetDifficultyRaw(difficultyId: string): DifficultyConfig?
 	return Difficulties[difficultyId]
 end
 

@@ -4,7 +4,15 @@
 	
 	Defines all zombie types with their stats.
 	Server-authoritative, clients use for prediction.
+	
+	NOTE: Use GetStats(type) to get stats with LiveConfigService overrides applied.
+	The raw ZombieStats table is the "factory default".
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Sift = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Sift"))
+local LiveConfigService = require(Shared.services.LiveConfigService)
 
 export type ZombieStats = {
 	Health: number,
@@ -208,4 +216,91 @@ local ZombieData: {[string]: ZombieStats} = {
 	},
 }
 
-return table.freeze(ZombieData)
+-- ============================================
+-- API
+-- ============================================
+
+local ZombieDataModule = {}
+
+-- Raw data table (factory defaults, frozen)
+ZombieDataModule.RawData = table.freeze(ZombieData)
+
+--[[
+	Get all zombie types (factory defaults).
+	@return Array of zombie type names
+]]
+function ZombieDataModule.GetAllTypes(): {string}
+	local types: {string} = {}
+	for zombieType, _ in ZombieData do
+		table.insert(types, zombieType)
+	end
+	return types
+end
+
+--[[
+	Get stats for a specific zombie type with LiveConfigService overrides applied.
+	
+	@param zombieType The zombie type (e.g., "Basic", "Gargantuar")
+	@return The effective stats with cloud config multipliers applied, or nil if not found
+]]
+function ZombieDataModule.GetStats(zombieType: string): ZombieStats?
+	local baseStats = ZombieData[zombieType]
+	if not baseStats then
+		return nil
+	end
+	
+	-- Get global multipliers
+	local globalHealthMult = LiveConfigService.GetGlobalZombieMult("Health")
+	local globalSpeedMult = LiveConfigService.GetGlobalZombieMult("Speed")
+	local globalDamageMult = LiveConfigService.GetGlobalZombieMult("Damage")
+	
+	-- Get zombie-specific multipliers
+	local zombieHealthMult = LiveConfigService.GetZombieStatMult(zombieType, "Health")
+	local zombieSpeedMult = LiveConfigService.GetZombieStatMult(zombieType, "Speed")
+	local zombieDamageMult = LiveConfigService.GetZombieStatMult(zombieType, "Damage")
+	
+	-- Apply multipliers (global * zombie-specific)
+	local effectiveStats = Sift.Dictionary.merge(baseStats, {
+		Health = math.floor(baseStats.Health * globalHealthMult * zombieHealthMult),
+		Speed = baseStats.Speed * globalSpeedMult * zombieSpeedMult,
+		Damage = math.floor(baseStats.Damage * globalDamageMult * zombieDamageMult),
+	})
+	
+	-- Also apply to armor health if present
+	if baseStats.ArmorHealth then
+		effectiveStats = Sift.Dictionary.merge(effectiveStats, {
+			ArmorHealth = math.floor(baseStats.ArmorHealth * globalHealthMult * zombieHealthMult),
+		})
+	end
+	
+	-- Apply to shield health if present
+	if baseStats.ShieldHealth then
+		effectiveStats = Sift.Dictionary.merge(effectiveStats, {
+			ShieldHealth = math.floor(baseStats.ShieldHealth * globalHealthMult * zombieHealthMult),
+		})
+	end
+	
+	return effectiveStats
+end
+
+--[[
+	Get raw stats for a specific zombie type WITHOUT LiveConfigService overrides.
+	
+	@param zombieType The zombie type (e.g., "Basic", "Gargantuar")
+	@return The factory default stats, or nil if not found
+]]
+function ZombieDataModule.GetStatsRaw(zombieType: string): ZombieStats?
+	return ZombieData[zombieType]
+end
+
+--[[
+	Check if a zombie type exists.
+	
+	@param zombieType The zombie type to check
+	@return true if the zombie type exists
+]]
+function ZombieDataModule.Exists(zombieType: string): boolean
+	return ZombieData[zombieType] ~= nil
+end
+
+return table.freeze(ZombieDataModule)
