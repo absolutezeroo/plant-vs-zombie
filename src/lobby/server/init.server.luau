@@ -9,12 +9,10 @@
 ]]
 
 local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Wait for packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Promise = require(Packages:WaitForChild("Promise"))
 local Trove = require(Packages:WaitForChild("Trove"))
 
 -- Trove for server-level connection cleanup
@@ -23,7 +21,6 @@ local _serverTrove = Trove.new()
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local ErrorHandler = require(Shared.utils.ErrorHandler)
 local TeleportData = require(Shared.data.TeleportData)
 local WorldData = require(Shared.data.WorldData)
 local DifficultyData = require(Shared.data.DifficultyData)
@@ -33,6 +30,9 @@ local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
 -- Import services from this folder
 local PlayerDataService = require(script.services.PlayerDataService)
 local LobbyService = require(script.services.LobbyService)
+
+-- Import managers
+local TeleportManager = require(script.managers.TeleportManager)
 
 -- Import modules
 local ShopHandler = require(script.modules.ShopHandler)
@@ -135,44 +135,19 @@ local function handleTeleportToArena(player: Player, worldId: string, difficulty
         end
     end
     
-    -- Check if PlaceIds are configured
-    if TeleportData.PlaceIds.Arena == 0 then
-        Logger.Warn("Lobby", "Arena PlaceId not configured - skipping teleport in Studio")
-        -- In Studio without configured PlaceIds, just log success
-        return true, 0, "Teleport simulated (Studio mode)"
-    end
-    
-    -- Get equipped mutations for the deck plants
-    local equippedMutations = PlayerDataService.GetAllEquippedMutations(player) or {}
-    
-    -- Create teleport data
-    local teleportOptions = Instance.new("TeleportOptions")
-    local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck, equippedMutations)
-    teleportOptions:SetTeleportData(arenaData)
-    
-    -- Teleport to Arena with Promise.retry (non-blocking)
-    Promise.retry(function()
-        return Promise.new(function(resolve, reject)
-            if player.Parent ~= Players then
-                reject("Player left the game")
-                return
+    -- Use TeleportManager for reserved server teleportation
+    -- This ensures players get their own private server
+    TeleportManager.GetInstance():TeleportPlayerAsync(player, worldId, difficulty)
+        :andThen(function(result)
+            if result.Success then
+                Logger.Info("Lobby", `{player.Name} teleported to private Arena`)
+            else
+                Logger.Error("Lobby", `Teleport failed for {player.Name}: {result.Error or "Unknown error"}`)
             end
-            
-            TeleportService:TeleportAsync(
-                TeleportData.PlaceIds.Arena,
-                { player },
-                teleportOptions
-            )
-            resolve()
         end)
-    end, 3, function(attempt)
-        Logger.Warn("Lobby", `Teleport attempt {attempt} failed for {player.Name}, retrying...`)
-        return 2 * attempt -- Exponential backoff
-    end):andThen(function()
-        Logger.Info("Lobby", `{player.Name} teleported to Arena`)
-    end):catch(function(err)
-        Logger.Error("Lobby", `Teleport failed for {player.Name} after 3 attempts: {err}`)
-    end)
+        :catch(function(err)
+            Logger.Error("Lobby", `Teleport promise failed for {player.Name}: {err}`)
+        end)
     
     return true, 0, "Teleporting..."
 end

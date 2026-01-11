@@ -141,11 +141,14 @@ function TeleportManager:TeleportPlayerAsync(player: Player, worldId: string, di
         end)
     end
     
-    -- Real teleport with retry
+    -- Create teleport options with ShouldReserveServer (modern approach, replaces deprecated ReserveServer)
     local teleportOptions = Instance.new("TeleportOptions")
+    teleportOptions.ShouldReserveServer = true
+    
     local arenaData = TeleportData.CreateArenaJoinData(worldId, difficulty, deck, equippedMutations)
     teleportOptions:SetTeleportData(arenaData)
     
+    -- Teleport with retry
     return Promise.retry(function()
         return Promise.new(function(resolve, reject)
             -- Check if player is still in game
@@ -153,6 +156,8 @@ function TeleportManager:TeleportPlayerAsync(player: Player, worldId: string, di
                 reject("Player left the game")
                 return
             end
+            
+            Logger.Info("TeleportManager", `Teleporting {player.Name} to reserved private server`)
             
             TeleportService:TeleportAsync(
                 TeleportData.PlaceIds.Arena,
@@ -167,7 +172,7 @@ function TeleportManager:TeleportPlayerAsync(player: Player, worldId: string, di
         Logger.Warn("TeleportManager", `Teleport attempt {attempt} failed for {player.Name}, retrying in {TELEPORT_RETRY_DELAY}s...`)
         return TELEPORT_RETRY_DELAY * attempt
     end):andThen(function()
-        Logger.Info("TeleportManager", `{player.Name} teleported to Arena (World={worldId}, Difficulty={difficulty})`)
+        Logger.Info("TeleportManager", `{player.Name} teleported to private Arena (World={worldId}, Difficulty={difficulty})`)
         return {
             Success = true,
             IsStudioMode = false,
@@ -183,15 +188,106 @@ function TeleportManager:TeleportPlayerAsync(player: Player, worldId: string, di
     end)
 end
 
--- Teleport a group of players (returns Promise.all)
+-- Teleport a group of players to the SAME reserved server (returns Promise)
 function TeleportManager:TeleportGroupAsync(players: {Player}, worldId: string, difficulty: string): any
-    local promises = {}
-    
-    for _, player in ipairs(players) do
-        table.insert(promises, self:TeleportPlayerAsync(player, worldId, difficulty))
+    if #players == 0 then
+        return Promise.resolve({})
     end
     
-    return Promise.all(promises)
+    if _isStudio then
+        -- In Studio, simulate teleport for all players
+        local results = {}
+        for _, player in ipairs(players) do
+            Logger.Info("TeleportManager", `[STUDIO] Would teleport {player.Name} to Arena (World={worldId}, Difficulty={difficulty})`)
+            movePlayerToSpawn(player)
+            PlayerLockManager.GetInstance():UnlockPlayer(player)
+            table.insert(results, {
+                Success = true,
+                IsStudioMode = true,
+            })
+        end
+        return Promise.resolve(results)
+    end
+    
+    -- Teleport all players together to a reserved server (modern approach using ShouldReserveServer)
+    return Promise.retry(function()
+        return Promise.new(function(resolve, reject)
+            -- Filter out players who left
+            local validPlayers = {}
+            local decks = {}
+            local allMutations = {}
+            
+            for _, player in ipairs(players) do
+                if player.Parent == _Players then
+                    table.insert(validPlayers, player)
+                    decks[player.UserId] = getPlayerDeck(player) or DEFAULT_DECK
+                    allMutations[player.UserId] = getPlayerEquippedMutations(player)
+                end
+            end
+            
+            if #validPlayers == 0 then
+                reject("All players left the game")
+                return
+            end
+            
+            -- Create teleport options with ShouldReserveServer (replaces deprecated ReserveServer)
+            -- Note: All players get the same world/difficulty, but each has their own deck
+            local teleportOptions = Instance.new("TeleportOptions")
+            teleportOptions.ShouldReserveServer = true
+            
+            -- For group teleport, each player's individual data is stored in a group data table
+            local groupData = {
+                WorldId = worldId,
+                Difficulty = difficulty,
+                Timestamp = os.time(),
+                -- Per-player data indexed by UserId
+                PlayerDecks = decks,
+                PlayerMutations = allMutations,
+            }
+            teleportOptions:SetTeleportData(groupData)
+            
+            Logger.Info("TeleportManager", `Teleporting group of {#validPlayers} players to reserved private server`)
+            
+            TeleportService:TeleportAsync(
+                TeleportData.PlaceIds.Arena,
+                validPlayers,
+                teleportOptions
+            )
+            
+            resolve(validPlayers)
+        end)
+    end, TELEPORT_MAX_RETRIES, function(attempt)
+        Logger.Warn("TeleportManager", `Group teleport attempt {attempt} failed, retrying in {TELEPORT_RETRY_DELAY}s...`)
+        return TELEPORT_RETRY_DELAY * attempt
+    end):andThen(function(teleportedPlayers)
+        local results = {}
+        for _, player in ipairs(teleportedPlayers) do
+            Logger.Info("TeleportManager", `{player.Name} teleported to private Arena (World={worldId}, Difficulty={difficulty})`)
+            table.insert(results, {
+                Success = true,
+                IsStudioMode = false,
+            })
+        end
+        return results
+    end):catch(function(err)
+        Logger.Error("TeleportManager", `Group teleport failed after {TELEPORT_MAX_RETRIES} attempts: {err}`)
+        -- Unlock all players on failure
+        for _, player in ipairs(players) do
+            if player.Parent == _Players then
+                PlayerLockManager.GetInstance():UnlockPlayer(player)
+            end
+        end
+        -- Return failure result for each player
+        local results = {}
+        for _ in ipairs(players) do
+            table.insert(results, {
+                Success = false,
+                Error = tostring(err),
+                IsStudioMode = false,
+            })
+        end
+        return results
+    end)
 end
 
 -- Singleton instance
