@@ -54,9 +54,9 @@ local _clientTrove = Trove.new()
 local Network: any
 local PlayerDataClient: any
 local HUDController: any
-local FloatingTextUI: any
-local VictoryDefeatScreen: any
+local FloatingTextController: any
 local PlantTooltipController: any
+local VictoryDefeatController: any
 
 -- Client ECS
 local world: any
@@ -64,7 +64,7 @@ local loop: any
 
 -- UI instances
 local hud: any
-local victoryScreen: any
+local victoryDefeatController: any
 
 -- Countdown state
 local preparationStartTime = 0
@@ -223,7 +223,7 @@ local function setupNetworkListeners()
     Network.TeleportCountdown.On(function(data)
         Logger.Info("ArenaClient", `Teleporting in {data.TimeRemaining}s`)
         
-        -- Fire signal for HUD and VictoryScreen to react
+        -- Fire signal for HUD and VictoryDefeatController to react
         GameSignals.OnTeleportCountdown:Fire({
             TimeRemaining = data.TimeRemaining,
         })
@@ -330,10 +330,8 @@ loader:AddStep("Modules", function()
     local Controllers = script:WaitForChild("controllers")
     HUDController = require(Controllers:WaitForChild("HUDController"))
     PlantTooltipController = require(Controllers:WaitForChild("PlantTooltipController"))
-    
-    local UI = script:WaitForChild("ui")
-    FloatingTextUI = require(UI:WaitForChild("FloatingTextUI"))
-    VictoryDefeatScreen = require(UI:WaitForChild("VictoryDefeatScreen"))
+    VictoryDefeatController = require(Controllers:WaitForChild("VictoryDefeatController"))
+    FloatingTextController = require(Controllers:WaitForChild("FloatingTextController"))
     
     Logger.Info("ArenaClient", "Modules loaded")
 end, 1)
@@ -390,8 +388,8 @@ end, 1)
 -- Step 4: Mount UI
 loader:AddStep("UI", function()
     -- Initialize floating text system
-    FloatingTextUI.Initialize()
-    Logger.Info("ArenaClient", "FloatingTextUI initialized")
+    FloatingTextController.Initialize()
+    Logger.Info("ArenaClient", "FloatingTextController initialized")
     
     -- Create and mount HUD
     hud = HUDController.new()
@@ -401,9 +399,10 @@ loader:AddStep("UI", function()
     PlantTooltipController.Initialize()
     Logger.Info("ArenaClient", "PlantTooltipController initialized")
     
-    -- Create and mount Victory/Defeat screen
-    victoryScreen = VictoryDefeatScreen.new()
-    victoryScreen:Mount()
+    -- Create and initialize Victory/Defeat controller
+    victoryDefeatController = VictoryDefeatController.new()
+    victoryDefeatController:Init()
+    Logger.Info("ArenaClient", "VictoryDefeatController initialized")
     
     -- Setup network listeners AFTER UI is ready
     setupNetworkListeners()
@@ -423,7 +422,7 @@ loader:AddStep("UI", function()
     -- Start performance monitoring
     startPerformanceMonitor()
     
-    Logger.Info("ArenaClient", "HUD and VictoryScreen mounted")
+    Logger.Info("ArenaClient", "HUD and VictoryDefeatController mounted")
 end, 1)
 
 -- Step 5: Map Sync Ready

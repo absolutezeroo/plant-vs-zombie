@@ -36,6 +36,7 @@ local Theme = require(Design.Theme)
 
 local Components = UI:WaitForChild("components")
 local SunCounter = require(Components.molecules.SunCounter)
+local CoinCounter = require(Components.molecules.CoinCounter)
 local SeedBank = require(Components.organisms.SeedBank)
 local WaveProgressBar = require(Components.molecules.WaveProgressBar)
 local BaseHealthBar = require(Components.molecules.BaseHealthBar)
@@ -146,23 +147,47 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		
 		[Children] = {
-			-- Top-Left: Sun Counter
-			SunCounter({
-				Scope = scope,
-				Position = UDim2.new(0, 20, 0, 20),
-				AnchorPoint = Vector2.new(0, 0),
-			}),
-			
-			-- Top-Center: Seed Bank (plant deck)
-			SeedBank({
-				Scope = scope,
-				EquippedPlants = equippedPlants,
-				EquippedMutations = equippedMutations,
-				OnPlantSelect = onPlantSelect,
+			-- Top-Center: SunCounter + SeedBank in horizontal layout
+			New(scope, "Frame") {
+				Name = "TopBar",
+				Size = UDim2.new(0, 0, 0, 90), -- Height for seedbank
 				Position = UDim2.new(0.5, 0, 0, 10),
 				AnchorPoint = Vector2.new(0.5, 0),
-				ZIndex = 5,
-			}),
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.X,
+				
+				[Children] = {
+					New(scope, "UIListLayout") {
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, 10),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					},
+					
+					-- Sun Counter (left)
+					SunCounter({
+						Scope = scope,
+						LayoutOrder = 1,
+					}),
+					
+					-- Seed Bank (center)
+					SeedBank({
+						Scope = scope,
+						EquippedPlants = equippedPlants,
+						EquippedMutations = equippedMutations,
+						OnPlantSelect = onPlantSelect,
+						ZIndex = 5,
+						LayoutOrder = 2,
+					}),
+					
+					-- Coin Counter (right)
+					CoinCounter({
+						Scope = scope,
+						LayoutOrder = 3,
+					}),
+				},
+			},
 			
 			-- Bottom-Center: Ready Button (visible during preparation phase AND game has started)
 			ToonButton({

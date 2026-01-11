@@ -5,7 +5,7 @@
 	Molecule component that shows the player's sun currency.
 	Connects internally to SelectionState for reactive sun updates.
 	
-	Visual: Rounded pill with sun icon + animated text
+	Visual: Compact rounded container with sun icon + text
 	Animation: Text "pops" (Spring scale) when sun amount increases
 ]]
 
@@ -15,7 +15,6 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 -- Path: client/ui/components/molecules/SunCounter.luau
--- script.Parent = molecules, Parent.Parent = components, Parent.Parent.Parent = ui, Parent.Parent.Parent.Parent = client
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
@@ -32,11 +31,18 @@ local Spring = Fusion.Spring
 local peek = Fusion.peek
 
 -- Constants
-local SUN_ICON_ID = "rbxassetid://6764432293" -- Default sun icon
-local ICON_SIZE = 32
-local CONTAINER_HEIGHT = 44
-local CONTAINER_PADDING = 8
-local TEXT_COLOR = Color3.fromHex("#FFD700") -- Golden yellow
+local ICON_SIZE = 28
+local CONTAINER_WIDTH = 90  -- Fixed width to prevent layout shifts
+local CONTAINER_HEIGHT = 40
+local CONTAINER_PADDING = 6
+
+-- Colors
+local Colors = {
+	Background = Color3.fromRGB(80, 60, 40),     -- Dark brown
+	Icon = Color3.fromRGB(255, 220, 50),         -- Sun yellow
+	Text = Color3.fromRGB(255, 255, 255),        -- White text
+	Stroke = Color3.fromRGB(50, 40, 30),         -- Dark stroke
+}
 
 export type SunCounterProps = {
 	Scope: Fusion.Scope<any>,
@@ -48,7 +54,7 @@ export type SunCounterProps = {
 --[[
 	SunCounter Component
 	
-	Displays the current sun amount in a pill-shaped container.
+	Displays the current sun amount in a compact container.
 	Automatically subscribes to SelectionState.SunCount.
 	
 	@param props SunCounterProps
@@ -71,7 +77,7 @@ local function SunCounter(props: SunCounterProps): Frame
 		
 		-- Trigger pop animation when sun increases
 		if current > prev then
-			popScale:set(1.25)
+			popScale:set(1.2)
 			task.defer(function()
 				popScale:set(1)
 			end)
@@ -80,79 +86,61 @@ local function SunCounter(props: SunCounterProps): Frame
 		-- Update previous value
 		previousSun:set(current)
 		
+		-- Format large numbers (1000+ becomes 1.0K, etc.)
+		if current >= 10000 then
+			return string.format("%.0fK", current / 1000)
+		elseif current >= 1000 then
+			return string.format("%.1fK", current / 1000)
+		end
 		return tostring(current)
-	end)
-	
-	-- Container size computed based on text width (min width for small numbers)
-	local containerWidth = Computed(scope, function(use): UDim
-		local text = use(sunText)
-		local charCount = #text
-		-- Base width: icon + padding + text space
-		local textWidth = math.max(30, charCount * 18)
-		return UDim.new(0, ICON_SIZE + CONTAINER_PADDING * 3 + textWidth)
 	end)
 	
 	return New(scope, "Frame") {
 		Name = "SunCounter",
 		Position = props.Position or UDim2.new(0, 0, 0, 0),
 		AnchorPoint = props.AnchorPoint or Vector2.new(0, 0),
-		Size = Computed(scope, function(use)
-			return UDim2.new(use(containerWidth), UDim.new(0, CONTAINER_HEIGHT))
-		end),
-		BackgroundColor3 = Theme.Colors.Surface.Shadow,
+		Size = UDim2.fromOffset(CONTAINER_WIDTH, CONTAINER_HEIGHT),
+		BackgroundColor3 = Colors.Background,
 		LayoutOrder = props.LayoutOrder or 0,
 		
 		[Children] = {
-			-- Rounded corners (pill shape)
+			-- Rounded corners
 			New(scope, "UICorner") {
-				CornerRadius = UDim.new(0, CONTAINER_HEIGHT / 2),
+				CornerRadius = UDim.new(0, 10),
 			},
 			
-			-- Thick cartoon outline
+			-- Stroke
 			New(scope, "UIStroke") {
-				Color = Theme.Colors.Surface.Stroke :: Color3,
-				Thickness = Theme.Layout.StrokeThickness,
+				Color = Colors.Stroke,
+				Thickness = 2,
 			},
 			
-			-- Padding inside container
-			New(scope, "UIPadding") {
-				PaddingLeft = UDim.new(0, CONTAINER_PADDING),
-				PaddingRight = UDim.new(0, CONTAINER_PADDING),
-			},
-			
-			-- Horizontal layout
-			New(scope, "UIListLayout") {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, CONTAINER_PADDING),
-			},
-			
-			-- Sun emoji icon (temporary for testing)
+			-- Sun icon (left)
 			New(scope, "TextLabel") {
 				Name = "SunIcon",
 				Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
+				Position = UDim2.new(0, CONTAINER_PADDING, 0.5, 0),
+				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
 				Text = "☀️",
-				TextScaled = true,
+				TextSize = 20,
 				Font = Enum.Font.GothamBold,
-				TextColor3 = TEXT_COLOR,
-				LayoutOrder = 1,
 			},
 			
-			-- Sun amount text with pop animation
+			-- Sun amount text
 			New(scope, "TextLabel") {
 				Name = "SunAmount",
-				Size = UDim2.new(1, -ICON_SIZE - CONTAINER_PADDING, 1, 0),
+				Size = UDim2.new(1, -ICON_SIZE - CONTAINER_PADDING * 2, 1, 0),
+				Position = UDim2.new(0, ICON_SIZE + CONTAINER_PADDING, 0, 0),
 				BackgroundTransparency = 1,
 				Text = sunText,
-				TextColor3 = TEXT_COLOR,
-				TextStrokeColor3 = Theme.Colors.Surface.Stroke :: Color3,
-				TextStrokeTransparency = 0,
+				TextColor3 = Colors.Text,
+				TextStrokeColor3 = Colors.Stroke,
+				TextStrokeTransparency = 0.5,
 				Font = Theme.Typography.Fonts.Title,
-				TextSize = 28,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 2,
+				TextSize = 18,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextTruncate = Enum.TextTruncate.AtEnd,
 				
 				[Children] = {
 					-- Scale transform for pop animation

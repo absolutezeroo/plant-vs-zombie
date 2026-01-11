@@ -23,6 +23,7 @@ local ToonPanel = require(Atoms.ToonPanel)
 
 local Molecules = script.Parent.Parent.molecules
 local SeedCard = require(Molecules.SeedCard)
+local ShovelButton = require(Molecules.ShovelButton)
 
 -- Fusion primitives
 local New = Fusion.New
@@ -44,8 +45,8 @@ export type SeedBankProps = {
 	OnPlantSelect: (plantType: string) -> (),
 	Position: UDim2?,
 	AnchorPoint: Vector2?,
-	ZIndex: number?,
-}
+	ZIndex: number?,	
+	LayoutOrder: number?,}
 
 --[[
 	SeedBank Component
@@ -65,11 +66,12 @@ local function SeedBank(props: SeedBankProps): Frame
 	local position = props.Position or UDim2.new(0.5, 0, 0, 10)
 	local anchorPoint = props.AnchorPoint or Vector2.new(0.5, 0)
 	local zIndex = props.ZIndex or 1
+	local layoutOrder = props.LayoutOrder or 0
 	
-	-- Calculate panel width based on number of plants (reactive)
+	-- Calculate panel width based on number of plants + shovel button (reactive)
 	local panelWidth = Computed(scope, function(use)
 		local plants = use(equippedPlants)
-		local cardCount = #plants
+		local cardCount = #plants + 1 -- +1 for shovel button
 		return (CARD_SIZE * cardCount) + (CARD_PADDING * (cardCount - 1)) + (PANEL_PADDING * 2)
 	end)
 	
@@ -100,6 +102,7 @@ local function SeedBank(props: SeedBankProps): Frame
 		Position = position,
 		AnchorPoint = anchorPoint,
 		ZIndex = zIndex,
+		LayoutOrder = layoutOrder,
 		
 		[Children] = {
 			-- Padding inside panel
@@ -121,6 +124,12 @@ local function SeedBank(props: SeedBankProps): Frame
 			
 			-- Seed cards (reactive array from ForValues)
 			seedCardsArray,
+			
+			-- Shovel button (at the end)
+			ShovelButton({
+				Scope = scope,
+				LayoutOrder = 999, -- Always last
+			}),
 		},
 	})
 end
