@@ -47,6 +47,7 @@ local ZoneInteractionController = {}
 -- ============================================
 local _scope = Fusion.scoped(Fusion)
 local _currentUI: ScreenGui? = nil
+local _currentUIScope: Fusion.Scope<any>? = nil -- Scope for current UI (cleaned on close)
 
 -- Reactive state values
 local _playerData = Value(_scope, nil :: any?)
@@ -67,6 +68,12 @@ local _onUIClose: (() -> ())? = nil -- Called when any UI is closed
 -- ============================================
 
 local function closeCurrentUI()
+    -- Clean up the UI-specific scope first (this cleans ViewportFrames, etc.)
+    if _currentUIScope then
+        Fusion.doCleanup(_currentUIScope)
+        _currentUIScope = nil
+    end
+    
     if _currentUI then
         _currentUI:Destroy()
         _currentUI = nil
@@ -91,7 +98,7 @@ local function wrapInScreenGui(name: string, viewFrame: Frame): ScreenGui
 end
 
 local function showUI(name: string, viewFrame: Frame)
-    closeCurrentUI()
+    -- Note: closeCurrentUI() must be called BEFORE creating the new UI scope
     -- Enable blur when UI opens
     BlurManager.Enable()
     _currentUI = wrapInScreenGui(name, viewFrame)
@@ -105,19 +112,26 @@ end
 local function openShopView()
     Logger.Info("ZoneInteraction", "Opening Shop")
     
+    -- Close any existing UI first (before creating new scope)
+    closeCurrentUI()
+    
+    -- Create a sub-scope for this UI (cleaned on close)
+    _currentUIScope = Fusion.scoped(Fusion)
+    local uiScope = _currentUIScope
+    
     -- Create Computed values for ShopScreen
-    local coins = Computed(_scope, function(use)
+    local coins = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.Coins else 0
     end)
     
-    local unlockedPlants = Computed(_scope, function(use)
+    local unlockedPlants = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.UnlockedPlants else {}
     end)
     
     local viewFrame = ShopScreen({
-        Scope = _scope,
+        Scope = uiScope,
         Coins = coins,
         UnlockedPlants = unlockedPlants,
         OnClose = closeCurrentUI,
@@ -134,8 +148,15 @@ end
 local function openDeckBuilderView()
     Logger.Info("ZoneInteraction", "Opening Deck Builder")
     
+    -- Close any existing UI first (before creating new scope)
+    closeCurrentUI()
+    
+    -- Create a sub-scope for this UI (cleaned on close)
+    _currentUIScope = Fusion.scoped(Fusion)
+    local uiScope = _currentUIScope
+    
     local viewFrame = DeckBuilderScreen({
-        Scope = _scope,
+        Scope = uiScope,
         SelectedDeck = _currentDeck,
         PlayerData = _playerData,
         PlantMutations = _equippedMutations, -- Show equipped mutations
@@ -157,54 +178,61 @@ end
 local function openProfileView()
     Logger.Info("ZoneInteraction", "Opening Profile")
     
+    -- Close any existing UI first (before creating new scope)
+    closeCurrentUI()
+    
+    -- Create a sub-scope for this UI (cleaned on close)
+    _currentUIScope = Fusion.scoped(Fusion)
+    local uiScope = _currentUIScope
+    
     -- Create Computed values that extract from _playerData
-    local level = Computed(_scope, function(use)
+    local level = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.Level else 1
     end)
     
-    local xp = Computed(_scope, function(use)
+    local xp = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.XP else 0
     end)
     
-    local xpRequired = Computed(_scope, function(use)
+    local xpRequired = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.TotalXPForNextLevel else 100
     end)
     
-    local coins = Computed(_scope, function(use)
+    local coins = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.Coins else 0
     end)
     
-    local gems = Computed(_scope, function(use)
+    local gems = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.Gems else 0
     end)
     
-    local gamesPlayed = Computed(_scope, function(use)
+    local gamesPlayed = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.GamesPlayed else 0
     end)
     
-    local gamesWon = Computed(_scope, function(use)
+    local gamesWon = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.GamesWon else 0
     end)
     
-    local zombiesKilled = Computed(_scope, function(use)
+    local zombiesKilled = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.ZombiesKilled else 0
     end)
     
-    local plantsPlaced = Computed(_scope, function(use)
+    local plantsPlaced = Computed(uiScope, function(use)
         local data = use(_playerData)
         return if data then data.PlantsPlaced else 0
     end)
     
     local viewFrame = ProfileScreen({
-        Scope = _scope,
+        Scope = uiScope,
         Level = level,
         XP = xp,
         XPRequired = xpRequired,
@@ -223,8 +251,15 @@ end
 local function openMutationView()
     Logger.Info("ZoneInteraction", "Opening Mutations")
     
+    -- Close any existing UI first (before creating new scope)
+    closeCurrentUI()
+    
+    -- Create a sub-scope for this UI (cleaned on close)
+    _currentUIScope = Fusion.scoped(Fusion)
+    local uiScope = _currentUIScope
+    
     local viewFrame = MutationScreen({
-        Scope = _scope,
+        Scope = uiScope,
         PlayerData = _playerData,
         OwnedMutations = _ownedMutations,
         EquippedMutations = _equippedMutations,

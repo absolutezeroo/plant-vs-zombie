@@ -10,6 +10,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
+
 local Molecules = script.Parent.Parent.molecules
 local PlayerInfoBar = require(Molecules.PlayerInfoBar)
 local NavBar = require(Molecules.NavBar)
@@ -48,6 +51,9 @@ local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 		IgnoreGuiInset = true,
 		
 		[Children] = {
+			-- Responsive scaling for all HUD elements
+			ResponsiveUtils.CreateUIScale(scope),
+			
 			-- Top-left: Player info (avatar, level, resources)
 			PlayerInfoBar({
 				Scope = scope,

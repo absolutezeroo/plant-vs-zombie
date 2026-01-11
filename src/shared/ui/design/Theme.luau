@@ -139,7 +139,7 @@ local Theme: ThemeType = {
 	},
 
 	Icons = {
-		Coin = "🪙",
+		Coin = "💸",
 		Gem = "💎",
 		XP = "⭐",
 		Sun = "☀️",

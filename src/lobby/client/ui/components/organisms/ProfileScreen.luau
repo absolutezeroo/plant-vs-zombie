@@ -14,6 +14,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 local Atoms = script.Parent.Parent.atoms
 local AvatarFrame = require(Atoms.AvatarFrame)
@@ -101,6 +102,9 @@ local function ProfileScreen(props: ProfileScreenProps): Frame
 				BackgroundTransparency = 1,
 				
 				[Children] = {
+					-- Responsive scaling
+					ResponsiveUtils.CreateUIScale(scope),
+					
 					New(scope, "UIListLayout") {
 						SortOrder = Enum.SortOrder.LayoutOrder,
 						FillDirection = Enum.FillDirection.Vertical,

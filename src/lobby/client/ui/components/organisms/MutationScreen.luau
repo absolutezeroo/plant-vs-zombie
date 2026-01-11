@@ -21,6 +21,7 @@ local Theme = require(Shared.ui.design.Theme)
 local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 -- Local atoms
 local Atoms = script.Parent.Parent.atoms
@@ -653,6 +654,9 @@ local function MutationScreen(props: MutationScreenProps): Frame
 				BackgroundTransparency = 1,
 				
 				[Children] = {
+					-- Responsive scaling
+					ResponsiveUtils.CreateUIScale(scope),
+					
 					-- ========================================
 					-- HEADER
 					-- ========================================

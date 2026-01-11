@@ -23,6 +23,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local Network = require(Shared.network.generated.client)
 local Theme = require(Shared.ui.design.Theme)
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 -- Client references (controllers is inside client)
 local Client = script.Parent.Parent
@@ -146,6 +147,9 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		
 		[Children] = {
+			-- Responsive scaling for all HUD elements
+			ResponsiveUtils.CreateUIScale(scope),
+			
 			-- Top-Center: SunCounter + SeedBank in horizontal layout
 			New(scope, "Frame") {
 				Name = "TopBar",

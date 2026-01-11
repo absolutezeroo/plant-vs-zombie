@@ -20,6 +20,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 local Atoms = script.Parent.Parent.atoms
 local ToonPanel = require(Atoms.ToonPanel)
@@ -73,9 +74,11 @@ export type ResultScreenProps = {
 local function ResultScreen(props: ResultScreenProps): Frame
 	local scope = props.Scope
 	
-	-- Animated scale for panel entrance
+	-- Animated scale for panel entrance (combined with responsive scaling)
 	local targetScale = Computed(scope, function(use)
-		return if use(props.Visible) then 1.0 else 0.8
+		local responsiveScale = use(ResponsiveUtils.GetScale())
+		local visibleScale = if use(props.Visible) then 1.0 else 0.8
+		return responsiveScale * visibleScale
 	end)
 	local animatedScale = Spring(scope, targetScale, 25, 0.6)
 	

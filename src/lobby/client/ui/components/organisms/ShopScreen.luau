@@ -14,6 +14,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 local ProgressionData = require(Shared.data.ProgressionData)
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 local Atoms = script.Parent.Parent.atoms
 local FilterPill = require(Atoms.FilterPill)
@@ -27,7 +28,6 @@ local Computed = Fusion.Computed
 local Value = Fusion.Value
 local Spring = Fusion.Spring
 local OnEvent = Fusion.OnEvent
-local peek = Fusion.peek
 
 -- Constants
 local SHADOW_OFFSET = 4
@@ -45,10 +45,8 @@ end
 
 export type ShopScreenProps = {
 	Scope: Fusion.Scope<any>,
-	-- Player data
 	Coins: any, -- Fusion.Value<number>
 	UnlockedPlants: any, -- Fusion.Value<{string}>
-	-- Callbacks
 	OnClose: () -> (),
 	OnPurchase: (plantType: string) -> (),
 }
@@ -104,6 +102,8 @@ local function ShopScreen(props: ShopScreenProps): Frame
 				BackgroundTransparency = 1,
 				
 				[Children] = {
+					-- Responsive scaling
+					ResponsiveUtils.CreateUIScale(scope),
 					-- Header
 					New(scope, "Frame") {
 						Name = "Header",

@@ -23,6 +23,7 @@ local PlantData = require(Shared.data.PlantData)
 local ProgressionData = require(Shared.data.ProgressionData)
 local MutationData = require(Shared.data.MutationData)
 local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 -- Local atoms
 local Atoms = script.Parent.Parent.atoms
@@ -374,6 +375,9 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 				BackgroundTransparency = 1,
 				
 				[Children] = {
+					-- Responsive scaling
+					ResponsiveUtils.CreateUIScale(scope),
+					
 					-- ========================================
 					-- HEADER
 					-- ========================================
