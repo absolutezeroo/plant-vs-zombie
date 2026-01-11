@@ -23,19 +23,20 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local LobbySignals = require(Shared.signals.LobbySignals)
+local BlurManager = require(Shared.ui.utils.BlurManager)
 
--- Import View modules (SRP: each view handles its own UI)
--- Views are functions: (scope, props) -> Frame
-local createShopView = require(script.Parent.Parent.ui.ShopView)
-local createDeckBuilderView = require(script.Parent.Parent.ui.DeckBuilderView)
-local createProfileView = require(script.Parent.Parent.ui.ProfileView)
-local createMutationView = require(script.Parent.Parent.ui.MutationView)
+-- Atomic Design components (organisms)
+local ProfileScreen = require(script.Parent.Parent.ui.components.organisms.ProfileScreen)
+local ShopScreen = require(script.Parent.Parent.ui.components.organisms.ShopScreen)
+local DeckBuilderScreen = require(script.Parent.Parent.ui.components.organisms.DeckBuilderScreen)
+local MutationScreen = require(script.Parent.Parent.ui.components.organisms.MutationScreen)
 
 -- Trove for connection cleanup
 local _trove = Trove.new()
 
 local New = Fusion.New
 local Value = Fusion.Value
+local Computed = Fusion.Computed
 local Children = Fusion.Children
 local peek = Fusion.peek
 
@@ -59,6 +60,7 @@ local _onSaveDeck: (({string}) -> ())? = nil
 local _onPurchaseMutation: ((string, string) -> ())? = nil
 local _onEquipMutation: ((string, string) -> ())? = nil
 local _onUnequipMutation: ((string, string) -> ())? = nil
+local _onUIClose: (() -> ())? = nil -- Called when any UI is closed
 
 -- ============================================
 -- UI MANAGEMENT
@@ -68,6 +70,12 @@ local function closeCurrentUI()
     if _currentUI then
         _currentUI:Destroy()
         _currentUI = nil
+        -- Disable blur when UI closes
+        BlurManager.Disable()
+        -- Notify listeners that UI was closed
+        if _onUIClose then
+            _onUIClose()
+        end
     end
 end
 
@@ -84,6 +92,8 @@ end
 
 local function showUI(name: string, viewFrame: Frame)
     closeCurrentUI()
+    -- Enable blur when UI opens
+    BlurManager.Enable()
     _currentUI = wrapInScreenGui(name, viewFrame)
     _currentUI.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 end
@@ -95,9 +105,22 @@ end
 local function openShopView()
     Logger.Info("ZoneInteraction", "Opening Shop")
     
-    local viewFrame = createShopView(_scope, {
-        PlayerData = _playerData,
-        OnBack = closeCurrentUI,
+    -- Create Computed values for ShopScreen
+    local coins = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.Coins else 0
+    end)
+    
+    local unlockedPlants = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.UnlockedPlants else {}
+    end)
+    
+    local viewFrame = ShopScreen({
+        Scope = _scope,
+        Coins = coins,
+        UnlockedPlants = unlockedPlants,
+        OnClose = closeCurrentUI,
         OnPurchase = function(plantType: string)
             if _onPurchasePlant then
                 _onPurchasePlant(plantType)
@@ -111,7 +134,8 @@ end
 local function openDeckBuilderView()
     Logger.Info("ZoneInteraction", "Opening Deck Builder")
     
-    local viewFrame = createDeckBuilderView(_scope, {
+    local viewFrame = DeckBuilderScreen({
+        Scope = _scope,
         SelectedDeck = _currentDeck,
         PlayerData = _playerData,
         PlantMutations = _equippedMutations, -- Show equipped mutations
@@ -123,7 +147,7 @@ local function openDeckBuilderView()
             if _onSaveDeck then
                 _onSaveDeck(deck)
             end
-            closeCurrentUI()
+            -- Don't close UI - auto-save should be seamless
         end,
     })
     
@@ -133,9 +157,64 @@ end
 local function openProfileView()
     Logger.Info("ZoneInteraction", "Opening Profile")
     
-    local viewFrame = createProfileView(_scope, {
-        PlayerData = _playerData,
-        OnBack = closeCurrentUI,
+    -- Create Computed values that extract from _playerData
+    local level = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.Level else 1
+    end)
+    
+    local xp = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.XP else 0
+    end)
+    
+    local xpRequired = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.TotalXPForNextLevel else 100
+    end)
+    
+    local coins = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.Coins else 0
+    end)
+    
+    local gems = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.Gems else 0
+    end)
+    
+    local gamesPlayed = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.GamesPlayed else 0
+    end)
+    
+    local gamesWon = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.GamesWon else 0
+    end)
+    
+    local zombiesKilled = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.ZombiesKilled else 0
+    end)
+    
+    local plantsPlaced = Computed(_scope, function(use)
+        local data = use(_playerData)
+        return if data then data.PlantsPlaced else 0
+    end)
+    
+    local viewFrame = ProfileScreen({
+        Scope = _scope,
+        Level = level,
+        XP = xp,
+        XPRequired = xpRequired,
+        Coins = coins,
+        Gems = gems,
+        GamesPlayed = gamesPlayed,
+        GamesWon = gamesWon,
+        ZombiesKilled = zombiesKilled,
+        PlantsPlaced = plantsPlaced,
+        OnClose = closeCurrentUI,
     })
     
     showUI("ProfileUI", viewFrame)
@@ -144,7 +223,8 @@ end
 local function openMutationView()
     Logger.Info("ZoneInteraction", "Opening Mutations")
     
-    local viewFrame = createMutationView(_scope, {
+    local viewFrame = MutationScreen({
+        Scope = _scope,
         PlayerData = _playerData,
         OwnedMutations = _ownedMutations,
         EquippedMutations = _equippedMutations,
@@ -268,6 +348,10 @@ end
 
 function ZoneInteractionController.SetOnUnequipMutation(callback: (string, string) -> ())
     _onUnequipMutation = callback
+end
+
+function ZoneInteractionController.SetOnUIClose(callback: () -> ())
+    _onUIClose = callback
 end
 
 -- Manual UI opening (for testing or keybinds)

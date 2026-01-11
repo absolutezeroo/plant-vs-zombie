@@ -40,10 +40,13 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- DEFERRED MODULE REFERENCES
 -- ============================================
 local ZapClient
-local LobbyHUD
+local LobbyHUDController
 local PadUIController
 local ZoneInteractionController
 local UIStateManager
+
+-- HUD instance
+local lobbyHUD: any = nil
 
 -- Create a scope for Fusion cleanup
 local scope = Fusion.scoped(Fusion)
@@ -188,6 +191,11 @@ local function setupNetworkListeners()
         playerData:set(newData)
         currentDeck:set(data.Deck or {})
         
+        -- Update HUD controller if mounted
+        if lobbyHUD then
+            lobbyHUD:UpdatePlayerData(newData)
+        end
+        
         -- Fire signal for controllers to react
         LobbySignals.OnPlayerDataSync:Fire(newData)
     end)
@@ -221,6 +229,11 @@ local function setupNetworkListeners()
     ZapClient.DeckChanged.On(function(data)
         Logger.Info("LobbyClient", `Deck updated: {#data.Deck} plants`)
         currentDeck:set(data.Deck)
+        
+        -- Update HUD controller
+        if lobbyHUD then
+            lobbyHUD:UpdateDeck(data.Deck)
+        end
         
         -- Fire signal for controllers to react
         LobbySignals.OnDeckUpdated:Fire({ Deck = data.Deck })
@@ -287,6 +300,11 @@ local function setupNetworkListeners()
         newEquipped[data.PlantType] = data.EquippedMutations
         equippedMutations:set(newEquipped)
         
+        -- Update HUD controller
+        if lobbyHUD then
+            lobbyHUD:UpdateMutations(newEquipped)
+        end
+        
         -- Fire signal for controllers to react
         LobbySignals.OnMutationsSync:Fire({
             OwnedMutations = newOwned,
@@ -311,6 +329,11 @@ local function setupNetworkListeners()
             equippedDict[entry.PlantType] = entry.Mutations
         end
         equippedMutations:set(equippedDict)
+        
+        -- Update HUD controller
+        if lobbyHUD then
+            lobbyHUD:UpdateMutations(equippedDict)
+        end
         
         -- Fire signal for controllers to react
         LobbySignals.OnMutationsSync:Fire({
@@ -338,7 +361,7 @@ end
 -- Step 1: Load Modules
 loader:AddStep("Modules", function()
     ZapClient = require(Shared.network.generated.client)
-    LobbyHUD = require(script:WaitForChild("ui"):WaitForChild("LobbyHUD"))
+    LobbyHUDController = require(script:WaitForChild("controllers"):WaitForChild("LobbyHUDController"))
     PadUIController = require(script:WaitForChild("controllers"):WaitForChild("PadUIController"))
     ZoneInteractionController = require(script:WaitForChild("controllers"):WaitForChild("ZoneInteractionController"))
     UIStateManager = require(script:WaitForChild("controllers"):WaitForChild("UIStateManager"))
@@ -365,14 +388,9 @@ end, 2)
 
 -- Step 4: Mount HUD
 loader:AddStep("UI", function()
-    local hudGui = LobbyHUD(scope, {
-        PlayerData = playerData,
-        CurrentDeck = currentDeck,
-        EquippedMutations = equippedMutations,
-    })
-    hudGui.Parent = PlayerGui
-    UIStateManager.Register("LobbyHUD", hudGui)
-    Logger.Info("LobbyClient", "LobbyHUD mounted")
+    lobbyHUD = LobbyHUDController.new()
+    lobbyHUD:Mount()
+    Logger.Info("LobbyClient", "LobbyHUDController mounted")
 end, 1)
 
 -- Step 5: Request Player Data

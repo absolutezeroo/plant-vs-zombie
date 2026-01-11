@@ -10,9 +10,10 @@
 ]]
 
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Theme = require(Shared.ui.design.Theme)
 
 -- Types
 export type FloatingTextData = {

@@ -643,6 +643,45 @@ function PlayerDataService.UnequipMutation(player: Player, plantType: string, mu
     return false
 end
 
+-- Sync all player data to the client
+function PlayerDataService.SyncToClient(player: Player)
+    local profile = Profiles[player]
+    if not profile then return end
+    
+    local coins = profile.Data.Coins or 0
+    local gems = profile.Data.Gems or 0
+    local level = profile.Data.Level or 1
+    local xp = profile.Data.XP or 0
+    local xpForNext = profile.Data.TotalXPForNextLevel or 100
+    local stats = {
+        GamesPlayed = profile.Data.GamesPlayed or 0,
+        GamesWon = profile.Data.GamesWon or 0,
+        ZombiesKilled = profile.Data.ZombiesKilled or 0,
+        PlantsPlaced = profile.Data.PlantsPlaced or 0,
+    }
+    local unlockedPlants = {}
+    for plantType, _ in pairs(profile.Data.UnlockedPlants or {}) do
+        table.insert(unlockedPlants, plantType)
+    end
+    local deck = profile.Data.Deck or {"Sunflower", "Peashooter", "WallNut"}
+    
+    Network.FullPlayerDataSync.Fire(player, {
+        Coins = coins,
+        Gems = gems,
+        Level = level,
+        XP = xp,
+        TotalXPForNextLevel = xpForNext,
+        GamesPlayed = stats.GamesPlayed,
+        GamesWon = stats.GamesWon,
+        ZombiesKilled = stats.ZombiesKilled,
+        PlantsPlaced = stats.PlantsPlaced,
+        UnlockedPlants = unlockedPlants,
+        Deck = deck,
+    })
+    
+    Logger.Debug("LobbyPlayerData", `Synced data to {player.Name}`)
+end
+
 -- Dispose: Clean up connections (called on server shutdown)
 function PlayerDataService.Dispose()
     Logger.Info("LobbyPlayerData", "Disposing PlayerDataService...")

@@ -3,9 +3,9 @@
     ServiceLoader.luau - Orchestrates service/controller initialization with loading UI
     
     Provides a structured way to load services with progress tracking.
-    Works with LoaderUI to show loading progress to players.
+    Works with LoadingScreen to show loading progress to players.
     
-    Note: Uses --!nonstrict due to complex Fusion type inference with LoaderUI.
+    Note: Uses --!nonstrict due to complex Fusion type inference.
     
     Usage:
         local ServiceLoader = require(Shared.utils.ServiceLoader)
@@ -30,7 +30,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Sift = require(Packages.Sift)
 local Promise = require(Packages.Promise)
-local LoaderUI = require(Shared.ui.LoaderUI)
+local LoadingScreen = require(Shared.ui.components.organisms.LoadingScreen)
 local Logger = require(Shared.utils.Logger)
 
 local ServiceLoader = {}
@@ -75,11 +75,11 @@ function ServiceLoader:Run(onComplete)
         totalWeight = totalWeight + step.weight
     end
     
-    -- Build stages for LoaderUI from predefined stages or from steps
+    -- Build stages for LoadingScreen from predefined stages or from steps
     local loaderStages = {}
     
     if #self._stages > 0 then
-        -- Use predefined stages with tips (convert to LoaderUI format)
+        -- Use predefined stages with tips (convert to LoadingScreen format)
         for i, stage in self._stages do
             local stepWeight = self._steps[i] and self._steps[i].weight or 1
             loaderStages = Sift.Array.push(loaderStages, {
@@ -97,8 +97,8 @@ function ServiceLoader:Run(onComplete)
         end
     end
     
-    -- Create LoaderUI
-    self._loaderUI = LoaderUI.new({
+    -- Create LoadingScreen
+    self._loaderUI = LoadingScreen.new({
         stages = loaderStages,
         title = self._title,
         subtitle = self._subtitle,
@@ -136,8 +136,8 @@ function ServiceLoader:Run(onComplete)
     end)
 end
 
--- Get the LoaderUI instance (for custom progress updates)
-function ServiceLoader:GetLoaderUI()
+-- Get the LoadingScreen instance (for custom progress updates)
+function ServiceLoader:GetLoadingScreen()
     return self._loaderUI
 end
 

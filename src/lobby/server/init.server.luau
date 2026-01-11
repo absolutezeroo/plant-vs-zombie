@@ -37,7 +37,6 @@ local TeleportManager = require(script.managers.TeleportManager)
 -- Import modules
 local ShopHandler = require(script.modules.ShopHandler)
 local MutationHandler = require(script.modules.MutationHandler)
-local DevCommands = require(script.modules.DevCommands)
 
 -- Network (unified Zap schema in shared/network)
 local ZapServer = require(Shared.network.generated.server)
@@ -59,9 +58,7 @@ Logger.Info("Lobby", "MutationHandler initialized")
 LobbyService.Initialize(ZapServer)
 Logger.Info("Lobby", "LobbyService initialized")
 
--- Initialize DevCommands
-DevCommands.Initialize(PlayerDataService)
-Logger.Info("Lobby", "DevCommands initialized")
+-- Note: Dev commands are now handled by Cmdr (see cmdr/init.server.luau)
 
 -- Initialize TeleportDataHandler for Lobby (handles return from Arena)
 TeleportDataHandler.InitializeLobby({
@@ -217,29 +214,6 @@ ZapServer.SaveDeck.SetCallback(function(player, data)
 		Logger.Info("Lobby", `{player.Name} deck saved`, {deckSize = #deckStrings})
 	else
 		Logger.Warn("Lobby", `Failed to save deck for {player.Name}`)
-	end
-end)
-
--- Handle DevCommand request
-ZapServer.DevCommand.SetCallback(function(player, data)
-	local command = data.Command
-	local stringArg = data.StringArg
-	local numberArg = data.NumberArg
-	
-	Logger.Info("Lobby", `DevCommand received: command={command}, type={typeof(command)}`)
-	
-	local success, message = DevCommands.HandleCommand(player, command, stringArg, numberArg)
-	
-	-- Send response
-	ZapServer.DevCommandResponse.Fire(player, {
-		Success = success,
-		Message = message,
-	})
-	
-	-- If successful, sync player data
-	if success then
-		-- Use ShopHandler to sync data properly (converts dict to array)
-		ShopHandler.SyncPlayerData(player)
 	end
 end)
 

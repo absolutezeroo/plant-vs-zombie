@@ -16,9 +16,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameSignals = require(Shared.signals.GameSignals)
-
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
+local Theme = require(Shared.ui.design.Theme)
 
 local Atoms = script.Parent.Parent.atoms
 local ToonPanel = require(Atoms.ToonPanel)

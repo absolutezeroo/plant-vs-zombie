@@ -14,12 +14,12 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 -- Path: client/ui/components/molecules/CoinCounter.luau
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Theme = require(Shared.ui.design.Theme)
+
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local PlayerDataClient = require(Modules.PlayerDataClient)
-
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
 
 -- Fusion primitives
 local New = Fusion.New

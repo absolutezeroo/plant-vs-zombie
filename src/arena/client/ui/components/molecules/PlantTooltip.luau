@@ -18,9 +18,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local Logger = require(Shared.utils.Logger)
-
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
+local Theme = require(Shared.ui.design.Theme)
 
 local Atoms = script.Parent.Parent.atoms
 local ToonPanel = require(Atoms.ToonPanel)
@@ -124,7 +122,7 @@ local function StatRow(scope: Scope, icon: string, label: string, value: any, co
 				Text = value,
 				TextColor3 = color or Colors.TextPrimary,
 				TextSize = 14,
-				Font = Theme.Typography.Fonts.Title,
+				Font = Enum.Font.GothamBold, -- More readable for numbers
 				TextXAlignment = Enum.TextXAlignment.Right,
 			},
 		},

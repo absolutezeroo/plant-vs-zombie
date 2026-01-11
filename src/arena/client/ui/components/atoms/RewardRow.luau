@@ -11,8 +11,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
 local New = Fusion.New
@@ -96,7 +96,7 @@ local function RewardRow(props: RewardRowProps): Frame
 				Text = displayText,
 				TextColor3 = color,
 				TextSize = 20,
-				Font = Theme.Typography.Fonts.Title,
+				Font = Enum.Font.GothamBold, -- More readable than LuckiestGuy for numbers
 				TextXAlignment = Enum.TextXAlignment.Right,
 			},
 		},

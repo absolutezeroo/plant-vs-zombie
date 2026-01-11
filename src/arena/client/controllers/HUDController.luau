@@ -22,6 +22,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local Network = require(Shared.network.generated.client)
+local Theme = require(Shared.ui.design.Theme)
 
 -- Client references (controllers is inside client)
 local Client = script.Parent.Parent
@@ -31,8 +32,6 @@ local PlayerDataClient = require(Modules.PlayerDataClient)
 
 -- UI Components
 local UI = Client:WaitForChild("ui")
-local Design = UI:WaitForChild("design")
-local Theme = require(Design.Theme)
 
 local Components = UI:WaitForChild("components")
 local SunCounter = require(Components.molecules.SunCounter)

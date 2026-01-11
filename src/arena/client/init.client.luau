@@ -57,6 +57,7 @@ local HUDController: any
 local FloatingTextController: any
 local PlantTooltipController: any
 local VictoryDefeatController: any
+local PlayerController: any
 
 -- Client ECS
 local world: any
@@ -332,6 +333,7 @@ loader:AddStep("Modules", function()
     PlantTooltipController = require(Controllers:WaitForChild("PlantTooltipController"))
     VictoryDefeatController = require(Controllers:WaitForChild("VictoryDefeatController"))
     FloatingTextController = require(Controllers:WaitForChild("FloatingTextController"))
+    PlayerController = require(Controllers:WaitForChild("PlayerController"))
     
     Logger.Info("ArenaClient", "Modules loaded")
 end, 1)
@@ -387,6 +389,10 @@ end, 1)
 
 -- Step 4: Mount UI
 loader:AddStep("UI", function()
+    -- Initialize player controller (disables jumping)
+    PlayerController.Init()
+    Logger.Info("ArenaClient", "PlayerController initialized")
+    
     -- Initialize floating text system
     FloatingTextController.Initialize()
     Logger.Info("ArenaClient", "FloatingTextController initialized")

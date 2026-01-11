@@ -18,13 +18,16 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 
+-- Assets
+local Assets = ReplicatedStorage:WaitForChild("Assets")
+local PlantModels = Assets:WaitForChild("Plants")
+
 -- Path: client/ui/components/molecules/SeedCard.luau
+local Theme = require(Shared.ui.design.Theme)
+
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
-
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
 
 -- Fusion primitives
 local New = Fusion.New
@@ -55,84 +58,53 @@ export type SeedCardProps = {
 	OnClick: () -> (),
 }
 
--- Temporary emoji map for testing (will be replaced with actual images)
-local PLANT_EMOJIS: {[string]: string} = {
-	Sunflower = "🌻",
-	Peashooter = "🌱",
-	WallNut = "🥜",
-	SnowPea = "❄️",
-	CherryBomb = "🍒",
-	PotatoMine = "💣",
-	PuffShroom = "🍄",
-	SunShroom = "☀️",
-	Chomper = "🦷",
-	Repeater = "🌿",
-	FumeShroom = "💨",
-	Squash = "🎃",
-	Garlic = "🧄",
-	TallNut = "🧱",
-	Threepeater = "🌾",
-	Jalapeno = "🌶️",
-	Spikeweed = "🔺",
-	Torchwood = "🔥",
-	CabbagePult = "🥬",
-	Pumpkin = "🎃",
-	ScaredyShroom = "😱",
-	HypnoShroom = "🌀",
-	SplitPea = "↔️",
-	KernelPult = "🌽",
-	Starfruit = "⭐",
-	Cactus = "🌵",
-	Blover = "🍀",
-	SeaShroom = "🌊",
-	TwinSunflower = "🌻🌻",
-	MelonPult = "🍈",
-	GatlingPea = "🔫",
-	GloomShroom = "☠️",
-	Cattail = "🐱",
-	WinterMelon = "🥶",
-	IceShroom = "🧊",
-	DoomShroom = "💀",
-	CobCannon = "🚀",
-	Marigold = "💰",
-	GoldMagnet = "🧲",
-	Imitater = "👻",
-	LilyPad = "🪷",
-	FlowerPot = "🪴",
-	TangleKelp = "🦑",
-	GraveBuster = "⚰️",
-	Plantern = "💡",
-	UmbrellaLeaf = "☂️",
-	CoffeeBean = "☕",
-	ExplodeONut = "💥",
-}
-
 --[[
-	Get plant emoji for testing
-	@param plantType string
-	@return string - Emoji character
+	Setup ViewportFrame with 3D plant model
 ]]
-local function getPlantEmoji(plantType: string): string
-	return PLANT_EMOJIS[plantType] or "🌱"
-end
-
---[[
-	Get plant image asset ID
-	@param plantType string
-	@return string - Asset ID or placeholder
-]]
-local function getPlantImage(plantType: string): string
-	-- TODO: Replace with actual plant image assets from PlantData
-	-- For now, use placeholder based on plant type
-	local imageMap: {[string]: string} = {
-		Sunflower = "rbxassetid://6764432293",
-		Peashooter = "rbxassetid://6764432293",
-		WallNut = "rbxassetid://6764432293",
-		SnowPea = "rbxassetid://6764432293",
-		CherryBomb = "rbxassetid://6764432293",
-		PotatoMine = "rbxassetid://6764432293",
-	}
-	return imageMap[plantType] or "rbxassetid://6764432293"
+local function setupViewport(viewport: ViewportFrame, plantType: string)
+	-- Clear previous content
+	for _, child in viewport:GetChildren() do
+		if child:IsA("Model") or child:IsA("Camera") or child:IsA("WorldModel") then
+			child:Destroy()
+		end
+	end
+	
+	-- Get plant model
+	local modelTemplate = PlantModels:FindFirstChild(plantType)
+	if not modelTemplate then
+		return
+	end
+	
+	-- Create WorldModel for proper rendering
+	local worldModel = Instance.new("WorldModel")
+	worldModel.Parent = viewport
+	
+	-- Clone and add model
+	local model = modelTemplate:Clone()
+	model.Parent = worldModel
+	
+	-- Position model at origin, rotate 90° to face camera
+	if model.PrimaryPart then
+		model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi / 2, 0))
+	end
+	
+	-- Create camera
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 35 -- Narrower FOV for larger appearance
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+	
+	-- Calculate framing based on model bounds
+	local cframe, size = model:GetBoundingBox()
+	local maxSize = math.max(size.X, size.Y, size.Z)
+	local distance = maxSize * 1.5 -- Closer to model
+	
+	-- Position camera directly in front of the plant (facing it)
+	local modelCenter = cframe.Position
+	camera.CFrame = CFrame.new(
+		modelCenter + Vector3.new(0, distance * 0.2, distance), -- Front view with slight upward offset
+		modelCenter
+	)
 end
 
 --[[
@@ -153,7 +125,26 @@ local function SeedCard(props: SeedCardProps): Frame
 	-- Get plant stats
 	local plantStats = PlantData.GetStats(plantType)
 	local cost = if plantStats then plantStats.Cost else 100
-	local plantImage = getPlantImage(plantType)
+	
+	-- Create ViewportFrame imperatively for 3D plant preview
+	local viewportFrame = Instance.new("ViewportFrame")
+	viewportFrame.Name = "PlantPreview"
+	viewportFrame.Size = UDim2.new(1, 0, 0.85, 0) -- Larger viewport
+	viewportFrame.Position = UDim2.new(0.5, 0, 0.4, 0)
+	viewportFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	viewportFrame.BackgroundTransparency = 1
+	viewportFrame.Ambient = Color3.fromRGB(200, 200, 200)
+	viewportFrame.LightColor = Color3.fromRGB(255, 255, 255)
+	viewportFrame.LightDirection = Vector3.new(-1, -1, -1)
+	viewportFrame.ZIndex = 3
+	
+	-- Setup viewport with plant model (deferred to ensure it's parented)
+	task.defer(function()
+		setupViewport(viewportFrame, plantType)
+	end)
+	
+	-- Cleanup viewport when scope is destroyed
+	table.insert(scope, viewportFrame)
 	
 	-- Internal state
 	local isHovered = Value(scope, false)
@@ -395,24 +386,8 @@ local function SeedCard(props: SeedCardProps): Frame
 								Thickness = borderThickness,
 							},
 							
-							-- Plant Emoji (temporary for testing)
-							New(scope, "TextLabel") {
-								Name = "PlantEmoji",
-								Size = UDim2.new(0.85, 0, 0.7, 0),
-								Position = UDim2.new(0.5, 0, 0.42, 0),
-								AnchorPoint = Vector2.new(0.5, 0.5),
-								BackgroundTransparency = 1,
-								Text = getPlantEmoji(plantType),
-								TextScaled = true,
-								TextColor3 = Computed(scope, function(use)
-									return if use(canAfford) then Color3.new(1, 1, 1) else Color3.new(0.5, 0.5, 0.5)
-								end),
-								TextTransparency = Computed(scope, function(use)
-									return if use(canAfford) then 0 else 0.3
-								end),
-								Font = Enum.Font.GothamBold,
-								ZIndex = 3,
-							},
+							-- 3D Plant Model Preview (created imperatively)
+							viewportFrame,
 							
 							-- Cost Badge (bottom-right pill)
 							New(scope, "Frame") {

@@ -11,8 +11,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
-local Design = script.Parent.Parent.Parent.design
-local Theme = require(Design.Theme)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
 local New = Fusion.New

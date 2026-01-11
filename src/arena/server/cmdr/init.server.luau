@@ -12,7 +12,6 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -20,6 +19,12 @@ local Cmdr = require(Packages:WaitForChild("Cmdr"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
+
+local WHITELISTED_USERS: {number} = {
+    353813522
+	-- Add your Roblox UserId here for production testing
+	-- Example: 12345678,
+}
 
 -- Register Cmdr (creates RemoteFunction in ReplicatedStorage)
 Cmdr:RegisterDefaultCommands()
@@ -42,10 +47,15 @@ Cmdr.Registry:RegisterHook("BeforeRun", function(context)
 	end
 	
 	-- In production: check if player is developer/admin
-	-- For now, allow all commands (you can add permission logic here)
-	-- Example: if context.Executor.UserId ~= YOUR_USER_ID then return "Permission denied" end
+	local player = context.Executor
+	for _, userId in WHITELISTED_USERS do
+		if player.UserId == userId then
+			return nil -- Allow
+		end
+	end
 	
-	return nil -- Allow
+	-- Block unauthorized users in production
+	return "Permission denied - dev commands are restricted"
 end)
 
 Logger.Info("Cmdr", "Server initialized with custom commands")
