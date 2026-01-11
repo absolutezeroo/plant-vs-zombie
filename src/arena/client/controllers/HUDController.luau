@@ -38,6 +38,7 @@ local Components = UI:WaitForChild("components")
 local SunCounter = require(Components.molecules.SunCounter)
 local SeedBank = require(Components.organisms.SeedBank)
 local WaveProgressBar = require(Components.molecules.WaveProgressBar)
+local BaseHealthBar = require(Components.molecules.BaseHealthBar)
 local ToonButton = require(Components.atoms.ToonButton)
 
 -- Fusion primitives
@@ -65,6 +66,7 @@ local _waveNumber: any = nil
 local _preparationPhase: any = nil
 local _preparationTime: any = nil
 local _intermissionTime: any = nil
+local _gameStarted: any = nil -- True once GameStarted event is received
 
 -- ============================================================
 -- PRIVATE FUNCTIONS
@@ -162,7 +164,7 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 				ZIndex = 5,
 			}),
 			
-			-- Bottom-Center: Ready Button (visible during preparation phase)
+			-- Bottom-Center: Ready Button (visible during preparation phase AND game has started)
 			ToonButton({
 				Scope = scope,
 				Text = readyButtonText,
@@ -173,7 +175,9 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 				OnClick = function()
 					onReadyClick(preparationPhase)
 				end,
-				Visible = preparationPhase,
+				Visible = Computed(scope, function(use)
+					return use(_gameStarted) and use(preparationPhase)
+				end),
 				ZIndex = 10,
 			}),
 			
@@ -217,6 +221,14 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 				AnchorPoint = Vector2.new(1, 1),
 				ZIndex = 5,
 			}),
+			
+			-- Bottom-Left: Base Health Bar
+			BaseHealthBar({
+				Scope = scope,
+				Position = UDim2.new(0, 20, 1, -60),
+				AnchorPoint = Vector2.new(0, 1),
+				ZIndex = 5,
+			}),
 		},
 	}
 	
@@ -242,12 +254,14 @@ function HUDController.new()
 	_preparationPhase = Value(_scope, true)
 	_preparationTime = Value(_scope, 0)
 	_intermissionTime = Value(_scope, 0)
+	_gameStarted = Value(_scope, false) -- Will be set true when GameStarted event received
 	
 	-- Expose for countdown loop in init.client.luau
 	self._waveNumber = _waveNumber
 	self._preparationPhase = _preparationPhase
 	self._preparationTime = _preparationTime
 	self._intermissionTime = _intermissionTime
+	self._gameStarted = _gameStarted
 	
 	Logger.Debug("HUDController", "Created new HUD controller")
 	return self
@@ -306,6 +320,16 @@ end
 function HUDController:SetIntermissionTime(time: number)
 	if _intermissionTime then
 		_intermissionTime:set(time)
+	end
+end
+
+--[[
+	Set game started state (called when GameStarted event is received).
+	This controls the Ready button visibility in Studio debug mode.
+]]
+function HUDController:SetGameStarted(started: boolean)
+	if _gameStarted then
+		_gameStarted:set(started)
 	end
 end
 

@@ -313,6 +313,7 @@ event PlantSpawned = {
         Lane: Lane,
         Column: Column,
         OwnerId: f64,
+        Mutations: MutationType[0..8],
     }
 }
 

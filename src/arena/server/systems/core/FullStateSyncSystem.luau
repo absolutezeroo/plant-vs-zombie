@@ -43,11 +43,19 @@ local function syncPlayer(player: Player, world: any)
 	
 	-- Sync all plants
 	for id, plant, pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
+		-- Get mutations if present
+		local mutationsComp = world:get(id, Components.MutationsComponent)
+		local mutations: {string} = {}
+		if mutationsComp and mutationsComp.MutationIds then
+			mutations = mutationsComp.MutationIds
+		end
+		
 		Network.PlantSpawned.Fire(player, {
 			EntityId = id,
 			PlantType = plant.PlantType :: any,
 			Column = plant.Column :: any,
 			Lane = plant.Lane :: any,
+			Mutations = mutations :: any,
 		})
 	end
 	

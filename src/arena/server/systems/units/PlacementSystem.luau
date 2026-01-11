@@ -303,13 +303,14 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 	
 	Logger.Info("PlacementSystem", `Spawned {plantType} at ({column}, {lane}) for {player.Name} - Entity {entityId}{mutationInfo}`)
 	
-	-- Broadcast to all clients
+	-- Broadcast to all clients (with mutations as enum array)
 	Network.PlantSpawned.FireAll({
 		EntityId = entityId,
 		PlantType = plantType :: any,
 		Lane = lane :: any,
 		Column = column :: any,
 		OwnerId = player.UserId,
+		Mutations = mutations :: any,
 	})
 	
 	-- Spawn SpawnEvent for presentation systems (VFX, Audio)

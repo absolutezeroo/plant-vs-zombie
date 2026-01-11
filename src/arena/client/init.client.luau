@@ -56,6 +56,7 @@ local PlayerDataClient: any
 local HUDController: any
 local FloatingTextUI: any
 local VictoryDefeatScreen: any
+local PlantTooltipController: any
 
 -- Client ECS
 local world: any
@@ -70,6 +71,7 @@ local preparationStartTime = 0
 local preparationDuration = 20
 local intermissionStartTime = 0
 local intermissionDuration = 10 -- Must match WaveConfig.WAVE_DELAY on server
+local totalWaves = 10 -- Default, will be updated by GameStarted event
 
 -- Create a scope for Fusion cleanup
 local scope = Fusion.scoped(Fusion)
@@ -128,11 +130,28 @@ end
     Called after UI is mounted.
 ]]
 local function setupNetworkListeners()
+    -- Game started event (receives total wave count)
+    Network.GameStarted.On(function(data)
+        Logger.Info("ArenaClient", `Game started: World={data.WorldId}, Difficulty={data.Difficulty}, Waves={data.WaveCount}`)
+        totalWaves = data.WaveCount or 10
+        
+        -- Mark game as started (enables Ready button in HUD)
+        hud:SetGameStarted(true)
+        
+        -- Fire initial wave change with MaxWaves
+        GameSignals.OnWaveChanged:Fire({
+            WaveNumber = 0,
+            MaxWaves = totalWaves,
+            IsPreparation = true,
+        })
+    end)
+    
     -- Wave started event
     Network.WaveStarted.On(function(data)
-        -- Fire signal for HUD to react
+        -- Fire signal for HUD to react (include MaxWaves)
         GameSignals.OnWaveChanged:Fire({
             WaveNumber = data.WaveNumber,
+            MaxWaves = totalWaves,
             IsPreparation = data.WaveNumber == 0,
         })
         
@@ -310,6 +329,7 @@ loader:AddStep("Modules", function()
     
     local Controllers = script:WaitForChild("controllers")
     HUDController = require(Controllers:WaitForChild("HUDController"))
+    PlantTooltipController = require(Controllers:WaitForChild("PlantTooltipController"))
     
     local UI = script:WaitForChild("ui")
     FloatingTextUI = require(UI:WaitForChild("FloatingTextUI"))
@@ -376,6 +396,10 @@ loader:AddStep("UI", function()
     -- Create and mount HUD
     hud = HUDController.new()
     hud:Mount()
+    
+    -- Initialize plant tooltip system (click on plants to see info)
+    PlantTooltipController.Initialize()
+    Logger.Info("ArenaClient", "PlantTooltipController initialized")
     
     -- Create and mount Victory/Defeat screen
     victoryScreen = VictoryDefeatScreen.new()

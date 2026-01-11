@@ -82,6 +82,9 @@ type PlantVisual = {
 }
 local _plantVisuals: {[number]: PlantVisual} = {}
 
+-- Mutations cache: entityId -> mutation list (cleaner than model attributes)
+local _plantMutations: {[number]: {string}} = {}
+
 -- Trove for cleanup (connections)
 local _trove = Trove.new()
 
@@ -125,6 +128,7 @@ local function createPlantVisual(entityId: number, plantType: string, column: nu
 		
 		-- Add entity tracking attributes
 		model:SetAttribute("EntityId", entityId)
+		model:SetAttribute("PlantType", plantType)
 		
 		model.Parent = Workspace
 		
@@ -211,6 +215,7 @@ local function setupNetworkListeners()
 		local plantType = tostring(data.PlantType)
 		local column = data.Column
 		local lane = data.Lane
+		local mutations = data.Mutations or {}
 		
 		if _plantVisuals[entityId] then
 			Logger.Warn("PlantRender", `Plant {entityId} already exists`)
@@ -218,6 +223,17 @@ local function setupNetworkListeners()
 		end
 		
 		_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
+		
+		-- Store mutations in local cache (cleaner than model attributes)
+		local mutationStrings: {string} = {}
+		for _, mutation in ipairs(mutations) do
+			table.insert(mutationStrings, tostring(mutation))
+		end
+		_plantMutations[entityId] = mutationStrings
+		
+		if #mutationStrings > 0 then
+			Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) has mutations: {table.concat(mutationStrings, ", ")}`)
+		end
 		
 		-- Play placement VFX
 		-- Use Center Attachment if model available, otherwise fallback to grid position
@@ -248,6 +264,7 @@ local function setupNetworkListeners()
 			
 			-- Remove from tracking immediately to prevent double-processing
 			_plantVisuals[entityId] = nil
+			_plantMutations[entityId] = nil
 			
 			if visual.Model then
 				-- Stop idle animation and VFX
@@ -377,7 +394,17 @@ local function Dispose()
 		destroyPlantVisual(entityId)
 	end
 	
+	-- Clear mutations cache
+	table.clear(_plantMutations)
+	
 	Logger.Debug("PlantRender", "Disposed")
+end
+
+--[[
+	Get mutations for an entity (used by tooltip)
+]]
+local function getMutations(entityId: number): {string}
+	return _plantMutations[entityId] or {}
 end
 
 return {
@@ -387,4 +414,5 @@ return {
 	Init = Init,
 	Dispose = Dispose,
 	getPlantVisual = getPlantVisual,
+	getMutations = getMutations,
 }
