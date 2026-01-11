@@ -46,17 +46,18 @@ local ZapServer = require(Shared.network.generated.server)
 PlayerDataService.Initialize()
 Logger.Info("Lobby", "PlayerDataService initialized")
 
--- Initialize LobbyService (teleport pads)
-LobbyService.Initialize(ZapServer)
-Logger.Info("Lobby", "LobbyService initialized")
-
--- Initialize ShopHandler
+-- Initialize ShopHandler EARLY (before client can request data)
+-- This sets up RequestPlayerData.SetCallback before any client requests arrive
 ShopHandler.Initialize()
 Logger.Info("Lobby", "ShopHandler initialized")
 
--- Initialize MutationHandler
+-- Initialize MutationHandler EARLY (for mutation sync)
 MutationHandler.Initialize()
 Logger.Info("Lobby", "MutationHandler initialized")
+
+-- Initialize LobbyService (teleport pads) - can be slow, do after network handlers
+LobbyService.Initialize(ZapServer)
+Logger.Info("Lobby", "LobbyService initialized")
 
 -- Initialize DevCommands
 DevCommands.Initialize(PlayerDataService)

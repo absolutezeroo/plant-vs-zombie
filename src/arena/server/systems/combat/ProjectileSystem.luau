@@ -349,9 +349,8 @@ local function OnStep(world)
 		-- Check if zombies in lane (or any lane for multi-direction)
 		local hasTargets = false
 		if stats.ShootsMultiDirection then
-			-- Starfruit shoots regardless of zombie position
-			hasTargets = true
-			for _, zombie in world:query(Components.ZombieTypeComponent) do
+			-- Starfruit shoots in all directions, but only if zombies exist on the map
+			for _ in world:query(Components.ZombieTypeComponent) do
 				hasTargets = true
 				break
 			end

@@ -28,6 +28,7 @@
 
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GridConfig = require(Shared.config.GridConfig)
@@ -35,6 +36,7 @@ local Logger = require(Shared.utils.Logger)
 
 -- Cached configuration
 local _isInitialized = false
+local _isClientMode = false -- If true, don't auto-initialize (wait for server sync)
 local _config = {
 	-- Grid bounds (world positions)
 	GridCornerA = Vector3.zero,  -- Top-left (min X, min Z)
@@ -64,6 +66,20 @@ local _config = {
 export type MapConfigType = typeof(_config)
 
 local MapConfig = {}
+
+--[[
+	Set client mode - prevents auto-initialization from Workspace.
+	Client should call this early and wait for ApplyFromServer().
+]]
+function MapConfig.SetClientMode()
+	if RunService:IsClient() then
+		_isClientMode = true
+		-- Initialize with defaults so functions don't error before server sync
+		MapConfig._UseDefaults()
+		_isInitialized = false -- Mark as NOT initialized until server sends config
+		Logger.Debug("MapConfig", "Client mode enabled - waiting for server sync")
+	end
+end
 
 --[[
 	Initialize configuration from Workspace
@@ -365,7 +381,7 @@ end
 
 -- Get grid to world position conversion
 function MapConfig.GridToWorld(column: number, lane: number): Vector3
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	
@@ -378,7 +394,7 @@ end
 
 -- Get world to grid coordinate conversion
 function MapConfig.WorldToGrid(position: Vector3): (number?, number?)
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	
@@ -401,7 +417,7 @@ end
 
 -- Get zombie spawn position for a lane
 function MapConfig.GetZombieSpawn(lane: number): Vector3
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	
@@ -410,7 +426,7 @@ end
 
 -- Get zombie movement direction
 function MapConfig.GetZombieDirection(): Vector3
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	return _config.ZombieDirection
@@ -418,7 +434,7 @@ end
 
 -- Get base position
 function MapConfig.GetBasePosition(): Vector3
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	return _config.BasePosition
@@ -426,7 +442,7 @@ end
 
 -- Get cell dimensions
 function MapConfig.GetCellSize(): (number, number)
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	return _config.CellWidth, _config.CellDepth
@@ -434,7 +450,7 @@ end
 
 -- Get grid origin
 function MapConfig.GetGridOrigin(): Vector3
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	return _config.GridOrigin
@@ -442,23 +458,33 @@ end
 
 -- Get full config (read-only)
 function MapConfig.GetConfig(): MapConfigType
-	if not _isInitialized then
+	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
 	return _config
 end
 
 -- Get config only if already initialized (non-blocking, for use in ECS systems)
+-- In client mode, returns config with defaults even before server sync
 function MapConfig.GetConfigIfReady(): MapConfigType?
 	if _isInitialized then
+		return _config
+	end
+	-- In client mode, return config with defaults (GridY=0 indicates not synced)
+	if _isClientMode then
 		return _config
 	end
 	return nil
 end
 
--- Check if config is initialized
+-- Check if config is initialized (server has synced in client mode)
 function MapConfig.IsInitialized(): boolean
 	return _isInitialized
+end
+
+-- Check if in client mode (waiting for server sync)
+function MapConfig.IsClientMode(): boolean
+	return _isClientMode
 end
 
 -- Check if using visual config

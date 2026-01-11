@@ -210,24 +210,7 @@ function PlayerDataClient.Initialize()
 		PlayerData.Level:set(data.Level or 1)
 		PlayerData.LevelProgress:set(data.LevelProgress or 0)
 		
-		-- Update equipped mutations
-		if data.EquippedMutations then
-			-- Convert array format from Zap to dictionary
-			local mutationsDict = {}
-			for _, entry in data.EquippedMutations do
-				mutationsDict[tostring(entry.PlantType)] = {}
-				for _, mutation in entry.Mutations do
-					table.insert(mutationsDict[tostring(entry.PlantType)], tostring(mutation))
-				end
-			end
-			PlayerData.PlantMutations:set(mutationsDict)
-			
-			local mutationCount = 0
-			for _, mutations in mutationsDict do
-				mutationCount = mutationCount + #mutations
-			end
-			Logger.Info("PlayerData", `Received {mutationCount} equipped mutations`)
-		end
+		-- Note: Mutations are synced via SyncAllMutations event (separate call)
 		
 		-- Update unlocked plants
 		local unlockedList = {}
@@ -235,6 +218,34 @@ function PlayerDataClient.Initialize()
 			table.insert(unlockedList, tostring(plantType))
 		end
 		PlayerData.UnlockedPlants:set(unlockedList)
+		
+		Logger.Debug("PlayerData", `Synced: {#unlockedList} unlocked plants`)
+	end)
+	
+	-- Handle mutations sync from server (sent separately after PlayerDataSync)
+	Network.SyncAllMutations.On(function(data)
+		-- Convert EquippedMutations array format from Zap to dictionary
+		local mutationsDict: {[string]: {string}} = {}
+		
+		if data.EquippedMutations then
+			for _, entry in data.EquippedMutations do
+				local plantType = tostring(entry.PlantType)
+				mutationsDict[plantType] = {}
+				for _, mutation in entry.Mutations do
+					table.insert(mutationsDict[plantType], tostring(mutation))
+				end
+			end
+		end
+		
+		PlayerData.PlantMutations:set(mutationsDict)
+		
+		local mutationCount = 0
+		local plantCount = 0
+		for _, mutations in mutationsDict do
+			mutationCount = mutationCount + #mutations
+			plantCount = plantCount + 1
+		end
+		Logger.Info("PlayerData", `Received {mutationCount} equipped mutations for {plantCount} plants`)
 	end)
 	
 	-- Handle coin gain events

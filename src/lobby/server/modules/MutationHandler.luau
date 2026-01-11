@@ -180,21 +180,15 @@ function MutationHandler.Initialize()
         end
     end)
     
-    -- Sync mutations when player data loads
-    _trove:Connect(Players.PlayerAdded, function(player)
-        -- Wait a bit for profile to load
-        task.delay(1, function()
+    -- Sync mutations when player profile loads (using OnDataChanged)
+    -- This fires when profile first loads and on any data change
+    PlayerDataService.OnDataChanged(function(player, _data)
+        -- Defer to ensure all profile data is ready
+        task.defer(function()
             if player.Parent then
                 MutationHandler.SyncMutationsToPlayer(player)
             end
         end)
-    end)
-    
-    -- Sync to existing players (Studio testing)
-    task.delay(1, function()
-        for _, player in Players:GetPlayers() do
-            MutationHandler.SyncMutationsToPlayer(player)
-        end
     end)
     
     Logger.Info("MutationHandler", "Mutation handlers initialized")

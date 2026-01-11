@@ -42,18 +42,6 @@ local function syncPlayerData(player: Player)
 		end
 	end
 	
-	-- Get equipped mutations from MutationService
-	local equippedMutationsDict = MutationService.GetPlayerMutations(player.UserId)
-	
-	-- Convert to array format for Zap
-	local equippedMutationsArray = {}
-	for plantType, mutations in equippedMutationsDict do
-		table.insert(equippedMutationsArray, {
-			PlantType = plantType,
-			Mutations = mutations,
-		})
-	end
-	
 	Network.PlayerDataSync.Fire(player, {
 		Coins = data.Coins,
 		Gems = data.Gems or 0,
@@ -61,6 +49,32 @@ local function syncPlayerData(player: Player)
 		Level = data.Level or 1,
 		LevelProgress = PlayerDataService.GetLevelProgress(player),
 		UnlockedPlants = unlockedPlants,
+	})
+	
+	-- Sync mutations via dedicated event (SyncAllMutations)
+	local equippedMutationsDict = MutationService.GetPlayerMutations(player.UserId)
+	local ownedMutationsDict = MutationService.GetOwnedMutations and MutationService.GetOwnedMutations(player.UserId) or {}
+	
+	-- Convert to array format for Zap
+	local equippedMutationsArray = {}
+	local ownedMutationsArray = {}
+	
+	for plantType, mutations in equippedMutationsDict do
+		table.insert(equippedMutationsArray, {
+			PlantType = plantType,
+			Mutations = mutations,
+		})
+	end
+	
+	for plantType, mutations in ownedMutationsDict do
+		table.insert(ownedMutationsArray, {
+			PlantType = plantType,
+			Mutations = mutations,
+		})
+	end
+	
+	Network.SyncAllMutations.Fire(player, {
+		OwnedMutations = ownedMutationsArray,
 		EquippedMutations = equippedMutationsArray,
 	})
 	

@@ -39,6 +39,9 @@ local ServiceLoader = require(Shared.utils.ServiceLoader)
 local SystemManager = require(Shared.utils.SystemManager)
 local GameSignals = require(Shared.signals.GameSignals)
 
+-- Client MUST wait for server to send MapConfigSync with authoritative values.
+MapConfig.SetClientMode()
+
 -- Get local player
 local LocalPlayer = Players.LocalPlayer
 
@@ -305,8 +308,10 @@ loader:AddStep("Modules", function()
     local Modules = script:WaitForChild("modules")
     PlayerDataClient = require(Modules:WaitForChild("PlayerDataClient"))
     
+    local Controllers = script:WaitForChild("controllers")
+    HUDController = require(Controllers:WaitForChild("HUDController"))
+    
     local UI = script:WaitForChild("ui")
-    HUDController = require(UI:WaitForChild("HUDController"))
     FloatingTextUI = require(UI:WaitForChild("FloatingTextUI"))
     VictoryDefeatScreen = require(UI:WaitForChild("VictoryDefeatScreen"))
     
@@ -316,6 +321,9 @@ end, 1)
 -- Step 2: Setup ECS
 loader:AddStep("ECS", function()
     local Systems = script:WaitForChild("systems")
+    
+    -- The server is authoritative for map config.
+    Logger.Info("ArenaClient", "MapConfig will be synced from server")
     
     -- Create client Matter World
     world = Matter.World.new()

@@ -74,6 +74,22 @@ function MutationService.GetPlantMutations(userId: number, plantType: string): {
 end
 
 --[[
+	Load mutations from player profile (for Studio debug mode)
+	@param player Player
+	@param profileData table - The player's profile data
+]]
+function MutationService.LoadMutationsFromProfile(player: Player, profileData: any)
+	local equippedMutations = profileData.PlantEquippedMutations or {}
+	State.PlayerMutationsCache[player.UserId] = equippedMutations
+	
+	local count = 0
+	for _ in equippedMutations do
+		count = count + 1
+	end
+	Logger.Info("MutationService", `Loaded {count} plant mutations from profile for {player.Name}`)
+end
+
+--[[
 	Dispose of service resources
 	Called when arena match ends
 ]]

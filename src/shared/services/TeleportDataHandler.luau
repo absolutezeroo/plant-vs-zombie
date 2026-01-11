@@ -74,6 +74,9 @@ TeleportDataHandler.OnPlayerReturned = _onPlayerReturnedSignal -- (player, retur
 local _playerTeleportData: { [number]: TeleportData.ArenaJoinData } = {}
 local _playerReturnData: { [number]: TeleportData.LobbyReturnData } = {}
 
+-- Track which players have already had OnPlayerReady fired (to avoid duplicates)
+local _playerReadyFired: { [number]: boolean } = {}
+
 -- Dependencies (set during initialization)
 local _dependencies: {
     PlayerDataService: any?,
@@ -113,6 +116,10 @@ export type ArenaDependencies = {
 --[[
     Initialize the handler for Arena place.
     Call this once in init.server.luau.
+    
+    IMPORTANT: Call this BEFORE PlayerDataService.Initialize() so that
+    PlayerAdded callbacks are registered in the correct order.
+    PlayerDataService will call NotifyProfileLoaded which triggers our callbacks.
 ]]
 function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
     Logger.Info("TeleportDataHandler", "Initializing for Arena")
@@ -123,23 +130,23 @@ function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
     _dependencies.ProgressionHandler = deps.ProgressionHandler
     
     -- Connect to PlayerAdded (single handler for all teleport logic)
+    -- This MUST be connected BEFORE PlayerDataService.Initialize() is called
     _trove:Connect(Players.PlayerAdded, function(player)
         task.spawn(function()
             TeleportDataHandler._handleArenaPlayerJoin(player)
         end)
     end)
     
-    -- Handle players already in game
-    for _, player in Players:GetPlayers() do
-        task.spawn(function()
-            TeleportDataHandler._handleArenaPlayerJoin(player)
-        end)
-    end
+    -- NOTE: We do NOT handle existing players here!
+    -- PlayerDataService.Initialize() will handle them and call NotifyProfileLoaded,
+    -- which triggers our WaitForProfile callbacks.
+    -- Handling them here would cause a race condition.
     
     -- Cleanup on player leave
     _trove:Connect(Players.PlayerRemoving, function(player)
         _profileWaiter.Cleanup(player)
         _playerTeleportData[player.UserId] = nil
+        _playerReadyFired[player.UserId] = nil
     end)
 end
 
@@ -192,7 +199,11 @@ function TeleportDataHandler._handleArenaPlayerJoin(player: Player)
     end
     
     -- Step 4: Fire OnPlayerReady signal (other systems can react)
-    _onPlayerReadySignal:Fire(player, teleportData)
+    -- Only fire once per player
+    if not _playerReadyFired[player.UserId] then
+        _playerReadyFired[player.UserId] = true
+        _onPlayerReadySignal:Fire(player, teleportData)
+    end
 end
 
 -- Internal: Apply teleport data to player profile
@@ -360,8 +371,42 @@ end
 --------------------------------------------------------------------------------
 
 -- Call this when a profile loads (from PlayerDataService.LoadProfile)
+-- This handles BOTH new players (who are waiting via WaitForProfile)
+-- AND existing players (who missed the PlayerAdded event)
 function TeleportDataHandler.NotifyProfileLoaded(player: Player, profileData: PlayerDataCore.ProfileData)
+    -- Fire callbacks for players who are waiting via WaitForProfile
     _profileWaiter.FireCallbacks(player, profileData)
+    
+    -- For existing players who missed PlayerAdded, we need to process them now
+    -- Check if we already processed this player (teleport data would be extracted)
+    -- If not, this is an existing player that needs full processing
+    if _playerTeleportData[player.UserId] == nil then
+        -- Check if there's teleport data we haven't processed yet
+        local joinData = player:GetJoinData()
+        local rawTeleportData = joinData.TeleportData :: any
+        
+        if rawTeleportData then
+            local isValid, errorMsg = TeleportData.ValidateArenaJoinData(rawTeleportData)
+            if isValid then
+                _playerTeleportData[player.UserId] = rawTeleportData
+                Logger.Info("TeleportDataHandler", `[Late] Valid teleport data for {player.Name}`)
+                TeleportDataHandler._applyTeleportData(player, rawTeleportData, profileData)
+            else
+                Logger.Warn("TeleportDataHandler", `[Late] Invalid teleport data for {player.Name}: {errorMsg}`)
+            end
+        else
+            Logger.Debug("TeleportDataHandler", `[Late] No teleport data for existing player {player.Name}`)
+        end
+        
+        -- Fire OnPlayerReady for existing players who missed the normal flow
+        -- Only fire if we haven't already fired for this player
+        if not _playerReadyFired[player.UserId] then
+            _playerReadyFired[player.UserId] = true
+            task.defer(function()
+                _onPlayerReadySignal:Fire(player, _playerTeleportData[player.UserId])
+            end)
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -377,6 +422,7 @@ function TeleportDataHandler.Dispose()
     _trove:Clean()
     table.clear(_playerTeleportData)
     table.clear(_playerReturnData)
+    table.clear(_playerReadyFired)
     table.clear(_dependencies)
 end
 

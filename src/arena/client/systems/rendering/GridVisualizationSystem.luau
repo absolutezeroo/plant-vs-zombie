@@ -144,10 +144,18 @@ local function Init(_world: any)
 		end)
 	end))
 	
-	-- If MapConfig already initialized (late system init), create immediately
-	if MapConfig.IsInitialized() then
-		Logger.Info("GridVisualization", "MapConfig already initialized, creating grid")
-		createGrid()
+	-- IMPORTANT: Do NOT create grid if MapConfig was initialized locally
+	-- We MUST wait for server's MapConfigSync to ensure correct GridY
+	-- Only create grid when config comes from server (UsingVisualConfig + correct GridY)
+	if MapConfig.IsInitialized() and MapConfig.IsUsingVisualConfig() then
+		local config = MapConfig.GetConfig()
+		-- Sanity check: GridY should be positive (above ground)
+		if config.GridY > 0 then
+			Logger.Info("GridVisualization", "MapConfig already synced from server, creating grid")
+			createGrid()
+		else
+			Logger.Warn("GridVisualization", `Skipping grid creation - suspicious GridY={config.GridY}, waiting for server sync`)
+		end
 	end
 	
 	Logger.Debug("GridVisualizationSystem", "Initialized with MapConfigSync listener")

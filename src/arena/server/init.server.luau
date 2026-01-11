@@ -60,7 +60,21 @@ local StatsService = require(Server.services.StatsService)
 -- Note: init.server.luau IS the Server script, so children are direct
 local Systems = script:WaitForChild("systems")
 
--- Initialize services
+-- ============================================
+-- CRITICAL: Initialize TeleportDataHandler FIRST
+-- This must happen BEFORE PlayerDataService to avoid race conditions
+-- TeleportDataHandler needs to register its PlayerAdded callback first
+-- so it can receive NotifyProfileLoaded calls from PlayerDataService
+-- ============================================
+TeleportDataHandler.InitializeArena({
+	PlayerDataService = PlayerDataService,
+	MutationService = MutationService,
+	ArenaService = ArenaService,
+	ProgressionHandler = ProgressionHandler,
+})
+Logger.Info("Server", "TeleportDataHandler initialized for Arena (EARLY)")
+
+-- NOW initialize PlayerDataService (it will call NotifyProfileLoaded which TeleportDataHandler can receive)
 PlayerDataService.Initialize()
 Logger.Info("Server", "PlayerDataService initialized")
 
@@ -71,7 +85,18 @@ Logger.Info("Server", "StatsService initialized")
 ProgressionHandler.Initialize()
 Logger.Info("Server", "ProgressionHandler initialized")
 
--- CRITICAL: Initialize MapConfig BEFORE Matter loop starts
+-- CRITICAL: Load map BEFORE MapConfig.Initialize()
+-- MapConfig reads grid bounds from ArenaMap, so map must exist first
+MapLoader.Initialize()
+local defaultMapId = "Map_Day"
+local mapLoaded = MapLoader.LoadMap(defaultMapId)
+if mapLoaded then
+	Logger.Info("Server", `Default map '{defaultMapId}' loaded for MapConfig initialization`)
+else
+	Logger.Warn("Server", `Failed to load default map '{defaultMapId}', MapConfig will use defaults`)
+end
+
+-- CRITICAL: Initialize MapConfig AFTER map is loaded, BEFORE Matter loop starts
 -- This prevents yield errors in ECS systems that call MapConfig functions
 MapConfig.Initialize()
 Logger.Info("Server", "MapConfig initialized (pre-cached for ECS systems)")
@@ -171,40 +196,25 @@ _serverTrove:Connect(RunService.Heartbeat, function(deltaTime)
 end)
 
 -- ============================================
--- ARENA: Initialize TeleportDataHandler (unified sync system)
--- ============================================
-
--- Initialize TeleportDataHandler with Arena dependencies
--- This handles ALL player join logic: profile waiting, teleport data, mutations, deck sync
-TeleportDataHandler.InitializeArena({
-	PlayerDataService = PlayerDataService,
-	MutationService = MutationService,
-	ArenaService = ArenaService,
-	ProgressionHandler = ProgressionHandler,
-})
-
-Logger.Info("Server", "TeleportDataHandler initialized for Arena")
-
--- ============================================
 -- STUDIO DEBUG MODE: Load map only, no gameplay
 -- ============================================
 if IS_STUDIO then
 	Logger.Info("Server", "=== STUDIO DEBUG MODE ===")
-	Logger.Info("Server", "Loading default map without starting gameplay...")
+	Logger.Info("Server", "Map already loaded during bootstrap")
 	Logger.Info("Server", "Use Cmdr commands (F2) to test: loadmap, spawn, wave, sun, killall")
-	
-	-- Load the default map immediately
-	local defaultMapId = "Map_Day" -- or read from config
-	local mapLoaded = MapLoader.LoadMap(defaultMapId)
-	if mapLoaded then
-		Logger.Info("Server", `Default map '{defaultMapId}' loaded successfully`)
-	else
-		Logger.Warn("Server", `Failed to load default map '{defaultMapId}', using existing ArenaMap`)
-	end
 	
 	-- Handle player join in Studio Debug mode
 	_serverTrove:Connect(TeleportDataHandler.OnPlayerReady, function(player: Player, _teleportData: TeleportData.ArenaJoinData?)
 		Logger.Info("Server", `[Studio Debug] Player {player.Name} joined`)
+		
+		-- Sync map config FIRST (client needs this for grid visualization)
+		MapLoader.SyncConfigToPlayer(player)
+		
+		-- Load mutations from profile (Studio mode has no teleport data)
+		local profileData = PlayerDataService.GetProfile(player)
+		if profileData then
+			MutationService.LoadMutationsFromProfile(player, profileData)
+		end
 		
 		-- Sync player data
 		if ProgressionHandler.SyncPlayerData then
@@ -226,6 +236,9 @@ else
 -- Subscribe to OnPlayerReady signal to start battles
 _serverTrove:Connect(TeleportDataHandler.OnPlayerReady, function(player: Player, teleportData: TeleportData.ArenaJoinData?)
 	Logger.Info("Server", `Player {player.Name} is ready (profile loaded, teleport data applied)`)
+	
+	-- Sync map config FIRST (client needs this for grid visualization)
+	MapLoader.SyncConfigToPlayer(player)
 	
 	-- Sync player data and deck to client BEFORE starting battle
 	-- This ensures the client has the correct deck/mutations

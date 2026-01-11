@@ -181,6 +181,17 @@ function ShopHandler.Initialize()
     -- Listen for data sync requests
     Network.RequestPlayerData.SetCallback(onRequestPlayerData)
     
+    -- Auto-sync player data when profile loads or data changes
+    -- This ensures data is pushed even if client request arrives too early
+    PlayerDataService.OnDataChanged(function(player, _data)
+        -- Small delay to ensure all data is ready
+        task.defer(function()
+            if player.Parent then
+                ShopHandler.SyncPlayerData(player)
+            end
+        end)
+    end)
+    
     Logger.Info("ShopHandler", "Shop Handler ready")
 end
 

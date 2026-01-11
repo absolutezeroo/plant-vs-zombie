@@ -532,7 +532,7 @@ event PlayerDataSync = {
         XP: u32,
         Level: u8,
         LevelProgress: f32,
-        UnlockedPlants: PlantType[..10],
+        UnlockedPlants: PlantType[..100],
     }
 }
 

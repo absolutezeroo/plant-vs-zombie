@@ -453,15 +453,18 @@ local function loadProfile(player: Player)
 		_profiles[player] = profile
 		Logger.Info("PlayerData", `Profile loaded for {player.Name}: {profile.Data.Coins} coins`)
 		
-		-- Notify data change listeners
-		PlayerDataService._notifyDataChanged(player)
-		
 		-- Fire profile waiter callbacks (for WaitForProfile)
 		_profileWaiter.FireCallbacks(player, profile.Data)
 		
 		-- Notify TeleportDataHandler that profile is ready
+		-- This will load mutations from profile and fire OnPlayerReady
+		-- which will then call SyncPlayerData with mutations loaded
 		local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
 		TeleportDataHandler.NotifyProfileLoaded(player, profile.Data)
+		
+		-- NOTE: We do NOT call _notifyDataChanged here anymore!
+		-- The TeleportDataHandler flow (via OnPlayerReady) will handle syncing
+		-- after mutations are loaded, preventing race conditions
 		
 		resolve(profile.Data)
 	end):catch(function(err)

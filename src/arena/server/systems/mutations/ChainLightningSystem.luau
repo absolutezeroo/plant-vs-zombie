@@ -18,6 +18,7 @@ local Components = require(Shared.components)
 local LaneCache = require(Shared.utils.LaneCache)
 local GridConfig = require(Shared.config.GridConfig)
 local ECSUtils = require(Shared.utils.ECSUtils)
+local Logger = require(Shared.utils.Logger)
 
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
@@ -152,6 +153,7 @@ local function OnStep(world)
 		
 		local chainLightning = world:get(sourcePlant, Components.ChainLightningComponent)
 		if chainLightning then
+			Logger.Debug("ChainLightning", "Triggering chain from plant", sourcePlant, "to zombie", hitEvent.TargetZombie)
 			applyChainLightning(
 				world,
 				hitEvent.TargetZombie,

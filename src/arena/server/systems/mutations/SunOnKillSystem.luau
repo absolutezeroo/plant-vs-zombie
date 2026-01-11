@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local EntityPool = require(Shared.utils.EntityPool)
+local Logger = require(Shared.utils.Logger)
 
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
@@ -54,6 +55,7 @@ local function OnStep(world)
 		
 		-- Spawn sun at zombie death location
 		local sunAmount = sunOnKill.SunAmount
+		Logger.Debug("SunOnKill", "Spawning", sunAmount, "sun from kill by plant", sourcePlant)
 		
 		EntityPool.Spawn(
 			Components.PositionComponent({

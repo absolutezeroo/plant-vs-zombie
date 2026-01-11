@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local ECSUtils = require(Shared.utils.ECSUtils)
+local Logger = require(Shared.utils.Logger)
 
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
@@ -52,6 +53,7 @@ local function OnStep(world)
 		if healAmount < CONFIG.MIN_HEAL_AMOUNT then continue end
 		
 		-- Apply healing using ECSUtils
+		Logger.Debug("Lifesteal", "Plant", sourcePlant, "healed for", healAmount, "HP")
 		ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
 	end
 end

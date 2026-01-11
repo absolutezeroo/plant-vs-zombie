@@ -94,7 +94,9 @@ local SHOVEL_TRANSPARENCY = 0.3
 
 -- Cache grid Y to avoid calling MapConfig.GetConfig() every frame (it can yield)
 local _cachedGridY: number? = nil
+local _cachedZombieDir: Vector3? = nil
 local DEFAULT_GRID_Y = 4.5
+local DEFAULT_ZOMBIE_DIR = Vector3.new(-1, 0, 0)
 local function getCachedGridY(): number
 	if _cachedGridY then
 		return _cachedGridY
@@ -107,6 +109,21 @@ local function getCachedGridY(): number
 	end
 	-- Fallback to default grid Y
 	return DEFAULT_GRID_Y
+end
+
+-- Get cached zombie direction (non-blocking)
+local function getCachedZombieDir(): Vector3
+	if _cachedZombieDir then
+		return _cachedZombieDir
+	end
+	-- Try to get from MapConfig if already initialized (non-blocking check)
+	if MapConfig.IsInitialized and MapConfig.IsInitialized() then
+		local dir = MapConfig.GetZombieDirection()
+		_cachedZombieDir = dir
+		return dir
+	end
+	-- Fallback to default direction (don't cache so we retry next frame)
+	return DEFAULT_ZOMBIE_DIR
 end
 
 --[[
@@ -205,8 +222,7 @@ local function updateGhostPosition(column: number, lane: number, valid: boolean,
 	local worldPos = GridUtils.GridToWorld(column, lane)
 	
 	-- Calculate rotation based on zombie direction (same as PlantRenderSystem)
-	-- Plants face OPPOSITE of zombie movement direction
-	local zombieDir = MapConfig.GetZombieDirection()
+	local zombieDir = getCachedZombieDir()
 	local facingDir = Vector3.new(-zombieDir.X, 0, -zombieDir.Z)
 	local facingCFrame = CFrame.lookAt(worldPos, worldPos + facingDir)
 	-- Add -90° rotation to correct model orientation (same as PlantRenderSystem)
@@ -594,6 +610,25 @@ end
 	Init - Setup input handlers and network listeners (CAN yield)
 ]]
 local function Init(_world)
+	-- Pre-cache MapConfig values if already synced from server
+	if MapConfig.IsInitialized and MapConfig.IsInitialized() then
+		_cachedZombieDir = MapConfig.GetZombieDirection()
+		local config = MapConfig.GetConfigIfReady()
+		if config and config.GridY > 0 then
+			_cachedGridY = config.GridY
+		end
+	else
+		-- Will use defaults until MapConfigSync arrives
+		Logger.Debug("GhostPreview", "MapConfig not yet synced, using defaults")
+	end
+	
+	-- Listen for MapConfigSync to update cached values when server sends config
+	_trove:Add(Network.MapConfigSync.On(function(data)
+		Logger.Debug("GhostPreview", `MapConfigSync received, updating cache: GridY={data.GridY}`)
+		_cachedGridY = data.GridY
+		_cachedZombieDir = Vector3.new(data.ZombieDirectionX, 0, data.ZombieDirectionZ).Unit
+	end))
+	
 	setupListeners()
 	Logger.Debug("GhostPreview", "Initialized")
 end
