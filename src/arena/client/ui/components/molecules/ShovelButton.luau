@@ -1,9 +1,11 @@
 --!strict
 --[[
-	ShovelButton.luau - Shovel tool button for removing plants
+	ShovelButton.luau - Shovel tool toggle button (Arena - Responsive)
 	
-	Molecule component in the SeedBank for removing placed plants.
-	Styled to match SeedCard with "Toon Pop" appearance.
+	Molecule component for the shovel tool that removes planted plants.
+	Toggles shovel mode when clicked via SelectionState.
+	
+	Uses Fusion 0.3 scope:Method() syntax.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,180 +13,233 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
--- Path: client/ui/components/molecules/ShovelButton.luau
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
+-- Path: client/ui/components/molecules/ShovelButton.luau
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local SelectionState = require(Modules.SelectionState)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
-local Computed = Fusion.Computed
-local Spring = Fusion.Spring
 local peek = Fusion.peek
 
--- Constants
-local CARD_SIZE = 70
-local SHADOW_OFFSET = 4
-local ICON_SIZE = 40
-
--- Colors
-local Colors = {
-	Background = Color3.fromRGB(180, 140, 100),      -- Brown/tan
-	BackgroundActive = Color3.fromRGB(220, 100, 80), -- Red-ish when active
-	Shadow = Color3.fromRGB(120, 90, 60),
-	ShadowActive = Color3.fromRGB(160, 60, 50),
-	Stroke = Color3.fromRGB(80, 60, 40),
-	Icon = Color3.fromRGB(60, 50, 40),
-}
+-- Shovel icon as text (can be replaced with image)
+local SHOVEL_ICON = "🔨" -- Or use ImageLabel with shovel image
 
 export type ShovelButtonProps = {
 	Scope: Fusion.Scope<any>,
 	LayoutOrder: number?,
-	OnClick: (() -> ())?,
 }
 
 --[[
-	ShovelButton Component
+	ShovelButton Component (Arena - Responsive)
 	
-	A button to toggle shovel mode for removing plants.
-	Styled to match SeedCard appearance.
+	A toggleable button that activates shovel mode for removing plants.
+	Highlights when active, animated press effect.
 	
 	@param props ShovelButtonProps
 	@return Frame
 ]]
 local function ShovelButton(props: ShovelButtonProps): Frame
 	local scope = props.Scope
-	local layoutOrder = props.LayoutOrder or 999 -- Last by default
-	local onClick = props.OnClick
+	local layoutOrder = props.LayoutOrder or 999
 	
-	-- Reactive: is shovel mode active?
-	local isActive = Computed(scope, function(use)
-		return use(SelectionState.ShovelMode)
+	-- Internal state
+	local isHovered = scope:Value(false)
+	local isPressed = scope:Value(false)
+	
+	-- Reactive: Is shovel mode active?
+	local isShovelActive = scope:Computed(function(use)
+		return use(SelectionState.IsShovelMode)
 	end)
 	
-	-- Hover state
-	local isHovered = Fusion.Value(scope, false)
+	-- Border color based on active state
+	local borderColor = scope:Computed(function(use)
+		if use(isShovelActive) then
+			return Color3.fromHex("#FF6B35") -- Orange when active
+		end
+		return Theme.Colors.Surface.Stroke :: Color3
+	end)
 	
-	-- Animated scale for hover/press
-	local targetScale = Computed(scope, function(use)
-		local active = use(isActive)
-		local hovered = use(isHovered)
-		if active then return 0.95 end
-		if hovered then return 1.05 end
+	-- Border thickness when active
+	local borderThickness = scope:Computed(function(use)
+		if use(isShovelActive) then
+			return 4
+		end
+		return Theme.Layout.StrokeThickness
+	end)
+	
+	-- Press animation (as percentage)
+	local pressOffset = scope:Spring(scope:Computed(function(use)
+		return if use(isPressed) then 0.06 else 0
+	end), 40, 0.7)
+	
+	-- Scale animation for hover
+	local hoverScale = scope:Spring(scope:Computed(function(use)
+		if use(isPressed) then return 0.95 end
+		if use(isHovered) then return 1.05 end
 		return 1
-	end)
-	local animatedScale = Spring(scope, targetScale, 40, 0.6)
+	end), 35, 0.7)
 	
-	-- Background color (changes when active)
-	local bgColor = Computed(scope, function(use)
-		return use(isActive) and Colors.BackgroundActive or Colors.Background
-	end)
-	
-	local shadowColor = Computed(scope, function(use)
-		return use(isActive) and Colors.ShadowActive or Colors.Shadow
+	-- Card background color
+	local cardColor = scope:Computed(function(use)
+		if use(isShovelActive) then
+			return Color3.fromRGB(255, 200, 150) -- Light orange when active
+		end
+		return Theme.Colors.Surface.Main
 	end)
 	
-	return New(scope, "Frame") {
+	local shadowColor = Theme.Colors.Surface.Shadow
+	
+	-- Toggle shovel mode
+	local function toggleShovel()
+		local currentMode = peek(SelectionState.IsShovelMode)
+		SelectionState.IsShovelMode:set(not currentMode)
+		-- Clear plant selection when entering shovel mode
+		if not currentMode then
+			SelectionState.SelectedPlant:set(nil)
+		end
+	end
+	
+	return scope:New("Frame") {
 		Name = "ShovelButton",
-		Size = UDim2.fromOffset(CARD_SIZE, CARD_SIZE + SHADOW_OFFSET),
+		Size = UDim2.fromScale(1, 1), -- Size determined by parent grid
 		BackgroundTransparency = 1,
 		LayoutOrder = layoutOrder,
 		
 		[Children] = {
-			-- Scale container
-			New(scope, "UIScale") {
-				Scale = animatedScale,
+			-- Aspect ratio constraint (square)
+			scope:New("UIAspectRatioConstraint") {
+				AspectRatio = 1,
 			},
 			
-			-- Shadow layer
-			New(scope, "Frame") {
-				Name = "Shadow",
-				Size = UDim2.fromOffset(CARD_SIZE, CARD_SIZE),
-				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
-				BackgroundColor3 = shadowColor,
+			-- Scale container for hover animation
+			scope:New("Frame") {
+				Size = UDim2.fromScale(1, 1),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				BackgroundTransparency = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
-						CornerRadius = UDim.new(0, 12),
-					},
-				},
-			},
-			
-			-- Main button
-			New(scope, "TextButton") {
-				Name = "Button",
-				Size = UDim2.fromOffset(CARD_SIZE, CARD_SIZE),
-				Position = UDim2.new(0, 0, 0, 0),
-				BackgroundColor3 = bgColor,
-				AutoButtonColor = false,
-				Text = "",
-				
-				[OnEvent("Activated")] = function()
-					if onClick then
-						onClick()
-					else
-						SelectionState.ToggleShovel()
-					end
-				end,
-				
-				[OnEvent("MouseEnter")] = function()
-					isHovered:set(true)
-				end,
-				
-				[OnEvent("MouseLeave")] = function()
-					isHovered:set(false)
-				end,
-				
-				[Children] = {
-					New(scope, "UICorner") {
-						CornerRadius = UDim.new(0, 12),
+					scope:New("UIScale") { Scale = hoverScale },
+					
+					-- Shadow Layer (6% offset)
+					scope:New("Frame") {
+						Name = "Shadow",
+						Size = UDim2.fromScale(1, 0.94),
+						Position = UDim2.fromScale(0, 0.06),
+						BackgroundColor3 = shadowColor,
+						ZIndex = 1,
+						
+						[Children] = {
+							scope:New("UICorner") {
+								CornerRadius = Theme.Layout.CornerRadius,
+							},
+						},
 					},
 					
-					New(scope, "UIStroke") {
-						Color = Colors.Stroke,
-						Thickness = 3,
+					-- Surface Layer (interactive)
+					scope:New("TextButton") {
+						Name = "Surface",
+						Size = scope:Computed(function(use)
+							local offset = use(pressOffset)
+							return UDim2.fromScale(1, 0.94 - offset)
+						end),
+						Position = scope:Computed(function(use)
+							return UDim2.fromScale(0, use(pressOffset))
+						end),
+						BackgroundColor3 = cardColor,
+						AutoButtonColor = false,
+						Text = "",
+						ZIndex = 2,
+						
+						[OnEvent("MouseButton1Down")] = function()
+							isPressed:set(true)
+						end,
+						
+						[OnEvent("MouseButton1Up")] = function()
+							isPressed:set(false)
+							if peek(isHovered) then
+								toggleShovel()
+							end
+						end,
+						
+						[OnEvent("MouseEnter")] = function()
+							isHovered:set(true)
+						end,
+						
+						[OnEvent("MouseLeave")] = function()
+							isHovered:set(false)
+							isPressed:set(false)
+						end,
+						
+						[Children] = {
+							scope:New("UICorner") {
+								CornerRadius = Theme.Layout.CornerRadius,
+							},
+							
+							-- Dynamic border (orange when active)
+							scope:New("UIStroke") {
+								Color = borderColor,
+								Thickness = borderThickness,
+							},
+							
+							-- Shovel Icon
+							scope:New("TextLabel") {
+								Name = "ShovelIcon",
+								Size = UDim2.fromScale(0.7, 0.7),
+								Position = UDim2.fromScale(0.5, 0.5),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundTransparency = 1,
+								Text = SHOVEL_ICON,
+								TextScaled = true,
+								Font = Enum.Font.GothamBold,
+								TextColor3 = scope:Computed(function(use)
+									return if use(isShovelActive)
+										then Color3.fromHex("#FF6B35")
+										else Color3.new(0.3, 0.3, 0.3)
+								end),
+								ZIndex = 3,
+								
+								[Children] = {
+									scope:New("UITextSizeConstraint") {
+										MaxTextSize = 40,
+										MinTextSize = 12,
+									},
+								},
+							},
+							
+							-- "Active" indicator label
+							scope:Computed(function(use)
+								if use(isShovelActive) then
+									return scope:New("TextLabel") {
+										Name = "ActiveLabel",
+										Size = UDim2.fromScale(1, 0.2),
+										Position = UDim2.fromScale(0.5, 0.95),
+										AnchorPoint = Vector2.new(0.5, 1),
+										BackgroundTransparency = 1,
+										Text = "ACTIVE",
+										TextScaled = true,
+										Font = Enum.Font.GothamBold,
+										TextColor3 = Color3.fromHex("#FF6B35"),
+										ZIndex = 4,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MaxTextSize = 10,
+												MinTextSize = 6,
+											},
+										},
+									}
+								else
+									return nil
+								end
+							end),
+						},
 					},
-					
-					-- Shovel icon (emoji for now, could be ImageLabel)
-					New(scope, "TextLabel") {
-						Name = "Icon",
-						Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
-						Position = UDim2.new(0.5, 0, 0.5, -4),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundTransparency = 1,
-						Text = "🔨",
-						TextSize = 32,
-						Font = Enum.Font.GothamBold,
-					},
-					
-					-- "SHOVEL" label at bottom
-					New(scope, "TextLabel") {
-						Name = "Label",
-						Size = UDim2.new(1, 0, 0, 14),
-						Position = UDim2.new(0, 0, 1, -16),
-						BackgroundTransparency = 1,
-						Text = "Pelle",
-						TextColor3 = Colors.Icon,
-						TextSize = 10,
-						Font = Theme.Typography.Fonts.Title,
-						TextXAlignment = Enum.TextXAlignment.Center,
-					},
-					
-					-- Active indicator glow
-					Computed(scope, function(use)
-						if not use(isActive) then return nil end
-						return New(scope, "UIStroke") {
-							Name = "ActiveGlow",
-							Color = Color3.fromRGB(255, 100, 80),
-							Thickness = 4,
-							Transparency = 0.3,
-						}
-					end),
 				},
 			},
 		},

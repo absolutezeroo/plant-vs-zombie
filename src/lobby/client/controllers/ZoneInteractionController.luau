@@ -30,6 +30,7 @@ local ProfileScreen = require(script.Parent.Parent.ui.components.organisms.Profi
 local ShopScreen = require(script.Parent.Parent.ui.components.organisms.ShopScreen)
 local DeckBuilderScreen = require(script.Parent.Parent.ui.components.organisms.DeckBuilderScreen)
 local MutationScreen = require(script.Parent.Parent.ui.components.organisms.MutationScreen)
+local UnlocksScreen = require(script.Parent.Parent.ui.components.organisms.UnlocksScreen)
 
 -- Trove for connection cleanup
 local _trove = Trove.new()
@@ -404,6 +405,30 @@ end
 
 function ZoneInteractionController.OpenMutations()
     openMutationView()
+end
+
+function ZoneInteractionController.OpenUnlocks()
+    Logger.Info("ZoneInteraction", "Opening Unlocks")
+    
+    -- Close any existing UI first (before creating new scope)
+    closeCurrentUI()
+    
+    -- Create a sub-scope for this UI (cleaned on close)
+    _currentUIScope = Fusion.scoped(Fusion)
+    local uiScope = _currentUIScope
+    
+    local playerLevel = Computed(uiScope, function(use)
+        local data = use(_playerData)
+        return if data then data.Level else 1
+    end)
+    
+    local viewFrame = UnlocksScreen({
+        Scope = uiScope,
+        PlayerLevel = playerLevel,
+        OnClose = closeCurrentUI,
+    })
+    
+    showUI("UnlocksUI", viewFrame)
 end
 
 function ZoneInteractionController.CloseUI()

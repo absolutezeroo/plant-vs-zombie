@@ -102,6 +102,87 @@ local function Init(_world: any)
 		Logger.Debug("VFXAudio", `Explosion at {pos}`)
 	end))
 	
+	-- ========================================
+	-- MUTATION VFX EVENTS
+	-- ========================================
+	
+	-- Status effect applied (Burn, Freeze, Poison, Stun)
+	_trove:Add(Network.StatusApplied.On(function(data)
+		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		local statusType = tostring(data.StatusType)
+		
+		if statusType == "Burn" then
+			VFXService.PlayBurnApplied(pos)
+			AudioService.PlaySFX("fire_ignite", pos)
+		elseif statusType == "Freeze" then
+			VFXService.PlayFreezeApplied(pos)
+			AudioService.PlaySFX("ice_freeze", pos)
+		elseif statusType == "Slow" then
+			VFXService.PlaySlowApplied(pos)
+		elseif statusType == "Poison" then
+			VFXService.PlayBurnApplied(pos) -- Reuse burn for now
+			AudioService.PlaySFX("poison_apply", pos)
+		elseif statusType == "Stun" then
+			VFXService.PlayStunApplied(pos)
+			AudioService.PlaySFX("stun", pos)
+		end
+		
+		Logger.Debug("VFXAudio", `Status {statusType} applied at {pos}`)
+	end))
+	
+	-- Status effect removed
+	_trove:Add(Network.StatusRemoved.On(function(data)
+		local statusType = tostring(data.StatusType)
+		
+		-- Thaw effect when freeze ends
+		if statusType == "Freeze" then
+			-- We don't have position here, just log for now
+			Logger.Debug("VFXAudio", `Status {statusType} removed from entity {data.EntityId}`)
+		end
+	end))
+	
+	-- Chain Lightning beam VFX
+	_trove:Add(Network.ChainLightningVFX.On(function(data)
+		local sourcePos = Vector3.new(data.SourceX, data.SourceY, data.SourceZ)
+		local targetPos = Vector3.new(data.TargetX, data.TargetY, data.TargetZ)
+		
+		VFXService.PlayChainLightning(sourcePos, targetPos, data.Damage)
+		AudioService.PlaySFX("electric_zap", targetPos)
+		
+		Logger.Debug("VFXAudio", `Chain lightning: {sourcePos} -> {targetPos}`)
+	end))
+	
+	-- Poison Cloud persistent VFX
+	_trove:Add(Network.PoisonCloudVFX.On(function(data)
+		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		
+		VFXService.PlayPoisonCloud(pos, data.Radius, data.Duration)
+		AudioService.PlaySFX("poison_cloud", pos)
+		
+		Logger.Debug("VFXAudio", `Poison cloud at {pos}, radius {data.Radius}`)
+	end))
+	
+	-- Lifesteal VFX (drain from zombie to plant)
+	_trove:Add(Network.LifestealVFX.On(function(data)
+		local zombiePos = Vector3.new(data.ZombieX, data.ZombieY, data.ZombieZ)
+		-- We need plant position - for now estimate based on entity
+		-- TODO: Add plant position to event or lookup from render cache
+		local plantPos = zombiePos + Vector3.new(-5, 0, 0) -- Estimate: plant is left of zombie
+		
+		VFXService.PlayLifesteal(zombiePos, plantPos, data.HealAmount)
+		
+		Logger.Debug("VFXAudio", `Lifesteal {data.HealAmount} from zombie`)
+	end))
+	
+	-- Splash Damage VFX (ring on ground)
+	_trove:Add(Network.SplashDamageVFX.On(function(data)
+		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		
+		VFXService.PlaySplashDamage(pos, data.Radius)
+		
+		Logger.Debug("VFXAudio", `Splash damage at {pos}, radius {data.Radius}`)
+	end))
+	
 	Logger.Info("VFXAudioSystem", "Initialized VFX and Audio services")
 end
 

@@ -45,9 +45,10 @@ local BASE_WIDTH = 1920
 local BASE_HEIGHT = 1080
 
 -- Scale limits to prevent extreme sizes
--- MAX_SCALE = 1.0 means we never enlarge beyond design size (only shrink for small screens)
+-- For overlay screens (92% of screen), we cap at 1.0 to avoid overflow
+-- For fixed-size elements, scaling helps on larger screens
 local MIN_SCALE = 0.5  -- Minimum 50% (very small screens)
-local MAX_SCALE = 1.0  -- Maximum 100% (never enlarge, only shrink)
+local MAX_SCALE = 2.5  -- Maximum 250% (large screens like 4K)
 
 -- Responsive breakpoints
 local BREAKPOINTS = {
@@ -223,9 +224,9 @@ end
 function ResponsiveUtils.CreateUIScale(scope: any): any
 	initialize()
 	
-	return New(scope, "UIScale") {
+	return scope:New("UIScale") {
 		Name = "ResponsiveScale",
-		Scale = Computed(scope, function(use)
+		Scale = scope:Computed(function(use)
 			return use(_scale)
 		end),
 	}

@@ -36,6 +36,7 @@ local ChanceUtils = require(Shared.utils.ChanceUtils)
 local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 local Network = require(Shared.network.generated.client)
+local VFXService = require(Modules.VFXService)
 
 -- Assets folder (optional - fallback to cubes if missing)
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -237,11 +238,43 @@ local function setupNetworkListeners()
 					1, -- Above zombie
 					0
 				)
+				
+				-- Pass DamageType if available (convert enum to string)
+				local damageType = if data.DamageType then tostring(data.DamageType) else "Normal"
+				
 				GameSignals.OnDamageDealt:Fire({
 					Position = floatPos,
 					Amount = data.DamageAmount,
+					DamageType = damageType,
 				})
 			end
+		end
+	end))
+	
+	-- Status effect applied (show overlay on zombie model)
+	_trove:Add(Network.StatusApplied.On(function(data)
+		local entityId = data.EntityId
+		local visual = _zombieVisuals[entityId]
+		if visual then
+			local statusType = tostring(data.StatusType)
+			local duration = data.Duration
+			
+			-- Apply status overlay to zombie model
+			VFXService.ApplyStatusOverlay(entityId, visual.Model, statusType, duration)
+			Logger.Debug("ZombieRender", `Status {statusType} overlay applied to zombie {entityId}`)
+		end
+	end))
+	
+	-- Status effect removed (cleanup overlay)
+	_trove:Add(Network.StatusRemoved.On(function(data)
+		local entityId = data.EntityId
+		local visual = _zombieVisuals[entityId]
+		if visual then
+			local statusType = tostring(data.StatusType)
+			
+			-- Remove status overlay from zombie model
+			VFXService.RemoveStatusOverlay(entityId, visual.Model, statusType)
+			Logger.Debug("ZombieRender", `Status {statusType} overlay removed from zombie {entityId}`)
 		end
 	end))
 end

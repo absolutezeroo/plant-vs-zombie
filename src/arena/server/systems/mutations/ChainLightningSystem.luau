@@ -20,6 +20,9 @@ local GridConfig = require(Shared.config.GridConfig)
 local ECSUtils = require(Shared.utils.ECSUtils)
 local Logger = require(Shared.utils.Logger)
 
+-- Network for VFX events
+local Network = require(Shared.network.generated.server)
+
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
 	DEFAULT_CENTER_LANE = 3, -- Middle lane fallback
@@ -140,6 +143,18 @@ local function applyChainLightning(
 		-- Update for next chain
 		local nextPos = world:get(nextTarget, Components.PositionComponent)
 		if not nextPos then break end
+		
+		-- Fire VFX event for chain lightning beam
+		Network.ChainLightningVFX.FireAll({
+			SourceX = currentPos.X,
+			SourceY = currentPos.Y,
+			SourceZ = currentPos.Z,
+			TargetX = nextPos.X,
+			TargetY = nextPos.Y,
+			TargetZ = nextPos.Z,
+			Damage = currentDamage,
+		})
+		
 		currentPos = {X = nextPos.X, Y = nextPos.Y, Z = nextPos.Z}
 	end
 end

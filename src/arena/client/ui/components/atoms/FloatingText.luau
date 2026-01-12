@@ -44,6 +44,32 @@ local Styles = {
 		FontSize = 36,
 		IsBig = true,
 	},
+	-- Damage type styles for mutations
+	DamageFire = {
+		Color = Color3.fromRGB(255, 140, 50),     -- Orange
+		FontSize = 26,
+		IsBig = false,
+	},
+	DamageIce = {
+		Color = Color3.fromRGB(100, 200, 255),    -- Cyan
+		FontSize = 26,
+		IsBig = false,
+	},
+	DamageLightning = {
+		Color = Color3.fromRGB(255, 255, 100),    -- Yellow electric
+		FontSize = 26,
+		IsBig = false,
+	},
+	DamagePoison = {
+		Color = Color3.fromRGB(100, 200, 100),    -- Toxic green
+		FontSize = 26,
+		IsBig = false,
+	},
+	DamageSplash = {
+		Color = Color3.fromRGB(200, 100, 255),    -- Splash purple
+		FontSize = 24,
+		IsBig = false,
+	},
 	Sun = {
 		Color = Color3.fromRGB(255, 220, 50),     -- Yellow
 		FontSize = 24,

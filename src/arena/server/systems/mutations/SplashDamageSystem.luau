@@ -17,6 +17,9 @@ local GridConfig = require(Shared.config.GridConfig)
 local ECSUtils = require(Shared.utils.ECSUtils)
 local MathUtils = require(Shared.utils.MathUtils)
 
+-- Network for VFX events
+local Network = require(Shared.network.generated.server)
+
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
 	DISTANCE_FALLOFF = 0.3, -- 30% damage falloff at max range
@@ -98,6 +101,14 @@ local function OnStep(world)
 		
 		local splashDamage = world:get(sourcePlant, Components.SplashDamageComponent)
 		if splashDamage then
+			-- Fire VFX event for splash damage ring
+			Network.SplashDamageVFX.FireAll({
+				PositionX = hitEvent.PositionX,
+				PositionY = hitEvent.PositionY,
+				PositionZ = hitEvent.PositionZ,
+				Radius = splashDamage.Radius,
+			})
+			
 			applySplashDamage(
 				world,
 				{X = hitEvent.PositionX, Y = hitEvent.PositionY, Z = hitEvent.PositionZ},

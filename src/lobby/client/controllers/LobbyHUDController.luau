@@ -45,20 +45,20 @@ LobbyHUDController.__index = LobbyHUDController
 function LobbyHUDController.new()
 	local self = setmetatable({}, LobbyHUDController)
 	
-	self._scope = Fusion.scoped({})
+	self._scope = Fusion.scoped(Fusion)
 	self._trove = Trove.new()
 	
-	-- State
-	self._level = Fusion.Value(self._scope, 1)
-	self._xp = Fusion.Value(self._scope, 0)
-	self._xpRequired = Fusion.Value(self._scope, 100)
-	self._coins = Fusion.Value(self._scope, 0)
-	self._gems = Fusion.Value(self._scope, 0)
-	self._deck = Fusion.Value(self._scope, {} :: {string})
-	self._equippedMutations = Fusion.Value(self._scope, {} :: {[string]: {string}})
+	-- State (using scope:Value() syntax)
+	self._level = self._scope:Value(1)
+	self._xp = self._scope:Value(0)
+	self._xpRequired = self._scope:Value(100)
+	self._coins = self._scope:Value(0)
+	self._gems = self._scope:Value(0)
+	self._deck = self._scope:Value({} :: {string})
+	self._equippedMutations = self._scope:Value({} :: {[string]: {string}})
 	
 	-- Navigation state
-	self._activeView = Fusion.Value(self._scope, "")  -- Empty = no view open
+	self._activeView = self._scope:Value("")  -- Empty = no view open
 	
 	-- GUI instance
 	self._gui = nil :: ScreenGui?
@@ -115,6 +115,8 @@ function LobbyHUDController:SetActiveView(view: string)
 			ZoneInteractionController.OpenDeckBuilder()
 		elseif view == "Mutation" then
 			ZoneInteractionController.OpenMutations()
+		elseif view == "Unlocks" then
+			ZoneInteractionController.OpenUnlocks()
 		end
 	end
 	Logger.Debug("LobbyHUD", `Active view: {Fusion.peek(self._activeView)}`)

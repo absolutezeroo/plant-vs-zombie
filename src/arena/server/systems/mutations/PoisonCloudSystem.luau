@@ -32,6 +32,9 @@ local MapConfig = require(Shared.config.MapConfig)
 local ECSUtils = require(Shared.utils.ECSUtils)
 local MathUtils = require(Shared.utils.MathUtils)
 
+-- Network for VFX events
+local Network = require(Shared.network.generated.server)
+
 -- ============================================================
 -- SECTION 2: CONFIG (immutable settings)
 -- ============================================================
@@ -74,6 +77,16 @@ local function spawnPoisonCloud(position: {X: number, Y: number, Z: number}, rad
 		RemainingDuration = duration,
 		LastTickTime = os.clock(),
 	})
+	
+	-- Fire VFX event for poison cloud
+	Network.PoisonCloudVFX.FireAll({
+		PositionX = position.X,
+		PositionY = position.Y,
+		PositionZ = position.Z,
+		Radius = radius,
+		Duration = duration,
+	})
+	
 	Logger.Debug("PoisonCloudSystem", `Spawned poison cloud at ({position.X}, {position.Z}) lane {lane or 3} - radius {radius}, {damagePerSecond} dps for {duration}s`)
 end
 

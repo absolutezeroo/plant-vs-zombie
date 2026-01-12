@@ -28,11 +28,13 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+local GridConfig = require(Shared.config.GridConfig)
 local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
 local Logger = require(Shared.utils.Logger)
 local EntityPool = require(Shared.utils.EntityPool)
 local ECSUtils = require(Shared.utils.ECSUtils)
+local LaneCache = require(Shared.utils.LaneCache)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -136,6 +138,7 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 	end
 	
 	-- Instant Explode (CherryBomb, PotatoMine)
+	-- OPTIMIZED: Uses LaneCache for O(lane_range) instead of O(all_zombies)
 	if ability.InstantExplode then
 		local radius = ability.ExplosionRadius or 9
 		
@@ -146,7 +149,18 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 			Radius = radius,
 		})
 		
-		for zombieId, zombiePos in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
+		-- Get plant lane for optimized lookup
+		local plantComp = world:get(plantId, Components.PlantTypeComponent)
+		local centerLane = if plantComp then plantComp.Lane else 3
+		local laneRadius = math.ceil(radius / GridConfig.CELL_SIZE)
+		
+		-- O(lane_range) lookup instead of O(N) world:query
+		local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
+		
+		for _, zombieId in zombiesInRange do
+			local zombiePos = LaneCache.GetPosition(zombieId)
+			if not zombiePos then continue end
+			
 			local dx = zombiePos.X - pos.X
 			local dz = zombiePos.Z - pos.Z
 			local dist = math.sqrt(dx * dx + dz * dz)

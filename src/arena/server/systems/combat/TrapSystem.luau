@@ -8,9 +8,6 @@
 	- Spikeweed/Spikerock damaging zombies walking over (IsTrap, DamagesOnWalk)
 	- Garlic diverting zombies to adjacent lanes (DivertsZombies)
 	- Vehicle tire popping (PopsTires) - for Zomboni etc.
-	
-	NOTE: TrapAPI is exported for CombatSystem integration (Garlic eating).
-	This is an exception to the "no public API" rule for event-driven callbacks.
 ]]
 
 -- 1. IMPORTS

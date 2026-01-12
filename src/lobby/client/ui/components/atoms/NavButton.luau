@@ -3,7 +3,9 @@
 	NavButton.luau - Navigation button for lobby zones
 	
 	Atomic component for navigating between Shop, Deck, Profile, etc.
-	Icon + label in a rounded button.
+	Icon in a rounded button with Toon Pop styling.
+	Uses Fusion 0.3 scope:Method() syntax.
+	Fully responsive using Scale-based sizing.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,26 +17,19 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 
--- Constants
-local BUTTON_SIZE = 60
-local SHADOW_OFFSET = 4
+-- Constants (scale-based)
+local SHADOW_OFFSET_SCALE = 0.08 -- 8% of button height
 
 export type NavButtonProps = {
-	Scope: Fusion.Scope<any>,
+	Scope: any,
 	Icon: string,
 	Label: string?,
 	OnClick: () -> (),
 	Color: string?, -- Theme color key
 	IsActive: any?, -- Fusion.Value<boolean>
-	Position: UDim2?,
-	AnchorPoint: Vector2?,
 	LayoutOrder: number?,
 }
 
@@ -43,122 +38,137 @@ local function NavButton(props: NavButtonProps): Frame
 	local colorKey = props.Color or "Action"
 	local colorSet = (Theme.Colors :: any)[colorKey] or Theme.Colors.Action
 	
-	local isHovered = Value(scope, false)
-	local isPressed = Value(scope, false)
+	local isPressed = scope:Value(false)
 	
-	-- Press animation
-	local targetOffset = Computed(scope, function(use)
-		return if use(isPressed) then SHADOW_OFFSET else 0
-	end)
-	local pressOffset = Spring(scope, targetOffset, 40, 0.7)
+	-- Press animation (scale-based offset)
+	local pressOffset = scope:Spring(scope:Computed(function(use)
+		return if use(isPressed) then SHADOW_OFFSET_SCALE else 0
+	end), 40, 0.7)
 	
 	-- Active state glow
-	local isActive = Computed(scope, function(use)
+	local isActive = scope:Computed(function(use)
 		if props.IsActive == nil then return false end
 		return use(props.IsActive)
 	end)
 	
-	return New(scope, "Frame") {
+	-- Outer frame takes full width, with AspectRatio < 1 to create vertical gap
+	return scope:New("Frame") {
 		Name = `NavButton_{props.Label or "Button"}`,
-		Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE + SHADOW_OFFSET + (if props.Label then 18 else 0)),
-		Position = props.Position or UDim2.new(0, 0, 0, 0),
-		AnchorPoint = props.AnchorPoint or Vector2.new(0, 0),
+		Size = UDim2.fromScale(1, 1),
 		LayoutOrder = props.LayoutOrder or 0,
 		BackgroundTransparency = 1,
 		
 		[Children] = {
-			-- Shadow
-			New(scope, "Frame") {
-				Name = "Shadow",
-				Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE),
-				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
-				BackgroundColor3 = colorSet.Shadow :: Color3,
-				ZIndex = 1,
-				
-				[Children] = {
-					New(scope, "UICorner") {
-						CornerRadius = UDim.new(0, 14),
-					},
-				},
+			-- AspectRatio < 1 means height > width, creating space between buttons
+			scope:New("UIAspectRatioConstraint") {
+				AspectRatio = 0.82, -- Creates ~18% vertical gap
+				DominantAxis = Enum.DominantAxis.Width,
 			},
 			
-			-- Main button
-			New(scope, "Frame") {
-				Name = "Main",
-				Size = Computed(scope, function(use)
-					local offset = use(pressOffset)
-					return UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE - offset)
-				end),
-				Position = Computed(scope, function(use)
-					return UDim2.fromOffset(0, use(pressOffset))
-				end),
-				BackgroundColor3 = colorSet.Main :: Color3,
-				ZIndex = 2,
+			-- Inner container for the actual button (centered with margin)
+			scope:New("Frame") {
+				Name = "ButtonContainer",
+				Size = UDim2.fromScale(1, 0.85), -- Button takes 85%, gap is 15%
+				Position = UDim2.fromScale(0.5, 0.42),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
-						CornerRadius = UDim.new(0, 14),
+					-- Inner button is square
+					scope:New("UIAspectRatioConstraint") {
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
 					},
 					
-					New(scope, "UIStroke") {
-						Color = Computed(scope, function(use)
-							if use(isActive) then
-								return Color3.fromRGB(255, 255, 255)
-							end
-							return Theme.Colors.Surface.Stroke :: Color3
-						end),
-						Thickness = Computed(scope, function(use)
-							return if use(isActive) then 4 else 2
-						end),
+					-- Shadow
+					scope:New("Frame") {
+						Name = "Shadow",
+						Size = UDim2.fromScale(1, 1),
+						Position = UDim2.fromScale(0, SHADOW_OFFSET_SCALE),
+						BackgroundColor3 = colorSet.Shadow :: Color3,
+						ZIndex = 1,
+						
+						[Children] = {
+							scope:New("UICorner") {
+								CornerRadius = UDim.new(0.22, 0),
+							},
+						},
 					},
 					
-					-- Icon
-					New(scope, "TextLabel") {
-						Name = "Icon",
-						Size = UDim2.new(1, 0, 1, 0),
+					-- Main button
+					scope:New("Frame") {
+						Name = "Main",
+						Size = scope:Computed(function(use)
+							local offset = use(pressOffset) :: number
+							return UDim2.fromScale(1, 1 - offset)
+						end),
+						Position = scope:Computed(function(use)
+							local offset = use(pressOffset) :: number
+							return UDim2.fromScale(0, offset)
+						end),
+						BackgroundColor3 = colorSet.Main :: Color3,
+						ZIndex = 2,
+						
+						[Children] = {
+							scope:New("UICorner") {
+								CornerRadius = UDim.new(0.22, 0),
+							},
+							
+							scope:New("UIStroke") {
+								Color = scope:Computed(function(use)
+									return if use(isActive) then Color3.new(1, 1, 1) else Theme.Colors.Surface.Stroke :: Color3
+								end),
+								Thickness = scope:Computed(function(use)
+									return if use(isActive) then 4 else 2
+								end),
+							},
+							
+							-- Icon
+							scope:New("TextLabel") {
+								Name = "Icon",
+								Size = UDim2.fromScale(1, 1),
+								BackgroundTransparency = 1,
+								Text = props.Icon,
+								TextScaled = true,
+								
+								[Children] = {
+									scope:New("UIPadding") {
+										PaddingTop = UDim.new(0.15, 0),
+										PaddingBottom = UDim.new(0.15, 0),
+										PaddingLeft = UDim.new(0.15, 0),
+										PaddingRight = UDim.new(0.15, 0),
+									},
+									scope:New("UITextSizeConstraint") {
+										MaxTextSize = 32,
+										MinTextSize = 14,
+									},
+								},
+							},
+						},
+					},
+					
+					-- Hit area
+					scope:New("TextButton") {
+						Name = "HitArea",
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
-						Text = props.Icon,
-						TextSize = 28,
+						Text = "",
+						ZIndex = 10,
+						
+						[OnEvent("MouseButton1Down")] = function()
+							isPressed:set(true)
+						end,
+						
+						[OnEvent("MouseButton1Up")] = function()
+							isPressed:set(false)
+							props.OnClick()
+						end,
+						
+						[OnEvent("MouseLeave")] = function()
+							isPressed:set(false)
+						end,
 					},
 				},
-			},
-			
-			-- Label (optional, below button)
-			props.Label and New(scope, "TextLabel") {
-				Name = "Label",
-				Size = UDim2.new(1, 0, 0, 16),
-				Position = UDim2.new(0, 0, 1, -14),
-				BackgroundTransparency = 1,
-				Text = props.Label,
-				TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-				TextSize = 11,
-				Font = Theme.Typography.Fonts.Body,
-				ZIndex = 3,
-			} or nil,
-			
-			-- Hit area
-			New(scope, "TextButton") {
-				Name = "HitArea",
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				Text = "",
-				ZIndex = 10,
-				
-				[OnEvent("MouseButton1Down")] = function()
-					isPressed:set(true)
-				end,
-				
-				[OnEvent("MouseButton1Up")] = function()
-					isPressed:set(false)
-				end,
-				
-				[OnEvent("MouseLeave")] = function()
-					isPressed:set(false)
-				end,
-				
-				[OnEvent("Activated")] = function()
-					props.OnClick()
-				end,
 			},
 		},
 	}

@@ -17,6 +17,9 @@ local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
 
+-- Network for VFX events
+local Network = require(Shared.network.generated.server)
+
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
 	DEFAULT_SLOW_PERCENT = GameConstants.Combat.DEFAULT_SLOW_PERCENT,
@@ -62,6 +65,20 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 			RemainingDuration = freezeDuration,
 			AppliedAt = os.clock(),
 		}))
+		
+		-- Fire VFX event for freeze application
+		local pos = world:get(zombieEntityId, Components.PositionComponent)
+		if pos then
+			Network.StatusApplied.FireAll({
+				EntityId = zombieEntityId,
+				StatusType = "Freeze",
+				Duration = freezeDuration,
+				PositionX = pos.X,
+				PositionY = pos.Y,
+				PositionZ = pos.Z,
+			})
+		end
+		
 		return true
 	else
 		-- Apply enhanced slow if specified

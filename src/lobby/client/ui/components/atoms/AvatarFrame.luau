@@ -16,9 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Value = Fusion.Value
 
 -- Constants
 local DEFAULT_SIZE = 64
@@ -39,7 +37,7 @@ local function AvatarFrame(props: AvatarFrameProps): Frame
 	
 	-- Get avatar URL
 	local player = Players.LocalPlayer
-	local avatarUrl = Value(scope, "")
+	local avatarUrl = scope:Value("")
 	
 	task.spawn(function()
 		if player then
@@ -56,7 +54,7 @@ local function AvatarFrame(props: AvatarFrameProps): Frame
 		end
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "AvatarFrame",
 		Size = UDim2.fromOffset(size, size),
 		Position = props.Position or UDim2.new(0, 0, 0, 0),
@@ -65,17 +63,17 @@ local function AvatarFrame(props: AvatarFrameProps): Frame
 		BackgroundColor3 = Theme.Colors.Surface.Main,
 		
 		[Children] = {
-			New(scope, "UICorner") {
+			scope:New("UICorner") {
 				CornerRadius = UDim.new(0.5, 0),
 			},
 			
-			New(scope, "UIStroke") {
+			scope:New("UIStroke") {
 				Color = borderColor,
 				Thickness = 3,
 			},
 			
 			-- Avatar image
-			New(scope, "ImageLabel") {
+			scope:New("ImageLabel") {
 				Name = "Avatar",
 				Size = UDim2.new(1, -6, 1, -6),
 				Position = UDim2.fromScale(0.5, 0.5),
@@ -84,7 +82,7 @@ local function AvatarFrame(props: AvatarFrameProps): Frame
 				Image = avatarUrl,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
 				},

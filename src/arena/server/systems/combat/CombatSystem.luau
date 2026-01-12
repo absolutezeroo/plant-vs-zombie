@@ -158,10 +158,21 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 end
 
 -- Apply splash damage to zombies near impact point
-local function applySplashDamage(world: MatterWorld, impactX: number, impactZ: number, splash: any, proj: any)
+-- OPTIMIZED: Uses LaneCache for O(lane_range) instead of O(all_zombies)
+local function applySplashDamage(world: MatterWorld, impactX: number, impactZ: number, splash: any, proj: any, impactLane: number?)
 	local hitCount = 0
 	
-	for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
+	-- Calculate lane radius from splash radius
+	local laneRadius = math.ceil(splash.SplashRadius / GridConfig.CELL_SIZE)
+	local centerLane = impactLane or 3
+	
+	-- O(lane_range) lookup instead of O(N) world:query
+	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
+	
+	for _, zombieId in zombiesInRange do
+		local zombiePos = LaneCache.GetPosition(zombieId)
+		if not zombiePos then continue end
+		
 		local dx = zombiePos.X - impactX
 		local dz = zombiePos.Z - impactZ
 		local distance = math.sqrt(dx * dx + dz * dz)
@@ -358,7 +369,7 @@ local function OnStep(world: MatterWorld)
 			-- Check for splash damage (Melon-pult, Winter Melon)
 			local splash = world:get(projId, Components.SplashComponent)
 			if splash and splash.SplashRadius > 0 then
-				applySplashDamage(world, projPos.X, projPos.Z, splash, proj)
+				applySplashDamage(world, projPos.X, projPos.Z, splash, proj, proj.Lane)
 			end
 			
 			-- Notify client of impact for VFX

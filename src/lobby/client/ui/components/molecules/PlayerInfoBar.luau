@@ -20,9 +20,7 @@ local LevelBadge = require(Atoms.LevelBadge)
 local ResourcePill = require(Atoms.ResourcePill)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
 
 export type PlayerInfoBarProps = {
 	Scope: Fusion.Scope<any>,
@@ -37,13 +35,36 @@ export type PlayerInfoBarProps = {
 local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 	local scope = props.Scope
 	
-	return New(scope, "Frame") {
+	-- Responsive scale based on viewport (designed for 1080p)
+	local camera = workspace.CurrentCamera
+	local viewportSize = scope:Value(camera and camera.ViewportSize or Vector2.new(1920, 1080))
+	
+	-- Update viewport size on change (cleanup handled by scope)
+	if camera then
+		local connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			viewportSize:set(camera.ViewportSize)
+		end)
+		table.insert(scope, connection)
+	end
+	
+	local uiScale = scope:Computed(function(use)
+		local size = use(viewportSize)
+		-- Scale up more aggressively (reference 720p, allow up to 2.5x)
+		return math.clamp(size.Y / 720, 0.8, 2.5)
+	end)
+	
+	return scope:New("Frame") {
 		Name = "PlayerInfoBar",
 		Size = UDim2.fromOffset(280, 70),
-		Position = props.Position or UDim2.fromOffset(16, 16),
+		Position = props.Position or UDim2.fromScale(0.01, 0.06),
 		BackgroundTransparency = 1,
 		
 		[Children] = {
+			-- Responsive scaling
+			scope:New("UIScale") {
+				Scale = uiScale,
+			},
+			
 			-- Avatar (left)
 			AvatarFrame({
 				Scope = scope,
@@ -64,14 +85,14 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 			}),
 			
 			-- Resources (right of avatar)
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Resources",
 				Size = UDim2.fromOffset(180, 70),
 				Position = UDim2.fromOffset(95, 0),
 				BackgroundTransparency = 1,
 				
 				[Children] = {
-					New(scope, "UIListLayout") {
+					scope:New("UIListLayout") {
 						SortOrder = Enum.SortOrder.LayoutOrder,
 						FillDirection = Enum.FillDirection.Vertical,
 						Padding = UDim.new(0, 4),

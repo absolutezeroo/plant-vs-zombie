@@ -15,9 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
 
 -- Constants
 local BANNER_HEIGHT = 60
@@ -36,7 +34,7 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 	local size = props.Size or UDim2.new(1, 0, 0, BANNER_HEIGHT + SHADOW_OFFSET)
 	
 	-- Calculate win rate (0-1)
-	local winRate = Computed(scope, function(use)
+	local winRate = scope:Computed(function(use)
 		local won = use(props.GamesWon) or 0
 		local played = use(props.GamesPlayed) or 0
 		if played == 0 then return 0 end
@@ -44,7 +42,7 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 	end)
 	
 	-- Color based on rate
-	local colorSet = Computed(scope, function(use)
+	local colorSet = scope:Computed(function(use)
 		local rate = use(winRate)
 		if rate >= 0.7 then
 			return Theme.Colors.Action -- Green
@@ -56,7 +54,7 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 	end)
 	
 	-- Display text
-	local displayText = Computed(scope, function(use)
+	local displayText = scope:Computed(function(use)
 		local played = use(props.GamesPlayed) or 0
 		if played == 0 then
 			return "🎯 Win Rate: Play some games!"
@@ -66,7 +64,7 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 		return `{emoji} Win Rate: {rate}%`
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "WinRateBanner",
 		Size = size,
 		BackgroundTransparency = 1,
@@ -74,43 +72,43 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 		
 		[Children] = {
 			-- Shadow
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Shadow",
 				Size = UDim2.new(1, 0, 0, BANNER_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
-				BackgroundColor3 = Computed(scope, function(use)
+				BackgroundColor3 = scope:Computed(function(use)
 					return use(colorSet).Shadow :: Color3
 				end),
 				ZIndex = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = Theme.Layout.CornerRadius,
 					},
 				},
 			},
 			
 			-- Main banner
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Main",
 				Size = UDim2.new(1, 0, 0, BANNER_HEIGHT),
-				BackgroundColor3 = Computed(scope, function(use)
+				BackgroundColor3 = scope:Computed(function(use)
 					return use(colorSet).Main :: Color3
 				end),
 				ZIndex = 2,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = Theme.Layout.CornerRadius,
 					},
 					
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
 					},
 					
 					-- Text
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "Text",
 						Size = UDim2.new(1, 0, 1, 0),
 						BackgroundTransparency = 1,

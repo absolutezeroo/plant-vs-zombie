@@ -143,6 +143,10 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 ## 🏗️ CODING STANDARDS
 
 * **Strict Typing:** Every file MUST start with `--!strict`. All functions must have type annotations.
+* **Linting (MANDATORY):**
+    * **Action:** Run `selene src/` (or `rokit run selene src/`) after every modification.
+    * **Rule:** Fix ALL warnings/errors reported by Selene before testing or committing. Do not ignore them.
+    * **Goal:** Catch syntax errors, unused variables, and shadowing instantly.
 * **Directory Awareness:**
     * `src/shared/network/packets.zap` -> Source of truth for networking.
     * `src/shared/components/` -> All component definitions.

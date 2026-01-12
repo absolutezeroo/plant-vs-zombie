@@ -423,4 +423,211 @@ function VFXService.DetachIdleVFX(model: Model)
 	VFXUtils.DetachIdleVFX(model)
 end
 
+-- ============================================
+-- MUTATION VFX EFFECTS
+-- ============================================
+
+--[[
+	🔥 BURN APPLIED - When zombie starts burning
+	ASSET-BASED: Looks for Assets/VFX/Burn_Applied
+]]
+function VFXService.PlayBurnApplied(position: Vector3)
+	playVFXFromAsset(position, "Burn_Applied", Color3.fromRGB(255, 100, 0))
+end
+
+--[[
+	🔥 BURN TICK - Each burn damage tick
+	ASSET-BASED: Looks for Assets/VFX/Burn_Tick
+]]
+function VFXService.PlayBurnTick(position: Vector3)
+	playVFXFromAsset(position, "Burn_Tick", Color3.fromRGB(255, 80, 0))
+end
+
+--[[
+	❄️ FREEZE APPLIED - When zombie is frozen solid
+	ASSET-BASED: Looks for Assets/VFX/Freeze_Applied
+]]
+function VFXService.PlayFreezeApplied(position: Vector3)
+	playVFXFromAsset(position, "Freeze_Applied", Color3.fromRGB(150, 220, 255))
+end
+
+--[[
+	❄️ FREEZE THAW - When zombie unfreezes
+	ASSET-BASED: Looks for Assets/VFX/Freeze_Thaw
+]]
+function VFXService.PlayFreezeThaw(position: Vector3)
+	playVFXFromAsset(position, "Freeze_Thaw", Color3.fromRGB(200, 240, 255))
+end
+
+--[[
+	⚡ CHAIN LIGHTNING - Electric arc between targets
+	Creates a beam effect between source and target
+]]
+function VFXService.PlayChainLightning(sourcePos: Vector3, targetPos: Vector3, damage: number?)
+	-- Create beam
+	VFXUtils.CreateBeam(sourcePos, targetPos, "Lightning_Beam", Color3.fromRGB(255, 255, 100), 0.25)
+	
+	-- Play spark at target
+	playVFXFromAsset(targetPos, "Electric_Spark", Color3.fromRGB(255, 255, 100))
+	
+	-- Screen shake for powerful hits
+	if damage and damage >= 50 then
+		VFXService.ScreenShake(0.3, 0.1)
+	end
+	
+	Logger.Debug("VFX", `Chain lightning from {sourcePos} to {targetPos}`)
+end
+
+--[[
+	☠️ POISON CLOUD - Persistent poison area effect
+	Creates a lingering cloud at position
+]]
+function VFXService.PlayPoisonCloud(position: Vector3, radius: number, duration: number)
+	local played = playVFXFromAsset(position, "Poison_Cloud", Color3.fromRGB(100, 255, 100))
+	
+	if not played then
+		-- Create procedural poison cloud (multiple emitters for coverage)
+		local part = createVFXPart(position)
+		
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Color = ColorSequence.new(Color3.fromRGB(100, 200, 100))
+		emitter.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, radius * 0.5),
+			NumberSequenceKeypoint.new(0.5, radius),
+			NumberSequenceKeypoint.new(1, radius * 0.3),
+		})
+		emitter.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.8),
+			NumberSequenceKeypoint.new(0.5, 0.5),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		emitter.Lifetime = NumberRange.new(1, 2)
+		emitter.Rate = 20
+		emitter.Speed = NumberRange.new(0.5, 1.5)
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.RotSpeed = NumberRange.new(-30, 30)
+		emitter.LightEmission = 0.3
+		emitter.Parent = part
+		
+		-- Schedule cleanup after duration
+		task.delay(duration, function()
+			if emitter and emitter.Parent then
+				emitter.Enabled = false
+			end
+		end)
+		
+		Debris:AddItem(part, duration + 3)
+	end
+	
+	Logger.Debug("VFX", `Poison cloud at {position}, radius {radius}, duration {duration}`)
+end
+
+--[[
+	🌑 LIFESTEAL DRAIN - Dark energy from zombie to plant
+]]
+function VFXService.PlayLifesteal(zombiePos: Vector3, plantPos: Vector3, healAmount: number)
+	-- Create drain beam
+	VFXUtils.CreateBeam(zombiePos, plantPos, "Lifesteal_Beam", Color3.fromRGB(80, 40, 120), 0.3)
+	
+	-- Play heal VFX at plant
+	playVFXFromAsset(plantPos, "Shadow_Heal", Color3.fromRGB(80, 40, 120))
+	
+	Logger.Debug("VFX", `Lifesteal {healAmount} from {zombiePos} to {plantPos}`)
+end
+
+--[[
+	💥 SPLASH DAMAGE - Ring effect on ground
+]]
+function VFXService.PlaySplashDamage(position: Vector3, radius: number)
+	local played = playVFXFromAsset(position, "Splash_Ring", Color3.fromRGB(255, 200, 100))
+	
+	if not played then
+		-- Create procedural splash ring
+		local ring = Instance.new("Part")
+		ring.Name = "SplashRing"
+		ring.Anchored = true
+		ring.CanCollide = false
+		ring.CanTouch = false
+		ring.Material = Enum.Material.Neon
+		ring.Color = Color3.fromRGB(255, 200, 100)
+		ring.Shape = Enum.PartType.Cylinder
+		ring.Size = Vector3.new(0.1, 1, 1)
+		ring.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
+		ring.Transparency = 0.3
+		ring.Parent = _vfxFolder
+		
+		local ringTween = TweenService:Create(ring, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = Vector3.new(0.1, radius * 2, radius * 2),
+			Transparency = 1,
+		})
+		ringTween:Play()
+		
+		Debris:AddItem(ring, 0.4)
+	end
+end
+
+--[[
+	⭐ STUN APPLIED - Stars above zombie
+]]
+function VFXService.PlayStunApplied(position: Vector3)
+	playVFXFromAsset(position + Vector3.new(0, 2, 0), "Stunned_Indicator", Color3.fromRGB(255, 255, 100))
+end
+
+--[[
+	☀️ SUN BURST - Golden burst for kill bonus sun
+]]
+function VFXService.PlaySunBurst(position: Vector3)
+	playVFXFromAsset(position, "Sun_Burst", Color3.fromRGB(255, 220, 50))
+end
+
+-- ============================================
+-- STATUS OVERLAY MANAGEMENT
+-- ============================================
+
+-- Cache of active status overlays per entity
+local _statusOverlays: {[number]: {[string]: Instance}} = {}
+
+--[[
+	Apply a status overlay to a zombie model
+	@param entityId number - Entity ID for tracking
+	@param model Model - The zombie model
+	@param statusType string - "Burn", "Freeze", "Poison", "Stun"
+	@param duration number? - Duration (nil = permanent)
+]]
+function VFXService.ApplyStatusOverlay(entityId: number, model: Model, statusType: string, duration: number?)
+	-- Initialize cache for entity
+	if not _statusOverlays[entityId] then
+		_statusOverlays[entityId] = {}
+	end
+	
+	-- Remove existing overlay of same type
+	if _statusOverlays[entityId][statusType] then
+		VFXUtils.RemoveStatusOverlay(model, statusType)
+	end
+	
+	-- Apply new overlay
+	local overlay = VFXUtils.ApplyStatusOverlay(model, statusType, duration)
+	if overlay then
+		_statusOverlays[entityId][statusType] = overlay
+	end
+end
+
+--[[
+	Remove a status overlay from a zombie
+]]
+function VFXService.RemoveStatusOverlay(entityId: number, model: Model, statusType: string)
+	VFXUtils.RemoveStatusOverlay(model, statusType)
+	
+	if _statusOverlays[entityId] then
+		_statusOverlays[entityId][statusType] = nil
+	end
+end
+
+--[[
+	Cleanup all overlays for an entity (on death)
+]]
+function VFXService.CleanupEntityOverlays(entityId: number)
+	_statusOverlays[entityId] = nil
+end
+
 return VFXService

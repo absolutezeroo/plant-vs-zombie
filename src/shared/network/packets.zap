@@ -50,6 +50,25 @@ type MutationType = enum {
     Swift, Hasty
 }
 
+-- Status effect types for VFX
+type StatusEffectType = enum {
+    Burn,       -- Fire damage over time
+    Freeze,     -- Frozen solid
+    Slow,       -- Movement slowed
+    Poison,     -- Poison damage over time
+    Stun        -- Cannot move or attack
+}
+
+-- Damage types for floating text colors
+type DamageType = enum {
+    Normal,     -- Standard pea damage (white/red)
+    Fire,       -- Fire/burn damage (orange)
+    Ice,        -- Ice/freeze damage (cyan)
+    Lightning,  -- Chain lightning (yellow)
+    Poison,     -- Poison damage (green)
+    Splash      -- Area splash damage (purple)
+}
+
 type ProjectileVariant = enum {
     Pea,         -- Standard green pea
     FrozenPea,   -- Blue ice pea (SnowPea, Winter Melon)
@@ -339,6 +358,7 @@ event EntityDamaged = {
         EntityId: EntityId,
         NewHealth: u16,
         DamageAmount: u16,
+        DamageType: DamageType?,    -- Optional damage type for colored floating text
         ShieldDestroyed: boolean?,  -- True when zombie shield is destroyed
     }
 }
@@ -573,6 +593,89 @@ event GameEndRewards = {
 event ExplosionVFX = {
     from: Server,
     type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PositionX: f32,
+        PositionY: f32,
+        PositionZ: f32,
+        Radius: f32,
+    }
+}
+
+-- Status effect applied to entity (for VFX: burn aura, freeze overlay, etc.)
+event StatusApplied = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        StatusType: StatusEffectType,
+        Duration: f32,
+        PositionX: f32,
+        PositionY: f32,
+        PositionZ: f32,
+    }
+}
+
+-- Status effect removed from entity (for cleanup VFX)
+event StatusRemoved = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        StatusType: StatusEffectType,
+    }
+}
+
+-- Chain lightning VFX (beam between targets)
+event ChainLightningVFX = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        SourceX: f32,
+        SourceY: f32,
+        SourceZ: f32,
+        TargetX: f32,
+        TargetY: f32,
+        TargetZ: f32,
+        Damage: u16,
+    }
+}
+
+-- Poison cloud spawned (persistent area effect)
+event PoisonCloudVFX = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PositionX: f32,
+        PositionY: f32,
+        PositionZ: f32,
+        Radius: f32,
+        Duration: f32,
+    }
+}
+
+-- Lifesteal heal VFX (drain from zombie to plant)
+event LifestealVFX = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        PlantEntityId: EntityId,
+        ZombieX: f32,
+        ZombieY: f32,
+        ZombieZ: f32,
+        HealAmount: u16,
+    }
+}
+
+-- Splash damage VFX (ring on ground)
+event SplashDamageVFX = {
+    from: Server,
+    type: Unreliable,
     call: ManyAsync,
     data: struct {
         PositionX: f32,

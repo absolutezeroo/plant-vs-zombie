@@ -319,4 +319,210 @@ function VFXUtils.DetachIdleVFX(model: Model)
 	end
 end
 
+-- ============================================
+-- Beam Effects (Chain Lightning, etc.)
+-- ============================================
+
+--[[
+	Create a beam effect between two points (for chain lightning)
+	
+	Uses asset from Assets/VFX/{beamName} if exists, otherwise creates procedural beam.
+	
+	@param startPos Vector3 - Start position
+	@param endPos Vector3 - End position
+	@param beamName string? - Name of beam asset (default "Lightning_Beam")
+	@param color Color3? - Beam color (default electric yellow)
+	@param duration number? - How long beam stays visible (default 0.2)
+	@return (Part, Part, Beam?) - Start anchor, end anchor, and beam (if created)
+]]
+function VFXUtils.CreateBeam(
+	startPos: Vector3,
+	endPos: Vector3,
+	beamName: string?,
+	color: Color3?,
+	duration: number?
+): (Part, Part, Beam?)
+	local actualDuration = duration or 0.2
+	local actualColor = color or Color3.fromRGB(255, 255, 100) -- Electric yellow
+	
+	-- Create start and end anchors
+	local startAnchor = VFXUtils.CreateVFXAnchor(startPos, "BeamStart")
+	local endAnchor = VFXUtils.CreateVFXAnchor(endPos, "BeamEnd")
+	
+	-- Create attachments
+	local startAttachment = Instance.new("Attachment")
+	startAttachment.Name = "BeamAttachment"
+	startAttachment.Parent = startAnchor
+	
+	local endAttachment = Instance.new("Attachment")
+	endAttachment.Name = "BeamAttachment"
+	endAttachment.Parent = endAnchor
+	
+	-- Try to find beam template in Assets
+	local Assets = game:GetService("ReplicatedStorage"):FindFirstChild("Assets")
+	local VFXAssets = Assets and Assets:FindFirstChild("VFX")
+	local beamTemplate = VFXAssets and VFXAssets:FindFirstChild(beamName or "Lightning_Beam")
+	
+	local beam: Beam?
+	
+	if beamTemplate and beamTemplate:FindFirstChildWhichIsA("Beam") then
+		-- Clone from asset
+		beam = beamTemplate:FindFirstChildWhichIsA("Beam"):Clone()
+		beam.Attachment0 = startAttachment
+		beam.Attachment1 = endAttachment
+		beam.Parent = startAnchor
+	else
+		-- Create procedural beam
+		beam = Instance.new("Beam")
+		beam.Attachment0 = startAttachment
+		beam.Attachment1 = endAttachment
+		beam.Color = ColorSequence.new(actualColor)
+		beam.LightEmission = 1
+		beam.LightInfluence = 0
+		beam.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.5, 0.3),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		beam.Width0 = 0.5
+		beam.Width1 = 0.5
+		beam.FaceCamera = true
+		beam.Segments = 10
+		beam.TextureMode = Enum.TextureMode.Stretch
+		beam.Parent = startAnchor
+	end
+	
+	-- Animate fade out and cleanup
+	task.delay(actualDuration * 0.5, function()
+		if beam then
+			local fadeSteps = 5
+			for i = 1, fadeSteps do
+				if beam.Parent then
+					beam.Transparency = NumberSequence.new(i / fadeSteps)
+				end
+				task.wait(actualDuration * 0.5 / fadeSteps)
+			end
+		end
+	end)
+	
+	-- Schedule cleanup
+	Debris:AddItem(startAnchor, actualDuration + 0.1)
+	Debris:AddItem(endAnchor, actualDuration + 0.1)
+	
+	return startAnchor, endAnchor, beam
+end
+
+--[[
+	Create multiple chained beams (for multi-target chain lightning)
+	
+	@param positions {Vector3} - Array of positions to chain between
+	@param color Color3? - Beam color
+	@param duration number? - Duration per beam
+]]
+function VFXUtils.CreateChainedBeams(
+	positions: {Vector3},
+	color: Color3?,
+	duration: number?
+)
+	if #positions < 2 then return end
+	
+	for i = 1, #positions - 1 do
+		-- Slight delay between each chain for visual effect
+		task.delay((i - 1) * 0.05, function()
+			VFXUtils.CreateBeam(positions[i], positions[i + 1], "Lightning_Beam", color, duration)
+		end)
+	end
+end
+
+--[[
+	Create a status effect overlay on a model (burning aura, freeze tint, etc.)
+	
+	@param model Model - The model to apply overlay to
+	@param effectType string - "Burn", "Freeze", "Poison", "Stun"
+	@param duration number? - How long overlay lasts (nil = permanent until removed)
+	@return Instance? - The overlay effect for manual cleanup
+]]
+function VFXUtils.ApplyStatusOverlay(
+	model: Model,
+	effectType: string,
+	duration: number?
+): Instance?
+	local visual = model:FindFirstChild("Visual")
+	if not visual then return nil end
+	
+	-- Find first BasePart for particle attachment
+	local targetPart = visual:FindFirstChildWhichIsA("BasePart")
+	if not targetPart then return nil end
+	
+	-- Try to find overlay template
+	local Assets = game:GetService("ReplicatedStorage"):FindFirstChild("Assets")
+	local VFXAssets = Assets and Assets:FindFirstChild("VFX")
+	local overlayName = effectType .. "_Overlay"
+	local overlayTemplate = VFXAssets and VFXAssets:FindFirstChild(overlayName)
+	
+	-- Color mappings for procedural fallback
+	local colorMap = {
+		Burn = Color3.fromRGB(255, 100, 0),
+		Freeze = Color3.fromRGB(150, 220, 255),
+		Poison = Color3.fromRGB(100, 255, 100),
+		Stun = Color3.fromRGB(255, 255, 100),
+	}
+	
+	local overlay: ParticleEmitter
+	
+	if overlayTemplate and overlayTemplate:FindFirstChildWhichIsA("ParticleEmitter") then
+		overlay = overlayTemplate:FindFirstChildWhichIsA("ParticleEmitter"):Clone()
+	else
+		-- Create procedural overlay
+		overlay = Instance.new("ParticleEmitter")
+		overlay.Color = ColorSequence.new(colorMap[effectType] or Color3.new(1, 1, 1))
+		overlay.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		overlay.Transparency = NumberSequence.new(0.5)
+		overlay.Lifetime = NumberRange.new(0.5, 1)
+		overlay.Rate = 10
+		overlay.Speed = NumberRange.new(1, 2)
+		overlay.SpreadAngle = Vector2.new(180, 180)
+		overlay.LightEmission = 0.5
+	end
+	
+	overlay.Name = "StatusOverlay_" .. effectType
+	overlay.Parent = targetPart
+	overlay.Enabled = true
+	
+	-- Schedule cleanup if duration specified
+	if duration then
+		task.delay(duration, function()
+			if overlay and overlay.Parent then
+				overlay.Enabled = false
+				Debris:AddItem(overlay, overlay.Lifetime.Max)
+			end
+		end)
+	end
+	
+	return overlay
+end
+
+--[[
+	Remove a status overlay from a model
+	
+	@param model Model - The model to remove overlay from
+	@param effectType string - "Burn", "Freeze", "Poison", "Stun"
+]]
+function VFXUtils.RemoveStatusOverlay(model: Model, effectType: string)
+	local visual = model:FindFirstChild("Visual")
+	if not visual then return end
+	
+	local overlayName = "StatusOverlay_" .. effectType
+	
+	for _, part in visual:GetDescendants() do
+		if part:IsA("ParticleEmitter") and part.Name == overlayName then
+			part.Enabled = false
+			Debris:AddItem(part, part.Lifetime.Max)
+		end
+	end
+end
+
 return VFXUtils

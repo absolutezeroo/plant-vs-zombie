@@ -376,23 +376,28 @@ local function OnStep(world)
 		end
 		
 		-- Range check for short-range mushrooms (PuffShroom, SeaShroom, etc.)
+		-- OPTIMIZED: Uses LaneCache for O(lane_size) instead of O(all_zombies)
 		if stats.Range and stats.Range > 0 then
 			local hasInRange = false
 			local zombieDir = State.CachedZombieDir
 			
-			for _, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
-				if zombie.Lane == plant.Lane then
-					-- Calculate distance in the direction zombies come from
-					local dx = zombiePos.X - pos.X
-					local dz = zombiePos.Z - pos.Z
-					-- Dot product with zombie direction (negative = in front of plant)
-					local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
-					local distance = -dotProduct -- Distance in the "forward" direction
-					
-					if distance > 0 and distance <= stats.Range then
-						hasInRange = true
-						break
-					end
+			-- O(1) lane lookup instead of O(N) world:query
+			local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
+			
+			for _, zombieId in zombiesInLane do
+				local zombiePos = LaneCache.GetPosition(zombieId)
+				if not zombiePos then continue end
+				
+				-- Calculate distance in the direction zombies come from
+				local dx = zombiePos.X - pos.X
+				local dz = zombiePos.Z - pos.Z
+				-- Dot product with zombie direction (negative = in front of plant)
+				local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
+				local distance = -dotProduct -- Distance in the "forward" direction
+				
+				if distance > 0 and distance <= stats.Range then
+					hasInRange = true
+					break
 				end
 			end
 			if not hasInRange then

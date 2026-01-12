@@ -15,9 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
 
 -- Constants
 local BADGE_SIZE = 50
@@ -38,12 +36,12 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 	local scope = props.Scope
 	local size = props.Size or BADGE_SIZE
 	
-	local levelText = Computed(scope, function(use)
+	local levelText = scope:Computed(function(use)
 		return tostring(use(props.Level))
 	end)
 	
 	-- XP progress (0-1)
-	local xpProgress = Computed(scope, function(use)
+	local xpProgress = scope:Computed(function(use)
 		if not props.XP or not props.XPRequired then
 			return 0
 		end
@@ -53,7 +51,7 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 		return math.clamp(current / required, 0, 1)
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "LevelBadge",
 		Size = UDim2.fromOffset(size, size + SHADOW_OFFSET),
 		Position = props.Position or UDim2.new(0, 0, 0, 0),
@@ -63,7 +61,7 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 		
 		[Children] = {
 			-- Shadow
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Shadow",
 				Size = UDim2.fromOffset(size, size),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
@@ -71,31 +69,31 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 				ZIndex = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0, 10),
 					},
 				},
 			},
 			
 			-- Main badge
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Main",
 				Size = UDim2.fromOffset(size, size),
 				BackgroundColor3 = Theme.Colors.Warning.Main,
 				ZIndex = 2,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0, 10),
 					},
 					
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
 					},
 					
 					-- Star icon (top)
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "Star",
 						Size = UDim2.fromOffset(20, 20),
 						Position = UDim2.new(0.5, 0, 0, 2),
@@ -106,7 +104,7 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 					},
 					
 					-- Level number
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "Level",
 						Size = UDim2.new(1, 0, 0.6, 0),
 						Position = UDim2.fromScale(0.5, 0.55),
@@ -119,7 +117,7 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 					},
 					
 					-- XP progress bar (bottom)
-					props.XP and New(scope, "Frame") {
+					props.XP and scope:New("Frame") {
 						Name = "XPBar",
 						Size = UDim2.new(0.8, 0, 0, 4),
 						Position = UDim2.new(0.5, 0, 1, -8),
@@ -127,20 +125,20 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 						BackgroundColor3 = Color3.fromRGB(100, 80, 50),
 						
 						[Children] = {
-							New(scope, "UICorner") {
+							scope:New("UICorner") {
 								CornerRadius = UDim.new(0.5, 0),
 							},
 							
 							-- Fill
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Fill",
-								Size = Computed(scope, function(use)
+								Size = scope:Computed(function(use)
 									return UDim2.new(use(xpProgress), 0, 1, 0)
 								end),
 								BackgroundColor3 = Theme.Colors.Action.Main,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = UDim.new(0.5, 0),
 									},
 								},

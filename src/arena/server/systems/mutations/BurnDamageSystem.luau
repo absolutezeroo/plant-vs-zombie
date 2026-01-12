@@ -16,6 +16,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local ECSUtils = require(Shared.utils.ECSUtils)
 
+-- Network for VFX events
+local Network = require(Shared.network.generated.server)
+
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
 	TICK_INTERVAL = 1, -- Seconds between burn ticks
@@ -59,6 +62,19 @@ local function applyBurn(world, zombieEntityId: number, damagePerSecond: number,
 			RemainingDuration = duration,
 			LastTickTime = os.clock(),
 		}))
+		
+		-- Fire VFX event for burn application
+		local pos = world:get(zombieEntityId, Components.PositionComponent)
+		if pos then
+			Network.StatusApplied.FireAll({
+				EntityId = zombieEntityId,
+				StatusType = "Burn",
+				Duration = duration,
+				PositionX = pos.X,
+				PositionY = pos.Y,
+				PositionZ = pos.Z,
+			})
+		end
 	end
 end
 

@@ -143,9 +143,21 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 		
 	else
 		-- Normal explosion (CherryBomb, DoomShroom)
+		-- OPTIMIZED: Uses LaneCache for O(lane_range) instead of O(all_zombies)
 		local explosionRadius = (stats.Range and stats.Range > 0) and stats.Range or CONFIG.EXPLOSION_RADIUS
 		
-		for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
+		-- Get plant lane for optimized lookup
+		local plantComp = world:get(entityId, Components.PlantTypeComponent)
+		local centerLane = if plantComp then plantComp.Lane else 3
+		local laneRadius = math.ceil(explosionRadius / GridConfig.CELL_SIZE)
+		
+		-- O(lane_range) lookup instead of O(N) world:query
+		local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
+		
+		for _, zombieId in zombiesInRange do
+			local zombiePos = LaneCache.GetPosition(zombieId)
+			if not zombiePos then continue end
+			
 			local dx = zombiePos.X - pos.X
 			local dz = zombiePos.Z - pos.Z
 			local distance = math.sqrt(dx * dx + dz * dz)

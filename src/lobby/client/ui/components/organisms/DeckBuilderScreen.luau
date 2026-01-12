@@ -1,14 +1,15 @@
 --!strict
 --[[
-	DeckBuilderScreen.luau - Deck building overlay screen (Toon Pop)
+	DeckBuilderScreen.luau - Deck building overlay screen (Toon Pop + Responsive)
 	
 	Organism for building and managing plant decks.
-	Follows the same "Toon Pop" design as ShopScreen:
-	- Dark overlay background
-	- Centered panel with header + shadows
-	- 3D deck slots bar 
-	- Filterable plant grid with DeckCard atoms
-	- Play button with shadow press animation
+	Follows EXACT same "Toon Pop" design as ShopScreen:
+	- Dark overlay background (50% black)
+	- Centered panel (90% x 90%) with BackgroundTransparency = 1
+	- Position-based layout (no UIListLayout for main sections)
+	- Each section (Header, DeckBar, Grid) has its own Shadow + Main
+	
+	RESPONSIVE: Uses UDim2.fromScale() + UIAspectRatioConstraint + UITextSizeConstraint
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,7 +24,6 @@ local PlantData = require(Shared.data.PlantData)
 local ProgressionData = require(Shared.data.ProgressionData)
 local MutationData = require(Shared.data.MutationData)
 local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
-local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 -- Local atoms
 local Atoms = script.Parent.Parent.atoms
@@ -31,22 +31,14 @@ local FilterPill = require(Atoms.FilterPill)
 local DeckCard = require(Atoms.DeckCard)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
 
 -- Constants
-local SHADOW_OFFSET = 4
-local HEADER_HEIGHT = 70
-local DECK_BAR_HEIGHT = 100
-local SLOT_SIZE = 68
 local MAX_DECK_SIZE = 6
 
--- Colors
+-- Colors (Toon Pop)
 local GOLD_BORDER = Color3.fromHex("#FFD700")
 local GREEN_SELECTED = Color3.fromHex("#4CAF50")
 
@@ -74,7 +66,7 @@ export type DeckBuilderScreenProps = {
 }
 
 --------------------------------------------------------------------------------
--- DeckSlot Component - A single slot in the deck bar
+-- DeckSlot Component - A single slot in the deck bar (Responsive)
 --------------------------------------------------------------------------------
 local function DeckSlot(scope: any, props: {
 	Index: number,
@@ -84,28 +76,14 @@ local function DeckSlot(scope: any, props: {
 }): Frame
 	local hasPlant = props.PlantType ~= nil
 	local hasMutations = props.Mutations and #props.Mutations > 0
-	local isHovered = Value(scope, false)
-	local isPressed = Value(scope, false)
+	local isHovered = scope:Value(false)
+	local isPressed = scope:Value(false)
 	
-	-- Create viewport for plant
-	local plantViewport: ViewportFrame? = nil
-	if hasPlant then
-		plantViewport = PlantViewport.CreateWithScope(scope, {
-			PlantType = props.PlantType :: string,
-			Size = UDim2.new(1, -12, 0, 42),
-			Position = UDim2.new(0.5, 0, 0, 18),
-			AnchorPoint = Vector2.new(0.5, 0),
-			ZIndex = 3,
-			CameraFOV = 38,
-			CameraDistance = 1.5,
-			CameraHeight = 0.15,
-		})
-	end
-	
-	-- Press animation
-	local pressOffset = Spring(scope, Computed(scope, function(use)
-		return if use(isPressed) then SHADOW_OFFSET else 0
-	end), 40, 0.7)
+	-- Press animation (scale-based)
+	local pressScale = scope:Spring(
+		scope:Computed(function(use)
+			return if use(isPressed) then 0.92 else 1
+		end), 40, 0.7)
 	
 	-- Border color based on state
 	local borderColor = if hasMutations 
@@ -113,166 +91,238 @@ local function DeckSlot(scope: any, props: {
 		elseif hasPlant then GREEN_SELECTED 
 		else Theme.Colors.Surface.Stroke
 	
-	return New(scope, "Frame") {
+	-- Create viewport for plant
+	local plantViewport: ViewportFrame? = nil
+	if hasPlant then
+		plantViewport = PlantViewport.CreateWithScope(scope, {
+			PlantType = props.PlantType :: string,
+			Size = UDim2.fromScale(0.85, 0.55),
+			Position = UDim2.fromScale(0.5, 0.35),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			ZIndex = 3,
+			CameraFOV = 38,
+			CameraDistance = 1.5,
+			CameraHeight = 0.15,
+		})
+	end
+	
+	return scope:New("Frame") {
 		Name = "Slot" .. props.Index,
-		Size = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE + SHADOW_OFFSET + 12),
+		Size = UDim2.fromScale(0.12, 1), -- Width will be constrained by aspect ratio
 		BackgroundTransparency = 1,
 		
 		[Children] = {
-			-- Shadow
-			New(scope, "Frame") {
-				Name = "Shadow",
-				Size = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE),
-				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
-				BackgroundColor3 = if hasPlant 
-					then (if hasMutations then Color3.fromHex("#B8860B") else Color3.fromHex("#357A38"))
-					else Theme.Colors.Surface.Shadow,
-				ZIndex = 1,
-				
-				[Children] = {
-					New(scope, "UICorner") {
-						CornerRadius = Theme.Layout.CornerRadius,
-					},
-				},
+			-- Maintain square aspect ratio
+			scope:New("UIAspectRatioConstraint") {
+				AspectRatio = 0.8,
+				DominantAxis = Enum.DominantAxis.Height,
 			},
 			
-			-- Main slot
-			New(scope, "Frame") {
-				Name = "Main",
-				Size = Computed(scope, function(use)
-					local offset = use(pressOffset)
-					return UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE - offset)
+			-- Scale wrapper for press animation
+			scope:New("Frame") {
+				Name = "ScaleWrapper",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = scope:Computed(function(use)
+					local s = use(pressScale)
+					return UDim2.fromScale(s, s)
 				end),
-				Position = Computed(scope, function(use)
-					return UDim2.fromOffset(0, use(pressOffset))
-				end),
-				BackgroundColor3 = Computed(scope, function(use)
-					if hasPlant and use(isHovered) then
-						return Theme.Colors.Danger.Main
-					end
-					return Theme.Colors.Surface.Main
-				end),
-				ZIndex = 2,
+				BackgroundTransparency = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
-						CornerRadius = Theme.Layout.CornerRadius,
-					},
-					
-					New(scope, "UIStroke") {
-						Color = borderColor,
-						Thickness = if hasMutations then 3 else Theme.Layout.StrokeThickness,
-					},
-					
-					-- Slot number badge (top-left)
-					New(scope, "Frame") {
-						Size = UDim2.fromOffset(18, 18),
-						Position = UDim2.fromOffset(3, 3),
-						BackgroundColor3 = Theme.Colors.Surface.Stroke,
-						ZIndex = 5,
+					-- Shadow
+					scope:New("Frame") {
+						Name = "Shadow",
+						Size = UDim2.fromScale(1, 1),
+						Position = UDim2.fromScale(0, 0.06),
+						BackgroundColor3 = if hasPlant 
+							then (if hasMutations then Color3.fromHex("#B8860B") else Color3.fromHex("#357A38"))
+							else Theme.Colors.Surface.Shadow,
+						ZIndex = 1,
 						
 						[Children] = {
-							New(scope, "UICorner") {
-								CornerRadius = UDim.new(0.5, 0),
-							},
-							New(scope, "TextLabel") {
-								Size = UDim2.new(1, 0, 1, 0),
-								BackgroundTransparency = 1,
-								Text = tostring(props.Index),
-								TextColor3 = Color3.new(1, 1, 1),
-								TextSize = 10,
-								Font = Enum.Font.GothamBold,
+							scope:New("UICorner") {
+								CornerRadius = UDim.new(0.12, 0),
 							},
 						},
 					},
 					
-					-- Mutation badge (top-right)
-					hasMutations and New(scope, "Frame") {
-						Size = UDim2.fromOffset(18, 18),
-						Position = UDim2.new(1, -3, 0, 3),
-						AnchorPoint = Vector2.new(1, 0),
-						BackgroundColor3 = GOLD_BORDER,
-						ZIndex = 6,
+					-- Main slot
+					scope:New("Frame") {
+						Name = "Main",
+						Size = UDim2.fromScale(1, 1),
+						BackgroundColor3 = scope:Computed(function(use)
+							if hasPlant and use(isHovered) then
+								return Theme.Colors.Danger.Main
+							end
+							return Theme.Colors.Surface.Main
+						end),
+						ZIndex = 2,
 						
 						[Children] = {
-							New(scope, "UICorner") {
-								CornerRadius = UDim.new(0.5, 0),
+							scope:New("UICorner") {
+								CornerRadius = UDim.new(0.12, 0),
 							},
-							New(scope, "TextLabel") {
-								Size = UDim2.new(1, 0, 1, 0),
+							
+							scope:New("UIStroke") {
+								Color = borderColor,
+								Thickness = if hasMutations then 3 else Theme.Layout.StrokeThickness,
+							},
+							
+							-- Slot number badge (top-left)
+							scope:New("Frame") {
+								Size = UDim2.fromScale(0.3, 0.22),
+								Position = UDim2.fromScale(0.05, 0.05),
+								BackgroundColor3 = Theme.Colors.Surface.Stroke,
+								ZIndex = 5,
+								
+								[Children] = {
+									scope:New("UICorner") {
+										CornerRadius = UDim.new(0.5, 0),
+									},
+									scope:New("UIAspectRatioConstraint") {
+										AspectRatio = 1,
+									},
+									scope:New("TextLabel") {
+										Size = UDim2.fromScale(1, 1),
+										BackgroundTransparency = 1,
+										Text = tostring(props.Index),
+										TextColor3 = Color3.new(1, 1, 1),
+										TextScaled = true,
+										Font = Enum.Font.GothamBold,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MinTextSize = 6,
+												MaxTextSize = 14,
+											},
+										},
+									},
+								},
+							},
+							
+							-- Mutation badge (top-right)
+							hasMutations and scope:New("Frame") {
+								Size = UDim2.fromScale(0.3, 0.22),
+								Position = UDim2.fromScale(0.95, 0.05),
+								AnchorPoint = Vector2.new(1, 0),
+								BackgroundColor3 = GOLD_BORDER,
+								ZIndex = 6,
+								
+								[Children] = {
+									scope:New("UICorner") {
+										CornerRadius = UDim.new(0.5, 0),
+									},
+									scope:New("UIAspectRatioConstraint") {
+										AspectRatio = 1,
+									},
+									scope:New("TextLabel") {
+										Size = UDim2.fromScale(1, 1),
+										BackgroundTransparency = 1,
+										Text = if props.Mutations then 
+											(MutationData.Get(props.Mutations[1]) or {Icon = "✨"}).Icon
+											else "✨",
+										TextScaled = true,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MinTextSize = 6,
+												MaxTextSize = 12,
+											},
+										},
+									},
+								},
+							} or nil,
+							
+							-- Plant viewport or empty plus
+							if hasPlant then plantViewport else scope:New("TextLabel") {
+								Size = UDim2.fromScale(0.8, 0.5),
+								Position = UDim2.fromScale(0.5, 0.4),
+								AnchorPoint = Vector2.new(0.5, 0.5),
 								BackgroundTransparency = 1,
-								Text = if props.Mutations then 
-									(MutationData.Get(props.Mutations[1]) or {Icon = "✨"}).Icon
-									else "✨",
-								TextSize = 10,
+								Text = "+",
+								TextColor3 = Theme.Colors.Surface.Shadow,
+								TextScaled = true,
+								Font = Theme.Typography.Fonts.Title,
+								
+								[Children] = {
+									scope:New("UITextSizeConstraint") {
+										MinTextSize = 14,
+										MaxTextSize = 32,
+									},
+								},
+							},
+							
+							-- Plant name label
+							hasPlant and scope:New("TextLabel") {
+								Size = UDim2.fromScale(0.9, 0.15),
+								Position = UDim2.fromScale(0.5, 0.88),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundTransparency = 1,
+								Text = props.PlantType :: string,
+								TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
+								TextScaled = true,
+								Font = Enum.Font.GothamBold,
+								TextTruncate = Enum.TextTruncate.AtEnd,
+								ZIndex = 4,
+								
+								[Children] = {
+									scope:New("UITextSizeConstraint") {
+										MinTextSize = 6,
+										MaxTextSize = 10,
+									},
+								},
+							} or nil,
+							
+							-- Remove overlay on hover
+							scope:Computed(function(use)
+								if hasPlant and use(isHovered) then
+									return scope:New("TextLabel") {
+										Size = UDim2.fromScale(1, 1),
+										BackgroundTransparency = 1,
+										Text = "✕",
+										TextColor3 = Color3.new(1, 1, 1),
+										TextScaled = true,
+										Font = Enum.Font.GothamBold,
+										ZIndex = 10,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MinTextSize = 16,
+												MaxTextSize = 32,
+											},
+										},
+									}
+								end
+								return nil :: any
+							end),
+							
+							-- Click handler
+							scope:New("TextButton") {
+								Size = UDim2.fromScale(1, 1),
+								BackgroundTransparency = 1,
+								Text = "",
+								ZIndex = 15,
+								
+								[OnEvent("MouseButton1Down")] = function()
+									if hasPlant then isPressed:set(true) end
+								end,
+								
+								[OnEvent("MouseButton1Up")] = function()
+									isPressed:set(false)
+									if hasPlant then props.OnRemove() end
+								end,
+								
+								[OnEvent("MouseEnter")] = function()
+									isHovered:set(true)
+								end,
+								
+								[OnEvent("MouseLeave")] = function()
+									isHovered:set(false)
+									isPressed:set(false)
+								end,
 							},
 						},
-					} or nil,
-					
-					-- Plant viewport or empty plus
-					if hasPlant then plantViewport else New(scope, "TextLabel") {
-						Size = UDim2.new(1, 0, 0, 36),
-						Position = UDim2.fromOffset(0, 16),
-						BackgroundTransparency = 1,
-						Text = "+",
-						TextColor3 = Theme.Colors.Surface.Shadow,
-						TextSize = 26,
-						Font = Theme.Typography.Fonts.Title,
-					},
-					
-					-- Plant name label
-					hasPlant and New(scope, "TextLabel") {
-						Size = UDim2.new(1, -4, 0, 12),
-						Position = UDim2.new(0, 2, 1, -14),
-						BackgroundTransparency = 1,
-						Text = props.PlantType :: string,
-						TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-						TextSize = 8,
-						Font = Enum.Font.GothamBold,
-						TextTruncate = Enum.TextTruncate.AtEnd,
-						ZIndex = 4,
-					} or nil,
-					
-					-- Remove overlay on hover
-					Computed(scope, function(use)
-						if hasPlant and use(isHovered) then
-							return New(scope, "TextLabel") {
-								Size = UDim2.new(1, 0, 1, 0),
-								BackgroundTransparency = 1,
-								Text = "✕",
-								TextColor3 = Color3.new(1, 1, 1),
-								TextSize = 26,
-								Font = Enum.Font.GothamBold,
-								ZIndex = 10,
-							}
-						end
-						return nil :: any
-					end),
-					
-					-- Click handler
-					New(scope, "TextButton") {
-						Size = UDim2.new(1, 0, 1, 0),
-						BackgroundTransparency = 1,
-						Text = "",
-						ZIndex = 15,
-						
-						[OnEvent("MouseButton1Down")] = function()
-							if hasPlant then isPressed:set(true) end
-						end,
-						
-						[OnEvent("MouseButton1Up")] = function()
-							isPressed:set(false)
-							if hasPlant then props.OnRemove() end
-						end,
-						
-						[OnEvent("MouseEnter")] = function()
-							isHovered:set(true)
-						end,
-						
-						[OnEvent("MouseLeave")] = function()
-							isHovered:set(false)
-							isPressed:set(false)
-						end,
 					},
 				},
 			},
@@ -281,28 +331,50 @@ local function DeckSlot(scope: any, props: {
 end
 
 --------------------------------------------------------------------------------
--- DeckBuilderScreen Component
+-- DeckBuilderScreen Component (Responsive - Same structure as ShopScreen)
 --------------------------------------------------------------------------------
 local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 	local scope = props.Scope
 	local sortedPlants = getSortedPlants()
 	
+	-- Viewport-based responsive sizing
+	local camera = workspace.CurrentCamera
+	local viewportSize = scope:Value(camera and camera.ViewportSize or Vector2.new(1920, 1080))
+	if camera then
+		local connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			viewportSize:set(camera.ViewportSize)
+		end)
+		table.insert(scope, connection)
+	end
+	
+	-- Responsive cell size for grid (scales with viewport, ref 1080p)
+	local gridCellSize = scope:Computed(function(use)
+		local size = use(viewportSize)
+		local scale = math.clamp(size.Y / 1080, 0.6, 1.8)
+		return UDim2.fromOffset(math.floor(140 * scale), math.floor(196 * scale))
+	end)
+	
+	local gridCellPadding = scope:Computed(function(use)
+		local size = use(viewportSize)
+		local scale = math.clamp(size.Y / 1080, 0.6, 1.8)
+		local padding = math.floor(12 * scale)
+		return UDim2.fromOffset(padding, padding)
+	end)
+	
 	-- Local deck state (mirrors SelectedDeck for local edits)
-	local localDeck = Value(scope, Sift.Array.copy(peek(props.SelectedDeck) or {}))
+	local localDeck = scope:Value(Sift.Array.copy(peek(props.SelectedDeck) or {}))
 	
 	-- Filter state
-	local selectedFilter = Value(scope, "All")
+	local selectedFilter = scope:Value("All")
 	
 	-- Close button animation
-	local isClosePressed = Value(scope, false)
-	local closeOffset = Spring(scope, Computed(scope, function(use)
-		return if use(isClosePressed) then SHADOW_OFFSET else 0
+	local isClosePressed = scope:Value(false)
+	local closeOffset = scope:Spring(scope:Computed(function(use)
+		return if use(isClosePressed) then 4 else 0
 	end), 40, 0.7)
 	
-
-	
 	-- Unlocked plants set for fast lookup
-	local unlockedSet = Computed(scope, function(use)
+	local unlockedSet = scope:Computed(function(use)
 		local data = use(props.PlayerData)
 		local set: {[string]: boolean} = {}
 		if data and data.UnlockedPlants then
@@ -314,7 +386,7 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 	end)
 	
 	-- Filtered plants based on selected category
-	local filteredPlants = Computed(scope, function(use)
+	local filteredPlants = scope:Computed(function(use)
 		local filter = use(selectedFilter)
 		local result = {}
 		for _, p in sortedPlants do
@@ -358,145 +430,168 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 	-- Filter categories
 	local categories = { "All", "Attacker", "Producer", "Defender", "Special" }
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "DeckBuilderScreen",
-		Size = UDim2.new(1, 0, 1, 0),
+		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
 		BackgroundTransparency = 0.5,
 		ZIndex = 100,
 		
 		[Children] = {
-			-- Main panel (centered)
-			New(scope, "Frame") {
+			-- Main panel (centered, transparent like ShopScreen)
+			scope:New("Frame") {
 				Name = "Panel",
-				Size = Theme.Layout.OverlaySize,
-				Position = Theme.Layout.OverlayPosition,
-				AnchorPoint = Theme.Layout.OverlayAnchorPoint,
+				Size = UDim2.fromScale(0.9, 0.9),
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				
 				[Children] = {
-					-- Responsive scaling
-					ResponsiveUtils.CreateUIScale(scope),
-					
-					-- ========================================
-					-- HEADER
-					-- ========================================
-					New(scope, "Frame") {
+					-- ═══════════════════════════════════════════════
+					-- HEADER (top 10%) - Same style as ShopScreen
+					-- ═══════════════════════════════════════════════
+					scope:New("Frame") {
 						Name = "Header",
-						Size = UDim2.new(1, 0, 0, HEADER_HEIGHT + SHADOW_OFFSET),
+						Size = UDim2.fromScale(1, 0.1),
+						Position = UDim2.fromScale(0.5, 0),
+						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
 						
 						[Children] = {
-							-- Shadow layer
-							New(scope, "Frame") {
+							-- Shadow
+							scope:New("Frame") {
 								Name = "Shadow",
-								Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
-								Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+								Size = UDim2.fromScale(1, 0.9),
+								Position = UDim2.fromScale(0.5, 0.1),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 								},
 							},
 							
-							-- Main header layer
-							New(scope, "Frame") {
+							-- Main header
+							scope:New("Frame") {
 								Name = "Main",
-								Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
+								Size = UDim2.fromScale(1, 0.9),
+								Position = UDim2.fromScale(0.5, 0),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Main,
 								ZIndex = 2,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 									
-									New(scope, "UIStroke") {
+									scope:New("UIStroke") {
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
 									},
 									
-									-- Title
-									New(scope, "TextLabel") {
+									-- Title (centered)
+									scope:New("TextLabel") {
 										Name = "Title",
-										Size = UDim2.fromOffset(250, 40),
-										Position = UDim2.new(0.5, 0, 0.5, 0),
+										Size = UDim2.fromScale(0.3, 0.6),
+										Position = UDim2.fromScale(0.5, 0.5),
 										AnchorPoint = Vector2.new(0.5, 0.5),
 										BackgroundTransparency = 1,
 										Text = "🌱 DECK BUILDER",
 										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-										TextSize = 26,
+										TextScaled = true,
 										Font = Theme.Typography.Fonts.Title,
-									},
-									
-									-- Deck count pill (left side)
-									New(scope, "Frame") {
-										Name = "DeckCount",
-										Size = UDim2.fromOffset(100, 36),
-										Position = UDim2.new(0, 20, 0.5, 0),
-										AnchorPoint = Vector2.new(0, 0.5),
-										BackgroundColor3 = Theme.Colors.Action.Main,
 										
 										[Children] = {
-											New(scope, "UICorner") {
-												CornerRadius = UDim.new(0, 18),
-											},
-											New(scope, "UIStroke") {
-												Color = Theme.Colors.Action.Shadow,
-												Thickness = 2,
-											},
-											New(scope, "TextLabel") {
-												Size = UDim2.new(1, 0, 1, 0),
-												BackgroundTransparency = 1,
-												Text = Computed(scope, function(use)
-													return `🌿 {#use(localDeck)}/{MAX_DECK_SIZE}`
-												end),
-												TextColor3 = Color3.new(1, 1, 1),
-												TextSize = 16,
-												Font = Enum.Font.GothamBold,
+											scope:New("UITextSizeConstraint") {
+												MaxTextSize = 32,
+												MinTextSize = 16,
 											},
 										},
 									},
 									
-									-- Close button container
-									New(scope, "Frame") {
+									-- Deck count pill (left side)
+									scope:New("Frame") {
+										Name = "DeckCount",
+										Size = UDim2.fromScale(0.12, 0.55),
+										Position = UDim2.fromScale(0.02, 0.5),
+										AnchorPoint = Vector2.new(0, 0.5),
+										BackgroundColor3 = Theme.Colors.Action.Main,
+										
+										[Children] = {
+											scope:New("UICorner") {
+												CornerRadius = UDim.new(0.4, 0),
+											},
+											scope:New("UIStroke") {
+												Color = Theme.Colors.Action.Shadow,
+												Thickness = 2,
+											},
+											scope:New("TextLabel") {
+												Size = UDim2.fromScale(1, 1),
+												BackgroundTransparency = 1,
+												Text = scope:Computed(function(use)
+													return `🌿 {#use(localDeck)}/{MAX_DECK_SIZE}`
+												end),
+												TextColor3 = Color3.new(1, 1, 1),
+												TextScaled = true,
+												Font = Enum.Font.GothamBold,
+												
+												[Children] = {
+													scope:New("UITextSizeConstraint") {
+														MinTextSize = 10,
+														MaxTextSize = 16,
+													},
+												},
+											},
+										},
+									},
+									
+									-- Close button (right) - Same style as ShopScreen
+									scope:New("Frame") {
 										Name = "CloseContainer",
-										Size = UDim2.fromOffset(50, 50 + SHADOW_OFFSET),
-										Position = UDim2.new(1, -16, 0.5, 0),
+										Size = UDim2.fromScale(0.08, 0.75),
+										Position = UDim2.fromScale(0.98, 0.5),
 										AnchorPoint = Vector2.new(1, 0.5),
 										BackgroundTransparency = 1,
 										
 										[Children] = {
+											scope:New("UIAspectRatioConstraint") {
+												AspectRatio = 1,
+												DominantAxis = Enum.DominantAxis.Height,
+											},
+											
 											-- Shadow
-											New(scope, "Frame") {
-												Size = UDim2.fromOffset(50, 50),
-												Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+											scope:New("Frame") {
+												Size = UDim2.fromScale(1, 0.9),
+												Position = UDim2.fromScale(0.5, 0.1),
+												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Shadow,
 												ZIndex = 1,
 												
 												[Children] = {
-													New(scope, "UICorner") {
+													scope:New("UICorner") {
 														CornerRadius = Theme.Layout.CornerRadius,
 													},
 												},
 											},
 											
 											-- Button
-											New(scope, "TextButton") {
-												Size = Computed(scope, function(use)
+											scope:New("TextButton") {
+												Size = scope:Computed(function(use)
 													local offset = use(closeOffset)
-													return UDim2.fromOffset(50, 50 - offset)
+													return UDim2.fromScale(1, 0.9 - offset * 0.01)
 												end),
-												Position = Computed(scope, function(use)
-													return UDim2.fromOffset(0, use(closeOffset))
+												Position = scope:Computed(function(use)
+													return UDim2.fromScale(0.5, use(closeOffset) * 0.01)
 												end),
+												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Main,
 												Text = Theme.Icons.Close,
 												TextColor3 = Color3.new(1, 1, 1),
-												TextSize = 22,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Title,
 												AutoButtonColor = false,
 												ZIndex = 2,
@@ -515,12 +610,16 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 												end,
 												
 												[Children] = {
-													New(scope, "UICorner") {
+													scope:New("UICorner") {
 														CornerRadius = Theme.Layout.CornerRadius,
 													},
-													New(scope, "UIStroke") {
+													scope:New("UIStroke") {
 														Color = Theme.Colors.Surface.Stroke :: Color3,
 														Thickness = 2,
+													},
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 24,
+														MinTextSize = 14,
 													},
 												},
 											},
@@ -531,65 +630,76 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 						},
 					},
 					
-					-- ========================================
-					-- DECK SLOTS BAR
-					-- ========================================
-					New(scope, "Frame") {
+					-- ═══════════════════════════════════════════════
+					-- DECK BAR (11% to 25% = 14% height)
+					-- ═══════════════════════════════════════════════
+					scope:New("Frame") {
 						Name = "DeckBar",
-						Size = UDim2.new(1, 0, 0, DECK_BAR_HEIGHT + SHADOW_OFFSET),
-						Position = UDim2.fromOffset(0, HEADER_HEIGHT + SHADOW_OFFSET + 10),
+						Size = UDim2.fromScale(1, 0.14),
+						Position = UDim2.fromScale(0.5, 0.11),
+						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
 						
 						[Children] = {
 							-- Shadow
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Shadow",
-								Size = UDim2.new(1, 0, 0, DECK_BAR_HEIGHT),
-								Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+								Size = UDim2.fromScale(1, 0.95),
+								Position = UDim2.fromScale(0.5, 0.05),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 								},
 							},
 							
 							-- Main bar
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Main",
-								Size = UDim2.new(1, 0, 0, DECK_BAR_HEIGHT),
+								Size = UDim2.fromScale(1, 0.95),
+								Position = UDim2.fromScale(0.5, 0),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Main,
 								ZIndex = 2,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 									
-									New(scope, "UIStroke") {
+									scope:New("UIStroke") {
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
 									},
 									
+									scope:New("UIPadding") {
+										PaddingTop = UDim.new(0.08, 0),
+										PaddingBottom = UDim.new(0.08, 0),
+										PaddingLeft = UDim.new(0.05, 0),
+										PaddingRight = UDim.new(0.05, 0),
+									},
+									
 									-- Slots container (horizontally centered)
-									New(scope, "Frame") {
-										Size = UDim2.new(1, 0, 1, -8),
+									scope:New("Frame") {
+										Size = UDim2.fromScale(0.8, 1),
 										Position = UDim2.fromScale(0.5, 0.5),
 										AnchorPoint = Vector2.new(0.5, 0.5),
 										BackgroundTransparency = 1,
 										
 										[Children] = {
-											New(scope, "UIListLayout") {
+											scope:New("UIListLayout") {
 												FillDirection = Enum.FillDirection.Horizontal,
 												HorizontalAlignment = Enum.HorizontalAlignment.Center,
 												VerticalAlignment = Enum.VerticalAlignment.Center,
-												Padding = UDim.new(0, 10),
+												Padding = UDim.new(0.02, 0),
 											},
 											
 											-- Reactive slots
-											Computed(scope, function(use)
+											scope:Computed(function(use)
 												local deck = use(localDeck)
 												local mutations = if props.PlantMutations then use(props.PlantMutations) else {}
 												local slots = {}
@@ -611,21 +721,30 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 						},
 					},
 					
-					-- ========================================
-					-- FILTERS ROW
-					-- ========================================
-					New(scope, "Frame") {
+					-- ═══════════════════════════════════════════════
+					-- FILTERS ROW (26% to 32% = 6% height) - Transparent
+					-- ═══════════════════════════════════════════════
+					scope:New("Frame") {
 						Name = "Filters",
-						Size = UDim2.new(1, 0, 0, 50),
-						Position = UDim2.fromOffset(0, HEADER_HEIGHT + DECK_BAR_HEIGHT + SHADOW_OFFSET * 2 + 20),
+						Size = UDim2.fromScale(1, 0.06),
+						Position = UDim2.fromScale(0.5, 0.26),
+						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
 						
 						[Children] = {
-							New(scope, "UIListLayout") {
+							-- Responsive scale for filter pills
+							scope:New("UIScale") {
+								Scale = scope:Computed(function(use)
+									local size = use(viewportSize)
+									return math.clamp(size.Y / 1080, 0.6, 1.5)
+								end),
+							},
+							
+							scope:New("UIListLayout") {
 								FillDirection = Enum.FillDirection.Horizontal,
 								HorizontalAlignment = Enum.HorizontalAlignment.Center,
 								VerticalAlignment = Enum.VerticalAlignment.Center,
-								Padding = UDim.new(0, 10),
+								Padding = UDim.new(0.02, 0),
 							},
 							
 							-- Filter pills
@@ -635,7 +754,7 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 									table.insert(pills, FilterPill({
 										Scope = scope,
 										Text = cat,
-										IsActive = Computed(scope, function(use)
+										IsActive = scope:Computed(function(use)
 											return use(selectedFilter) == cat
 										end),
 										OnClick = function()
@@ -649,85 +768,91 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 						},
 					},
 					
-					-- ========================================
-					-- PLANTS GRID
-					-- ========================================
-					New(scope, "Frame") {
+					-- ═══════════════════════════════════════════════
+					-- GRID CONTAINER (33% to 100% = 67% height) - Same as ShopScreen
+					-- ═══════════════════════════════════════════════
+					scope:New("Frame") {
 						Name = "GridContainer",
-						Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + DECK_BAR_HEIGHT + SHADOW_OFFSET * 3 + 80)),
-						Position = UDim2.fromOffset(0, HEADER_HEIGHT + DECK_BAR_HEIGHT + SHADOW_OFFSET * 2 + 70),
+						Size = UDim2.fromScale(1, 0.67),
+						Position = UDim2.fromScale(0.5, 1),
+						AnchorPoint = Vector2.new(0.5, 1),
 						BackgroundTransparency = 1,
 						
 						[Children] = {
 							-- Shadow
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Shadow",
-								Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
-								Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+								Size = UDim2.fromScale(1, 0.99),
+								Position = UDim2.fromScale(0.5, 0.01),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 								},
 							},
 							
 							-- Scrolling frame
-							New(scope, "ScrollingFrame") {
+							scope:New("ScrollingFrame") {
 								Name = "Grid",
-								Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
+								Size = UDim2.fromScale(1, 0.99),
+								Position = UDim2.fromScale(0.5, 0),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Main,
 								ScrollBarThickness = 8,
 								ScrollBarImageColor3 = Theme.Colors.Surface.Shadow,
+								ScrollingDirection = Enum.ScrollingDirection.Y,
 								AutomaticCanvasSize = Enum.AutomaticSize.Y,
 								CanvasSize = UDim2.new(0, 0, 0, 0),
 								ZIndex = 2,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 									
-									New(scope, "UIStroke") {
+									scope:New("UIStroke") {
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
 									},
 									
-									New(scope, "UIPadding") {
-										PaddingTop = UDim.new(0, 16),
-										PaddingBottom = UDim.new(0, 20),
-										PaddingLeft = UDim.new(0, 16),
-										PaddingRight = UDim.new(0, 16),
+									scope:New("UIPadding") {
+										PaddingTop = UDim.new(0.02, 0),
+										PaddingBottom = UDim.new(0.03, 0),
+										PaddingLeft = UDim.new(0.02, 0),
+										PaddingRight = UDim.new(0.02, 0),
 									},
 									
-									New(scope, "UIGridLayout") {
-										CellSize = UDim2.fromOffset(100, 138),
-										CellPadding = UDim2.fromOffset(12, 12),
+									scope:New("UIGridLayout") {
+										CellSize = gridCellSize,
+										CellPadding = gridCellPadding,
 										HorizontalAlignment = Enum.HorizontalAlignment.Center,
 										SortOrder = Enum.SortOrder.LayoutOrder,
 									},
 									
 									-- Plant cards (reactive to filter and deck state)
-									Computed(scope, function(use)
+									scope:Computed(function(use)
 										local plants = use(filteredPlants)
 										local unlocked = use(unlockedSet)
-										local mutations = if props.PlantMutations then use(props.PlantMutations) else {}
+										local mutations = if props.PlantMutations then use(props.PlantMutations) else nil
 										
 										local cards = {}
 										for i, p in plants do
 											local isLocked = not unlocked[p.PlantType]
-											local isInDeck = Computed(scope, function(use2)
+											local isInDeck = scope:Computed(function(use2)
 												return table.find(use2(localDeck), p.PlantType) ~= nil
 											end)
+											local plantMutations = if mutations then mutations[p.PlantType] else nil
 											
 											table.insert(cards, DeckCard({
 												Scope = scope,
 												PlantType = p.PlantType,
 												IsInDeck = isInDeck,
 												IsLocked = isLocked,
-												EquippedMutations = mutations[p.PlantType],
+												EquippedMutations = plantMutations,
 												OnToggle = function()
 													togglePlant(p.PlantType)
 												end,

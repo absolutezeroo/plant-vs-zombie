@@ -34,6 +34,16 @@ local CONFIG = {
 	COIN_ICON = "🪙",
 }
 
+-- Map damage types to styles
+local DAMAGE_TYPE_STYLES = {
+	Normal = "Damage",
+	Fire = "DamageFire",
+	Ice = "DamageIce",
+	Lightning = "DamageLightning",
+	Poison = "DamagePoison",
+	Splash = "DamageSplash",
+}
+
 -- Module state
 local _activeTexts: {FloatingTextData} = {}
 local _trove = Trove.new()
@@ -59,7 +69,8 @@ function FloatingTextController.Initialize()
 	
 	-- Connect to combat signals
 	_trove:Connect(GameSignals.OnDamageDealt, function(data)
-		FloatingTextController.ShowDamage(data.Position, data.Amount)
+		local damageType = data.DamageType or "Normal"
+		FloatingTextController.ShowDamage(data.Position, data.Amount, damageType)
 	end)
 	
 	Logger.Info("FloatingTextController", "Initialized")
@@ -96,10 +107,20 @@ end
 	
 	@param position Vector3 - World position
 	@param damage number - Damage amount
+	@param damageType string? - Type of damage for coloring (Normal, Fire, Ice, etc.)
 ]]
-function FloatingTextController.ShowDamage(position: Vector3, damage: number)
+function FloatingTextController.ShowDamage(position: Vector3, damage: number, damageType: string?)
 	local isCrit = damage >= CONFIG.CRIT_THRESHOLD
-	local style = if isCrit then FloatingText.Styles.DamageCrit else FloatingText.Styles.Damage
+	
+	-- Get style based on damage type, defaulting to normal Damage
+	local styleName = DAMAGE_TYPE_STYLES[damageType or "Normal"] or "Damage"
+	local style = FloatingText.Styles[styleName] or FloatingText.Styles.Damage
+	
+	-- Override with crit style for very high damage (unless already special type)
+	if isCrit and damageType == "Normal" then
+		style = FloatingText.Styles.DamageCrit
+	end
+	
 	local text = tostring(math.floor(damage))
 	
 	local ft = FloatingText.Create(position, text, style)

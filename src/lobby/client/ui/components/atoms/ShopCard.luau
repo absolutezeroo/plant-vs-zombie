@@ -18,11 +18,7 @@ local PlantData = require(Shared.data.PlantData)
 local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
 
@@ -61,24 +57,24 @@ local function ShopCard(props: ShopCardProps): Frame
 	})
 	
 	-- State
-	local isHovered = Value(scope, false)
-	local isPressed = Value(scope, false)
+	local isHovered = scope:Value(false)
+	local isPressed = scope:Value(false)
 	
 	-- Animations
-	local targetScale = Computed(scope, function(use)
+	local targetScale = scope:Computed(function(use)
 		if use(isPressed) then return 0.95 end
 		if use(isHovered) then return 1.03 end
 		return 1
 	end)
-	local hoverScale = Spring(scope, targetScale, 35, 0.7)
+	local hoverScale = scope:Spring(targetScale, 35, 0.7)
 	
-	local targetOffset = Computed(scope, function(use)
+	local targetOffset = scope:Computed(function(use)
 		return if use(isPressed) then SHADOW_OFFSET else 0
 	end)
-	local pressOffset = Spring(scope, targetOffset, 40, 0.7)
+	local pressOffset = scope:Spring(targetOffset, 40, 0.7)
 	
 	-- Border color based on state
-	local borderColor = Computed(scope, function(use)
+	local borderColor = scope:Computed(function(use)
 		if use(props.IsUnlocked) then
 			return Theme.Colors.Action.Main
 		end
@@ -88,7 +84,7 @@ local function ShopCard(props: ShopCardProps): Frame
 		return Theme.Colors.Surface.Stroke :: Color3
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = props.PlantType,
 		Size = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT + SHADOW_OFFSET),
 		BackgroundTransparency = 1,
@@ -96,17 +92,17 @@ local function ShopCard(props: ShopCardProps): Frame
 		
 		[Children] = {
 			-- Scale container
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Size = UDim2.new(1, 0, 1, 0),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				
 				[Children] = {
-					New(scope, "UIScale") { Scale = hoverScale },
+					scope:New("UIScale") { Scale = hoverScale },
 					
 					-- Shadow
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Shadow",
 						Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
 						Position = UDim2.fromOffset(0, SHADOW_OFFSET),
@@ -114,55 +110,55 @@ local function ShopCard(props: ShopCardProps): Frame
 						ZIndex = 1,
 						
 						[Children] = {
-							New(scope, "UICorner") {
+							scope:New("UICorner") {
 								CornerRadius = Theme.Layout.CornerRadius,
 							},
 						},
 					},
 					
 					-- Main card
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Main",
-						Size = Computed(scope, function(use)
+						Size = scope:Computed(function(use)
 							local offset = use(pressOffset)
 							return UDim2.new(1, 0, 1, -SHADOW_OFFSET - offset)
 						end),
-						Position = Computed(scope, function(use)
+						Position = scope:Computed(function(use)
 							return UDim2.fromOffset(0, use(pressOffset))
 						end),
 						BackgroundColor3 = Theme.Colors.Surface.Main,
 						ZIndex = 2,
 						
 						[Children] = {
-							New(scope, "UICorner") {
+							scope:New("UICorner") {
 								CornerRadius = Theme.Layout.CornerRadius,
 							},
 							
-							New(scope, "UIStroke") {
+							scope:New("UIStroke") {
 								Color = borderColor,
 								Thickness = Theme.Layout.StrokeThickness,
 							},
 							
 							-- Owned badge (top)
-							Computed(scope, function(use)
+							scope:Computed(function(use)
 								if not use(props.IsUnlocked) then return nil end
-								return New(scope, "Frame") {
+								return scope:New("Frame") {
 									Name = "OwnedBadge",
 									Size = UDim2.new(1, 0, 0, 26),
 									BackgroundColor3 = Theme.Colors.Action.Main,
 									ZIndex = 3,
 									
 									[Children] = {
-										New(scope, "UICorner") {
+										scope:New("UICorner") {
 											CornerRadius = Theme.Layout.CornerRadius,
 										},
 										-- Bottom cover
-										New(scope, "Frame") {
+										scope:New("Frame") {
 											Size = UDim2.new(1, 0, 0, 12),
 											Position = UDim2.new(0, 0, 1, -12),
 											BackgroundColor3 = Theme.Colors.Action.Main,
 										},
-										New(scope, "TextLabel") {
+										scope:New("TextLabel") {
 											Size = UDim2.new(1, 0, 1, 0),
 											BackgroundTransparency = 1,
 											Text = "✓ OWNED",
@@ -178,7 +174,7 @@ local function ShopCard(props: ShopCardProps): Frame
 							plantViewport,
 							
 							-- Plant name
-							New(scope, "TextLabel") {
+							scope:New("TextLabel") {
 								Name = "PlantName",
 								Size = UDim2.new(1, -12, 0, 22),
 								Position = UDim2.new(0, 6, 0, 105), -- Below viewport
@@ -192,7 +188,7 @@ local function ShopCard(props: ShopCardProps): Frame
 							},
 							
 							-- Category
-							plantStats and New(scope, "TextLabel") {
+							plantStats and scope:New("TextLabel") {
 								Name = "Category",
 								Size = UDim2.new(1, 0, 0, 14),
 								Position = UDim2.fromOffset(0, 126), -- Below name
@@ -205,7 +201,7 @@ local function ShopCard(props: ShopCardProps): Frame
 							} or nil,
 							
 							-- Sun cost pill
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "SunCost",
 								Size = UDim2.fromOffset(60, 22),
 								Position = UDim2.new(0.5, 0, 0, 142), -- Below category
@@ -214,10 +210,10 @@ local function ShopCard(props: ShopCardProps): Frame
 								ZIndex = 3,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = UDim.new(0.5, 0),
 									},
-									New(scope, "TextLabel") {
+									scope:New("TextLabel") {
 										Size = UDim2.new(1, 0, 1, 0),
 										BackgroundTransparency = 1,
 										Text = `☀️ {sunCost}`,
@@ -229,10 +225,10 @@ local function ShopCard(props: ShopCardProps): Frame
 							},
 							
 							-- Buy button / Owned indicator
-							Computed(scope, function(use)
+							scope:Computed(function(use)
 								if use(props.IsUnlocked) then
 									-- Show "In Collection" for owned
-									return New(scope, "Frame") {
+									return scope:New("Frame") {
 										Name = "OwnedInfo",
 										Size = UDim2.new(1, -16, 0, 36),
 										Position = UDim2.new(0, 8, 1, -44),
@@ -240,10 +236,10 @@ local function ShopCard(props: ShopCardProps): Frame
 										ZIndex = 3,
 										
 										[Children] = {
-											New(scope, "UICorner") {
+											scope:New("UICorner") {
 												CornerRadius = UDim.new(0, 8),
 											},
-											New(scope, "TextLabel") {
+											scope:New("TextLabel") {
 												Size = UDim2.new(1, 0, 1, 0),
 												BackgroundTransparency = 1,
 												Text = "✓ Collection",
@@ -260,7 +256,7 @@ local function ShopCard(props: ShopCardProps): Frame
 								-- Use dark brown text on gold for better contrast
 								local textCol = if canAfford then Color3.fromRGB(80, 50, 20) else Theme.Colors.Surface.Main
 								
-								return New(scope, "TextButton") {
+								return scope:New("TextButton") {
 									Name = "BuyButton",
 									Size = UDim2.new(1, -16, 0, 36),
 									Position = UDim2.new(0, 8, 1, -44),
@@ -279,10 +275,10 @@ local function ShopCard(props: ShopCardProps): Frame
 									end,
 									
 									[Children] = {
-										New(scope, "UICorner") {
+										scope:New("UICorner") {
 											CornerRadius = UDim.new(0, 8),
 										},
-										New(scope, "UIStroke") {
+										scope:New("UIStroke") {
 											Color = Theme.Colors.Surface.Stroke :: Color3,
 											Thickness = 2,
 										},
@@ -291,7 +287,7 @@ local function ShopCard(props: ShopCardProps): Frame
 							end),
 							
 							-- Hover detector
-							New(scope, "TextButton") {
+							scope:New("TextButton") {
 								Name = "HoverDetector",
 								Size = UDim2.new(1, 0, 1, -50),
 								BackgroundTransparency = 1,

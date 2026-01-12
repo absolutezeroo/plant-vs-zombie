@@ -1,9 +1,11 @@
---!strict
+--!nonstrict
 --[[
-	ProfileScreen.luau - Player profile overlay screen
+	ProfileScreen.luau - Player profile overlay screen (Fusion 0.3 Responsive)
 	
 	Organism displaying player stats, level progress, and win rate.
 	Uses "Toon Pop" design system with atomic components.
+	
+	Fully responsive using Scale-based sizing.
 ]]
 
 local Players = game:GetService("Players")
@@ -14,7 +16,6 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
-local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
 
 local Atoms = script.Parent.Parent.atoms
 local AvatarFrame = require(Atoms.AvatarFrame)
@@ -24,18 +25,9 @@ local StatCard = require(Atoms.StatCard)
 local XPBar = require(Atoms.XPBar)
 local WinRateBanner = require(Atoms.WinRateBanner)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 scope-based primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 local OnEvent = Fusion.OnEvent
-
--- Constants
-local SHADOW_OFFSET = 4
-local PANEL_WIDTH = 400
-local HEADER_HEIGHT = 120
 
 -- Get dynamic title based on level
 local function getTitleForLevel(level: number): string
@@ -50,7 +42,7 @@ local function getTitleForLevel(level: number): string
 end
 
 export type ProfileScreenProps = {
-	Scope: Fusion.Scope<any>,
+	Scope: any, -- Fusion scope
 	-- Player data values
 	Level: any, -- Fusion.Value<number>
 	XP: any, -- Fusion.Value<number>
@@ -65,145 +57,191 @@ export type ProfileScreenProps = {
 	OnClose: () -> (),
 }
 
-local function ProfileScreen(props: ProfileScreenProps): Frame
+local function ProfileScreen(props: ProfileScreenProps)
 	local scope = props.Scope
 	local player = Players.LocalPlayer
 	
 	-- Animation states
-	local isHovered = Value(scope, false)
-	local isPressed = Value(scope, false)
+	local isPressed = scope:Value(false)
 	
 	-- Press animation for close button
-	local targetOffset = Computed(scope, function(use)
-		return if use(isPressed) then SHADOW_OFFSET else 0
-	end)
-	local pressOffset = Spring(scope, targetOffset, 40, 0.7)
+	local pressOffset = scope:Spring(scope:Computed(function(use)
+		return if use(isPressed) then 4 else 0
+	end), 40, 0.7)
 	
 	-- Dynamic title
-	local title = Computed(scope, function(use)
+	local title = scope:Computed(function(use)
 		return getTitleForLevel(use(props.Level))
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "ProfileScreen",
-		Size = UDim2.new(1, 0, 1, 0),
+		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
 		BackgroundTransparency = 0.5,
 		ZIndex = 100,
 		
 		[Children] = {
-			-- Center panel
-			New(scope, "Frame") {
+			-- Center panel (responsive width, auto height)
+			scope:New("Frame") {
 				Name = "Panel",
-				Size = UDim2.fromOffset(PANEL_WIDTH, 0),
+				Size = UDim2.fromScale(0.35, 0.85),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
 				
 				[Children] = {
-					-- Responsive scaling
-					ResponsiveUtils.CreateUIScale(scope),
-					
-					New(scope, "UIListLayout") {
-						SortOrder = Enum.SortOrder.LayoutOrder,
-						FillDirection = Enum.FillDirection.Vertical,
-						Padding = UDim.new(0, 0),
+					-- Constrain minimum/maximum width
+					scope:New("UISizeConstraint") {
+						MinSize = Vector2.new(320, 0),
+						MaxSize = Vector2.new(500, 9999),
 					},
 					
-					-- Header Card
-					New(scope, "Frame") {
+					scope:New("UIListLayout") {
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						FillDirection = Enum.FillDirection.Vertical,
+						Padding = UDim.new(0.02, 0),
+					},
+					
+					-- Header Card (20% of panel)
+					scope:New("Frame") {
 						Name = "Header",
-						Size = UDim2.new(1, 0, 0, HEADER_HEIGHT + SHADOW_OFFSET),
+						Size = UDim2.fromScale(1, 0.18),
 						BackgroundTransparency = 1,
 						LayoutOrder = 1,
 						
 						[Children] = {
 							-- Shadow
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Shadow",
-								Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
-								Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+								Size = UDim2.fromScale(1, 0.95),
+								Position = UDim2.fromScale(0.5, 0.05),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 								},
 							},
 							
 							-- Main header
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Main",
-								Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
+								Size = UDim2.fromScale(1, 0.95),
+								Position = UDim2.fromScale(0.5, 0),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Main,
 								ZIndex = 2,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 									
-									New(scope, "UIStroke") {
+									scope:New("UIStroke") {
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
 									},
 									
-									-- Avatar
-									AvatarFrame({
-										Scope = scope,
-										Size = 80,
-										Position = UDim2.fromOffset(20, 20),
-										BorderColor = Theme.Colors.Info.Main,
-									}),
-									
-									-- Level badge (overlapping avatar)
-									LevelBadge({
-										Scope = scope,
-										Level = props.Level,
-										Size = 36,
-										Position = UDim2.fromOffset(70, 60),
-									}),
-									
-									-- Player name
-									New(scope, "TextLabel") {
-										Name = "Name",
-										Size = UDim2.fromOffset(180, 28),
-										Position = UDim2.fromOffset(115, 18),
-										BackgroundTransparency = 1,
-										Text = player.DisplayName,
-										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-										TextSize = 22,
-										Font = Theme.Typography.Fonts.Title,
-										TextXAlignment = Enum.TextXAlignment.Left,
-									},
-									
-									-- Title
-									New(scope, "TextLabel") {
-										Name = "Title",
-										Size = UDim2.fromOffset(180, 20),
-										Position = UDim2.fromOffset(115, 46),
-										BackgroundTransparency = 1,
-										Text = title,
-										TextColor3 = Theme.Colors.Action.Main,
-										TextSize = 14,
-										Font = Theme.Typography.Fonts.Body,
-										TextXAlignment = Enum.TextXAlignment.Left,
-									},
-									
-									-- Resources row
-									New(scope, "Frame") {
-										Name = "Resources",
-										Size = UDim2.fromOffset(200, 40),
-										Position = UDim2.fromOffset(115, 72),
+									-- Avatar container (square)
+									scope:New("Frame") {
+										Name = "AvatarContainer",
+										Size = UDim2.fromScale(0.22, 0.7),
+										Position = UDim2.fromScale(0.05, 0.15),
 										BackgroundTransparency = 1,
 										
 										[Children] = {
-											New(scope, "UIListLayout") {
+											scope:New("UIAspectRatioConstraint") {
+												AspectRatio = 1,
+												DominantAxis = Enum.DominantAxis.Height,
+											},
+											AvatarFrame({
+												Scope = scope,
+												Size = 80,
+												Position = UDim2.fromScale(0.5, 0.5),
+												AnchorPoint = Vector2.new(0.5, 0.5),
+												BorderColor = Theme.Colors.Info.Main,
+											}),
+										},
+									},
+									
+									-- Level badge (overlapping avatar)
+									scope:New("Frame") {
+										Name = "LevelBadgeContainer",
+										Size = UDim2.fromScale(0.1, 0.35),
+										Position = UDim2.fromScale(0.2, 0.6),
+										BackgroundTransparency = 1,
+										ZIndex = 3,
+										
+										[Children] = {
+											scope:New("UIAspectRatioConstraint") {
+												AspectRatio = 1,
+												DominantAxis = Enum.DominantAxis.Height,
+											},
+											LevelBadge({
+												Scope = scope,
+												Level = props.Level,
+												Size = 36,
+												Position = UDim2.fromScale(0.5, 0.5),
+												AnchorPoint = Vector2.new(0.5, 0.5),
+											}),
+										},
+									},
+									
+									-- Player name
+									scope:New("TextLabel") {
+										Name = "Name",
+										Size = UDim2.fromScale(0.5, 0.25),
+										Position = UDim2.fromScale(0.3, 0.15),
+										BackgroundTransparency = 1,
+										Text = player.DisplayName,
+										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
+										TextScaled = true,
+										Font = Theme.Typography.Fonts.Title,
+										TextXAlignment = Enum.TextXAlignment.Left,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MaxTextSize = 24,
+												MinTextSize = 14,
+											},
+										},
+									},
+									
+									-- Title
+									scope:New("TextLabel") {
+										Name = "Title",
+										Size = UDim2.fromScale(0.5, 0.18),
+										Position = UDim2.fromScale(0.3, 0.4),
+										BackgroundTransparency = 1,
+										Text = title,
+										TextColor3 = Theme.Colors.Action.Main,
+										TextScaled = true,
+										Font = Theme.Typography.Fonts.Body,
+										TextXAlignment = Enum.TextXAlignment.Left,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MaxTextSize = 16,
+												MinTextSize = 10,
+											},
+										},
+									},
+									
+									-- Resources row
+									scope:New("Frame") {
+										Name = "Resources",
+										Size = UDim2.fromScale(0.55, 0.28),
+										Position = UDim2.fromScale(0.3, 0.62),
+										BackgroundTransparency = 1,
+										
+										[Children] = {
+											scope:New("UIListLayout") {
 												FillDirection = Enum.FillDirection.Horizontal,
-												Padding = UDim.new(0, 8),
+												Padding = UDim.new(0.05, 0),
 											},
 											
 											ResourcePill({
@@ -226,44 +264,51 @@ local function ProfileScreen(props: ProfileScreenProps): Frame
 										},
 									},
 									
-									-- Close button
-									New(scope, "Frame") {
+									-- Close button (square)
+									scope:New("Frame") {
 										Name = "CloseButtonContainer",
-										Size = UDim2.fromOffset(44, 44 + SHADOW_OFFSET),
-										Position = UDim2.new(1, -12, 0, 12),
+										Size = UDim2.fromScale(0.12, 0.4),
+										Position = UDim2.fromScale(0.97, 0.1),
 										AnchorPoint = Vector2.new(1, 0),
 										BackgroundTransparency = 1,
 										
 										[Children] = {
+											scope:New("UIAspectRatioConstraint") {
+												AspectRatio = 1,
+												DominantAxis = Enum.DominantAxis.Height,
+											},
+											
 											-- Shadow
-											New(scope, "Frame") {
+											scope:New("Frame") {
 												Name = "Shadow",
-												Size = UDim2.fromOffset(44, 44),
-												Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+												Size = UDim2.fromScale(1, 0.9),
+												Position = UDim2.fromScale(0.5, 0.1),
+												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Shadow,
 												ZIndex = 1,
 												
 												[Children] = {
-													New(scope, "UICorner") {
+													scope:New("UICorner") {
 														CornerRadius = Theme.Layout.CornerRadius,
 													},
 												},
 											},
 											
 											-- Button
-											New(scope, "TextButton") {
+											scope:New("TextButton") {
 												Name = "CloseButton",
-												Size = Computed(scope, function(use)
+												Size = scope:Computed(function(use)
 													local offset = use(pressOffset)
-													return UDim2.fromOffset(44, 44 - offset)
+													return UDim2.fromScale(1, 0.9 - offset * 0.01)
 												end),
-												Position = Computed(scope, function(use)
-													return UDim2.fromOffset(0, use(pressOffset))
+												Position = scope:Computed(function(use)
+													return UDim2.fromScale(0.5, use(pressOffset) * 0.01)
 												end),
+												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Main,
 												Text = Theme.Icons.Close,
 												TextColor3 = Color3.new(1, 1, 1),
-												TextSize = 20,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Title,
 												AutoButtonColor = false,
 												ZIndex = 2,
@@ -282,13 +327,16 @@ local function ProfileScreen(props: ProfileScreenProps): Frame
 												end,
 												
 												[Children] = {
-													New(scope, "UICorner") {
+													scope:New("UICorner") {
 														CornerRadius = Theme.Layout.CornerRadius,
 													},
-													
-													New(scope, "UIStroke") {
+													scope:New("UIStroke") {
 														Color = Theme.Colors.Surface.Stroke :: Color3,
 														Thickness = 2,
+													},
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 22,
+														MinTextSize = 12,
 													},
 												},
 											},
@@ -299,80 +347,97 @@ local function ProfileScreen(props: ProfileScreenProps): Frame
 						},
 					},
 					
-					-- Spacer
-					New(scope, "Frame") {
-						Size = UDim2.new(1, 0, 0, 16),
+					-- Level & XP Card (15% of panel)
+					scope:New("Frame") {
+						Name = "LevelCard",
+						Size = UDim2.fromScale(1, 0.15),
 						BackgroundTransparency = 1,
 						LayoutOrder = 2,
-					},
-					
-					-- Level & XP Card
-					New(scope, "Frame") {
-						Name = "LevelCard",
-						Size = UDim2.new(1, 0, 0, 100 + SHADOW_OFFSET),
-						BackgroundTransparency = 1,
-						LayoutOrder = 3,
 						
 						[Children] = {
 							-- Shadow
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Shadow",
-								Size = UDim2.new(1, 0, 0, 100),
-								Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+								Size = UDim2.fromScale(1, 0.95),
+								Position = UDim2.fromScale(0.5, 0.05),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Action.Shadow,
 								ZIndex = 1,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 								},
 							},
 							
 							-- Main
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Main",
-								Size = UDim2.new(1, 0, 0, 100),
+								Size = UDim2.fromScale(1, 0.95),
+								Position = UDim2.fromScale(0.5, 0),
+								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Action.Main,
 								ZIndex = 2,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
 									
-									New(scope, "UIStroke") {
+									scope:New("UIStroke") {
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
 									},
 									
-									-- Large level badge
-									LevelBadge({
-										Scope = scope,
-										Level = props.Level,
-										Size = 60,
-										Position = UDim2.fromOffset(20, 20),
-									}),
+									-- Large level badge container (square)
+									scope:New("Frame") {
+										Name = "LevelBadgeContainer",
+										Size = UDim2.fromScale(0.18, 0.7),
+										Position = UDim2.fromScale(0.05, 0.15),
+										BackgroundTransparency = 1,
+										
+										[Children] = {
+											scope:New("UIAspectRatioConstraint") {
+												AspectRatio = 1,
+												DominantAxis = Enum.DominantAxis.Height,
+											},
+											LevelBadge({
+												Scope = scope,
+												Level = props.Level,
+												Size = 60,
+												Position = UDim2.fromScale(0.5, 0.5),
+												AnchorPoint = Vector2.new(0.5, 0.5),
+											}),
+										},
+									},
 									
 									-- LEVEL label
-									New(scope, "TextLabel") {
+									scope:New("TextLabel") {
 										Name = "LevelLabel",
-										Size = UDim2.fromOffset(100, 20),
-										Position = UDim2.fromOffset(95, 18),
+										Size = UDim2.fromScale(0.3, 0.2),
+										Position = UDim2.fromScale(0.25, 0.15),
 										BackgroundTransparency = 1,
 										Text = "LEVEL",
 										TextColor3 = Color3.new(1, 1, 1),
-										TextSize = 12,
+										TextScaled = true,
 										Font = Theme.Typography.Fonts.Body,
 										TextXAlignment = Enum.TextXAlignment.Left,
 										TextTransparency = 0.3,
+										
+										[Children] = {
+											scope:New("UITextSizeConstraint") {
+												MaxTextSize = 14,
+												MinTextSize = 8,
+											},
+										},
 									},
 									
-									-- XP Bar
-									New(scope, "Frame") {
+									-- XP Bar container
+									scope:New("Frame") {
 										Name = "XPBarContainer",
-										Size = UDim2.new(1, -110, 0, 32),
-										Position = UDim2.fromOffset(95, 40),
+										Size = UDim2.fromScale(0.7, 0.4),
+										Position = UDim2.fromScale(0.25, 0.4),
 										BackgroundTransparency = 1,
 										
 										[Children] = {
@@ -380,7 +445,7 @@ local function ProfileScreen(props: ProfileScreenProps): Frame
 												Scope = scope,
 												XP = props.XP,
 												XPRequired = props.XPRequired,
-												Size = UDim2.new(1, 0, 1, 0),
+												Size = UDim2.fromScale(1, 1),
 											}),
 										},
 									},
@@ -389,102 +454,75 @@ local function ProfileScreen(props: ProfileScreenProps): Frame
 						},
 					},
 					
-					-- Spacer
-					New(scope, "Frame") {
-						Size = UDim2.new(1, 0, 0, 16),
-						BackgroundTransparency = 1,
-						LayoutOrder = 4,
-					},
-					
-					-- Stats Grid (2x2)
-					New(scope, "Frame") {
+					-- Stats Grid 2x2 (30% of panel)
+					scope:New("Frame") {
 						Name = "StatsGrid",
-						Size = UDim2.new(1, 0, 0, 200),
+						Size = UDim2.fromScale(1, 0.32),
 						BackgroundTransparency = 1,
-						LayoutOrder = 5,
+						LayoutOrder = 3,
 						
 						[Children] = {
-							-- Row 1
-							New(scope, "Frame") {
-								Name = "Row1",
-								Size = UDim2.new(1, 0, 0, 94),
-								BackgroundTransparency = 1,
-								
-								[Children] = {
-									New(scope, "UIListLayout") {
-										FillDirection = Enum.FillDirection.Horizontal,
-										Padding = UDim.new(0, 16),
-									},
-									
-									StatCard({
-										Scope = scope,
-										Icon = "🎮",
-										Label = "Games",
-										Value = props.GamesPlayed,
-										Color = "Info",
-										LayoutOrder = 1,
-									}),
-									
-									StatCard({
-										Scope = scope,
-										Icon = "🏆",
-										Label = "Wins",
-										Value = props.GamesWon,
-										Color = "Gold",
-										LayoutOrder = 2,
-									}),
-								},
+							scope:New("UIGridLayout") {
+								CellSize = UDim2.fromScale(0.48, 0.48),
+								CellPadding = UDim2.fromScale(0.04, 0.04),
+								HorizontalAlignment = Enum.HorizontalAlignment.Center,
+								SortOrder = Enum.SortOrder.LayoutOrder,
 							},
 							
-							-- Row 2
-							New(scope, "Frame") {
-								Name = "Row2",
-								Size = UDim2.new(1, 0, 0, 94),
-								Position = UDim2.fromOffset(0, 106),
-								BackgroundTransparency = 1,
-								
-								[Children] = {
-									New(scope, "UIListLayout") {
-										FillDirection = Enum.FillDirection.Horizontal,
-										Padding = UDim.new(0, 16),
-									},
-									
-									StatCard({
-										Scope = scope,
-										Icon = "💀",
-										Label = "Kills",
-										Value = props.ZombiesKilled,
-										Color = "Danger",
-										LayoutOrder = 1,
-									}),
-									
-									StatCard({
-										Scope = scope,
-										Icon = "🌱",
-										Label = "Plants",
-										Value = props.PlantsPlaced,
-										Color = "Action",
-										LayoutOrder = 2,
-									}),
-								},
-							},
+							StatCard({
+								Scope = scope,
+								Icon = "🎮",
+								Label = "Games",
+								Value = props.GamesPlayed,
+								Color = "Info",
+								LayoutOrder = 1,
+							}),
+							
+							StatCard({
+								Scope = scope,
+								Icon = "🏆",
+								Label = "Wins",
+								Value = props.GamesWon,
+								Color = "Gold",
+								LayoutOrder = 2,
+							}),
+							
+							StatCard({
+								Scope = scope,
+								Icon = "💀",
+								Label = "Kills",
+								Value = props.ZombiesKilled,
+								Color = "Danger",
+								LayoutOrder = 3,
+							}),
+							
+							StatCard({
+								Scope = scope,
+								Icon = "🌱",
+								Label = "Plants",
+								Value = props.PlantsPlaced,
+								Color = "Action",
+								LayoutOrder = 4,
+							}),
 						},
 					},
 					
-					-- Spacer
-					New(scope, "Frame") {
-						Size = UDim2.new(1, 0, 0, 16),
+					-- Win Rate Banner (12% of panel)
+					scope:New("Frame") {
+						Name = "WinRateContainer",
+						Size = UDim2.fromScale(1, 0.12),
 						BackgroundTransparency = 1,
-						LayoutOrder = 6,
+						LayoutOrder = 4,
+						
+						[Children] = {
+							WinRateBanner({
+								Scope = scope,
+								GamesWon = props.GamesWon,
+								GamesPlayed = props.GamesPlayed,
+								Size = UDim2.fromScale(1, 1),
+							}),
+						},
 					},
-					
-					-- Win Rate Banner
-					WinRateBanner({
-						Scope = scope,
-						GamesWon = props.GamesWon,
-						GamesPlayed = props.GamesPlayed,
-						LayoutOrder = 7,
-					}),
 				},
 			},
 		},

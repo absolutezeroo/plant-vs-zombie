@@ -15,6 +15,9 @@ local Components = require(Shared.components)
 local ECSUtils = require(Shared.utils.ECSUtils)
 local Logger = require(Shared.utils.Logger)
 
+-- Network for VFX events
+local Network = require(Shared.network.generated.server)
+
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
 	-- Minimum heal amount to apply (prevents micro-heals)
@@ -52,9 +55,23 @@ local function OnStep(world)
 		local healAmount = math.floor(hitEvent.Damage * lifestealPercent)
 		if healAmount < CONFIG.MIN_HEAL_AMOUNT then continue end
 		
+		-- Get zombie position for VFX
+		local zombiePos = world:get(hitEvent.TargetZombie, Components.PositionComponent)
+		
 		-- Apply healing using ECSUtils
 		Logger.Debug("Lifesteal", "Plant", sourcePlant, "healed for", healAmount, "HP")
 		ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
+		
+		-- Fire VFX event for lifesteal drain
+		if zombiePos then
+			Network.LifestealVFX.FireAll({
+				PlantEntityId = sourcePlant,
+				ZombieX = zombiePos.X,
+				ZombieY = zombiePos.Y,
+				ZombieZ = zombiePos.Z,
+				HealAmount = healAmount,
+			})
+		end
 	end
 end
 

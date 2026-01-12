@@ -15,9 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
 
 -- Constants
 local PILL_HEIGHT = 36
@@ -53,12 +51,12 @@ local function ResourcePill(props: ResourcePillProps): Frame
 	
 	local colorSet = (Theme.Colors :: any)[colorKey] or Theme.Colors.Gold
 	
-	local displayText = Computed(scope, function(use)
+	local displayText = scope:Computed(function(use)
 		local value = use(props.Value)
 		return formatNumber(value)
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "ResourcePill",
 		Size = UDim2.fromOffset(width, PILL_HEIGHT + SHADOW_OFFSET),
 		BackgroundTransparency = 1,
@@ -66,7 +64,7 @@ local function ResourcePill(props: ResourcePillProps): Frame
 		
 		[Children] = {
 			-- Shadow
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Shadow",
 				Size = UDim2.fromOffset(width, PILL_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
@@ -74,31 +72,31 @@ local function ResourcePill(props: ResourcePillProps): Frame
 				ZIndex = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
 				},
 			},
 			
 			-- Main pill
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Main",
 				Size = UDim2.fromOffset(width, PILL_HEIGHT),
 				BackgroundColor3 = colorSet.Main :: Color3,
 				ZIndex = 2,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
 					
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
 					},
 					
 					-- Icon
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "Icon",
 						Size = UDim2.fromOffset(28, PILL_HEIGHT),
 						Position = UDim2.fromOffset(6, 0),
@@ -108,13 +106,13 @@ local function ResourcePill(props: ResourcePillProps): Frame
 					},
 					
 					-- Value
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "Value",
 						Size = UDim2.new(1, -40, 1, 0),
 						Position = UDim2.fromOffset(32, 0),
 						BackgroundTransparency = 1,
 						Text = displayText,
-						TextColor3 = Color3.fromRGB(80, 50, 20), -- Dark brown for readability on colored backgrounds
+						TextColor3 = Color3.fromRGB(80, 50, 20),
 						TextSize = 16,
 						Font = Enum.Font.GothamBold,
 						TextXAlignment = Enum.TextXAlignment.Center,

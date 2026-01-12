@@ -19,11 +19,7 @@ local MutationData = require(Shared.data.MutationData)
 local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
 
@@ -75,25 +71,25 @@ local function DeckCard(props: DeckCardProps): Frame
 	end
 	
 	-- State
-	local isHovered = Value(scope, false)
-	local isPressed = Value(scope, false)
+	local isHovered = scope:Value(false)
+	local isPressed = scope:Value(false)
 	
 	-- Animations
-	local targetScale = Computed(scope, function(use)
+	local targetScale = scope:Computed(function(use)
 		if isLocked then return 1 end
 		if use(isPressed) then return 0.95 end
 		if use(isHovered) then return 1.03 end
 		return 1
 	end)
-	local hoverScale = Spring(scope, targetScale, 35, 0.7)
+	local hoverScale = scope:Spring(targetScale, 35, 0.7)
 	
-	local targetOffset = Computed(scope, function(use)
+	local targetOffset = scope:Computed(function(use)
 		return if use(isPressed) then SHADOW_OFFSET else 0
 	end)
-	local pressOffset = Spring(scope, targetOffset, 40, 0.7)
+	local pressOffset = scope:Spring(targetOffset, 40, 0.7)
 	
 	-- Border color based on state
-	local borderColor = Computed(scope, function(use)
+	local borderColor = scope:Computed(function(use)
 		if isLocked then return Theme.Colors.Surface.Shadow end
 		if use(props.IsInDeck) then return GREEN_SELECTED end
 		if hasMutations then return GOLD_BORDER end
@@ -102,7 +98,7 @@ local function DeckCard(props: DeckCardProps): Frame
 	end)
 	
 	-- Background color
-	local bgColor = Computed(scope, function(use)
+	local bgColor = scope:Computed(function(use)
 		if isLocked then return Color3.fromRGB(80, 80, 80) end
 		if use(props.IsInDeck) then return Color3.fromRGB(200, 240, 200) end
 		return Theme.Colors.Surface.Main
@@ -113,21 +109,21 @@ local function DeckCard(props: DeckCardProps): Frame
 	for i, mutType in mutations do
 		if i > 3 then break end -- Max 3 visible
 		local mutData = MutationData.Get(mutType)
-		table.insert(mutationIcons, New(scope, "Frame") {
+		table.insert(mutationIcons, scope:New("Frame") {
 			Name = "MutationIcon" .. i,
 			Size = UDim2.fromOffset(MUTATION_ICON_SIZE, MUTATION_ICON_SIZE),
 			BackgroundColor3 = if mutData then mutData.Color else GOLD_BORDER,
 			ZIndex = 6,
 			
 			[Children] = {
-				New(scope, "UICorner") {
+				scope:New("UICorner") {
 					CornerRadius = UDim.new(0.5, 0),
 				},
-				New(scope, "UIStroke") {
+				scope:New("UIStroke") {
 					Color = Color3.new(1, 1, 1),
 					Thickness = 1,
 				},
-				New(scope, "TextLabel") {
+				scope:New("TextLabel") {
 					Size = UDim2.new(1, 0, 1, 0),
 					BackgroundTransparency = 1,
 					Text = if mutData then mutData.Icon else "✨",
@@ -137,7 +133,7 @@ local function DeckCard(props: DeckCardProps): Frame
 		})
 	end
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = plantType,
 		Size = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT + SHADOW_OFFSET),
 		BackgroundTransparency = 1,
@@ -145,17 +141,17 @@ local function DeckCard(props: DeckCardProps): Frame
 		
 		[Children] = {
 			-- Scale container
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Size = UDim2.new(1, 0, 1, 0),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				
 				[Children] = {
-					New(scope, "UIScale") { Scale = hoverScale },
+					scope:New("UIScale") { Scale = hoverScale },
 					
 					-- Shadow
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Shadow",
 						Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
 						Position = UDim2.fromOffset(0, SHADOW_OFFSET),
@@ -163,37 +159,37 @@ local function DeckCard(props: DeckCardProps): Frame
 						ZIndex = 1,
 						
 						[Children] = {
-							New(scope, "UICorner") {
+							scope:New("UICorner") {
 								CornerRadius = Theme.Layout.CornerRadius,
 							},
 						},
 					},
 					
 					-- Main card
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Main",
-						Size = Computed(scope, function(use)
+						Size = scope:Computed(function(use)
 							local offset = use(pressOffset)
 							return UDim2.new(1, 0, 1, -SHADOW_OFFSET - offset)
 						end),
-						Position = Computed(scope, function(use)
+						Position = scope:Computed(function(use)
 							return UDim2.fromOffset(0, use(pressOffset))
 						end),
 						BackgroundColor3 = bgColor,
 						ZIndex = 2,
 						
 						[Children] = {
-							New(scope, "UICorner") {
+							scope:New("UICorner") {
 								CornerRadius = Theme.Layout.CornerRadius,
 							},
 							
-							New(scope, "UIStroke") {
+							scope:New("UIStroke") {
 								Color = borderColor,
 								Thickness = Theme.Layout.StrokeThickness,
 							},
 							
 							-- Lock overlay
-							isLocked and New(scope, "Frame") {
+							isLocked and scope:New("Frame") {
 								Name = "LockOverlay",
 								Size = UDim2.new(1, 0, 1, 0),
 								BackgroundColor3 = Color3.new(0, 0, 0),
@@ -201,10 +197,10 @@ local function DeckCard(props: DeckCardProps): Frame
 								ZIndex = 10,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = Theme.Layout.CornerRadius,
 									},
-									New(scope, "TextLabel") {
+									scope:New("TextLabel") {
 										Size = UDim2.new(1, 0, 1, 0),
 										BackgroundTransparency = 1,
 										Text = "🔒",
@@ -214,9 +210,9 @@ local function DeckCard(props: DeckCardProps): Frame
 							} or nil,
 							
 							-- Selected checkmark
-							Computed(scope, function(use)
+							scope:Computed(function(use)
 								if not use(props.IsInDeck) then return nil end
-								return New(scope, "Frame") {
+								return scope:New("Frame") {
 									Name = "SelectedBadge",
 									Size = UDim2.fromOffset(24, 24),
 									Position = UDim2.new(1, -6, 0, 6),
@@ -225,10 +221,10 @@ local function DeckCard(props: DeckCardProps): Frame
 									ZIndex = 8,
 									
 									[Children] = {
-										New(scope, "UICorner") {
+										scope:New("UICorner") {
 											CornerRadius = UDim.new(0.5, 0),
 										},
-										New(scope, "TextLabel") {
+										scope:New("TextLabel") {
 											Size = UDim2.new(1, 0, 1, 0),
 											BackgroundTransparency = 1,
 											Text = "✓",
@@ -244,7 +240,7 @@ local function DeckCard(props: DeckCardProps): Frame
 							plantViewport,
 							
 							-- Plant name
-							New(scope, "TextLabel") {
+							scope:New("TextLabel") {
 								Name = "PlantName",
 								Size = UDim2.new(1, -8, 0, 18),
 								Position = UDim2.new(0, 4, 0, VIEWPORT_HEIGHT + 10),
@@ -258,7 +254,7 @@ local function DeckCard(props: DeckCardProps): Frame
 							},
 							
 							-- Sun cost pill
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "SunCost",
 								Size = UDim2.fromOffset(50, 18),
 								Position = UDim2.new(0.5, 0, 0, VIEWPORT_HEIGHT + 30),
@@ -267,10 +263,10 @@ local function DeckCard(props: DeckCardProps): Frame
 								ZIndex = 4,
 								
 								[Children] = {
-									New(scope, "UICorner") {
+									scope:New("UICorner") {
 										CornerRadius = UDim.new(0.5, 0),
 									},
-									New(scope, "TextLabel") {
+									scope:New("TextLabel") {
 										Size = UDim2.new(1, 0, 1, 0),
 										BackgroundTransparency = 1,
 										Text = `☀️ {sunCost}`,
@@ -282,7 +278,7 @@ local function DeckCard(props: DeckCardProps): Frame
 							},
 							
 							-- Mutation icons (bottom-left)
-							hasMutations and New(scope, "Frame") {
+							hasMutations and scope:New("Frame") {
 								Name = "MutationIcons",
 								Size = UDim2.fromOffset(#mutationIcons * (MUTATION_ICON_SIZE + 2), MUTATION_ICON_SIZE),
 								Position = UDim2.new(0, 4, 1, -24),
@@ -290,7 +286,7 @@ local function DeckCard(props: DeckCardProps): Frame
 								ZIndex = 5,
 								
 								[Children] = {
-									New(scope, "UIListLayout") {
+									scope:New("UIListLayout") {
 										FillDirection = Enum.FillDirection.Horizontal,
 										Padding = UDim.new(0, 2),
 									},
@@ -299,7 +295,7 @@ local function DeckCard(props: DeckCardProps): Frame
 							} or nil,
 							
 							-- Click handler
-							New(scope, "TextButton") {
+							scope:New("TextButton") {
 								Name = "ClickHandler",
 								Size = UDim2.new(1, 0, 1, 0),
 								BackgroundTransparency = 1,

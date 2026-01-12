@@ -1,8 +1,11 @@
 --!strict
 --[[
-	LobbyScreen.luau - Main lobby HUD organism
+	LobbyScreen.luau - Main lobby HUD organism (Responsive)
 	
 	Combines PlayerInfoBar, DeckPreviewBar, and NavBar into the main lobby interface.
+	Uses percentage-based positioning for full responsiveness.
+	
+	Uses Fusion 0.3 scope:Method() syntax.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,7 +24,6 @@ local Organisms = script.Parent
 local SeedBank = require(Organisms.SeedBank)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
 
 export type LobbyScreenProps = {
@@ -44,7 +46,7 @@ export type LobbyScreenProps = {
 local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 	local scope = props.Scope
 	
-	return New(scope, "ScreenGui") {
+	return scope:New("ScreenGui") {
 		Name = "LobbyHUD",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -55,6 +57,7 @@ local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 			ResponsiveUtils.CreateUIScale(scope),
 			
 			-- Top-left: Player info (avatar, level, resources)
+			-- Position: 1% from left, 6% from top (avoids Roblox UI)
 			PlayerInfoBar({
 				Scope = scope,
 				Level = props.Level,
@@ -62,25 +65,28 @@ local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 				XPRequired = props.XPRequired,
 				Coins = props.Coins,
 				Gems = props.Gems,
-				Position = UDim2.fromOffset(16, 70), -- Offset down to avoid Roblox UI (chat, menu)
+				Position = UDim2.fromScale(0.01, 0.06),
+				AnchorPoint = Vector2.new(0, 0),
 			}),
 			
 			-- Right side: Navigation bar
+			-- Position: 1% from right edge, centered vertically
 			NavBar({
 				Scope = scope,
 				ActiveView = props.ActiveView,
 				OnNavigate = props.OnNavigate,
-				Position = UDim2.new(1, -16, 0.5, 0),
+				Position = UDim2.fromScale(0.99, 0.5),
 				AnchorPoint = Vector2.new(1, 0.5),
 			}),
 			
 			-- Bottom center: Seed bank (deck preview)
+			-- Position: centered horizontally, 2% from bottom
 			SeedBank({
 				Scope = scope,
 				EquippedPlants = props.Deck,
 				EquippedMutations = props.EquippedMutations,
 				OnPlantClick = props.OnPlantClick,
-				Position = UDim2.new(0.5, 0, 1, -16),
+				Position = UDim2.fromScale(0.5, 0.98),
 				AnchorPoint = Vector2.new(0.5, 1),
 			}),
 		},

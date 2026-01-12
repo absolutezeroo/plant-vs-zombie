@@ -15,9 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
 -- Fusion primitives
-local New = Fusion.New
 local Children = Fusion.Children
-local Computed = Fusion.Computed
 
 -- Constants
 local BAR_HEIGHT = 28
@@ -37,7 +35,7 @@ local function XPBar(props: XPBarProps): Frame
 	local size = props.Size or UDim2.new(1, 0, 0, BAR_HEIGHT + SHADOW_OFFSET)
 	
 	-- Progress 0-1
-	local progress = Computed(scope, function(use)
+	local progress = scope:Computed(function(use)
 		local current = use(props.XP) or 0
 		local required = use(props.XPRequired) or 100
 		if required <= 0 then return 0 end
@@ -45,13 +43,13 @@ local function XPBar(props: XPBarProps): Frame
 	end)
 	
 	-- Display text
-	local displayText = Computed(scope, function(use)
+	local displayText = scope:Computed(function(use)
 		local current = use(props.XP) or 0
 		local required = use(props.XPRequired) or 100
 		return `{current} / {required} XP`
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "XPBar",
 		Size = size,
 		Position = props.Position,
@@ -60,7 +58,7 @@ local function XPBar(props: XPBarProps): Frame
 		
 		[Children] = {
 			-- Shadow
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Shadow",
 				Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
@@ -68,47 +66,47 @@ local function XPBar(props: XPBarProps): Frame
 				ZIndex = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
 				},
 			},
 			
 			-- Background bar
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Background",
 				Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
 				BackgroundColor3 = Theme.Colors.Surface.Shadow,
 				ZIndex = 2,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
 					
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
 					},
 					
 					-- Fill bar
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Fill",
-						Size = Computed(scope, function(use)
+						Size = scope:Computed(function(use)
 							return UDim2.new(use(progress), 0, 1, 0)
 						end),
 						BackgroundColor3 = Theme.Colors.Purple.Main,
 						ZIndex = 1,
 						
 						[Children] = {
-							New(scope, "UICorner") {
+							scope:New("UICorner") {
 								CornerRadius = UDim.new(0.5, 0),
 							},
 						},
 					},
 					
 					-- Text overlay
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "Text",
 						Size = UDim2.new(1, 0, 1, 0),
 						BackgroundTransparency = 1,
