@@ -65,7 +65,7 @@ local function OnStep(world)
 
 		-- Spawn sun at zombie death location
 		local sunAmount = sunOnKill.SunAmount
-		Logger.Debug("SunOnKill", "Spawning", sunAmount, "sun from kill by plant", sourcePlant)
+		Logger.Debug("SunOnKill", `Spawning {sunAmount} sun from kill by plant {sourcePlant}`)
 
 		EntityPool.Spawn(
 			Components.PositionComponent({

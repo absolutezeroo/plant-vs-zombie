@@ -38,6 +38,7 @@ local AttachmentUtils = require(Shared.utils.AttachmentUtils)
 local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 local Network = require(Shared.network.generated.client)
+local AudioService = require(Modules.AudioService)
 
 -- Assets folder (optional - fallback to cubes if missing)
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -333,6 +334,15 @@ local function setupNetworkListeners()
 		if not visual then
 			return
 		end
+
+		-- Play zombie bite sound (plant is being attacked)
+		local pos: Vector3?
+		if visual.Model then
+			pos = visual.Model:GetPivot().Position
+		elseif visual.Part then
+			pos = visual.Part.Position
+		end
+		AudioService.PlayZombieBite(pos)
 
 		local vfx = getVFXService()
 

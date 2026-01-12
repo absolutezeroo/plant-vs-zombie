@@ -96,9 +96,15 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	local currentTime = os.clock()
 
 	if stats.FreezesAll then
-		-- IceShroom: Freeze ALL zombies on screen
+		-- IceShroom: Freeze ALL zombies on screen (using LaneCache for O(1) iteration)
 		local freezeDuration = stats.FreezeDuration or CONFIG.FREEZE_DURATION
-		for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
+		local allZombies = LaneCache.GetAllZombies()
+		
+		for _, zombieId in allZombies do
+			if not world:contains(zombieId) then
+				continue
+			end
+			
 			-- Apply freeze (slow to 0%)
 			world:insert(
 				zombieId,

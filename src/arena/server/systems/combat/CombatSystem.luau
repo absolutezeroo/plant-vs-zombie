@@ -234,18 +234,32 @@ local function tryApplyStun(world: MatterWorld, zombieId: number, proj: any): bo
 end
 
 -- Find plant at grid position (ignores traps - zombies walk over them)
+-- OPTIMIZED: Uses LaneCache for O(1) lookup instead of O(P) world:query
 local function findPlantAtPosition(world: MatterWorld, column: number, lane: number): number?
-	for id, plant in world:query(Components.PlantTypeComponent) do
-		if plant.Column == column and plant.Lane == lane then
-			-- Skip traps - zombies don't stop to eat them
-			local plantStats = PlantData[plant.PlantType]
-			if plantStats and plantStats.IsTrap then
-				continue
-			end
-			return id
-		end
+	local plantId = LaneCache.GetPlantAt(column, lane)
+	
+	if not plantId then
+		return nil
 	end
-	return nil
+	
+	-- Validate entity still exists (could have been despawned this frame)
+	if not world:contains(plantId) then
+		return nil
+	end
+	
+	-- Get plant type to check if it's a trap
+	local plant = world:get(plantId, Components.PlantTypeComponent)
+	if not plant then
+		return nil
+	end
+	
+	-- Skip traps - zombies don't stop to eat them (e.g., Spikeweed)
+	local plantStats = PlantData[plant.PlantType]
+	if plantStats and plantStats.IsTrap then
+		return nil
+	end
+	
+	return plantId
 end
 
 -- Get grid column from world X position (uses cached values from Init)
@@ -274,7 +288,6 @@ local function OnStep(world: MatterWorld)
 	end
 
 	-- Process projectile-zombie collisions
-	-- OPTIMIZED: Uses LaneCache for O(lane_size) instead of O(all_zombies)
 	for projId, projPos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		local hitZombie = false
 		local hitZombieId = nil
@@ -296,6 +309,11 @@ local function OnStep(world: MatterWorld)
 		end
 
 		for _, zombieId in zombiesToCheck do
+			-- Check if entity still exists (could have been killed by another projectile)
+			if not world:contains(zombieId) then
+				continue
+			end
+
 			-- Get zombie components (already filtered by lane)
 			local zombiePos = world:get(zombieId, Components.PositionComponent)
 			local zombie = world:get(zombieId, Components.ZombieTypeComponent)

@@ -147,13 +147,22 @@ local function applyChainLightning(
 		-- Apply damage to next target using ECSUtils
 		local actualDamage = ECSUtils.DamageEntity(world, nextTarget, currentDamage, Components)
 		if actualDamage > 0 then
-			-- Emit damage event
+			-- Emit damage event (ECS component for other systems)
 			world:spawn(Components.DamageEvent({
 				Target = nextTarget,
 				Amount = currentDamage,
 				DamageType = "Lightning",
 				Source = sourceZombieId,
 			}))
+
+			-- Send network event for client visual feedback (floating damage numbers)
+			local targetHealth = world:get(nextTarget, Components.HealthComponent)
+			Network.EntityDamaged.FireAll({
+				EntityId = nextTarget,
+				NewHealth = targetHealth and targetHealth.Current or 0,
+				DamageAmount = actualDamage,
+				DamageType = "Lightning",
+			})
 		end
 
 		-- Update for next chain
@@ -190,10 +199,7 @@ local function OnStep(world)
 		if chainLightning then
 			Logger.Debug(
 				"ChainLightning",
-				"Triggering chain from plant",
-				sourcePlant,
-				"to zombie",
-				hitEvent.TargetZombie
+				`Triggering chain from plant {sourcePlant} to zombie {hitEvent.TargetZombie}`
 			)
 			applyChainLightning(
 				world,

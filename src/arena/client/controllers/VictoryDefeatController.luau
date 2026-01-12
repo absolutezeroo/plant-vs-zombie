@@ -67,20 +67,20 @@ VictoryDefeatController.__index = VictoryDefeatController
 function VictoryDefeatController.new()
 	local self = setmetatable({}, VictoryDefeatController)
 
-	self._scope = Fusion.scoped({})
+	self._scope = Fusion.scoped(Fusion)
 	self._trove = Trove.new()
 
 	-- State
-	self._visible = Fusion.Value(self._scope, false)
-	self._victory = Fusion.Value(self._scope, false)
-	self._waveReached = Fusion.Value(self._scope, 0)
-	self._starCount = Fusion.Value(self._scope, 0)
+	self._visible = self._scope:Value(false)
+	self._victory = self._scope:Value(false)
+	self._waveReached = self._scope:Value(0)
+	self._starCount = self._scope:Value(0)
 
 	-- Animated display values
-	self._displayCoins = Fusion.Value(self._scope, 0)
-	self._displayXP = Fusion.Value(self._scope, 0)
-	self._displayGems = Fusion.Value(self._scope, 0)
-	self._displayZombies = Fusion.Value(self._scope, 0)
+	self._displayCoins = self._scope:Value(0)
+	self._displayXP = self._scope:Value(0)
+	self._displayGems = self._scope:Value(0)
+	self._displayZombies = self._scope:Value(0)
 
 	-- Target values
 	self._targetStars = 0
@@ -90,7 +90,7 @@ function VictoryDefeatController.new()
 	self._targetZombies = 0
 
 	-- Teleport
-	self._teleportCountdown = Fusion.Value(self._scope, 0)
+	self._teleportCountdown = self._scope:Value(0)
 
 	-- Animation state
 	self._animating = false

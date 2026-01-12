@@ -2,7 +2,7 @@
 --[[
 	EnhancementSystem.luau - Server-side projectile enhancement behaviors
 	
-	Priority: 158 (Simulation phase - after projectile spawn, before collision)
+	Priority: 165 (After projectile movement, before combat detection)
 	
 	Handles:
 	- Torchwood converting peas to fire peas (EnhancesPeas)
@@ -151,8 +151,10 @@ local function OnStep(world)
 end
 
 -- 7. EXPORT
+-- Priority 165: Must run AFTER Projectile movement (160) but BEFORE Combat detection (170)
+-- to ensure projectiles are enhanced on the same frame they hit.
 return {
-	priority = 158,
+	priority = 165,
 	Init = Init,
 	Dispose = Dispose,
 	system = OnStep,

@@ -1,6 +1,6 @@
 --!strict
 --[[
-	ProjectileSystem.luau - Server-side projectile spawning and movement
+	ProjectileSpawnSystem.luau - Server-side projectile spawning logic
 	
 	Priority: 160 (Simulation phase - after zombie movement)
 	
@@ -11,7 +11,6 @@
 	- Backwards shooters (SplitPea)
 	- Multi-direction plants (Starfruit)
 	- Catapult plants (lobbing projectiles)
-	- Projectile movement
 	- Short-range mushrooms (PuffShroom, SeaShroom, FumeShroom)
 ]]
 
@@ -19,9 +18,6 @@
 -- [1] IMPORTS
 --------------------------------------------------------------------------------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -31,6 +27,7 @@ local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local LaneCache = require(Shared.utils.LaneCache)
 local EntityPool = require(Shared.utils.EntityPool)
+local GridDetection = require(Shared.utils.GridDetection)
 
 local Network = require(Shared.network.generated.server)
 
@@ -50,9 +47,6 @@ local CONFIG = table.freeze({
 	SPAWN_OFFSET_X = 2,
 	SPAWN_OFFSET_Y = 2.5,
 	SHOOT_RANGE = 54,
-	-- Movement limits
-	MIN_DT = 1 / 120,
-	MAX_DT = 1 / 15,
 })
 
 --------------------------------------------------------------------------------
@@ -254,52 +248,74 @@ end
 
 -- Fire in multiple directions for Starfruit
 local function fireMultiDirection(world: any, plantId: number, lane: number, startX: number, plantType: string)
-	-- Starfruit fires 5 stars in relative directions
-	-- "Forward" = toward zombie spawns, "Backward" = toward base
-	local laneCenter = MapConfig.GridToWorld(1, lane) -- Safe: MapConfig initialized at bootstrap
-	local z = laneCenter.Z
+	-- STARFRUIT: 5 directions on a GRID
+	-- Forward (→), Up (⬆), Down (⬇), BackUp (↖), BackDown (↙)
 
 	local stats = PlantData[plantType]
 	local damage = (stats and stats.Damage) or CONFIG.DAMAGE
-
-	-- Projectile spawn offset (data-driven with defaults)
 	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
 	local offsetX = if spawnOffset then spawnOffset.X else CONFIG.SPAWN_OFFSET_X
 	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
 
-	-- Get forward direction (opposite of zombie movement)
+	-- Zombie direction (they go toward -X typically)
 	local zombieDir = State.CachedZombieDir
-	local fwdX, fwdZ = -zombieDir.X, -zombieDir.Z
-	-- Perpendicular direction (for "up/down" relative to forward)
-	local perpX, perpZ = -fwdZ, fwdX
+	local forwardSign = if zombieDir.X < 0 then 1 else -1 -- Toward zombies
 
-	-- 5 directions relative to forward
+	-- Adjacent lanes
+	local laneUp = lane - 1
+	local laneDown = lane + 1
+
+	-- Check which directions have zombies
+	-- Forward: zombies ahead in same lane
+	local hasForward = hasZombiesInLane(world, lane, startX, 0, false)
+
+	-- Up/Down: zombies in adjacent lane but ONLY if on the grid
+	local hasUp = GridDetection.HasZombiesOnGrid(laneUp)
+	local hasDown = GridDetection.HasZombiesOnGrid(laneDown)
+
+	-- BackUp/BackDown: zombies behind in adjacent lanes AND on the grid
+	local hasBackUp = GridDetection.HasZombiesBehindOnGrid(laneUp, startX)
+	local hasBackDown = GridDetection.HasZombiesBehindOnGrid(laneDown, startX)
+
+	-- Spawn position
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local plantZ = laneCenter.Z
+	local _laneSpacing = MapConfig.GetCellSize()
+
+	-- 5 directions with parameters
+	-- dx = X direction (1 = toward zombies, -1 = toward base)
+	-- targetLane = which lane the projectile travels through
 	local directions = {
-		{ dx = fwdX, dz = fwdZ }, -- Forward
-		{ dx = -fwdX, dz = -fwdZ }, -- Backward
-		{ dx = fwdX + perpX, dz = fwdZ + perpZ }, -- Forward-Up diagonal
-		{ dx = fwdX - perpX, dz = fwdZ - perpZ }, -- Forward-Down diagonal
-		{ dx = -fwdX + perpX, dz = -fwdZ + perpZ }, -- Backward-Up diagonal
+		{ fire = hasForward, dx = forwardSign, dz = 0, targetLane = lane, name = "Forward" },
+		{ fire = hasUp, dx = 0, dz = -1, targetLane = laneUp, name = "Up" },
+		{ fire = hasDown, dx = 0, dz = 1, targetLane = laneDown, name = "Down" },
+		{ fire = hasBackUp, dx = -forwardSign, dz = -1, targetLane = laneUp, name = "BackUp" },
+		{ fire = hasBackDown, dx = -forwardSign, dz = 1, targetLane = laneDown, name = "BackDown" },
 	}
 
 	for _, dir in directions do
-		-- Normalize direction
+		if not dir.fire then
+			continue
+		end
+
+		-- Normalize diagonals
 		local mag = math.sqrt(dir.dx * dir.dx + dir.dz * dir.dz)
 		local normDx = if mag > 0 then dir.dx / mag else dir.dx
 		local normDz = if mag > 0 then dir.dz / mag else dir.dz
 
 		local entityId = EntityPool.Spawn(
 			Components.PositionComponent({
-				X = startX + normDx * offsetX,
+				X = startX,
 				Y = offsetY,
-				Z = z + normDz * offsetX,
+				Z = plantZ,
 			}),
 			Components.ProjectileComponent({
 				Damage = damage,
 				Speed = CONFIG.SPEED,
 				SourceEntity = plantId,
-				Lane = lane,
+				Lane = dir.targetLane,
 				SpawnX = startX,
+				SpawnZ = plantZ,
 				DirectionX = normDx,
 				DirectionZ = normDz,
 				MaxRange = CONFIG.MAX_RANGE,
@@ -310,14 +326,17 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 			continue
 		end
 
+		-- Send plant's lane for visual spawn position, not target lane
 		Network.ProjectileSpawned.FireAll({
 			EntityId = entityId,
-			Lane = lane :: any,
-			StartX = startX + normDx * offsetX,
+			Lane = lane :: any, -- Plant's lane (for correct Z position)
+			StartX = startX,
 			TargetEntityId = nil,
 			Variant = "Star" :: any,
 			IsFrozen = false,
 			IsEnhanced = false,
+			DirectionX = normDx,
+			DirectionZ = normDz,
 		})
 	end
 end
@@ -328,9 +347,15 @@ end
 local function OnStep(world)
 	local currentTime = os.clock()
 
-	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
-	local dt = Matter.useDeltaTime()
-	dt = math.clamp(dt, CONFIG.MIN_DT, CONFIG.MAX_DT)
+	-- EVENT-DRIVEN CLEANUP: Clean up state for dead plants before main logic
+	-- This runs BEFORE shooting logic to prevent errors from stale state
+	for _, deathEvent in world:query(Components.DeathEvent) do
+		if deathEvent.EntityType == "Plant" then
+			local plantId = deathEvent.Target
+			State.PlantFireTimes[plantId] = nil
+			State.PendingMultiShots[plantId] = nil
+		end
+	end
 
 	-- Process pending multi-shots (Repeater, GatlingPea, etc.)
 	for plantId, shotData in State.PendingMultiShots do
@@ -375,15 +400,15 @@ local function OnStep(world)
 		-- Check if zombies in lane (or any lane for multi-direction)
 		local hasTargets = false
 		if stats.ShootsMultiDirection then
-			-- Starfruit shoots in all directions, but only if zombies exist on the map
-			for _ in world:query(Components.ZombieTypeComponent) do
-				hasTargets = true
-				break
-			end
+			-- Starfruit: will check directions in fireMultiDirection
+			-- Just need at least one zombie anywhere to attempt firing (O(1) check)
+			hasTargets = LaneCache.GetTotalCount() > 0
 		elseif stats.IsThreeLane then
-			-- Threepeater checks 3 lanes
-			for checkLane = math.max(1, plant.Lane - 1), math.min(GridConfig.GRID_LANES, plant.Lane + 1) do
-				if hasZombiesInLane(world, checkLane, pos.X, pos.Z, false) then
+			-- Threepeater checks 3 lanes (O(1) per lane with GridDetection)
+			local minLane = math.max(1, plant.Lane - 1)
+			local maxLane = math.min(GridConfig.GRID_LANES, plant.Lane + 1)
+			for checkLane = minLane, maxLane do
+				if GridDetection.HasZombiesOnGrid(checkLane) or hasZombiesInLane(world, checkLane, pos.X, pos.Z, false) then
 					hasTargets = true
 					break
 				end
@@ -401,8 +426,7 @@ local function OnStep(world)
 			continue
 		end
 
-		-- Range check for short-range mushrooms (PuffShroom, SeaShroom, etc.)
-		-- OPTIMIZED: Uses LaneCache for O(lane_size) instead of O(all_zombies)
+		-- Range check for short-range mushrooms
 		if stats.Range and stats.Range > 0 then
 			local hasInRange = false
 			local zombieDir = State.CachedZombieDir
@@ -476,49 +500,6 @@ local function OnStep(world)
 			end
 		end
 	end
-
-	-- Move projectiles
-	for projId, pos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
-		-- Handle multi-directional projectiles (Starfruit)
-		local dx = proj.DirectionX or 1
-		local dz = proj.DirectionZ or 0
-
-		local newX = pos.X + (proj.Speed * dx) * dt
-		local newZ = pos.Z + (proj.Speed * dz) * dt
-
-		-- Check max range
-		local distanceTraveled = math.sqrt((newX - proj.SpawnX) ^ 2 + (newZ - pos.Z) ^ 2)
-		local maxRange = proj.MaxRange or CONFIG.MAX_RANGE
-
-		if distanceTraveled > maxRange then
-			-- Notify client to remove visual (no impact VFX)
-			Network.ProjectileDespawned.FireAll({ EntityId = projId })
-			if EntityPool.IsPooledEntity(projId) then
-				EntityPool.Despawn(projId)
-			else
-				world:despawn(projId)
-			end
-			continue
-		end
-
-		-- Update position using component constructor
-		world:insert(
-			projId,
-			Components.PositionComponent({
-				X = newX,
-				Y = pos.Y,
-				Z = newZ,
-			})
-		)
-	end
-
-	-- Clean up fire times for despawned plants
-	for plantId in State.PlantFireTimes do
-		if not world:contains(plantId) then
-			State.PlantFireTimes[plantId] = nil
-			State.PendingMultiShots[plantId] = nil
-		end
-	end
 end
 
 --------------------------------------------------------------------------------
@@ -530,12 +511,7 @@ local function Init(_world)
 	end
 
 	-- Pre-cache MapConfig values to avoid yield in OnStep
-	if MapConfig.IsInitialized() then
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	else
-		-- Fallback: force init (should not happen if bootstrap is correct)
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	end
+	State.CachedZombieDir = MapConfig.GetZombieDirection()
 
 	State.IsInitialized = true
 end
@@ -552,7 +528,7 @@ end
 --------------------------------------------------------------------------------
 return {
 	priority = 160,
-	system = OnStep,
 	Init = Init,
 	Dispose = Dispose,
+	system = OnStep,
 }

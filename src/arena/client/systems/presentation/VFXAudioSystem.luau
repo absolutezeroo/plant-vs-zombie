@@ -50,7 +50,7 @@ local function Init(_world: any)
 	AudioService.Initialize()
 
 	-- Start with calm music
-	AudioService.SetMusic("calm")
+	AudioService.SetMusic("Calm")
 
 	-- Connect to wave events for music changes
 	_trove:Add(Network.WaveStarted.On(function(data)
@@ -59,16 +59,16 @@ local function Init(_world: any)
 
 		-- Wave 0 = preparation phase, don't play wave start sound
 		if _currentWave == 0 then
-			AudioService.SetMusic("calm")
+			AudioService.SetMusic("Calm")
 			Logger.Debug("VFXAudio", "Preparation phase started - music: calm")
 			return
 		end
 
 		-- Intense music for later waves
 		if _currentWave >= 5 then
-			AudioService.SetMusic("intense")
+			AudioService.SetMusic("Intense")
 		else
-			AudioService.SetMusic("wave")
+			AudioService.SetMusic("Wave")
 		end
 
 		-- Play wave start sound
@@ -82,8 +82,8 @@ local function Init(_world: any)
 	_trove:Add(Network.WaveCompleted.On(function(_data)
 		_isWaveActive = false
 		-- Return to calm music between waves
-		AudioService.SetMusic("calm")
-		Logger.Debug("VFXAudio", `Wave completed - music: calm`)
+		AudioService.SetMusic("Calm")
+		Logger.Debug("VFXAudio", `Wave completed - music: Calm`)
 	end))
 
 	_trove:Add(Network.GameOver.On(function(data)
@@ -116,18 +116,18 @@ local function Init(_world: any)
 
 		if statusType == "Burn" then
 			VFXService.PlayBurnApplied(pos)
-			AudioService.PlaySFX("fire_ignite", pos)
+			AudioService.PlaySound("FireIgnite", { Position = pos })
 		elseif statusType == "Freeze" then
 			VFXService.PlayFreezeApplied(pos)
-			AudioService.PlaySFX("ice_freeze", pos)
+			AudioService.PlaySound("IceFreeze", { Position = pos })
 		elseif statusType == "Slow" then
 			VFXService.PlaySlowApplied(pos)
 		elseif statusType == "Poison" then
 			VFXService.PlayBurnApplied(pos) -- Reuse burn for now
-			AudioService.PlaySFX("poison_apply", pos)
+			AudioService.PlaySound("PoisonApply", { Position = pos })
 		elseif statusType == "Stun" then
 			VFXService.PlayStunApplied(pos)
-			AudioService.PlaySFX("stun", pos)
+			AudioService.PlaySound("Stun", { Position = pos })
 		end
 
 		Logger.Debug("VFXAudio", `Status {statusType} applied at {pos}`)
@@ -150,7 +150,7 @@ local function Init(_world: any)
 		local targetPos = Vector3.new(data.TargetX, data.TargetY, data.TargetZ)
 
 		VFXService.PlayChainLightning(sourcePos, targetPos, data.Damage)
-		AudioService.PlaySFX("electric_zap", targetPos)
+		AudioService.PlaySound("ElectricZap", { Position = targetPos })
 
 		Logger.Debug("VFXAudio", `Chain lightning: {sourcePos} -> {targetPos}`)
 	end))
@@ -160,7 +160,7 @@ local function Init(_world: any)
 		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
 
 		VFXService.PlayPoisonCloud(pos, data.Radius, data.Duration)
-		AudioService.PlaySFX("poison_cloud", pos)
+		AudioService.PlaySound("PoisonCloud", { Position = pos })
 
 		Logger.Debug("VFXAudio", `Poison cloud at {pos}, radius {data.Radius}`)
 	end))

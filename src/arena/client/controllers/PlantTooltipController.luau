@@ -37,7 +37,6 @@ local PlantTooltip = require(Components.molecules.PlantTooltip)
 
 -- Fusion primitives
 local New = Fusion.New
-local Value = Fusion.Value
 local peek = Fusion.peek
 
 -- ============================================================
@@ -199,15 +198,15 @@ function PlantTooltipController.Initialize()
 
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
 
-	-- Create Fusion scope
-	_scope = Fusion.scoped({})
+	-- Create Fusion scope with Fusion methods (required for scope:Computed, scope:Value, etc.)
+	_scope = Fusion.scoped(Fusion)
 
 	-- Initialize reactive state
-	_tooltipVisible = Value(_scope, false)
-	_tooltipPosition = Value(_scope, UDim2.new(0.5, 0, 0.5, 0))
-	_selectedPlantType = Value(_scope, nil :: string?)
-	_selectedMutations = Value(_scope, {} :: { string })
-	_selectedEntityId = Value(_scope, nil :: number?)
+	_tooltipVisible = _scope:Value(false)
+	_tooltipPosition = _scope:Value(UDim2.new(0.5, 0, 0.5, 0))
+	_selectedPlantType = _scope:Value(nil :: string?)
+	_selectedMutations = _scope:Value({} :: { string })
+	_selectedEntityId = _scope:Value(nil :: number?)
 
 	-- Create ScreenGui for tooltip
 	local screenGui = New(_scope, "ScreenGui")({
@@ -224,7 +223,7 @@ function PlantTooltipController.Initialize()
 				Name = "Backdrop",
 				Size = UDim2.new(1, 0, 1, 0),
 				BackgroundColor3 = Color3.new(0, 0, 0),
-				BackgroundTransparency = Fusion.Computed(_scope, function(use)
+				BackgroundTransparency = _scope:Computed(function(use)
 					return use(_tooltipVisible) and 0.5 or 1
 				end),
 				Text = "",

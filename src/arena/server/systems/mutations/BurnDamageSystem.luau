@@ -121,15 +121,26 @@ local function OnStep(world)
 				local damage = burning.DamagePerSecond
 
 				-- Apply damage using ECSUtils
-				ECSUtils.DamageEntity(world, entityId, damage, Components)
+				local actualDamage = ECSUtils.DamageEntity(world, entityId, damage, Components)
 
-				-- Emit damage event for visual feedback
-				world:spawn(Components.DamageEvent({
-					Target = entityId,
-					Amount = damage,
-					DamageType = "Burn",
-					Source = 0,
-				}))
+				if actualDamage > 0 then
+					-- Emit damage event for visual feedback
+					world:spawn(Components.DamageEvent({
+						Target = entityId,
+						Amount = damage,
+						DamageType = "Burn",
+						Source = 0,
+					}))
+
+					-- Send network event for client visual feedback (floating damage numbers)
+					local targetHealth = world:get(entityId, Components.HealthComponent)
+					Network.EntityDamaged.FireAll({
+						EntityId = entityId,
+						NewHealth = targetHealth and targetHealth.Current or 0,
+						DamageAmount = actualDamage,
+						DamageType = "Burn",
+					})
+				end
 
 				-- Update burn timer
 				world:insert(

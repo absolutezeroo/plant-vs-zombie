@@ -71,7 +71,8 @@ type DamageType = enum {
 
 type ProjectileVariant = enum {
     Pea,         -- Standard green pea
-    FrozenPea,   -- Blue ice pea (SnowPea, Winter Melon)
+    SnowPea,     -- Blue ice pea (SnowPea)
+    FrozenPea,   -- Frozen pea (ice mutation)
     FirePea,     -- Flaming pea (Torchwood enhanced)
     Spore,       -- Mushroom spores (PuffShroom, SeaShroom)
     Fume,        -- Purple fumes (FumeShroom, GloomShroom)
@@ -79,8 +80,10 @@ type ProjectileVariant = enum {
     Kernel,      -- Corn kernel
     Butter,      -- Butter (stun)
     Melon,       -- Melon slice
+    WinterMelon, -- Winter melon (frozen melon)
     Star,        -- Star projectile (Starfruit)
     Spike,       -- Cactus spike
+    Thorn,       -- Thorn projectile
     Seed         -- Generic seed
 }
 
@@ -386,6 +389,8 @@ event ProjectileSpawned = {
         Variant: ProjectileVariant?,  -- Visual type (default: Pea)
         IsFrozen: boolean?,           -- Has slow effect
         IsEnhanced: boolean?,         -- Fire enhanced by Torchwood
+        DirectionX: f32?,             -- X direction for multi-directional (Starfruit)
+        DirectionZ: f32?,             -- Z direction for multi-directional (Starfruit)
     }
 }
 
@@ -682,6 +687,18 @@ event SplashDamageVFX = {
         PositionY: f32,
         PositionZ: f32,
         Radius: f32,
+    }
+}
+
+-- Zombie bite VFX/SFX (when zombie attacks plant)
+event ZombieBiteVFX = {
+    from: Server,
+    type: Unreliable,
+    call: ManyAsync,
+    data: struct {
+        PositionX: f32,
+        PositionY: f32,
+        PositionZ: f32,
     }
 }
 

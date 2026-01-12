@@ -23,6 +23,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
+local LaneCache = require(Shared.utils.LaneCache)
 
 -- Service (contains state + API)
 local Server = script.Parent.Parent.Parent
@@ -214,10 +215,7 @@ local function OnStep(world)
 
 	-- Check wave completion
 	local waveComplete = false
-	local activeZombies = 0
-	for _ in world:query(Components.ZombieTypeComponent) do
-		activeZombies += 1
-	end
+	local activeZombies = LaneCache.GetTotalCount()
 
 	if state.UsingDefinedWave then
 		-- For defined waves, complete when all zombies dead after min time

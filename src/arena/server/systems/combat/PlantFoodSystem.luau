@@ -124,9 +124,15 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 		end)
 	end
 
-	-- Freeze All (Snow Pea)
+	-- Freeze All (Snow Pea) - Using LaneCache for O(1) iteration
 	if ability.FreezeAll and ability.FreezeDuration then
-		for zombieId, _ in world:query(Components.ZombieTypeComponent) do
+		local allZombies = LaneCache.GetAllZombies()
+		
+		for _, zombieId in allZombies do
+			if not world:contains(zombieId) then
+				continue
+			end
+			
 			if not world:get(zombieId, Components.SlowComponent) then
 				world:insert(
 					zombieId,

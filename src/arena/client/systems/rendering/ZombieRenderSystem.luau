@@ -37,6 +37,7 @@ local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 local Network = require(Shared.network.generated.client)
 local VFXService = require(Modules.VFXService)
+local AudioService = require(Modules.AudioService)
 
 -- Assets folder (optional - fallback to cubes if missing)
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -75,6 +76,14 @@ local _zombieVisuals: { [number]: ZombieVisual } = {}
 local _trove = Trove.new()
 
 local INTERPOLATION_SPEED = 10 -- How fast to interpolate to target position
+
+-- Groan system: random zombie groans for immersion
+local GROAN_CONFIG = {
+	MIN_INTERVAL = 2.0, -- Minimum seconds between groans
+	MAX_INTERVAL = 6.0, -- Maximum seconds between groans
+	CHANCE_PER_ZOMBIE = 0.7, -- 30% chance a zombie groans when timer triggers
+}
+local _nextGroanTime = 0
 
 local function getLaneZ(lane: number): number
 	-- Return default if not initialized (will be corrected when initialized)
@@ -331,6 +340,27 @@ local function ZombieRenderSystem(_world)
 		-- Update position with 90° rotation
 		local facingCFrame = CFrame.lookAt(newPos, newPos + zombieDir) * CFrame.Angles(0, math.pi / 2, 0)
 		visual.Model:PivotTo(facingCFrame)
+	end
+
+	-- Random zombie groans for immersion
+	local currentTime = os.clock()
+	if currentTime >= _nextGroanTime then
+		-- Schedule next groan check
+		_nextGroanTime = currentTime + ChanceUtils.RandomFloat(GROAN_CONFIG.MIN_INTERVAL, GROAN_CONFIG.MAX_INTERVAL)
+
+		-- Pick a random zombie to groan
+		local zombieList = {}
+		for entityId, visual in _zombieVisuals do
+			if visual.Model.Parent then
+				table.insert(zombieList, visual)
+			end
+		end
+
+		if #zombieList > 0 and ChanceUtils.Roll(GROAN_CONFIG.CHANCE_PER_ZOMBIE) then
+			local randomZombie = ChanceUtils.PickRandom(zombieList)
+			local pos = randomZombie.Model:GetPivot().Position
+			AudioService.PlayZombieGroan(pos)
+		end
 	end
 end
 

@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local LaneCache = require(Shared.utils.LaneCache)
+local MapConfig = require(Shared.config.MapConfig)
 
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
@@ -49,8 +50,9 @@ end
 -- 6. MAIN LOOP
 local function OnStep(world)
 	-- Rebuild the cache from scratch every frame
-	-- Philosophy: "Rebuild, Don't Maintain" - dirty flag bugs are expensive
-	LaneCache.Rebuild(world, Components.PositionComponent, Components.ZombieTypeComponent)
+	local mapConfig = MapConfig.IsInitialized() and MapConfig.GetConfig() or nil
+	LaneCache.Rebuild(world, Components.PositionComponent, Components.ZombieTypeComponent, mapConfig)
+	LaneCache.RebuildPlants(world, Components.PlantTypeComponent)
 end
 
 -- 7. EXPORT

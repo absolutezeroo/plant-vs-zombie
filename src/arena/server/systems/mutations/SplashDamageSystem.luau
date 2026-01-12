@@ -96,6 +96,15 @@ local function applySplashDamage(
 						DamageType = "Splash",
 						Source = sourceEntityId or 0,
 					}))
+
+					-- Send network event for client visual feedback (floating damage numbers)
+					local targetHealth = world:get(entityId, Components.HealthComponent)
+					Network.EntityDamaged.FireAll({
+						EntityId = entityId,
+						NewHealth = targetHealth and targetHealth.Current or 0,
+						DamageAmount = actualDamage,
+						DamageType = "Splash",
+					})
 				end
 			end
 		end

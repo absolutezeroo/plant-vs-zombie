@@ -23,17 +23,52 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))
 
 -- Sound asset IDs (using Roblox library sounds)
-local SOUNDS = {
-	-- Plant sounds
+-- Strings for single sounds, arrays for random selection
+type SoundEntry = string | { string }
+
+local SOUNDS: { [string]: SoundEntry } = {
+	-- Plant sounds (base)
 	PeaShoot = "rbxassetid://116561468284287", -- Pop/shoot sound
 	PeaImpact = "rbxassetid://83662029103234", -- Splat
 	PlantPlaced = "rbxassetid://101826567553108", -- Dirt/place
 	Explosion = "rbxassetid://100749525232283", -- Boom
 
-	-- Zombie sounds
-	ZombieGroan = "rbxassetid://122508006619291", -- Groan
-	ZombieDeath = "rbxassetid://", -- Death groan
-	ZombieBite = "rbxassetid://99729332638497", -- Chomp
+	-- Projectile shoot sounds by variant
+	FirePeaShoot = "rbxassetid://96996054899812", -- Fire pea whoosh
+	SnowPeaShoot = "rbxassetid://", -- Ice pea crystal
+	FrozenPeaShoot = "rbxassetid://", -- Frozen pea
+	ElectricPeaShoot = "rbxassetid://", -- Electric zap shoot
+	PoisonPeaShoot = "rbxassetid://", -- Poison bubble
+	CabbageShoot = "rbxassetid://", -- Cabbage throw
+	MelonShoot = "rbxassetid://", -- Melon throw
+	SporeShoot = "rbxassetid://", -- Spore puff
+	StarShoot = "rbxassetid://", -- Star throw
+
+	-- Projectile impact sounds by variant
+	FirePeaImpact = "rbxassetid://", -- Fire sizzle
+	SnowPeaImpact = "rbxassetid://", -- Ice shatter
+	FrozenPeaImpact = "rbxassetid://", -- Frozen crack
+	ElectricPeaImpact = "rbxassetid://", -- Electric pop
+	PoisonPeaImpact = "rbxassetid://", -- Poison splat
+
+	-- Zombie sounds (arrays for variety)
+	ZombieGroan = {
+		"rbxassetid://96212894659858", -- Groan 1
+		"rbxassetid://109709023330604", -- Groan 2
+		"rbxassetid://97117633200401", -- Groan 3
+		"rbxassetid://120788954302740", -- Groan 4
+		"rbxassetid://111779193498196", -- Groan 5
+		"rbxassetid://115097902409458", -- Groan 6
+	},
+	ZombieDeath = {
+		"rbxassetid://", -- Death 1
+		-- Add more death sounds here
+	},
+	ZombieBite = {
+		"rbxassetid://101758146644849", -- Chomp 1
+		"rbxassetid://103641406166985", -- Chomp 2
+		"rbxassetid://78758545041403", -- Chomp 3
+	},
 
 	-- Collection sounds
 	SunCollect = "rbxassetid://73530939144429", -- Sparkle/chime
@@ -47,8 +82,16 @@ local SOUNDS = {
 
 	-- Game events
 	WaveStart = "rbxassetid://81385124977604", -- Alert/horn
-	Victory = "rbxassetid://", -- Fanfare
+	Victory = "rbxassetid://74477612565568", -- Fanfare
 	Defeat = "rbxassetid://", -- Doom
+
+	-- Mutation sounds
+	FireIgnite = "rbxassetid://", -- Fire burn start
+	IceFreeze = "rbxassetid://", -- Ice freeze
+	PoisonApply = "rbxassetid://", -- Poison applied
+	PoisonCloud = "rbxassetid://", -- Poison cloud spawn
+	ElectricZap = "rbxassetid://92624633997529", -- Chain lightning zap
+	Stun = "rbxassetid://", -- Stun effect
 
 	-- Music
 	MusicCalm = "rbxassetid://", -- Peaceful background
@@ -87,7 +130,7 @@ function AudioService.Initialize()
 	end)
 
 	_trove:Connect(GameSignals.OnProjectileImpact, function(data)
-		AudioService.PlayPeaImpact(data.Position)
+		AudioService.PlayProjectileImpact(data.ProjectileType, data.Position)
 	end)
 
 	_trove:Connect(GameSignals.OnSunCollected, function(data)
@@ -103,11 +146,38 @@ function AudioService.Initialize()
 	Logger.Info("Audio", "AudioService initialized with signal listeners")
 end
 
+-- Get a random sound ID from an entry (handles both single strings and arrays)
+function AudioService._GetRandomSoundId(soundName: string): string?
+	local entry = SOUNDS[soundName]
+	if not entry then
+		return nil
+	end
+
+	if type(entry) == "table" then
+		-- Filter out empty strings
+		local validSounds = {}
+		for _, id in entry do
+			if id and id ~= "" and id ~= "rbxassetid://" then
+				table.insert(validSounds, id)
+			end
+		end
+		if #validSounds == 0 then
+			return nil
+		end
+		return ChanceUtils.PickRandom(validSounds)
+	else
+		if entry == "" or entry == "rbxassetid://" then
+			return nil
+		end
+		return entry
+	end
+end
+
 -- Preload a sound for faster playback
 function AudioService._PreloadSound(soundName: string): Sound?
-	local soundId = SOUNDS[soundName]
+	local soundId = AudioService._GetRandomSoundId(soundName)
 	if not soundId then
-		Logger.Warn("Audio", `Unknown sound: {soundName}`)
+		-- Silent fail for empty sounds (user hasn't added custom sound yet)
 		return nil
 	end
 
@@ -135,13 +205,18 @@ function AudioService.PlaySound(
 	}?
 )
 	local opts = options or {}
-	local sound = AudioService._PreloadSound(soundName)
-	if not sound then
+
+	-- Get a random sound ID (for variety with arrays)
+	local soundId = AudioService._GetRandomSoundId(soundName)
+	if not soundId then
+		-- Silent fail for empty/missing sounds
 		return
 	end
 
-	-- Clone for overlapping sounds
-	local playSound = sound:Clone()
+	-- Create sound directly (don't use cache for varied sounds)
+	local playSound = Instance.new("Sound")
+	playSound.Name = soundName
+	playSound.SoundId = soundId
 	playSound.Volume = (opts.Volume or 1) * _sfxVolume
 	playSound.PlaybackSpeed = opts.PlaybackSpeed or 1
 
@@ -178,6 +253,57 @@ end
 --[[
 	🌱 PLANT SOUNDS
 ]]
+
+-- Mapping of projectile variants to their shoot sound names
+local VARIANT_SHOOT_SOUNDS: { [string]: string } = {
+	Pea = "PeaShoot",
+	FirePea = "FirePeaShoot",
+	SnowPea = "SnowPeaShoot",
+	FrozenPea = "FrozenPeaShoot",
+	ElectricPea = "ElectricPeaShoot",
+	PoisonPea = "PoisonPeaShoot",
+	Cabbage = "CabbageShoot",
+	Melon = "MelonShoot",
+	Spore = "SporeShoot",
+	Star = "StarShoot",
+}
+
+-- Mapping of projectile variants to their impact sound names
+local VARIANT_IMPACT_SOUNDS: { [string]: string } = {
+	Pea = "PeaImpact",
+	FirePea = "FirePeaImpact",
+	SnowPea = "SnowPeaImpact",
+	FrozenPea = "FrozenPeaImpact",
+	ElectricPea = "ElectricPeaImpact",
+	PoisonPea = "PoisonPeaImpact",
+}
+
+function AudioService.PlayProjectileShoot(variant: string?, position: Vector3?)
+	local soundName = VARIANT_SHOOT_SOUNDS[variant or "Pea"] or "PeaShoot"
+	-- Fallback to PeaShoot if variant sound is empty
+	local soundId = AudioService._GetRandomSoundId(soundName)
+	if not soundId then
+		soundName = "PeaShoot" -- Fallback
+	end
+	AudioService.PlaySound(soundName, {
+		Position = position,
+		PlaybackSpeed = ChanceUtils.RandomPitch(1.0, 0.1),
+	})
+end
+
+function AudioService.PlayProjectileImpact(variant: string?, position: Vector3?)
+	local soundName = VARIANT_IMPACT_SOUNDS[variant or "Pea"] or "PeaImpact"
+	-- Fallback to PeaImpact if variant sound is empty
+	local soundId = AudioService._GetRandomSoundId(soundName)
+	if not soundId then
+		soundName = "PeaImpact" -- Fallback
+	end
+	AudioService.PlaySound(soundName, {
+		Position = position,
+		Volume = 0.7,
+	})
+end
+
 function AudioService.PlayPeaShoot(position: Vector3?)
 	AudioService.PlaySound("PeaShoot", {
 		Position = position,
@@ -294,12 +420,12 @@ end
 --[[
 	🎶 MUSIC SYSTEM
 ]]
-export type MusicIntensity = "calm" | "wave" | "intense"
+export type MusicIntensity = "Calm" | "Wave" | "Intense"
 
 function AudioService.SetMusic(intensity: MusicIntensity)
-	local soundId = if intensity == "calm"
+	local soundId = if intensity == "Calm"
 		then SOUNDS.MusicCalm
-		elseif intensity == "wave" then SOUNDS.MusicWave
+		elseif intensity == "Wave" then SOUNDS.MusicWave
 		else SOUNDS.MusicIntense
 
 	-- Same music already playing?

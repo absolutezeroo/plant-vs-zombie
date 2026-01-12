@@ -16,6 +16,7 @@ export type ProjectileComponent = {
 	SourceEntity: number, -- Entity ID of firing plant
 	Lane: number, -- Lane the projectile travels in
 	SpawnX: number, -- X position when spawned (for max range check)
+	SpawnZ: number?, -- Z position when spawned (for multi-directional range check)
 	IsFrozen: boolean?, -- True for SnowPea projectiles (applies slow)
 	SlowPercent: number?, -- Slow amount (0.5 = 50% slower)
 	SlowDuration: number?, -- How long the slow lasts

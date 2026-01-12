@@ -45,7 +45,9 @@ local VFXUtils = require(Shared.utils.VFXUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
+local Modules = Client:FindFirstChild("modules")
 local Network = require(Shared.network.generated.client)
+local AudioService = require(Modules.AudioService)
 
 -- Assets folder
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -226,7 +228,9 @@ local function createProjectileVisual(
 	startX: number,
 	variant: string?,
 	isFrozen: boolean?,
-	isEnhanced: boolean?
+	isEnhanced: boolean?,
+	directionX: number?,
+	directionZ: number?
 ): ProjectileVisual
 	local actualVariant = variant or "Pea"
 	local actualFrozen = isFrozen or false
@@ -237,10 +241,17 @@ local function createProjectileVisual(
 		actualVariant = "FirePea"
 	end
 
-	-- Calculate forward direction (opposite of zombie direction)
-	local zombieDir = MapConfig.GetZombieDirection()
-	local forwardDirX = -zombieDir.X
-	local forwardDirZ = -zombieDir.Z
+	-- Use provided direction or calculate forward direction (opposite of zombie direction)
+	local forwardDirX: number
+	local forwardDirZ: number
+	if directionX ~= nil and directionZ ~= nil then
+		forwardDirX = directionX
+		forwardDirZ = directionZ
+	else
+		local zombieDir = MapConfig.GetZombieDirection()
+		forwardDirX = -zombieDir.X
+		forwardDirZ = -zombieDir.Z
+	end
 
 	-- Get spawn position
 	local z = getLaneZ(lane)
@@ -358,7 +369,23 @@ local function setupNetworkListeners()
 		local isEnhanced = data.IsEnhanced or false
 
 		if not _projectileVisuals[entityId] then
-			_projectileVisuals[entityId] = createProjectileVisual(entityId, lane, startX, variant, isFrozen, isEnhanced)
+			_projectileVisuals[entityId] = createProjectileVisual(
+				entityId,
+				lane,
+				startX,
+				variant,
+				isFrozen,
+				isEnhanced,
+				data.DirectionX,
+				data.DirectionZ
+			)
+
+			-- Play shoot sound based on variant
+			local groundY = if MapConfig.IsInitialized() then MapConfig.GetConfig().GridY else 0
+			local z = if MapConfig.IsInitialized() then MapConfig.GridToWorld(1, lane).Z else lane * 4
+			local shootPos = Vector3.new(startX, groundY + 2, z)
+			AudioService.PlayProjectileShoot(variant, shootPos)
+
 			Logger.Debug("ProjectileRender", `{variant} {entityId} spawned in lane {lane}`)
 		end
 	end))

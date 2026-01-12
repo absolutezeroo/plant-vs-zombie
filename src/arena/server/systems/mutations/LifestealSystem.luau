@@ -63,11 +63,14 @@ local function OnStep(world)
 			continue
 		end
 
-		-- Get zombie position for VFX
-		local zombiePos = world:get(hitEvent.TargetZombie, Components.PositionComponent)
+		-- Get zombie position for VFX (zombie may already be dead)
+		local zombiePos = nil
+		if world:contains(hitEvent.TargetZombie) then
+			zombiePos = world:get(hitEvent.TargetZombie, Components.PositionComponent)
+		end
 
 		-- Apply healing using ECSUtils
-		Logger.Debug("Lifesteal", "Plant", sourcePlant, "healed for", healAmount, "HP")
+		Logger.Debug("Lifesteal", `Plant {sourcePlant} healed for {healAmount} HP`)
 		ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
 
 		-- Fire VFX event for lifesteal drain
