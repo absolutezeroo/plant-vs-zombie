@@ -25,7 +25,7 @@ local Logger = require(Shared.utils.Logger)
 -- ============================================================
 local State = {
 	-- [UserId] -> [PlantType] -> {mutations}
-	PlayerMutationsCache = {} :: {[number]: {[string]: {string}}},
+	PlayerMutationsCache = {} :: { [number]: { [string]: { string } } },
 }
 
 -- ============================================================
@@ -39,7 +39,7 @@ local MutationService = {}
 	@param userId number
 	@param mutations {[string]: {string}} - PlantType -> {MutationIds}
 ]]
-function MutationService.LoadPlayerMutations(userId: number, mutations: {[string]: {string}})
+function MutationService.LoadPlayerMutations(userId: number, mutations: { [string]: { string } })
 	State.PlayerMutationsCache[userId] = mutations
 	Logger.Info("MutationService", `Loaded mutations for user {userId}`)
 end
@@ -57,7 +57,7 @@ end
 	@param userId number
 	@return {[string]: {string}} - PlantType -> {MutationIds}
 ]]
-function MutationService.GetPlayerMutations(userId: number): {[string]: {string}}
+function MutationService.GetPlayerMutations(userId: number): { [string]: { string } }
 	return State.PlayerMutationsCache[userId] or {}
 end
 
@@ -67,9 +67,11 @@ end
 	@param plantType string
 	@return {string} - Array of mutation IDs
 ]]
-function MutationService.GetPlantMutations(userId: number, plantType: string): {string}
+function MutationService.GetPlantMutations(userId: number, plantType: string): { string }
 	local playerMutations = State.PlayerMutationsCache[userId]
-	if not playerMutations then return {} end
+	if not playerMutations then
+		return {}
+	end
 	return playerMutations[plantType] or {}
 end
 
@@ -81,7 +83,7 @@ end
 function MutationService.LoadMutationsFromProfile(player: Player, profileData: any)
 	local equippedMutations = profileData.PlantEquippedMutations or {}
 	State.PlayerMutationsCache[player.UserId] = equippedMutations
-	
+
 	local count = 0
 	for _ in equippedMutations do
 		count = count + 1

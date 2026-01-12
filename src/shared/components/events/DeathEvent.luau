@@ -12,9 +12,9 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("DeathEvent", {
-	Target = 0,           -- Entity ID of dying entity
-	EntityType = "",      -- "Plant", "Zombie", "Projectile"
-	PositionX = 0,        -- Last known X position for VFX
-	PositionY = 0,        -- Last known Y position for VFX
-	PositionZ = 0,        -- Last known Z position for VFX
+	Target = 0, -- Entity ID of dying entity
+	EntityType = "", -- "Plant", "Zombie", "Projectile"
+	PositionX = 0, -- Last known X position for VFX
+	PositionY = 0, -- Last known Y position for VFX
+	PositionZ = 0, -- Last known Z position for VFX
 })

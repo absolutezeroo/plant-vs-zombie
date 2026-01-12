@@ -57,7 +57,7 @@ export type ToonButtonProps = {
 ]]
 local function ToonButton(props: ToonButtonProps): Frame
 	local scope = props.Scope
-	
+
 	-- Default values (Scale-based)
 	local size = props.Size or UDim2.fromScale(0.15, 0.06)
 	local position = props.Position or UDim2.new(0, 0, 0, 0)
@@ -65,14 +65,14 @@ local function ToonButton(props: ToonButtonProps): Frame
 	local layoutOrder = props.LayoutOrder or 0
 	local zIndex = props.ZIndex or 1
 	local colorKey = props.Color or "Action"
-	
+
 	-- Get color set from theme
 	local colorSet = (Theme.Colors :: any)[colorKey] or Theme.Colors.Action
-	
+
 	-- Internal state
 	local isHovered = scope:Value(false)
 	local isPressed = scope:Value(false)
-	
+
 	-- Compute disabled state (handle both Value and raw boolean)
 	local isDisabled = scope:Computed(function(use)
 		local disabled = props.Disabled
@@ -84,7 +84,7 @@ local function ToonButton(props: ToonButtonProps): Frame
 		end
 		return use(disabled :: Fusion.Value<boolean>)
 	end)
-	
+
 	-- Press offset animation (0 = normal, SHADOW_OFFSET_SCALE = fully pressed)
 	local targetOffset = scope:Computed(function(use)
 		if use(isDisabled) then
@@ -92,20 +92,20 @@ local function ToonButton(props: ToonButtonProps): Frame
 		end
 		return if use(isPressed) then SHADOW_OFFSET_SCALE else 0
 	end)
-	
+
 	local pressOffset = scope:Spring(targetOffset, PRESS_SPRING_SPEED, PRESS_SPRING_DAMPING)
-	
+
 	-- Surface Y position (animated, Scale-based)
 	local surfacePosition = scope:Computed(function(use)
 		return UDim2.fromScale(0, use(pressOffset))
 	end)
-	
+
 	-- Surface size (shrinks slightly when pressed to match shadow)
 	local surfaceSize = scope:Computed(function(use)
 		local offset = use(pressOffset)
 		return UDim2.fromScale(1, 1 - offset)
 	end)
-	
+
 	-- Button colors with disabled state
 	local mainColor = scope:Computed(function(use)
 		if use(isDisabled) then
@@ -113,22 +113,22 @@ local function ToonButton(props: ToonButtonProps): Frame
 		end
 		return colorSet.Main :: Color3
 	end)
-	
+
 	local shadowColor = scope:Computed(function(use)
 		if use(isDisabled) then
 			return Color3.fromRGB(100, 100, 100)
 		end
 		return colorSet.Shadow :: Color3
 	end)
-	
+
 	local textColor = scope:Computed(function(use)
 		if use(isDisabled) then
 			return Color3.fromRGB(200, 200, 200)
 		end
 		return (colorSet.Text or Color3.new(1, 1, 1)) :: Color3
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "ToonButton",
 		Size = size,
 		Position = position,
@@ -137,49 +137,49 @@ local function ToonButton(props: ToonButtonProps): Frame
 		ZIndex = zIndex,
 		BackgroundTransparency = 1,
 		Visible = if props.Visible ~= nil then props.Visible else true,
-		
+
 		[Children] = {
 			-- Size constraints
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(80, 30),
 				MaxSize = Vector2.new(300, 60),
-			},
-			
+			}),
+
 			-- Shadow Layer (bottom, stationary, Scale-based)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Shadow",
 				Size = UDim2.fromScale(1, 1),
 				Position = UDim2.fromScale(0, SHADOW_OFFSET_SCALE),
 				BackgroundColor3 = shadowColor,
 				ZIndex = 1,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Surface Layer (top, animated)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Surface",
 				Size = surfaceSize,
 				Position = surfacePosition,
 				BackgroundColor3 = mainColor,
 				ZIndex = 2,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
-					
-					scope:New("UIStroke") {
+					}),
+
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
-					},
-					
+					}),
+
 					-- Text label (responsive)
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Label",
 						Size = UDim2.new(1, -16, 1, 0),
 						Position = UDim2.fromOffset(8, 0),
@@ -190,61 +190,63 @@ local function ToonButton(props: ToonButtonProps): Frame
 						Font = Theme.Typography.Fonts.Title,
 						TextXAlignment = Enum.TextXAlignment.Center,
 						TextYAlignment = Enum.TextYAlignment.Center,
-						
+
 						[Children] = {
-							scope:New("UITextSizeConstraint") {
+							scope:New("UITextSizeConstraint")({
 								MaxTextSize = 20,
 								MinTextSize = 10,
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Children content
-					props[Children] and scope:New("Frame") {
-						Name = "Content",
-						Size = UDim2.fromScale(1, 1),
-						BackgroundTransparency = 1,
-						ZIndex = 2,
-						[Children] = props[Children],
-					} or nil,
+					props[Children]
+							and scope:New("Frame")({
+								Name = "Content",
+								Size = UDim2.fromScale(1, 1),
+								BackgroundTransparency = 1,
+								ZIndex = 2,
+								[Children] = props[Children],
+							})
+						or nil,
 				},
-			},
-			
+			}),
+
 			-- Invisible hit area
-			scope:New("TextButton") {
+			scope:New("TextButton")({
 				Name = "HitArea",
 				Size = UDim2.fromScale(1, 1 + SHADOW_OFFSET_SCALE),
 				BackgroundTransparency = 1,
 				Text = "",
 				ZIndex = 10,
-				
+
 				[OnEvent("MouseEnter")] = function()
 					isHovered:set(true)
 				end,
-				
+
 				[OnEvent("MouseLeave")] = function()
 					isHovered:set(false)
 					isPressed:set(false)
 				end,
-				
+
 				[OnEvent("MouseButton1Down")] = function()
 					if not peek(isDisabled) then
 						isPressed:set(true)
 					end
 				end,
-				
+
 				[OnEvent("MouseButton1Up")] = function()
 					isPressed:set(false)
 				end,
-				
+
 				[OnEvent("Activated")] = function()
 					if not peek(isDisabled) then
 						props.OnClick()
 					end
 				end,
-			},
+			}),
 		},
-	}
+	})
 end
 
 return ToonButton

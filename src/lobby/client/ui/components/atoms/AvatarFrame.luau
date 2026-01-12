@@ -34,11 +34,11 @@ local function AvatarFrame(props: AvatarFrameProps): Frame
 	local scope = props.Scope
 	local size = props.Size or DEFAULT_SIZE
 	local borderColor = props.BorderColor or Theme.Colors.Info.Main
-	
+
 	-- Get avatar URL
 	local player = Players.LocalPlayer
 	local avatarUrl = scope:Value("")
-	
+
 	task.spawn(function()
 		if player then
 			local success, url = pcall(function()
@@ -53,42 +53,42 @@ local function AvatarFrame(props: AvatarFrameProps): Frame
 			end
 		end
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "AvatarFrame",
 		Size = UDim2.fromOffset(size, size),
 		Position = props.Position or UDim2.new(0, 0, 0, 0),
 		AnchorPoint = props.AnchorPoint or Vector2.new(0, 0),
 		LayoutOrder = props.LayoutOrder or 0,
 		BackgroundColor3 = Theme.Colors.Surface.Main,
-		
+
 		[Children] = {
-			scope:New("UICorner") {
+			scope:New("UICorner")({
 				CornerRadius = UDim.new(0.5, 0),
-			},
-			
-			scope:New("UIStroke") {
+			}),
+
+			scope:New("UIStroke")({
 				Color = borderColor,
 				Thickness = 3,
-			},
-			
+			}),
+
 			-- Avatar image
-			scope:New("ImageLabel") {
+			scope:New("ImageLabel")({
 				Name = "Avatar",
 				Size = UDim2.new(1, -6, 1, -6),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				Image = avatarUrl,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return AvatarFrame

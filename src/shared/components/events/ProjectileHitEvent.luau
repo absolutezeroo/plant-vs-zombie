@@ -14,14 +14,14 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type ProjectileHitEvent = {
-	SourcePlant: number,     -- Entity ID of the plant that fired
-	TargetZombie: number,    -- Entity ID of the zombie that was hit
-	Damage: number,          -- Damage dealt by the projectile
-	PositionX: number,       -- Impact position X
-	PositionY: number,       -- Impact position Y
-	PositionZ: number,       -- Impact position Z
-	Lane: number,            -- Lane where the hit occurred (for optimized AoE lookups)
-	WasKill: boolean,        -- True if this hit killed the zombie
+	SourcePlant: number, -- Entity ID of the plant that fired
+	TargetZombie: number, -- Entity ID of the zombie that was hit
+	Damage: number, -- Damage dealt by the projectile
+	PositionX: number, -- Impact position X
+	PositionY: number, -- Impact position Y
+	PositionZ: number, -- Impact position Z
+	Lane: number, -- Lane where the hit occurred (for optimized AoE lookups)
+	WasKill: boolean, -- True if this hit killed the zombie
 }
 
 return Matter.component("ProjectileHitEvent")

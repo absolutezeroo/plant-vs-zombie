@@ -12,6 +12,6 @@ local GameSignals = require(script.GameSignals)
 local LobbySignals = require(script.LobbySignals)
 
 return table.freeze({
-    Game = GameSignals,
-    Lobby = LobbySignals,
+	Game = GameSignals,
+	Lobby = LobbySignals,
 })

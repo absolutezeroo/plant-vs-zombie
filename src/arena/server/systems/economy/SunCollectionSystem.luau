@@ -48,7 +48,7 @@ local CONFIG = table.freeze({
 -- ============================================================
 local State = {
 	World = nil :: any?,
-	CollectionQueue = {} :: {{Player: Player, EntityId: number, RequestId: number}},
+	CollectionQueue = {} :: { { Player: Player, EntityId: number, RequestId: number } },
 }
 
 -- ============================================================
@@ -60,7 +60,7 @@ local function queueCollection(player: Player, entityId: number, requestId: numb
 	table.insert(State.CollectionQueue, {
 		Player = player,
 		EntityId = entityId,
-		RequestId = requestId
+		RequestId = requestId,
 	})
 end
 
@@ -71,25 +71,25 @@ local function processCollection(world: any, player: Player, entityId: number): 
 		Logger.Warn("SunCollection", `Entity {entityId} does not exist`)
 		return nil
 	end
-	
+
 	-- Check entity has SunComponent
 	local sun = world:get(entityId, Components.SunComponent)
 	if not sun then
 		Logger.Warn("SunCollection", `Entity {entityId} is not a sun`)
 		return nil
 	end
-	
+
 	local value = sun.Value
-	
+
 	-- Release sun back to pool
 	if EntityPool.IsPooledEntity(entityId) then
 		EntityPool.Despawn(entityId)
 	else
 		world:despawn(entityId)
 	end
-	
+
 	Logger.Debug("SunCollection", `{player.Name} collected sun {entityId} worth {value}`)
-	
+
 	return value
 end
 
@@ -98,23 +98,23 @@ end
 -- ============================================================
 local function OnStep(world)
 	State.World = world
-	
+
 	-- Process collection queue
 	for _, request in State.CollectionQueue do
 		local value = processCollection(world, request.Player, request.EntityId)
-		
+
 		if value then
 			-- Add sun via SunService
 			SunService.AddSun(request.Player, value)
 			local newTotal = SunService.GetSun(request.Player)
-			
+
 			-- Broadcast SunCollected to all clients
 			Network.SunCollected.FireAll({
 				SunEntityId = request.EntityId,
 				CollectorId = request.Player.UserId,
 				NewTotal = newTotal,
 			})
-			
+
 			-- Send success response
 			Network.RequestResponse.Fire(request.Player, {
 				RequestId = request.RequestId,
@@ -130,7 +130,7 @@ local function OnStep(world)
 			})
 		end
 	end
-	
+
 	-- Clear queue
 	table.clear(State.CollectionQueue)
 end
@@ -143,7 +143,7 @@ local function Init(_world)
 	Network.CollectSunRequest.SetCallback(function(player: Player, data)
 		queueCollection(player, data.SunEntityId, data.RequestId)
 	end)
-	
+
 	Logger.Debug("SunCollectionSystem", "Initialized")
 end
 

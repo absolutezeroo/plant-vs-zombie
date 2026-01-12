@@ -12,8 +12,8 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("DamageEvent", {
-	Target = 0,           -- Entity ID of damaged entity
-	Amount = 0,           -- Damage value
+	Target = 0, -- Entity ID of damaged entity
+	Amount = 0, -- Damage value
 	DamageType = "Normal", -- "Normal", "Ice", "Explosive"
-	Source = 0,           -- Entity ID of attacker (for VFX direction)
+	Source = 0, -- Entity ID of attacker (for VFX direction)
 })

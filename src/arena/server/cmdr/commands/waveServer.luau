@@ -20,7 +20,7 @@ return function(_context)
 	local gameState = WaveService.GetGameState()
 	local worldId = WaveService.GetCurrentWorldId()
 	local difficulty = WaveService.GetCurrentDifficulty()
-	
+
 	local lines = {
 		"=== Wave Info ===",
 		`Wave: {currentWave}/{totalWaves}`,
@@ -28,7 +28,7 @@ return function(_context)
 		`World: {worldId}`,
 		`Difficulty: {difficulty}`,
 	}
-	
+
 	Logger.Info("Cmdr", `Wave info requested: {currentWave}/{totalWaves} ({gameState})`)
 	return table.concat(lines, "\n")
 end

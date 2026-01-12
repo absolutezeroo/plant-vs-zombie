@@ -11,6 +11,6 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("PlantTypeComponent", {
-	PlantType = "Peashooter",  -- String identifier (matches PlantData keys)
-	OwnerId = 0,               -- Player UserId who placed this plant
+	PlantType = "Peashooter", -- String identifier (matches PlantData keys)
+	OwnerId = 0, -- Player UserId who placed this plant
 })

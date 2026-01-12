@@ -10,9 +10,9 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type ZombieTypeComponent = {
-	ZombieType: string,     -- "Basic", "Cone", "Bucket", etc.
-	Lane: number,           -- Lane 1-5
-	SpawnTime: number,      -- os.clock() when spawned
+	ZombieType: string, -- "Basic", "Cone", "Bucket", etc.
+	Lane: number, -- Lane 1-5
+	SpawnTime: number, -- os.clock() when spawned
 }
 
 return Matter.component("ZombieType")

@@ -18,84 +18,84 @@ local LiveConfigService = require(Shared.services.LiveConfigService)
 export type PlantStats = {
 	Name: string,
 	Cost: number,
-	Cooldown: number,       -- Seconds before can place again
+	Cooldown: number, -- Seconds before can place again
 	Health: number,
-	Damage: number,         -- Per projectile or per tick
-	AttackSpeed: number,    -- Attacks per second (0 for non-attackers)
-	Range: number,          -- Attack range in studs (0 for lane-wide)
+	Damage: number, -- Per projectile or per tick
+	AttackSpeed: number, -- Attacks per second (0 for non-attackers)
+	Range: number, -- Attack range in studs (0 for lane-wide)
 	Description: string,
-	Category: string,       -- "Attacker", "Producer", "Defender", "Special"
-	
+	Category: string, -- "Attacker", "Producer", "Defender", "Special"
+
 	-- Behavior flags (data-driven)
-	CanShoot: boolean?,      -- Can fire projectiles at zombies
-	IsFrozen: boolean?,      -- Projectiles apply slow effect
-	IsRepeater: boolean?,    -- Fires double projectiles
-	IsExplosive: boolean?,   -- Is a one-time explosion plant
+	CanShoot: boolean?, -- Can fire projectiles at zombies
+	IsFrozen: boolean?, -- Projectiles apply slow effect
+	IsRepeater: boolean?, -- Fires double projectiles
+	IsExplosive: boolean?, -- Is a one-time explosion plant
 	ExplodesOnPlace: boolean?, -- Explodes immediately after fuse (CherryBomb)
-	NeedsArming: boolean?,   -- Requires arming time before active (PotatoMine)
-	ProducesSun: boolean?,   -- Produces sun periodically
-	
+	NeedsArming: boolean?, -- Requires arming time before active (PotatoMine)
+	ProducesSun: boolean?, -- Produces sun periodically
+
 	-- Sun Producer stats (for ProducesSun plants)
 	SunProductionInterval: number?, -- Seconds between sun production (default 24)
-	FirstSunDelay: number?,         -- Seconds before first sun (default 7)
-	SunValue: number?,              -- Sun value per production (default 25)
-	
+	FirstSunDelay: number?, -- Seconds before first sun (default 7)
+	SunValue: number?, -- Sun value per production (default 25)
+
 	-- Projectile stats (for CanShoot plants)
-	SlowPercent: number?,    -- Slow multiplier for IsFrozen (default 0.5)
-	SlowDuration: number?,   -- Slow duration in seconds (default 3)
-	ShotDelay: number?,      -- Delay between multi-shots for IsRepeater (default 0.1)
+	SlowPercent: number?, -- Slow multiplier for IsFrozen (default 0.5)
+	SlowDuration: number?, -- Slow duration in seconds (default 3)
+	ShotDelay: number?, -- Delay between multi-shots for IsRepeater (default 0.1)
 	ProjectileSpawnOffset: Vector3?, -- Offset from plant center for projectile spawn (default Vector3.new(2, 2.5, 0))
-	
+
 	-- Projectile visual variant (data-driven, replaces hardcoded switch)
-	ProjectileVariant: string?,  -- "Pea", "SnowPea", "FirePea", "Cabbage", "Kernel", "Butter", "Melon", "Spore", "Fume", "Star", "Spike", "Thorn"
-	
+	ProjectileVariant: string?, -- "Pea", "SnowPea", "FirePea", "Cabbage", "Kernel", "Butter", "Melon", "Spore", "Fume", "Star", "Spike", "Thorn"
+
 	-- Advanced projectile stats
-	IsCatapult: boolean?,    -- Lobs projectiles in an arc (Cabbage-pult, Melon-pult)
-	HasSplash: boolean?,     -- Projectile deals splash damage
-	SplashRadius: number?,   -- Radius of splash damage
+	IsCatapult: boolean?, -- Lobs projectiles in an arc (Cabbage-pult, Melon-pult)
+	HasSplash: boolean?, -- Projectile deals splash damage
+	SplashRadius: number?, -- Radius of splash damage
 	PiercesShields: boolean?, -- Projectile ignores shields (Fume-shroom)
-	CanStun: boolean?,       -- Can stun zombies (Kernel-pult butter)
-	StunChance: number?,     -- Chance to stun (0-1)
-	StunDuration: number?,   -- Stun duration in seconds
+	CanStun: boolean?, -- Can stun zombies (Kernel-pult butter)
+	StunChance: number?, -- Chance to stun (0-1)
+	StunDuration: number?, -- Stun duration in seconds
 	StunProjectileVariant: string?, -- Variant when stun procs ("Butter" for KernelPult)
-	CanHitFlying: boolean?,  -- Can hit flying zombies (Cactus, Cattail)
-	ShotsPerBurst: number?,  -- Number of shots per attack (Repeater=2, GatlingPea=4)
+	CanHitFlying: boolean?, -- Can hit flying zombies (Cactus, Cattail)
+	ShotsPerBurst: number?, -- Number of shots per attack (Repeater=2, GatlingPea=4)
 	ShootsMultiDirection: boolean?, -- Shoots in multiple directions (Starfruit)
-	IsThreeLane: boolean?,   -- Shoots in 3 lanes (Threepeater)
-	ShootsBehind: boolean?,  -- Also shoots behind (Split Pea)
-	
+	IsThreeLane: boolean?, -- Shoots in 3 lanes (Threepeater)
+	ShootsBehind: boolean?, -- Also shoots behind (Split Pea)
+
 	-- Explosive stats (for IsExplosive plants)
-	FuseTime: number?,       -- Seconds before explosion for ExplodesOnPlace (default 0.5)
-	ArmDuration: number?,    -- Seconds to arm for NeedsArming (default 15)
-	TriggerRadius: number?,  -- Radius to trigger armed explosion (default 2)
-	
+	FuseTime: number?, -- Seconds before explosion for ExplodesOnPlace (default 0.5)
+	ArmDuration: number?, -- Seconds to arm for NeedsArming (default 15)
+	TriggerRadius: number?, -- Radius to trigger armed explosion (default 2)
+
 	-- Platform/Water requirements (data-driven placement validation)
-	IsPlatform: boolean?,         -- Is a platform plant (LilyPad, FlowerPot)
-	IsWaterPlatform: boolean?,    -- Platform for water lanes (LilyPad)
-	IsGroundPlatform: boolean?,   -- Platform for roof/ground (FlowerPot)
-	AllowsPlantOnTop: boolean?,   -- Allows another plant to be placed on top
-	RequiresWater: boolean?,      -- Must be placed on water lane (SeaShroom, TangleKelp)
-	RequiresLilyPad: boolean?,    -- Must be placed on a LilyPad (Cattail)
-	
+	IsPlatform: boolean?, -- Is a platform plant (LilyPad, FlowerPot)
+	IsWaterPlatform: boolean?, -- Platform for water lanes (LilyPad)
+	IsGroundPlatform: boolean?, -- Platform for roof/ground (FlowerPot)
+	AllowsPlantOnTop: boolean?, -- Allows another plant to be placed on top
+	RequiresWater: boolean?, -- Must be placed on water lane (SeaShroom, TangleKelp)
+	RequiresLilyPad: boolean?, -- Must be placed on a LilyPad (Cattail)
+
 	-- Mushroom behavior (data-driven day/night cycle)
-	IsMushroom: boolean?,         -- Is a mushroom plant
-	SleepsDuringDay: boolean?,    -- Sleeps on day maps (needs Coffee Bean to wake)
-	GrowsOverTime: boolean?,      -- Grows larger over time (Sun-shroom)
-	HidesWhenNear: boolean?,      -- Hides when zombies are near (Scaredy-shroom)
-	HideRadius: number?,          -- Distance at which to hide (default 6 studs)
-	
+	IsMushroom: boolean?, -- Is a mushroom plant
+	SleepsDuringDay: boolean?, -- Sleeps on day maps (needs Coffee Bean to wake)
+	GrowsOverTime: boolean?, -- Grows larger over time (Sun-shroom)
+	HidesWhenNear: boolean?, -- Hides when zombies are near (Scaredy-shroom)
+	HideRadius: number?, -- Distance at which to hide (default 6 studs)
+
 	-- Stacking behavior (for plants that can be placed on top of others)
-	CanStackOnPlant: boolean?,    -- Can be placed on top of Pumpkin/shell plants
+	CanStackOnPlant: boolean?, -- Can be placed on top of Pumpkin/shell plants
 	CanStackOnMushroom: boolean?, -- Can be placed on sleeping mushrooms (CoffeeBean)
-	WakesMushrooms: boolean?,     -- Wakes sleeping mushrooms when stacked
-	IsShell: boolean?,            -- Is a protective shell plant (Pumpkin)
+	WakesMushrooms: boolean?, -- Wakes sleeping mushrooms when stacked
+	IsShell: boolean?, -- Is a protective shell plant (Pumpkin)
 }
 
-local PlantData: {[string]: PlantStats} = {
+local PlantData: { [string]: PlantStats } = {
 	-- ============================================
 	-- MVP Plants (Epic 2)
 	-- ============================================
-	
+
 	Sunflower = {
 		Name = "Sunflower",
 		Cost = 25,
@@ -113,7 +113,7 @@ local PlantData: {[string]: PlantStats} = {
 		FirstSunDelay = 7,
 		SunValue = 25,
 	},
-	
+
 	Peashooter = {
 		Name = "Peashooter",
 		Cost = 100,
@@ -127,7 +127,7 @@ local PlantData: {[string]: PlantStats} = {
 		CanShoot = true,
 		ProjectileVariant = "Pea",
 	},
-	
+
 	WallNut = {
 		Name = "Wall-nut",
 		Cost = 50,
@@ -139,11 +139,11 @@ local PlantData: {[string]: PlantStats} = {
 		Description = "Blocks zombies with high health",
 		Category = "Defender",
 	},
-	
+
 	-- ============================================
 	-- Future Plants (Epic 4+)
 	-- ============================================
-	
+
 	SnowPea = {
 		Name = "Snow Pea",
 		Cost = 175,
@@ -162,7 +162,7 @@ local PlantData: {[string]: PlantStats} = {
 		SlowPercent = 0.5,
 		SlowDuration = 3,
 	},
-	
+
 	CherryBomb = {
 		Name = "Cherry Bomb",
 		Cost = 150,
@@ -170,7 +170,7 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 1,
 		Damage = 1800,
 		AttackSpeed = 0,
-		Range = 9,          -- Explosion radius in studs
+		Range = 9, -- Explosion radius in studs
 		Description = "Explodes and destroys nearby zombies",
 		Category = "Special",
 		-- Behavior
@@ -179,7 +179,7 @@ local PlantData: {[string]: PlantStats} = {
 		-- Explosive stats
 		FuseTime = 0.5,
 	},
-	
+
 	PotatoMine = {
 		Name = "Potato Mine",
 		Cost = 25,
@@ -197,7 +197,7 @@ local PlantData: {[string]: PlantStats} = {
 		ArmDuration = 15,
 		TriggerRadius = 2,
 	},
-	
+
 	Repeater = {
 		Name = "Repeater",
 		Cost = 200,
@@ -216,11 +216,11 @@ local PlantData: {[string]: PlantStats} = {
 		ShotsPerBurst = 2,
 		ShotDelay = 0.1,
 	},
-	
+
 	-- ============================================
 	-- Shooter Plants
 	-- ============================================
-	
+
 	Threepeater = {
 		Name = "Threepeater",
 		Cost = 325,
@@ -235,7 +235,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsThreeLane = true,
 		ProjectileVariant = "Pea",
 	},
-	
+
 	SplitPea = {
 		Name = "Split Pea",
 		Cost = 125,
@@ -250,7 +250,7 @@ local PlantData: {[string]: PlantStats} = {
 		ShootsBehind = true,
 		ProjectileVariant = "Pea",
 	},
-	
+
 	GatlingPea = {
 		Name = "Gatling Pea",
 		Cost = 250,
@@ -267,7 +267,7 @@ local PlantData: {[string]: PlantStats} = {
 		ShotsPerBurst = 4,
 		ShotDelay = 0.08,
 	},
-	
+
 	Starfruit = {
 		Name = "Starfruit",
 		Cost = 125,
@@ -282,7 +282,7 @@ local PlantData: {[string]: PlantStats} = {
 		ShootsMultiDirection = true,
 		ProjectileVariant = "Star",
 	},
-	
+
 	Cactus = {
 		Name = "Cactus",
 		Cost = 125,
@@ -297,7 +297,7 @@ local PlantData: {[string]: PlantStats} = {
 		CanHitFlying = true,
 		ProjectileVariant = "Spike",
 	},
-	
+
 	Cattail = {
 		Name = "Cattail",
 		Cost = 225,
@@ -313,11 +313,11 @@ local PlantData: {[string]: PlantStats} = {
 		ProjectileVariant = "Thorn",
 		RequiresLilyPad = true,
 	},
-	
+
 	-- ============================================
 	-- Catapult Plants
 	-- ============================================
-	
+
 	CabbagePult = {
 		Name = "Cabbage-pult",
 		Cost = 100,
@@ -332,7 +332,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsCatapult = true,
 		ProjectileVariant = "Cabbage",
 	},
-	
+
 	KernelPult = {
 		Name = "Kernel-pult",
 		Cost = 100,
@@ -351,7 +351,7 @@ local PlantData: {[string]: PlantStats} = {
 		StunDuration = 4,
 		StunProjectileVariant = "Butter",
 	},
-	
+
 	MelonPult = {
 		Name = "Melon-pult",
 		Cost = 300,
@@ -368,7 +368,7 @@ local PlantData: {[string]: PlantStats} = {
 		HasSplash = true,
 		SplashRadius = 3,
 	},
-	
+
 	WinterMelon = {
 		Name = "Winter Melon",
 		Cost = 500,
@@ -388,7 +388,7 @@ local PlantData: {[string]: PlantStats} = {
 		SlowPercent = 0.5,
 		SlowDuration = 3,
 	},
-	
+
 	CobCannon = {
 		Name = "Cob Cannon",
 		Cost = 500,
@@ -404,11 +404,11 @@ local PlantData: {[string]: PlantStats} = {
 		SplashRadius = 9,
 		RequiresTwoKernelPults = true,
 	},
-	
+
 	-- ============================================
 	-- Mushroom Plants
 	-- ============================================
-	
+
 	PuffShroom = {
 		Name = "Puff-shroom",
 		Cost = 0,
@@ -416,7 +416,7 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 100,
 		Damage = 20,
 		AttackSpeed = 1.5,
-		Range = 18,  -- Short range (3 cells)
+		Range = 18, -- Short range (3 cells)
 		Description = "Free, short-range spore shooter",
 		Category = "Attacker",
 		CanShoot = true,
@@ -424,7 +424,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsMushroom = true,
 		SleepsDuringDay = true,
 	},
-	
+
 	SeaShroom = {
 		Name = "Sea-shroom",
 		Cost = 0,
@@ -441,7 +441,7 @@ local PlantData: {[string]: PlantStats} = {
 		SleepsDuringDay = true,
 		RequiresWater = true,
 	},
-	
+
 	FumeShroom = {
 		Name = "Fume-shroom",
 		Cost = 75,
@@ -449,7 +449,7 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 100,
 		Damage = 20,
 		AttackSpeed = 1.5,
-		Range = 24,  -- 4 cells
+		Range = 24, -- 4 cells
 		Description = "Fumes pierce shields",
 		Category = "Attacker",
 		CanShoot = true,
@@ -458,7 +458,7 @@ local PlantData: {[string]: PlantStats} = {
 		SleepsDuringDay = true,
 		PiercesShields = true,
 	},
-	
+
 	ScaredyShroom = {
 		Name = "Scaredy-shroom",
 		Cost = 25,
@@ -476,7 +476,7 @@ local PlantData: {[string]: PlantStats} = {
 		HidesWhenNear = true,
 		HideRadius = 6,
 	},
-	
+
 	SunShroom = {
 		Name = "Sun-shroom",
 		Cost = 25,
@@ -492,10 +492,10 @@ local PlantData: {[string]: PlantStats} = {
 		ProducesSun = true,
 		SunProductionInterval = 24,
 		FirstSunDelay = 7,
-		SunValue = 15,  -- Starts small, grows to 25
+		SunValue = 15, -- Starts small, grows to 25
 		GrowsOverTime = true,
 	},
-	
+
 	HypnoShroom = {
 		Name = "Hypno-shroom",
 		Cost = 75,
@@ -510,7 +510,7 @@ local PlantData: {[string]: PlantStats} = {
 		SleepsDuringDay = true,
 		HypnotizesOnDeath = true,
 	},
-	
+
 	IceShroom = {
 		Name = "Ice-shroom",
 		Cost = 75,
@@ -528,7 +528,7 @@ local PlantData: {[string]: PlantStats} = {
 		FreezesAll = true,
 		FreezeDuration = 4,
 	},
-	
+
 	DoomShroom = {
 		Name = "Doom-shroom",
 		Cost = 125,
@@ -536,7 +536,7 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 1,
 		Damage = 1800,
 		AttackSpeed = 0,
-		Range = 15,  -- Large explosion radius
+		Range = 15, -- Large explosion radius
 		Description = "Massive explosion, leaves crater",
 		Category = "Special",
 		IsMushroom = true,
@@ -546,7 +546,7 @@ local PlantData: {[string]: PlantStats} = {
 		FuseTime = 1.0,
 		LeavesCrater = true,
 	},
-	
+
 	GloomShroom = {
 		Name = "Gloom-shroom",
 		Cost = 150,
@@ -554,7 +554,7 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 100,
 		Damage = 20,
 		AttackSpeed = 2.0,
-		Range = 6,  -- 1 cell radius (8 directions)
+		Range = 6, -- 1 cell radius (8 directions)
 		Description = "Releases fumes in all directions",
 		Category = "Attacker",
 		IsMushroom = true,
@@ -564,11 +564,11 @@ local PlantData: {[string]: PlantStats} = {
 		ShootsAllDirections = true,
 		PiercesShields = true,
 	},
-	
+
 	-- ============================================
 	-- Defensive Plants
 	-- ============================================
-	
+
 	TallNut = {
 		Name = "Tall-nut",
 		Cost = 125,
@@ -581,7 +581,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Defender",
 		BlocksJumpers = true,
 	},
-	
+
 	Pumpkin = {
 		Name = "Pumpkin",
 		Cost = 125,
@@ -595,7 +595,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsShell = true,
 		CanStackOnPlant = true,
 	},
-	
+
 	Garlic = {
 		Name = "Garlic",
 		Cost = 50,
@@ -608,11 +608,11 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Defender",
 		DivertsZombies = true,
 	},
-	
+
 	-- ============================================
 	-- Instant Kill Plants
 	-- ============================================
-	
+
 	Chomper = {
 		Name = "Chomper",
 		Cost = 150,
@@ -620,13 +620,13 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 100,
 		Damage = 1800,
 		AttackSpeed = 0,
-		Range = 6,  -- 1 cell
+		Range = 6, -- 1 cell
 		Description = "Eats zombie, chews for 42 seconds",
 		Category = "Attacker",
 		IsInstantKill = true,
 		ChewDuration = 42,
 	},
-	
+
 	Squash = {
 		Name = "Squash",
 		Cost = 50,
@@ -640,7 +640,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsInstantKill = true,
 		JumpsToTarget = true,
 	},
-	
+
 	Jalapeno = {
 		Name = "Jalapeno",
 		Cost = 125,
@@ -656,7 +656,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsLaneWide = true,
 		FuseTime = 0.5,
 	},
-	
+
 	TangleKelp = {
 		Name = "Tangle Kelp",
 		Cost = 25,
@@ -670,11 +670,11 @@ local PlantData: {[string]: PlantStats} = {
 		IsInstantKill = true,
 		RequiresWater = true,
 	},
-	
+
 	-- ============================================
 	-- Support Plants
 	-- ============================================
-	
+
 	TwinSunflower = {
 		Name = "Twin Sunflower",
 		Cost = 150,
@@ -690,7 +690,7 @@ local PlantData: {[string]: PlantStats} = {
 		FirstSunDelay = 7,
 		SunValue = 50,
 	},
-	
+
 	Marigold = {
 		Name = "Marigold",
 		Cost = 50,
@@ -704,7 +704,7 @@ local PlantData: {[string]: PlantStats} = {
 		ProducesCoins = true,
 		CoinProductionInterval = 24,
 	},
-	
+
 	GoldMagnet = {
 		Name = "Gold Magnet",
 		Cost = 50,
@@ -717,7 +717,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Support",
 		CollectsCoins = true,
 	},
-	
+
 	Torchwood = {
 		Name = "Torchwood",
 		Cost = 175,
@@ -731,7 +731,7 @@ local PlantData: {[string]: PlantStats} = {
 		EnhancesPeas = true,
 		FireDamageMultiplier = 2,
 	},
-	
+
 	Plantern = {
 		Name = "Plantern",
 		Cost = 25,
@@ -745,7 +745,7 @@ local PlantData: {[string]: PlantStats} = {
 		RemovesFog = true,
 		FogRadius = 36,
 	},
-	
+
 	Blover = {
 		Name = "Blover",
 		Cost = 100,
@@ -760,7 +760,7 @@ local PlantData: {[string]: PlantStats} = {
 		RemovesFog = true,
 		RemovesFlying = true,
 	},
-	
+
 	UmbrellaLeaf = {
 		Name = "Umbrella Leaf",
 		Cost = 100,
@@ -768,12 +768,12 @@ local PlantData: {[string]: PlantStats} = {
 		Health = 100,
 		Damage = 0,
 		AttackSpeed = 0,
-		Range = 6,  -- Protects 3x3 area
+		Range = 6, -- Protects 3x3 area
 		Description = "Deflects catapult zombies",
 		Category = "Defender",
 		DeflectsProjectiles = true,
 	},
-	
+
 	CoffeeBean = {
 		Name = "Coffee Bean",
 		Cost = 75,
@@ -788,11 +788,11 @@ local PlantData: {[string]: PlantStats} = {
 		WakesMushrooms = true,
 		CanStackOnMushroom = true,
 	},
-	
+
 	-- ============================================
 	-- Platform/Special Plants
 	-- ============================================
-	
+
 	LilyPad = {
 		Name = "Lily Pad",
 		Cost = 25,
@@ -807,7 +807,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsWaterPlatform = true,
 		AllowsPlantOnTop = true,
 	},
-	
+
 	FlowerPot = {
 		Name = "Flower Pot",
 		Cost = 25,
@@ -822,7 +822,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsGroundPlatform = true,
 		AllowsPlantOnTop = true,
 	},
-	
+
 	GraveBuster = {
 		Name = "Grave Buster",
 		Cost = 75,
@@ -836,7 +836,7 @@ local PlantData: {[string]: PlantStats} = {
 		IsInstant = true,
 		RemovesGraves = true,
 	},
-	
+
 	Spikeweed = {
 		Name = "Spikeweed",
 		Cost = 100,
@@ -851,10 +851,10 @@ local PlantData: {[string]: PlantStats} = {
 		DamagesOnWalk = true,
 		PopsTires = true,
 	},
-	
+
 	Imitater = {
 		Name = "Imitater",
-		Cost = 0,  -- Adds to imitated plant cost
+		Cost = 0, -- Adds to imitated plant cost
 		Cooldown = 5,
 		Health = 100,
 		Damage = 0,
@@ -864,7 +864,7 @@ local PlantData: {[string]: PlantStats} = {
 		Category = "Special",
 		IsImitater = true,
 	},
-	
+
 	ExplodeONut = {
 		Name = "Explode-o-nut",
 		Cost = 50,
@@ -899,8 +899,8 @@ PlantDataModule.RawData = PlantData
 	Get all plant types (factory defaults).
 	@return Array of plant type names
 ]]
-function PlantDataModule.GetAllTypes(): {string}
-	local types: {string} = {}
+function PlantDataModule.GetAllTypes(): { string }
+	local types: { string } = {}
 	for plantType, _ in PlantData do
 		table.insert(types, plantType)
 	end
@@ -918,38 +918,38 @@ function PlantDataModule.GetStats(plantType: string): PlantStats?
 	if not baseStats then
 		return nil
 	end
-	
+
 	-- Get plant-specific overrides (0 = use base value)
 	local costOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Cost`, 0)
 	local damageOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Damage`, 0)
 	local cooldownOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Cooldown`, 0)
 	local healthOverride = LiveConfigService.GetFloat(`Plant_{plantType}_Health`, 0)
-	
+
 	-- Get global plant multiplier
 	local globalDamageMult = LiveConfigService.GetMultiplier("Global_PlantDamage")
-	
+
 	-- Build overrides table only for non-zero values
-	local overrides: {[string]: any} = {}
-	
+	local overrides: { [string]: any } = {}
+
 	-- Apply cost override (direct replacement if set)
 	if costOverride > 0 then
 		overrides.Cost = math.floor(costOverride)
 	end
-	
+
 	-- Apply cooldown override (direct replacement if set)
 	if cooldownOverride > 0 then
 		overrides.Cooldown = cooldownOverride
 	end
-	
+
 	-- Apply health override (direct replacement if set)
 	if healthOverride > 0 then
 		overrides.Health = math.floor(healthOverride)
 	end
-	
+
 	-- Apply damage: combine override with global multiplier
 	local effectiveDamage = if damageOverride > 0 then damageOverride else baseStats.Damage
 	overrides.Damage = math.floor(effectiveDamage * globalDamageMult)
-	
+
 	-- Merge with base stats (immutable)
 	return Sift.Dictionary.merge(baseStats, overrides)
 end
@@ -983,8 +983,7 @@ end
 setmetatable(PlantDataModule :: any, {
 	__index = function(_, key: string): PlantStats?
 		-- Skip known function/property names
-		if key == "GetStats" or key == "GetStatsRaw" or key == "GetAllTypes" 
-			or key == "Exists" or key == "RawData" then
+		if key == "GetStats" or key == "GetStatsRaw" or key == "GetAllTypes" or key == "Exists" or key == "RawData" then
 			return nil
 		end
 		-- Redirect to GetStats for any plant type access

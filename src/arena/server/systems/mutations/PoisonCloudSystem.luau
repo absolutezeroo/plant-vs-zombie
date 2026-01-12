@@ -47,7 +47,7 @@ local CONFIG = table.freeze({
 -- SECTION 3: STATE (all mutable data)
 -- ============================================================
 export type ActiveCloud = {
-	Position: {X: number, Y: number, Z: number},
+	Position: { X: number, Y: number, Z: number },
 	Lane: number,
 	Radius: number,
 	DamagePerSecond: number,
@@ -56,7 +56,7 @@ export type ActiveCloud = {
 }
 
 local State = {
-	ActiveClouds = {} :: {ActiveCloud},
+	ActiveClouds = {} :: { ActiveCloud },
 	IsInitialized = false,
 }
 
@@ -66,9 +66,14 @@ local State = {
 
 -- Spawn a poison cloud at a position
 -- NOTE: MapConfig.WorldToGrid is safe to call - MapConfig.Initialize() is called at server bootstrap
-local function spawnPoisonCloud(position: {X: number, Y: number, Z: number}, radius: number, damagePerSecond: number, duration: number)
+local function spawnPoisonCloud(
+	position: { X: number, Y: number, Z: number },
+	radius: number,
+	damagePerSecond: number,
+	duration: number
+)
 	local _, lane = MapConfig.WorldToGrid(Vector3.new(position.X, position.Y, position.Z))
-	
+
 	table.insert(State.ActiveClouds, {
 		Position = position,
 		Lane = lane or 3,
@@ -77,7 +82,7 @@ local function spawnPoisonCloud(position: {X: number, Y: number, Z: number}, rad
 		RemainingDuration = duration,
 		LastTickTime = os.clock(),
 	})
-	
+
 	-- Fire VFX event for poison cloud
 	Network.PoisonCloudVFX.FireAll({
 		PositionX = position.X,
@@ -86,8 +91,11 @@ local function spawnPoisonCloud(position: {X: number, Y: number, Z: number}, rad
 		Radius = radius,
 		Duration = duration,
 	})
-	
-	Logger.Debug("PoisonCloudSystem", `Spawned poison cloud at ({position.X}, {position.Z}) lane {lane or 3} - radius {radius}, {damagePerSecond} dps for {duration}s`)
+
+	Logger.Debug(
+		"PoisonCloudSystem",
+		`Spawned poison cloud at ({position.X}, {position.Z}) lane {lane or 3} - radius {radius}, {damagePerSecond} dps for {duration}s`
+	)
 end
 
 -- ============================================================
@@ -96,71 +104,83 @@ end
 local function OnStep(world)
 	local currentTime = os.clock()
 	local cloudsToRemove = {}
-	
+
 	-- React to plant deaths with PoisonCloudComponent
 	for entityId, record in world:queryChanged(Components.HealthComponent) do
 		-- Check if entity just died
 		if record.new and record.new.Current <= 0 then
 			-- Check if it had PoisonCloudComponent
 			local poisonCloud = world:get(entityId, Components.PoisonCloudComponent)
-			if not poisonCloud then continue end
-			
+			if not poisonCloud then
+				continue
+			end
+
 			local pos = world:get(entityId, Components.PositionComponent)
-			if not pos then continue end
-			
+			if not pos then
+				continue
+			end
+
 			-- Spawn cloud at death location
 			spawnPoisonCloud(
-				{X = pos.X, Y = pos.Y, Z = pos.Z},
+				{ X = pos.X, Y = pos.Y, Z = pos.Z },
 				poisonCloud.Radius,
 				poisonCloud.DamagePerSecond,
 				poisonCloud.Duration
 			)
 		end
 	end
-	
+
 	-- Process each active cloud
 	for i, cloud in State.ActiveClouds do
 		local elapsed = currentTime - cloud.LastTickTime
 		cloud.RemainingDuration -= elapsed
-		
+
 		if cloud.RemainingDuration <= 0 then
 			table.insert(cloudsToRemove, i)
 		else
 			-- Tick damage every second
 			if elapsed >= CONFIG.TICK_INTERVAL then
 				cloud.LastTickTime = currentTime
-				
+
 				-- Calculate how many lanes the cloud radius covers
 				local laneRadius = math.ceil(cloud.Radius / GridConfig.CELL_SIZE)
-				
+
 				-- O(lane_range) lookup instead of O(N) world:query
 				local zombiesInRange = LaneCache.GetEntitiesInLaneRange(cloud.Lane, laneRadius)
-				
+
 				-- Find zombies in cloud
 				for _, entityId in zombiesInRange do
-					if not world:contains(entityId) then continue end
-					
+					if not world:contains(entityId) then
+						continue
+					end
+
 					local pos = LaneCache.GetPosition(entityId)
-					if not pos then continue end
-					
+					if not pos then
+						continue
+					end
+
 					local distance = MathUtils.Distance2D(pos.X, pos.Z, cloud.Position.X, cloud.Position.Z)
-					
+
 					if distance <= cloud.Radius then
 						-- Apply poison damage
-						local actualDamage, died = ECSUtils.DamageEntity(world, entityId, cloud.DamagePerSecond, Components)
+						local actualDamage, died =
+							ECSUtils.DamageEntity(world, entityId, cloud.DamagePerSecond, Components)
 						if actualDamage > 0 then
-							world:insert(entityId, Components.DamageEvent({
-								Amount = cloud.DamagePerSecond,
-								DamageType = "Poison",
-								SourceEntityId = nil,
-							}))
+							world:insert(
+								entityId,
+								Components.DamageEvent({
+									Amount = cloud.DamagePerSecond,
+									DamageType = "Poison",
+									SourceEntityId = nil,
+								})
+							)
 						end
 					end
 				end
 			end
 		end
 	end
-	
+
 	-- Remove expired clouds (in reverse order to preserve indices)
 	for i = #cloudsToRemove, 1, -1 do
 		table.remove(State.ActiveClouds, cloudsToRemove[i])
@@ -171,7 +191,9 @@ end
 -- SECTION 6: INIT / DISPOSE
 -- ============================================================
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 	Logger.Debug("PoisonCloudSystem", "Initialized")
 end

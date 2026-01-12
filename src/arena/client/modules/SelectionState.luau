@@ -23,7 +23,7 @@ SelectionState.SelectedPlant = Fusion.Value(scope, nil :: string?)
 SelectionState.ShovelMode = Fusion.Value(scope, false)
 
 -- Card cooldowns: PlantType -> timestamp when available again
-SelectionState.Cooldowns = Fusion.Value(scope, {} :: {[string]: number})
+SelectionState.Cooldowns = Fusion.Value(scope, {} :: { [string]: number })
 
 -- Player's sun count (synced from server)
 SelectionState.SunCount = Fusion.Value(scope, 50) -- Start with 50 sun

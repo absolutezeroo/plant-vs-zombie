@@ -9,13 +9,13 @@
 ]]
 
 export type PlantUnlockInfo = {
-	Cost: number,           -- Coins to unlock
-	StarterPlant: boolean,  -- Free from start?
-	Order: number,          -- Display order in shop
+	Cost: number, -- Coins to unlock
+	StarterPlant: boolean, -- Free from start?
+	Order: number, -- Display order in shop
 }
 
 -- Plants unlock configuration (ALL 48 plants)
-local PlantUnlocks: {[string]: PlantUnlockInfo} = {
+local PlantUnlocks: { [string]: PlantUnlockInfo } = {
 	-- ============================================
 	-- STARTER PLANTS (Free from start)
 	-- ============================================
@@ -34,7 +34,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = true,
 		Order = 3,
 	},
-	
+
 	-- ============================================
 	-- TIER 1: Early Game (Levels 1-10, 50-200 coins)
 	-- ============================================
@@ -63,7 +63,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = false,
 		Order = 8,
 	},
-	
+
 	-- ============================================
 	-- TIER 2: Mid-Early Game (Levels 10-20, 250-500 coins)
 	-- ============================================
@@ -97,7 +97,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = false,
 		Order = 14,
 	},
-	
+
 	-- ============================================
 	-- TIER 3: Mid Game (Levels 20-30, 600-1000 coins)
 	-- ============================================
@@ -141,7 +141,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = false,
 		Order = 22,
 	},
-	
+
 	-- ============================================
 	-- TIER 4: Mid-Late Game (Levels 30-40, 1200-2000 coins)
 	-- ============================================
@@ -185,7 +185,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = false,
 		Order = 30,
 	},
-	
+
 	-- ============================================
 	-- TIER 5: Late Game (Levels 40-50, 2500-4000 coins)
 	-- ============================================
@@ -219,7 +219,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = false,
 		Order = 36,
 	},
-	
+
 	-- ============================================
 	-- TIER 6: End Game (Level 50+, 5000+ coins)
 	-- ============================================
@@ -243,7 +243,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 		StarterPlant = false,
 		Order = 40,
 	},
-	
+
 	-- ============================================
 	-- UTILITY PLANTS (Various levels)
 	-- ============================================
@@ -290,7 +290,7 @@ local PlantUnlocks: {[string]: PlantUnlockInfo} = {
 }
 
 -- Coin rewards per zombie type
-local ZombieCoinRewards: {[string]: number} = {
+local ZombieCoinRewards: { [string]: number } = {
 	Basic = 5,
 	Cone = 8,
 	Bucket = 12,
@@ -305,25 +305,29 @@ local ZombieCoinRewards: {[string]: number} = {
 local VICTORY_BONUS_PER_WAVE = 25
 
 -- XP and Level configuration
-local XP_PER_ZOMBIE = 5           -- Base XP per zombie killed
-local XP_PER_WAVE = 50            -- XP bonus per wave completed
-local XP_VICTORY_BONUS = 200      -- XP bonus for winning
-local XP_PER_STAR = 25            -- Bonus XP per star earned
+local XP_PER_ZOMBIE = 5 -- Base XP per zombie killed
+local XP_PER_WAVE = 50 -- XP bonus per wave completed
+local XP_VICTORY_BONUS = 200 -- XP bonus for winning
+local XP_PER_STAR = 25 -- Bonus XP per star earned
 
 -- Level curve: XP required = BASE * (MULTIPLIER ^ (level - 1))
-local LEVEL_XP_BASE = 100         -- XP for level 2
-local LEVEL_XP_MULTIPLIER = 1.5   -- Each level needs 50% more XP
-local MAX_LEVEL = 50              -- Maximum player level
+local LEVEL_XP_BASE = 100 -- XP for level 2
+local LEVEL_XP_MULTIPLIER = 1.5 -- Each level needs 50% more XP
+local MAX_LEVEL = 50 -- Maximum player level
 
 -- Gem rewards
-local GEMS_PER_LEVEL_UP = 10      -- Gems earned per level up
-local GEMS_VICTORY_3_STAR = 5     -- Gems for 3-star victory
-local GEMS_FIRST_CLEAR = 25       -- Gems for first-time world/difficulty clear
+local GEMS_PER_LEVEL_UP = 10 -- Gems earned per level up
+local GEMS_VICTORY_3_STAR = 5 -- Gems for 3-star victory
+local GEMS_FIRST_CLEAR = 25 -- Gems for first-time world/difficulty clear
 
 -- Calculate XP required for a specific level
 local function getXPForLevel(level: number): number
-	if level <= 1 then return 0 end
-	if level > MAX_LEVEL then return math.huge end
+	if level <= 1 then
+		return 0
+	end
+	if level > MAX_LEVEL then
+		return math.huge
+	end
 	return math.floor(LEVEL_XP_BASE * math.pow(LEVEL_XP_MULTIPLIER, level - 2))
 end
 
@@ -338,69 +342,69 @@ end
 
 -- Level up rewards (coins, gems, unlocks)
 -- Plants are unlocked for FREE at these levels (alternative to buying with coins)
-local LevelRewards: {[number]: {Coins: number?, Gems: number?, UnlockPlant: string?}} = {
+local LevelRewards: { [number]: { Coins: number?, Gems: number?, UnlockPlant: string? } } = {
 	-- Early milestones (quick rewards to hook players)
 	[2] = { Coins = 50 },
 	[3] = { Coins = 75, UnlockPlant = "PotatoMine" },
 	[4] = { Coins = 100 },
 	[5] = { Coins = 200, Gems = 15, UnlockPlant = "PuffShroom" },
-	
+
 	-- Building momentum
 	[6] = { Coins = 150 },
 	[7] = { Coins = 200, UnlockPlant = "SunShroom" },
 	[8] = { Coins = 250 },
 	[9] = { Coins = 300 },
 	[10] = { Coins = 500, Gems = 25, UnlockPlant = "SnowPea" },
-	
+
 	-- Mid-early game
 	[11] = { Coins = 300 },
 	[12] = { Coins = 400, UnlockPlant = "Chomper" },
 	[13] = { Coins = 400 },
 	[14] = { Coins = 500 },
 	[15] = { Coins = 750, Gems = 35, UnlockPlant = "Repeater" },
-	
+
 	-- Getting stronger
 	[16] = { Coins = 500 },
 	[17] = { Coins = 600, UnlockPlant = "FumeShroom" },
 	[18] = { Coins = 600 },
 	[19] = { Coins = 700 },
 	[20] = { Coins = 1000, Gems = 50, UnlockPlant = "CherryBomb" },
-	
+
 	-- Mid game
 	[21] = { Coins = 700 },
 	[22] = { Coins = 800, UnlockPlant = "Squash" },
 	[23] = { Coins = 800 },
 	[24] = { Coins = 900, UnlockPlant = "TallNut" },
 	[25] = { Coins = 1250, Gems = 60, UnlockPlant = "Threepeater" },
-	
+
 	-- Getting serious
 	[26] = { Coins = 900 },
 	[27] = { Coins = 1000, UnlockPlant = "Jalapeno" },
 	[28] = { Coins = 1000 },
 	[29] = { Coins = 1100, UnlockPlant = "Torchwood" },
 	[30] = { Coins = 1500, Gems = 75, UnlockPlant = "HypnoShroom" },
-	
+
 	-- Late-mid game
 	[31] = { Coins = 1100 },
 	[32] = { Coins = 1200, UnlockPlant = "SplitPea" },
 	[33] = { Coins = 1200 },
 	[34] = { Coins = 1300, UnlockPlant = "Starfruit" },
 	[35] = { Coins = 1750, Gems = 90, UnlockPlant = "Cactus" },
-	
+
 	-- Late game
 	[36] = { Coins = 1300 },
 	[37] = { Coins = 1400, UnlockPlant = "TwinSunflower" },
 	[38] = { Coins = 1500 },
 	[39] = { Coins = 1600, UnlockPlant = "MelonPult" },
 	[40] = { Coins = 2500, Gems = 100, UnlockPlant = "GatlingPea" },
-	
+
 	-- End game
 	[41] = { Coins = 1700 },
 	[42] = { Coins = 1800, UnlockPlant = "GloomShroom" },
 	[43] = { Coins = 1900 },
 	[44] = { Coins = 2000, UnlockPlant = "Cattail" },
 	[45] = { Coins = 3000, Gems = 150, UnlockPlant = "WinterMelon" },
-	
+
 	-- Prestige levels
 	[46] = { Coins = 2500 },
 	[47] = { Coins = 3000, UnlockPlant = "IceShroom" },
@@ -419,19 +423,19 @@ return {
 	ZombieCoinRewards = ZombieCoinRewards,
 	LevelRewards = LevelRewards,
 	VICTORY_BONUS_PER_WAVE = VICTORY_BONUS_PER_WAVE,
-	
+
 	-- XP/Level constants
 	XP_PER_ZOMBIE = XP_PER_ZOMBIE,
 	XP_PER_WAVE = XP_PER_WAVE,
 	XP_VICTORY_BONUS = XP_VICTORY_BONUS,
 	XP_PER_STAR = XP_PER_STAR,
 	MAX_LEVEL = MAX_LEVEL,
-	
+
 	-- Gem constants
 	GEMS_PER_LEVEL_UP = GEMS_PER_LEVEL_UP,
 	GEMS_VICTORY_3_STAR = GEMS_VICTORY_3_STAR,
 	GEMS_FIRST_CLEAR = GEMS_FIRST_CLEAR,
-	
+
 	-- Level functions
 	GetXPForLevel = getXPForLevel,
 	GetTotalXPForLevel = getTotalXPForLevel,

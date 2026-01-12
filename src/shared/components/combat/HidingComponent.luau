@@ -10,6 +10,6 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("HidingComponent", {
-	IsHiding = false,     -- Currently hiding?
-	HideRadius = 6,       -- Studs - how close zombie triggers hide
+	IsHiding = false, -- Currently hiding?
+	HideRadius = 6, -- Studs - how close zombie triggers hide
 })

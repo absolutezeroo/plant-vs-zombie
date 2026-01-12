@@ -53,23 +53,26 @@ function ECSUtils.DamageEntity(
 	if not world:contains(entityId) then
 		return 0, false
 	end
-	
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return 0, false
 	end
-	
+
 	local currentHealth = health.Current :: number
 	local maxHealth = health.Max :: number
 	local actualDamage = math.min(damage, currentHealth)
 	local newHealth = math.max(0, currentHealth - damage)
-	
-	world:insert(entityId, HealthComponent({
-		Current = newHealth,
-		Max = maxHealth,
-	}))
-	
+
+	world:insert(
+		entityId,
+		HealthComponent({
+			Current = newHealth,
+			Max = maxHealth,
+		})
+	)
+
 	return actualDamage, newHealth <= 0
 end
 
@@ -82,34 +85,32 @@ end
 	@param Components ComponentRegistry - Component registry with HealthComponent
 	@return number - Actual amount healed
 ]]
-function ECSUtils.HealEntity(
-	world: any,
-	entityId: number,
-	healAmount: number,
-	Components: ComponentRegistry
-): number
+function ECSUtils.HealEntity(world: any, entityId: number, healAmount: number, Components: ComponentRegistry): number
 	if not world:contains(entityId) then
 		return 0
 	end
-	
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return 0
 	end
-	
+
 	local currentHealth = health.Current :: number
 	local maxHealth = health.Max :: number
 	local newHealth = math.min(maxHealth, currentHealth + healAmount)
 	local actualHeal = newHealth - currentHealth
-	
+
 	if actualHeal > 0 then
-		world:insert(entityId, HealthComponent({
-			Current = newHealth,
-			Max = maxHealth,
-		}))
+		world:insert(
+			entityId,
+			HealthComponent({
+				Current = newHealth,
+				Max = maxHealth,
+			})
+		)
 	end
-	
+
 	return actualHeal
 end
 
@@ -131,22 +132,25 @@ function ECSUtils.ModifyHealth(
 	if not world:contains(entityId) then
 		return 0, false
 	end
-	
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return 0, false
 	end
-	
+
 	local currentHealth = health.Current :: number
 	local maxHealth = health.Max :: number
 	local newHealth = math.clamp(currentHealth + delta, 0, maxHealth)
-	
-	world:insert(entityId, HealthComponent({
-		Current = newHealth,
-		Max = maxHealth,
-	}))
-	
+
+	world:insert(
+		entityId,
+		HealthComponent({
+			Current = newHealth,
+			Max = maxHealth,
+		})
+	)
+
 	return newHealth, newHealth <= 0
 end
 
@@ -166,15 +170,19 @@ function ECSUtils.SetMaxHealth(
 	adjustCurrent: boolean?,
 	Components: ComponentRegistry
 )
-	if not world:contains(entityId) then return end
-	
+	if not world:contains(entityId) then
+		return
+	end
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
-	if not health then return end
-	
+	if not health then
+		return
+	end
+
 	local currentHealth = health.Current :: number
 	local oldMax = health.Max :: number
-	
+
 	local newCurrent = currentHealth
 	if adjustCurrent and oldMax > 0 then
 		-- Scale current health proportionally
@@ -183,11 +191,14 @@ function ECSUtils.SetMaxHealth(
 		-- Cap current at new max
 		newCurrent = math.min(currentHealth, newMax)
 	end
-	
-	world:insert(entityId, HealthComponent({
-		Current = newCurrent,
-		Max = newMax,
-	}))
+
+	world:insert(
+		entityId,
+		HealthComponent({
+			Current = newCurrent,
+			Max = newMax,
+		})
+	)
 end
 
 --[[
@@ -198,28 +209,27 @@ end
 	@param Components ComponentRegistry - Component registry with HealthComponent
 	@return boolean - True if entity was killed (had health > 0)
 ]]
-function ECSUtils.KillEntity(
-	world: any,
-	entityId: number,
-	Components: ComponentRegistry
-): boolean
+function ECSUtils.KillEntity(world: any, entityId: number, Components: ComponentRegistry): boolean
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return false
 	end
-	
+
 	local wasAlive = (health.Current :: number) > 0
-	
-	world:insert(entityId, HealthComponent({
-		Current = 0,
-		Max = health.Max :: number,
-	}))
-	
+
+	world:insert(
+		entityId,
+		HealthComponent({
+			Current = 0,
+			Max = health.Max :: number,
+		})
+	)
+
 	return wasAlive
 end
 
@@ -233,27 +243,25 @@ end
 	@param Components ComponentRegistry - Component registry with HealthComponent
 	@return boolean - True if health was modified
 ]]
-function ECSUtils.BoostHealth(
-	world: any,
-	entityId: number,
-	bonusHealth: number,
-	Components: ComponentRegistry
-): boolean
+function ECSUtils.BoostHealth(world: any, entityId: number, bonusHealth: number, Components: ComponentRegistry): boolean
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return false
 	end
-	
-	world:insert(entityId, HealthComponent({
-		Current = (health.Current :: number) + bonusHealth,
-		Max = (health.Max :: number) + bonusHealth,
-	}))
-	
+
+	world:insert(
+		entityId,
+		HealthComponent({
+			Current = (health.Current :: number) + bonusHealth,
+			Max = (health.Max :: number) + bonusHealth,
+		})
+	)
+
 	return true
 end
 
@@ -267,30 +275,28 @@ end
 	@param Components ComponentRegistry - Component registry with HealthComponent
 	@return boolean - True if health was modified
 ]]
-function ECSUtils.ScaleHealth(
-	world: any,
-	entityId: number,
-	multiplier: number,
-	Components: ComponentRegistry
-): boolean
+function ECSUtils.ScaleHealth(world: any, entityId: number, multiplier: number, Components: ComponentRegistry): boolean
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	local HealthComponent = Components.HealthComponent
 	local health = world:get(entityId, HealthComponent)
 	if not health then
 		return false
 	end
-	
+
 	local newMax = math.floor((health.Max :: number) * multiplier)
 	local newCurrent = math.floor((health.Current :: number) * multiplier)
-	
-	world:insert(entityId, HealthComponent({
-		Current = newCurrent,
-		Max = newMax,
-	}))
-	
+
+	world:insert(
+		entityId,
+		HealthComponent({
+			Current = newCurrent,
+			Max = newMax,
+		})
+	)
+
 	return true
 end
 
@@ -340,12 +346,12 @@ function ECSUtils.IsAlive(world: any, entityId: number, Components: ComponentReg
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	local health = world:get(entityId, Components.HealthComponent)
 	if not health then
 		return true -- Entities without health are considered "alive"
 	end
-	
+
 	return (health.Current :: number) > 0
 end
 
@@ -388,7 +394,7 @@ function ECSUtils.ApplyOrRefreshEffect(
 	world: any,
 	entityId: number,
 	Component: any,
-	newData: {[string]: any},
+	newData: { [string]: any },
 	strategy: RefreshStrategy?,
 	durationField: string?,
 	strengthField: string?
@@ -396,27 +402,26 @@ function ECSUtils.ApplyOrRefreshEffect(
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	local strat = strategy or "Longest"
 	local durField = durationField or "RemainingDuration"
-	
+
 	local existing = world:get(entityId, Component)
-	
+
 	if not existing then
 		-- No existing effect, apply new one
 		world:insert(entityId, Component(newData))
 		return true
 	end
-	
+
 	-- Handle based on strategy
 	if strat == "Replace" then
 		world:insert(entityId, Component(newData))
 		return true
-		
 	elseif strat == "Longest" then
 		local existingDuration = existing[durField] or 0
 		local newDuration = newData[durField] or 0
-		
+
 		if newDuration > existingDuration then
 			world:insert(entityId, Component(newData))
 		else
@@ -427,7 +432,6 @@ function ECSUtils.ApplyOrRefreshEffect(
 			world:insert(entityId, Component(merged))
 		end
 		return true
-		
 	elseif strat == "Strongest" then
 		-- Find strength field (first numeric field if not specified)
 		local strField = strengthField
@@ -439,11 +443,11 @@ function ECSUtils.ApplyOrRefreshEffect(
 				end
 			end
 		end
-		
+
 		if strField then
 			local existingStrength = existing[strField] or 0
 			local newStrength = newData[strField] or 0
-			
+
 			if newStrength >= existingStrength then
 				-- Use stronger effect with max duration
 				local merged = Sift.Dictionary.merge(newData, {
@@ -455,18 +459,17 @@ function ECSUtils.ApplyOrRefreshEffect(
 			world:insert(entityId, Component(newData))
 		end
 		return true
-		
 	elseif strat == "Stack" then
 		local existingDuration = existing[durField] or 0
 		local newDuration = newData[durField] or 0
-		
+
 		local merged = Sift.Dictionary.merge(newData, {
 			[durField] = existingDuration + newDuration,
 		})
 		world:insert(entityId, Component(merged))
 		return true
 	end
-	
+
 	return false
 end
 
@@ -483,16 +486,11 @@ end
 	@param defaultValue T - Default value if not found
 	@return T
 ]]
-function ECSUtils.GetOrDefault<T>(
-	world: any,
-	entityId: number,
-	Component: any,
-	defaultValue: T
-): T
+function ECSUtils.GetOrDefault<T>(world: any, entityId: number, Component: any, defaultValue: T): T
 	if not world:contains(entityId) then
 		return defaultValue
 	end
-	
+
 	local component = world:get(entityId, Component)
 	return if component then component else defaultValue
 end
@@ -505,17 +503,17 @@ end
 	@param components {any} - Array of component types
 	@return boolean
 ]]
-function ECSUtils.HasAllComponents(world: any, entityId: number, components: {any}): boolean
+function ECSUtils.HasAllComponents(world: any, entityId: number, components: { any }): boolean
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	for _, Component in components do
 		if not world:get(entityId, Component) then
 			return false
 		end
 	end
-	
+
 	return true
 end
 
@@ -527,17 +525,17 @@ end
 	@param components {any} - Array of component types
 	@return boolean
 ]]
-function ECSUtils.HasAnyComponent(world: any, entityId: number, components: {any}): boolean
+function ECSUtils.HasAnyComponent(world: any, entityId: number, components: { any }): boolean
 	if not world:contains(entityId) then
 		return false
 	end
-	
+
 	for _, Component in components do
 		if world:get(entityId, Component) then
 			return true
 		end
 	end
-	
+
 	return false
 end
 

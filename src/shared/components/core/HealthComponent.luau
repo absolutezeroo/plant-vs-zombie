@@ -11,6 +11,6 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("HealthComponent", {
-	Current = 100,    -- Current health points
-	Max = 100,        -- Maximum health points
+	Current = 100, -- Current health points
+	Max = 100, -- Maximum health points
 })

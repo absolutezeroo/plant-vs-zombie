@@ -11,7 +11,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type SunOnKillComponent = {
-	SunAmount: number,  -- How much sun to spawn per kill
+	SunAmount: number, -- How much sun to spawn per kill
 }
 
 return Matter.component("SunOnKill")

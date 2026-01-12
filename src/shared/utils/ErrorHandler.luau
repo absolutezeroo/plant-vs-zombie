@@ -32,7 +32,7 @@ export type ErrorRecord = {
 }
 
 -- Recent errors for debugging (not persistent)
-local recentErrors: {ErrorRecord} = {}
+local recentErrors: { ErrorRecord } = {}
 local MAX_RECENT_ERRORS = 50
 
 --[[
@@ -50,22 +50,22 @@ function ErrorHandler.Report(message: string, context: string, severity: Severit
 		Timestamp = os.time(),
 		Realm = realm,
 	}
-	
+
 	-- Store recent errors (circular buffer with Sift)
 	recentErrors = Sift.Array.push(recentErrors, record)
 	if #recentErrors > MAX_RECENT_ERRORS then
 		recentErrors = Sift.Array.removeIndex(recentErrors, 1)
 	end
-	
+
 	-- Format output
 	local prefix = `[{severity}][{realm}][{context}]`
 	local fullMessage = `{prefix} {message}`
-	
+
 	-- Severity-based handling
 	if severity == "Critical" then
 		-- Always log critical errors
 		warn(fullMessage)
-		
+
 		-- In Studio, also throw to halt execution
 		if isStudio then
 			error(fullMessage, 2)
@@ -90,12 +90,12 @@ end
 ]]
 function ErrorHandler.Try<T>(fn: () -> T, context: string): (boolean, T | string)
 	local success, result = pcall(fn)
-	
+
 	if not success then
 		-- Result is error message when pcall fails
 		ErrorHandler.Report(tostring(result), context, "Important")
 	end
-	
+
 	return success, result
 end
 
@@ -103,7 +103,7 @@ end
 	Get recent errors for debugging
 	@return Array of recent error records
 ]]
-function ErrorHandler.GetRecentErrors(): {ErrorRecord}
+function ErrorHandler.GetRecentErrors(): { ErrorRecord }
 	return recentErrors
 end
 

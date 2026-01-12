@@ -11,9 +11,9 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type ArmedComponent = {
-	IsArmed: boolean,       -- True when ready to explode
-	ArmTime: number,        -- os.clock() when arming started
-	ArmDuration: number,    -- Seconds to fully arm
+	IsArmed: boolean, -- True when ready to explode
+	ArmTime: number, -- os.clock() when arming started
+	ArmDuration: number, -- Seconds to fully arm
 }
 
 return Matter.component("Armed")

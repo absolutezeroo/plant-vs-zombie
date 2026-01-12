@@ -77,13 +77,13 @@ local _gameStarted: any = nil -- True once GameStarted event is received
 	Get the player's equipped plants from PlayerDataClient.
 	Falls back to default deck if unavailable.
 ]]
-local function getEquippedPlants(): {string}
+local function getEquippedPlants(): { string }
 	local deck = PlayerDataClient.GetDeck()
 	if deck and #deck > 0 then
 		return deck
 	end
 	-- Fallback default deck
-	return {"Sunflower", "Peashooter", "WallNut"}
+	return { "Sunflower", "Peashooter", "WallNut" }
 end
 
 --[[
@@ -100,7 +100,7 @@ end
 local function onReadyClick(preparationPhase: any)
 	Logger.Info("HUDController", "Ready button clicked - starting wave")
 	preparationPhase:set(false)
-	
+
 	Network.StartWaveRequest.Fire({
 		RequestId = math.random(1, 65535),
 	})
@@ -114,15 +114,15 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 	if not localPlayer then
 		error("HUDController: No LocalPlayer found")
 	end
-	
+
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
-	
+
 	-- Get reactive player data (both deck and mutations are reactive now)
 	local equippedPlants = PlayerDataClient.GetDeckValue()
 	local equippedMutations = PlayerDataClient.GetMutationsValue()
-	
+
 	Logger.Debug("HUDController", `Building HUD with reactive deck and mutations`)
-	
+
 	-- Ready button text with countdown
 	local readyButtonText = scope:Computed(function(use)
 		local timeLeft = math.floor(use(preparationTime))
@@ -131,54 +131,54 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 		end
 		return "🌻 READY!"
 	end)
-	
+
 	-- Intermission indicator text
 	local intermissionText = scope:Computed(function(use)
 		local timeLeft = math.floor(use(intermissionTime))
 		return `🎉 WAVE COMPLETE! Next in {timeLeft}s`
 	end)
-	
+
 	-- Create ScreenGui
-	local screenGui = scope:New("ScreenGui") {
+	local screenGui = scope:New("ScreenGui")({
 		Name = "GameHUD",
 		Parent = playerGui,
 		IgnoreGuiInset = true,
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		
+
 		[Children] = {
 			-- Responsive scaling for all HUD elements
 			ResponsiveUtils.CreateUIScale(scope),
-			
+
 			-- Top-Center: SunCounter + SeedBank + CoinCounter in horizontal layout
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "TopBar",
 				Size = UDim2.fromScale(1, 0.12), -- Width 100%, height 12%
 				Position = UDim2.fromScale(0.5, 0.01),
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
-				
+
 				[Children] = {
 					-- Constrain height for consistency
-					scope:New("UISizeConstraint") {
+					scope:New("UISizeConstraint")({
 						MinSize = Vector2.new(0, 80),
 						MaxSize = Vector2.new(9999, 120),
-					},
-					
-					scope:New("UIListLayout") {
+					}),
+
+					scope:New("UIListLayout")({
 						FillDirection = Enum.FillDirection.Horizontal,
 						HorizontalAlignment = Enum.HorizontalAlignment.Center,
 						VerticalAlignment = Enum.VerticalAlignment.Center,
 						Padding = UDim.new(0.01, 0),
 						SortOrder = Enum.SortOrder.LayoutOrder,
-					},
-					
+					}),
+
 					-- Sun Counter (left)
 					SunCounter({
 						Scope = scope,
 						LayoutOrder = 1,
 					}),
-					
+
 					-- Seed Bank (center)
 					SeedBank({
 						Scope = scope,
@@ -188,15 +188,15 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 						ZIndex = 5,
 						LayoutOrder = 2,
 					}),
-					
+
 					-- Coin Counter (right)
 					CoinCounter({
 						Scope = scope,
 						LayoutOrder = 3,
 					}),
 				},
-			},
-			
+			}),
+
 			-- Bottom-Center: Ready Button (visible during preparation phase AND game has started)
 			ToonButton({
 				Scope = scope,
@@ -213,9 +213,9 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 				end),
 				ZIndex = 10,
 			}),
-			
+
 			-- Intermission Indicator (visible between waves)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "IntermissionIndicator",
 				Size = UDim2.fromScale(0.25, 0.06), -- 25% width, 6% height
 				Position = UDim2.fromScale(0.5, 0.35),
@@ -225,20 +225,20 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 					return use(intermissionTime) > 0 and not use(preparationPhase)
 				end),
 				ZIndex = 15,
-				
+
 				[Children] = {
-					scope:New("UISizeConstraint") {
+					scope:New("UISizeConstraint")({
 						MinSize = Vector2.new(200, 40),
 						MaxSize = Vector2.new(400, 80),
-					},
-					scope:New("UICorner") {
+					}),
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
-					scope:New("UIStroke") {
+					}),
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
-					},
-					scope:New("TextLabel") {
+					}),
+					scope:New("TextLabel")({
 						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						Text = intermissionText,
@@ -247,17 +247,17 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 						TextScaled = true,
 						TextStrokeTransparency = 0,
 						TextStrokeColor3 = Theme.Colors.Surface.Stroke :: Color3,
-						
+
 						[Children] = {
-							scope:New("UITextSizeConstraint") {
+							scope:New("UITextSizeConstraint")({
 								MaxTextSize = 24,
 								MinTextSize = 14,
-							},
+							}),
 						},
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Bottom-Right: Wave Progress Bar
 			WaveProgressBar({
 				Scope = scope,
@@ -265,7 +265,7 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 				AnchorPoint = Vector2.new(1, 1),
 				ZIndex = 5,
 			}),
-			
+
 			-- Bottom-Left: Base Health Bar
 			BaseHealthBar({
 				Scope = scope,
@@ -274,8 +274,8 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 				ZIndex = 5,
 			}),
 		},
-	}
-	
+	})
+
 	return screenGui :: ScreenGui
 end
 
@@ -289,24 +289,24 @@ end
 ]]
 function HUDController.new()
 	local self = setmetatable({}, HUDController)
-	
+
 	-- Create Fusion 0.3 scope with methods
 	_scope = Fusion.scoped(Fusion)
-	
+
 	-- Initialize reactive state
 	_waveNumber = _scope:Value(0)
 	_preparationPhase = _scope:Value(true)
 	_preparationTime = _scope:Value(0)
 	_intermissionTime = _scope:Value(0)
 	_gameStarted = _scope:Value(false) -- Will be set true when GameStarted event received
-	
+
 	-- Expose for countdown loop in init.client.luau
 	self._waveNumber = _waveNumber
 	self._preparationPhase = _preparationPhase
 	self._preparationTime = _preparationTime
 	self._intermissionTime = _intermissionTime
 	self._gameStarted = _gameStarted
-	
+
 	Logger.Debug("HUDController", "Created new HUD controller")
 	return self
 end
@@ -319,15 +319,15 @@ function HUDController:Mount()
 		Logger.Warn("HUDController", "Already mounted")
 		return
 	end
-	
+
 	-- Build and mount HUD with reactive state for Ready button and Intermission
 	_screenGui = buildHUD(_scope, _preparationPhase, _preparationTime, _intermissionTime)
-	
+
 	-- Store in trove for cleanup
 	if _screenGui then
 		_trove:Add(_screenGui)
 	end
-	
+
 	_initialized = true
 	Logger.Info("HUDController", "HUD mounted")
 end
@@ -339,12 +339,12 @@ function HUDController:Unmount()
 	if not _initialized then
 		return
 	end
-	
+
 	if _screenGui then
 		_screenGui:Destroy()
 		_screenGui = nil
 	end
-	
+
 	_initialized = false
 	Logger.Info("HUDController", "HUD unmounted")
 end
@@ -386,24 +386,24 @@ function HUDController.Initialize()
 		Logger.Warn("HUDController", "Already initialized")
 		return
 	end
-	
+
 	-- Create Fusion 0.3 scope with methods
 	_scope = Fusion.scoped(Fusion)
-	
+
 	-- Initialize reactive state
 	_waveNumber = _scope:Value(0)
 	_preparationPhase = _scope:Value(true)
 	_preparationTime = _scope:Value(0)
 	_intermissionTime = _scope:Value(0)
-	
+
 	-- Build and mount HUD
 	_screenGui = buildHUD(_scope)
-	
+
 	-- Store in trove for cleanup
 	if _screenGui then
 		_trove:Add(_screenGui)
 	end
-	
+
 	_initialized = true
 	Logger.Info("HUDController", "Initialized - GameHUD mounted")
 end
@@ -416,7 +416,7 @@ function HUDController.RefreshDeck()
 	if not _initialized or not _scope then
 		return
 	end
-	
+
 	-- For now, log that refresh was requested
 	-- Full implementation would rebuild the SeedBank or use reactive props
 	Logger.Debug("HUDController", "Deck refresh requested")
@@ -446,18 +446,18 @@ function HUDController.Dispose()
 	if not _initialized then
 		return
 	end
-	
+
 	_trove:Destroy()
 	_trove = Trove.new()
-	
+
 	if _scope then
 		Fusion.doCleanup(_scope)
 		_scope = nil
 	end
-	
+
 	_screenGui = nil
 	_initialized = false
-	
+
 	Logger.Info("HUDController", "Disposed")
 end
 

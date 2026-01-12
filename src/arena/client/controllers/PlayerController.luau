@@ -26,7 +26,7 @@ local function setupCharacter(character: Model)
 		-- Disable jumping completely
 		humanoid.JumpPower = 0
 		humanoid.JumpHeight = 0
-		
+
 		Logger.Debug("PlayerController", "Jump disabled for character")
 	end
 end
@@ -39,17 +39,17 @@ function PlayerController.Init()
 		return
 	end
 	_initialized = true
-	
+
 	local player = Players.LocalPlayer
-	
+
 	-- Setup current character if exists
 	if player.Character then
 		setupCharacter(player.Character)
 	end
-	
+
 	-- Setup future characters (respawn)
 	player.CharacterAdded:Connect(setupCharacter)
-	
+
 	Logger.Info("PlayerController", "Initialized - Jump disabled in Arena")
 end
 

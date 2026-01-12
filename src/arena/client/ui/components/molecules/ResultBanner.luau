@@ -23,11 +23,11 @@ local Children = Fusion.Children
 -- Colors
 local Colors = {
 	Victory = {
-		Background = Color3.fromRGB(100, 180, 80),  -- Green
+		Background = Color3.fromRGB(100, 180, 80), -- Green
 		Stroke = Color3.fromRGB(60, 120, 50),
 	},
 	Defeat = {
-		Background = Color3.fromRGB(180, 60, 60),   -- Red
+		Background = Color3.fromRGB(180, 60, 60), -- Red
 		Stroke = Color3.fromRGB(120, 40, 40),
 	},
 }
@@ -50,32 +50,32 @@ export type ResultBannerProps = {
 ]]
 local function ResultBanner(props: ResultBannerProps): Frame
 	local scope = props.Scope
-	
+
 	-- Animated scale for entrance
 	local targetScale = scope:Computed(function()
 		return 1.0
 	end)
 	local animatedScale = scope:Spring(targetScale, 20, 0.6)
-	
+
 	-- Dynamic colors
 	local bgColor = scope:Computed(function(use)
 		return if use(props.Victory) then Colors.Victory.Background else Colors.Defeat.Background
 	end)
-	
+
 	local strokeColor = scope:Computed(function(use)
 		return if use(props.Victory) then Colors.Victory.Stroke else Colors.Defeat.Stroke
 	end)
-	
+
 	-- Icon
 	local icon = scope:Computed(function(use)
 		return if use(props.Victory) then "🏆" else "💀"
 	end)
-	
+
 	-- Title text
 	local titleText = scope:Computed(function(use)
 		return if use(props.Victory) then "VICTOIRE !" else "DÉFAITE..."
 	end)
-	
+
 	-- Subtitle (wave reached)
 	local subtitleText = scope:Computed(function(use)
 		local wave = props.WaveReached and use(props.WaveReached) or 0
@@ -85,35 +85,35 @@ local function ResultBanner(props: ResultBannerProps): Frame
 			return `Vague atteinte : {wave}`
 		end
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "ResultBanner",
 		Size = UDim2.fromScale(1, 0.16), -- 16% of parent height
 		BackgroundColor3 = bgColor,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Size constraints
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(200, 50),
 				MaxSize = Vector2.new(500, 80),
-			},
-			
-			scope:New("UIScale") {
+			}),
+
+			scope:New("UIScale")({
 				Scale = animatedScale,
-			},
-			
-			scope:New("UICorner") {
+			}),
+
+			scope:New("UICorner")({
 				CornerRadius = UDim.new(0.15, 0), -- Relative corner radius
-			},
-			
-			scope:New("UIStroke") {
+			}),
+
+			scope:New("UIStroke")({
 				Color = strokeColor,
 				Thickness = 3,
-			},
-			
+			}),
+
 			-- Icon (left, square aspect)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "Icon",
 				Size = UDim2.fromScale(0.12, 0.75),
 				Position = UDim2.fromScale(0.03, 0.5),
@@ -121,17 +121,17 @@ local function ResultBanner(props: ResultBannerProps): Frame
 				BackgroundTransparency = 1,
 				Text = icon,
 				TextScaled = true,
-				
+
 				[Children] = {
-					scope:New("UIAspectRatioConstraint") {
+					scope:New("UIAspectRatioConstraint")({
 						AspectRatio = 1,
 						DominantAxis = Enum.DominantAxis.Height,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Title (responsive)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "Title",
 				Size = UDim2.fromScale(0.7, 0.5),
 				Position = UDim2.fromScale(0.18, 0.12),
@@ -143,17 +143,17 @@ local function ResultBanner(props: ResultBannerProps): Frame
 				TextScaled = true,
 				Font = Theme.Typography.Fonts.Title,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 28,
 						MinTextSize = 16,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Subtitle (responsive)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "Subtitle",
 				Size = UDim2.fromScale(0.7, 0.3),
 				Position = UDim2.fromScale(0.18, 0.62),
@@ -163,16 +163,16 @@ local function ResultBanner(props: ResultBannerProps): Frame
 				TextScaled = true,
 				Font = Theme.Typography.Fonts.Body,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 14,
 						MinTextSize = 10,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return ResultBanner

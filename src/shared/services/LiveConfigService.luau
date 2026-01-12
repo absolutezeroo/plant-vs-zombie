@@ -45,7 +45,7 @@ export type ConfigKey = string
 -- Plant: "Plant_Peashooter_Cost", "Plant_Sunflower_Damage", etc.
 
 -- Default values for all known config keys
-local DEFAULT_VALUES: {[string]: number} = {
+local DEFAULT_VALUES: { [string]: number } = {
 	-- Global multipliers (1.0 = no change)
 	Global_ZombieHealth = 1.0,
 	Global_ZombieSpeed = 1.0,
@@ -54,19 +54,19 @@ local DEFAULT_VALUES: {[string]: number} = {
 	Global_PlantHealth = 1.0,
 	Global_SunDropRate = 1.0,
 	Global_CoinDropRate = 1.0,
-	
+
 	-- Difficulty-specific multipliers (1.0 = use base value)
 	Difficulty_Easy_ZombieHealthMult = 1.0,
 	Difficulty_Normal_ZombieHealthMult = 1.0,
 	Difficulty_Hard_ZombieHealthMult = 1.0,
 	Difficulty_Nightmare_ZombieHealthMult = 1.0,
-	
+
 	-- Difficulty coin rewards (0 = use base value)
 	Difficulty_Easy_CoinReward = 0,
 	Difficulty_Normal_CoinReward = 0,
 	Difficulty_Hard_CoinReward = 0,
 	Difficulty_Nightmare_CoinReward = 0,
-	
+
 	-- Zombie-specific multipliers (1.0 = no change)
 	Zombie_Basic_HealthMult = 1.0,
 	Zombie_Basic_SpeedMult = 1.0,
@@ -74,7 +74,7 @@ local DEFAULT_VALUES: {[string]: number} = {
 	Zombie_Gargantuar_HealthMult = 1.0,
 	Zombie_Gargantuar_SpeedMult = 1.0,
 	Zombie_Gargantuar_DamageMult = 1.0,
-	
+
 	-- Plant-specific overrides (0 = use base value)
 	-- Format: Plant_{Type}_{Stat} where Stat = Cost, Damage, Cooldown, Health
 	Plant_Peashooter_Cost = 0,
@@ -93,8 +93,8 @@ local DEFAULT_VALUES: {[string]: number} = {
 -- ============================================
 
 -- Cache to avoid repeated ConfigurationService calls
-local _cache: {[string]: number} = {}
-local _cacheExpiry: {[string]: number} = {}
+local _cache: { [string]: number } = {}
+local _cacheExpiry: { [string]: number } = {}
 local CACHE_TTL_SECONDS = 60 -- Refresh cache every 60 seconds
 
 -- ============================================
@@ -119,23 +119,23 @@ local function getCloudFloat(key: string, default: number): number
 	if isCacheValid(key) then
 		return _cache[key]
 	end
-	
+
 	-- Only server can access DataStore
 	if not _isServer or not _configStore then
 		setCacheValue(key, default)
 		return default
 	end
-	
+
 	-- Try to get from DataStore
 	local success, result = pcall(function()
 		return _configStore:GetAsync(key)
 	end)
-	
+
 	if success and result ~= nil and type(result) == "number" then
 		setCacheValue(key, result)
 		return result
 	end
-	
+
 	-- Fallback to default
 	setCacheValue(key, default)
 	return default
@@ -146,15 +146,15 @@ local function getCloudString(key: string, default: string): string
 	if not _isServer or not _configStore then
 		return default
 	end
-	
+
 	local success, result = pcall(function()
 		return _configStore:GetAsync(key)
 	end)
-	
+
 	if success and result ~= nil and type(result) == "string" and result ~= "" then
 		return result
 	end
-	
+
 	return default
 end
 
@@ -236,9 +236,9 @@ function LiveConfigService.GetDifficultyOverride(difficultyId: string, field: st
 	-- Capitalize first letter for key format
 	local capitalizedId = difficultyId:sub(1, 1):upper() .. difficultyId:sub(2):lower()
 	local key = `Difficulty_{capitalizedId}_{field}` :: ConfigKey
-	
+
 	local override = getCloudFloat(key, 0)
-	
+
 	-- If override is 0, use base value (0 means "not configured")
 	-- For multipliers, check if it's a Mult field
 	if field:match("Mult$") then
@@ -281,16 +281,16 @@ function LiveConfigService.SetConfigValue(key: ConfigKey, value: number): boolea
 	if not _isServer or not _configStore then
 		return false
 	end
-	
+
 	local success = pcall(function()
 		_configStore:SetAsync(key, value)
 	end)
-	
+
 	if success then
 		-- Update cache immediately
 		setCacheValue(key, value)
 	end
-	
+
 	return success
 end
 

@@ -33,7 +33,7 @@ export type SessionStats = {
 --------------------------------------------------------------------------------
 local _isInitialized = false
 local _trove: any = nil
-local _sessionStats: {[Player]: SessionStats} = {}
+local _sessionStats: { [Player]: SessionStats } = {}
 
 --------------------------------------------------------------------------------
 -- Private Functions
@@ -58,15 +58,17 @@ local StatsService = {}
 	Initialize the stats service
 ]]
 function StatsService.Initialize()
-	if _isInitialized then return end
-	
+	if _isInitialized then
+		return
+	end
+
 	_trove = Trove.new()
-	
+
 	-- Clean up when player leaves
 	_trove:Connect(Players.PlayerRemoving, function(player)
 		_sessionStats[player] = nil
 	end)
-	
+
 	_isInitialized = true
 	Logger.Info("StatsService", "Initialized")
 end

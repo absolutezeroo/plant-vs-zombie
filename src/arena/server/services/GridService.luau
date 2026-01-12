@@ -18,7 +18,7 @@ local GridConfig = require(Shared.config.GridConfig)
 local GridService = {}
 
 -- 2D array: _occupancy[column][lane] = entityId or nil
-local _occupancy: {{number?}} = {}
+local _occupancy: { { number? } } = {}
 
 -- Initialize empty grid
 local function initGrid()
@@ -77,11 +77,11 @@ function GridService.Occupy(column: number, lane: number, entityId: number): boo
 	if GridService.IsOccupied(column, lane) then
 		return false
 	end
-	
+
 	if not _occupancy[column] then
 		_occupancy[column] = {}
 	end
-	
+
 	_occupancy[column][lane] = entityId
 	return true
 end
@@ -145,7 +145,7 @@ end
 	
 	@return {{Column: number, Lane: number, EntityId: number}}
 ]]
-function GridService.GetAllOccupied(): {{Column: number, Lane: number, EntityId: number}}
+function GridService.GetAllOccupied(): { { Column: number, Lane: number, EntityId: number } }
 	local occupied = {}
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do
@@ -156,9 +156,9 @@ function GridService.GetAllOccupied(): {{Column: number, Lane: number, EntityId:
 					Lane = lane,
 					EntityId = entityId,
 				})
-				end
 			end
 		end
+	end
 	return occupied
 end
 

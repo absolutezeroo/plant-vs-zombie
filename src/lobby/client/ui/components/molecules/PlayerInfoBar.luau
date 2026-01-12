@@ -34,11 +34,11 @@ export type PlayerInfoBarProps = {
 
 local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 	local scope = props.Scope
-	
+
 	-- Responsive scale based on viewport (designed for 1080p)
 	local camera = workspace.CurrentCamera
 	local viewportSize = scope:Value(camera and camera.ViewportSize or Vector2.new(1920, 1080))
-	
+
 	-- Update viewport size on change (cleanup handled by scope)
 	if camera then
 		local connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
@@ -46,25 +46,25 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 		end)
 		table.insert(scope, connection)
 	end
-	
+
 	local uiScale = scope:Computed(function(use)
 		local size = use(viewportSize)
 		-- Scale up more aggressively (reference 720p, allow up to 2.5x)
 		return math.clamp(size.Y / 720, 0.8, 2.5)
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "PlayerInfoBar",
 		Size = UDim2.fromOffset(280, 70),
 		Position = props.Position or UDim2.fromScale(0.01, 0.06),
 		BackgroundTransparency = 1,
-		
+
 		[Children] = {
 			-- Responsive scaling
-			scope:New("UIScale") {
+			scope:New("UIScale")({
 				Scale = uiScale,
-			},
-			
+			}),
+
 			-- Avatar (left)
 			AvatarFrame({
 				Scope = scope,
@@ -72,7 +72,7 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 				Position = UDim2.fromOffset(0, 0),
 				BorderColor = Theme.Colors.Info.Main,
 			}),
-			
+
 			-- Level badge (overlapping avatar)
 			LevelBadge({
 				Scope = scope,
@@ -83,21 +83,21 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 				Position = UDim2.fromOffset(44, 28),
 				AnchorPoint = Vector2.new(0, 0),
 			}),
-			
+
 			-- Resources (right of avatar)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Resources",
 				Size = UDim2.fromOffset(180, 70),
 				Position = UDim2.fromOffset(95, 0),
 				BackgroundTransparency = 1,
-				
+
 				[Children] = {
-					scope:New("UIListLayout") {
+					scope:New("UIListLayout")({
 						SortOrder = Enum.SortOrder.LayoutOrder,
 						FillDirection = Enum.FillDirection.Vertical,
 						Padding = UDim.new(0, 4),
-					},
-					
+					}),
+
 					-- Coins
 					ResourcePill({
 						Scope = scope,
@@ -107,7 +107,7 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 						Width = 100,
 						LayoutOrder = 1,
 					}),
-					
+
 					-- Gems
 					ResourcePill({
 						Scope = scope,
@@ -118,9 +118,9 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 						LayoutOrder = 2,
 					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return PlayerInfoBar

@@ -35,7 +35,9 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -46,16 +48,22 @@ end
 
 -- Helper: Find nearby zombies within range (excluding already hit ones)
 -- Uses LaneCache for O(lane_range) lookup instead of O(N) world:query
-local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: number}, range: number, excludeIds: {number}, centerLane: number?): {number}
+local function findNearbyZombies(
+	world,
+	centerPos: { X: number, Y: number, Z: number },
+	range: number,
+	excludeIds: { number },
+	centerLane: number?
+): { number }
 	local nearby = {}
-	
+
 	-- Calculate how many lanes the range covers
 	local laneRadius = math.ceil(range / GridConfig.CELL_SIZE)
 	local lane = centerLane or CONFIG.DEFAULT_CENTER_LANE
-	
+
 	-- O(lane_range) lookup instead of O(N) world:query
 	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(lane, laneRadius)
-	
+
 	for _, entityId in zombiesInRange do
 		-- Check if excluded
 		local isExcluded = false
@@ -65,18 +73,22 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 				break
 			end
 		end
-		
+
 		if not isExcluded then
-			if not world:contains(entityId) then continue end
-			
+			if not world:contains(entityId) then
+				continue
+			end
+
 			local pos = LaneCache.GetPosition(entityId)
-			if not pos then continue end
-			
+			if not pos then
+				continue
+			end
+
 			-- Calculate distance
 			local dx = pos.X - centerPos.X
 			local dz = pos.Z - centerPos.Z
 			local distance = math.sqrt(dx * dx + dz * dz)
-			
+
 			if distance <= range then
 				nearby = Sift.Array.push(nearby, {
 					entityId = entityId,
@@ -85,12 +97,12 @@ local function findNearbyZombies(world, centerPos: {X: number, Y: number, Z: num
 			end
 		end
 	end
-	
+
 	-- Sort by distance (closest first)
 	local sortedNearby = Sift.Array.sort(nearby, function(a, b)
 		return a.distance < b.distance
 	end)
-	
+
 	-- Return just entity IDs
 	return Sift.Array.map(sortedNearby, function(data)
 		return data.entityId
@@ -99,35 +111,39 @@ end
 
 -- Helper: Apply chain lightning damage from a source
 local function applyChainLightning(
-	world, 
+	world,
 	sourceZombieId: number,
-	baseDamage: number, 
-	chainCount: number, 
-	chainDamagePercent: number, 
+	baseDamage: number,
+	chainCount: number,
+	chainDamagePercent: number,
 	chainRange: number,
 	sourceLane: number?
 )
-	if not world:contains(sourceZombieId) then return end
-	
+	if not world:contains(sourceZombieId) then
+		return
+	end
+
 	local sourcePos = world:get(sourceZombieId, Components.PositionComponent)
-	if not sourcePos then return end
-	
-	local hitZombies = {sourceZombieId}
-	local currentPos: {X: number, Y: number, Z: number} = {X = sourcePos.X, Y = sourcePos.Y, Z = sourcePos.Z}
+	if not sourcePos then
+		return
+	end
+
+	local hitZombies = { sourceZombieId }
+	local currentPos: { X: number, Y: number, Z: number } = { X = sourcePos.X, Y = sourcePos.Y, Z = sourcePos.Z }
 	local currentDamage = baseDamage * chainDamagePercent
 	local currentLane = sourceLane or CONFIG.DEFAULT_CENTER_LANE
-	
+
 	for _ = 1, chainCount do
 		-- Find next target (pass current lane for optimized lookup)
 		local nearbyZombies = findNearbyZombies(world, currentPos, chainRange, hitZombies, currentLane)
-		
+
 		if #nearbyZombies == 0 then
 			break -- No more targets
 		end
-		
+
 		local nextTarget = nearbyZombies[1]
 		hitZombies = Sift.Array.push(hitZombies, nextTarget)
-		
+
 		-- Apply damage to next target using ECSUtils
 		local actualDamage = ECSUtils.DamageEntity(world, nextTarget, currentDamage, Components)
 		if actualDamage > 0 then
@@ -139,11 +155,13 @@ local function applyChainLightning(
 				Source = sourceZombieId,
 			}))
 		end
-		
+
 		-- Update for next chain
 		local nextPos = world:get(nextTarget, Components.PositionComponent)
-		if not nextPos then break end
-		
+		if not nextPos then
+			break
+		end
+
 		-- Fire VFX event for chain lightning beam
 		Network.ChainLightningVFX.FireAll({
 			SourceX = currentPos.X,
@@ -154,8 +172,8 @@ local function applyChainLightning(
 			TargetZ = nextPos.Z,
 			Damage = currentDamage,
 		})
-		
-		currentPos = {X = nextPos.X, Y = nextPos.Y, Z = nextPos.Z}
+
+		currentPos = { X = nextPos.X, Y = nextPos.Y, Z = nextPos.Z }
 	end
 end
 
@@ -164,11 +182,19 @@ local function OnStep(world)
 	-- Process ProjectileHitEvents: apply chain lightning from plants with ChainLightningComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
-		if not world:contains(sourcePlant) then continue end
-		
+		if not world:contains(sourcePlant) then
+			continue
+		end
+
 		local chainLightning = world:get(sourcePlant, Components.ChainLightningComponent)
 		if chainLightning then
-			Logger.Debug("ChainLightning", "Triggering chain from plant", sourcePlant, "to zombie", hitEvent.TargetZombie)
+			Logger.Debug(
+				"ChainLightning",
+				"Triggering chain from plant",
+				sourcePlant,
+				"to zombie",
+				hitEvent.TargetZombie
+			)
 			applyChainLightning(
 				world,
 				hitEvent.TargetZombie,

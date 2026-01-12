@@ -34,7 +34,9 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -44,28 +46,42 @@ local function Dispose()
 end
 
 -- Helper: Try to freeze a zombie (with chance roll)
-local function tryFreeze(world, zombieEntityId: number, freezeChance: number, freezeDuration: number, enhancedSlow: number?): boolean
-	if not world:contains(zombieEntityId) then return false end
-	
+local function tryFreeze(
+	world,
+	zombieEntityId: number,
+	freezeChance: number,
+	freezeDuration: number,
+	enhancedSlow: number?
+): boolean
+	if not world:contains(zombieEntityId) then
+		return false
+	end
+
 	-- Check if already frozen
 	local existingFreeze = world:get(zombieEntityId, Components.FrozenComponent)
 	if existingFreeze then
 		-- Refresh duration
-		world:insert(zombieEntityId, Components.FrozenComponent({
-			RemainingDuration = math.max(existingFreeze.RemainingDuration, freezeDuration),
-			AppliedAt = os.clock(),
-		}))
+		world:insert(
+			zombieEntityId,
+			Components.FrozenComponent({
+				RemainingDuration = math.max(existingFreeze.RemainingDuration, freezeDuration),
+				AppliedAt = os.clock(),
+			})
+		)
 		return true
 	end
-	
+
 	-- Roll for freeze
 	if ChanceUtils.Roll(freezeChance) then
 		-- Freeze successful!
-		world:insert(zombieEntityId, Components.FrozenComponent({
-			RemainingDuration = freezeDuration,
-			AppliedAt = os.clock(),
-		}))
-		
+		world:insert(
+			zombieEntityId,
+			Components.FrozenComponent({
+				RemainingDuration = freezeDuration,
+				AppliedAt = os.clock(),
+			})
+		)
+
 		-- Fire VFX event for freeze application
 		local pos = world:get(zombieEntityId, Components.PositionComponent)
 		if pos then
@@ -78,24 +94,27 @@ local function tryFreeze(world, zombieEntityId: number, freezeChance: number, fr
 				PositionZ = pos.Z,
 			})
 		end
-		
+
 		return true
 	else
 		-- Apply enhanced slow if specified
 		if enhancedSlow and enhancedSlow > 0 then
 			local existingSlow = world:get(zombieEntityId, Components.SlowComponent)
 			local slowPercent = CONFIG.DEFAULT_SLOW_PERCENT + enhancedSlow
-			
+
 			if existingSlow then
 				local existingSlowPercent = existingSlow.SlowPercent :: number
 				slowPercent = math.min(CONFIG.MAX_SLOW_PERCENT, existingSlowPercent + enhancedSlow)
 			end
-			
-			world:insert(zombieEntityId, Components.SlowComponent({
-				SlowPercent = slowPercent,
-				Duration = CONFIG.DEFAULT_SLOW_DURATION,
-				AppliedAt = os.clock(),
-			}))
+
+			world:insert(
+				zombieEntityId,
+				Components.SlowComponent({
+					SlowPercent = slowPercent,
+					Duration = CONFIG.DEFAULT_SLOW_DURATION,
+					AppliedAt = os.clock(),
+				})
+			)
 		end
 		return false
 	end
@@ -104,12 +123,14 @@ end
 -- 6. MAIN LOOP
 local function OnStep(world)
 	local currentTime = os.clock()
-	
+
 	-- 1. Process ProjectileHitEvents: apply freezes from plants with FreezeEffectComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
-		if not world:contains(sourcePlant) then continue end
-		
+		if not world:contains(sourcePlant) then
+			continue
+		end
+
 		local freezeEffect = world:get(sourcePlant, Components.FreezeEffectComponent)
 		if freezeEffect then
 			tryFreeze(
@@ -121,11 +142,11 @@ local function OnStep(world)
 			)
 		end
 	end
-	
+
 	-- 2. Process all frozen zombies (expiration)
 	for entityId, frozen in world:query(Components.FrozenComponent, Components.ZombieTypeComponent) do
 		local elapsed = currentTime - frozen.AppliedAt
-		
+
 		if elapsed >= frozen.RemainingDuration then
 			-- Freeze expired, remove component
 			world:remove(entityId, Components.FrozenComponent)

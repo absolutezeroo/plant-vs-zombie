@@ -28,12 +28,14 @@ local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
 
 -- Get sorted plants list
-local function getSortedPlants(): {{PlantType: string, Info: ProgressionData.PlantUnlockInfo}}
+local function getSortedPlants(): { { PlantType: string, Info: ProgressionData.PlantUnlockInfo } }
 	local plants = {}
 	for plantType, info in pairs(ProgressionData.PlantUnlocks) do
-		table.insert(plants, {PlantType = plantType, Info = info})
+		table.insert(plants, { PlantType = plantType, Info = info })
 	end
-	table.sort(plants, function(a, b) return a.Info.Order < b.Info.Order end)
+	table.sort(plants, function(a, b)
+		return a.Info.Order < b.Info.Order
+	end)
 	return plants
 end
 
@@ -48,7 +50,7 @@ export type ShopScreenProps = {
 local function ShopScreen(props: ShopScreenProps)
 	local scope = props.Scope
 	local sortedPlants = getSortedPlants()
-	
+
 	-- Viewport-based responsive sizing
 	local camera = workspace.CurrentCamera
 	local viewportSize = scope:Value(camera and camera.ViewportSize or Vector2.new(1920, 1080))
@@ -58,41 +60,45 @@ local function ShopScreen(props: ShopScreenProps)
 		end)
 		table.insert(scope, connection)
 	end
-	
+
 	-- Responsive cell size for grid (scales with viewport, ref 1080p)
 	local gridCellSize = scope:Computed(function(use)
 		local size = use(viewportSize)
 		local scale = math.clamp(size.Y / 1080, 0.6, 1.8)
 		return UDim2.fromOffset(math.floor(160 * scale), math.floor(224 * scale))
 	end)
-	
+
 	local gridCellPadding = scope:Computed(function(use)
 		local size = use(viewportSize)
 		local scale = math.clamp(size.Y / 1080, 0.6, 1.8)
 		local padding = math.floor(16 * scale)
 		return UDim2.fromOffset(padding, padding)
 	end)
-	
+
 	-- Filter state
 	local selectedFilter = scope:Value("All")
-	
+
 	-- Close button state
 	local isClosePressed = scope:Value(false)
-	local closeOffset = scope:Spring(scope:Computed(function(use)
-		return if use(isClosePressed) then 4 else 0
-	end), 40, 0.7)
-	
+	local closeOffset = scope:Spring(
+		scope:Computed(function(use)
+			return if use(isClosePressed) then 4 else 0
+		end),
+		40,
+		0.7
+	)
+
 	-- Filtered plants
 	local filteredPlants = scope:Computed(function(use)
 		local filter = use(selectedFilter)
 		local unlocked = use(props.UnlockedPlants) or {}
-		
+
 		-- Build unlocked set
-		local unlockedSet: {[string]: boolean} = {}
+		local unlockedSet: { [string]: boolean } = {}
 		for _, pt in ipairs(unlocked) do
 			unlockedSet[pt] = true
 		end
-		
+
 		local result = {}
 		for _, plant in ipairs(sortedPlants) do
 			local owned = unlockedSet[plant.PlantType] == true
@@ -102,70 +108,70 @@ local function ShopScreen(props: ShopScreenProps)
 		end
 		return result
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "ShopScreen",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
 		BackgroundTransparency = 0.5,
 		ZIndex = 100,
-		
+
 		[Children] = {
 			-- Main panel (centered)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Panel",
 				Size = UDim2.fromScale(0.9, 0.9),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				
+
 				[Children] = {
 					-- Header (top 10%)
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Header",
 						Size = UDim2.fromScale(1, 0.1),
 						Position = UDim2.fromScale(0.5, 0),
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						
+
 						[Children] = {
 							-- Shadow
-							scope:New("Frame") {
+							scope:New("Frame")({
 								Name = "Shadow",
 								Size = UDim2.fromScale(1, 0.9),
 								Position = UDim2.fromScale(0.5, 0.1),
 								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
-								
+
 								[Children] = {
-									scope:New("UICorner") {
+									scope:New("UICorner")({
 										CornerRadius = Theme.Layout.CornerRadius,
-									},
+									}),
 								},
-							},
-							
+							}),
+
 							-- Main header
-							scope:New("Frame") {
+							scope:New("Frame")({
 								Name = "Main",
 								Size = UDim2.fromScale(1, 0.9),
 								Position = UDim2.fromScale(0.5, 0),
 								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Main,
 								ZIndex = 2,
-								
+
 								[Children] = {
-									scope:New("UICorner") {
+									scope:New("UICorner")({
 										CornerRadius = Theme.Layout.CornerRadius,
-									},
-									
-									scope:New("UIStroke") {
+									}),
+
+									scope:New("UIStroke")({
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
-									},
-									
+									}),
+
 									-- Title (centered)
-									scope:New("TextLabel") {
+									scope:New("TextLabel")({
 										Name = "Title",
 										Size = UDim2.fromScale(0.3, 0.6),
 										Position = UDim2.fromScale(0.5, 0.5),
@@ -175,23 +181,23 @@ local function ShopScreen(props: ShopScreenProps)
 										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
 										TextScaled = true,
 										Font = Theme.Typography.Fonts.Title,
-										
+
 										[Children] = {
-											scope:New("UITextSizeConstraint") {
+											scope:New("UITextSizeConstraint")({
 												MaxTextSize = 32,
 												MinTextSize = 16,
-											},
+											}),
 										},
-									},
-									
+									}),
+
 									-- Coins display (left)
-									scope:New("Frame") {
+									scope:New("Frame")({
 										Name = "CoinsContainer",
 										Size = UDim2.fromScale(0.15, 0.6),
 										Position = UDim2.fromScale(0.02, 0.5),
 										AnchorPoint = Vector2.new(0, 0.5),
 										BackgroundTransparency = 1,
-										
+
 										[Children] = {
 											ResourcePill({
 												Scope = scope,
@@ -201,39 +207,39 @@ local function ShopScreen(props: ShopScreenProps)
 												Width = 110,
 											}),
 										},
-									},
-									
+									}),
+
 									-- Close button (right) - Square
-									scope:New("Frame") {
+									scope:New("Frame")({
 										Name = "CloseContainer",
 										Size = UDim2.fromScale(0.08, 0.75),
 										Position = UDim2.fromScale(0.98, 0.5),
 										AnchorPoint = Vector2.new(1, 0.5),
 										BackgroundTransparency = 1,
-										
+
 										[Children] = {
-											scope:New("UIAspectRatioConstraint") {
+											scope:New("UIAspectRatioConstraint")({
 												AspectRatio = 1,
 												DominantAxis = Enum.DominantAxis.Height,
-											},
-											
+											}),
+
 											-- Shadow
-											scope:New("Frame") {
+											scope:New("Frame")({
 												Size = UDim2.fromScale(1, 0.9),
 												Position = UDim2.fromScale(0.5, 0.1),
 												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Shadow,
 												ZIndex = 1,
-												
+
 												[Children] = {
-													scope:New("UICorner") {
+													scope:New("UICorner")({
 														CornerRadius = Theme.Layout.CornerRadius,
-													},
+													}),
 												},
-											},
-											
+											}),
+
 											-- Button
-											scope:New("TextButton") {
+											scope:New("TextButton")({
 												Size = scope:Computed(function(use)
 													local offset = use(closeOffset)
 													return UDim2.fromScale(1, 0.9 - offset * 0.01)
@@ -249,65 +255,65 @@ local function ShopScreen(props: ShopScreenProps)
 												Font = Theme.Typography.Fonts.Title,
 												AutoButtonColor = false,
 												ZIndex = 2,
-												
+
 												[OnEvent("MouseButton1Down")] = function()
 													isClosePressed:set(true)
 												end,
-												
+
 												[OnEvent("MouseButton1Up")] = function()
 													isClosePressed:set(false)
 													props.OnClose()
 												end,
-												
+
 												[OnEvent("MouseLeave")] = function()
 													isClosePressed:set(false)
 												end,
-												
+
 												[Children] = {
-													scope:New("UICorner") {
+													scope:New("UICorner")({
 														CornerRadius = Theme.Layout.CornerRadius,
-													},
-													scope:New("UIStroke") {
+													}),
+													scope:New("UIStroke")({
 														Color = Theme.Colors.Surface.Stroke :: Color3,
 														Thickness = 2,
-													},
-													scope:New("UITextSizeConstraint") {
+													}),
+													scope:New("UITextSizeConstraint")({
 														MaxTextSize = 24,
 														MinTextSize = 14,
-													},
+													}),
 												},
-											},
+											}),
 										},
-									},
+									}),
 								},
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Filters row (6% height)
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Filters",
 						Size = UDim2.fromScale(1, 0.06),
 						Position = UDim2.fromScale(0.5, 0.11),
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						
+
 						[Children] = {
 							-- Responsive scale for filter pills
-							scope:New("UIScale") {
+							scope:New("UIScale")({
 								Scale = scope:Computed(function(use)
 									local size = use(viewportSize)
 									return math.clamp(size.Y / 1080, 0.6, 1.5)
 								end),
-							},
-							
-							scope:New("UIListLayout") {
+							}),
+
+							scope:New("UIListLayout")({
 								FillDirection = Enum.FillDirection.Horizontal,
 								HorizontalAlignment = Enum.HorizontalAlignment.Center,
 								VerticalAlignment = Enum.VerticalAlignment.Center,
 								Padding = UDim.new(0.02, 0),
-							},
-							
+							}),
+
 							FilterPill({
 								Scope = scope,
 								Text = "All",
@@ -319,7 +325,7 @@ local function ShopScreen(props: ShopScreenProps)
 								end,
 								LayoutOrder = 1,
 							}),
-							
+
 							FilterPill({
 								Scope = scope,
 								Text = "Owned",
@@ -331,7 +337,7 @@ local function ShopScreen(props: ShopScreenProps)
 								end,
 								LayoutOrder = 2,
 							}),
-							
+
 							FilterPill({
 								Scope = scope,
 								Text = "Locked",
@@ -344,35 +350,35 @@ local function ShopScreen(props: ShopScreenProps)
 								LayoutOrder = 3,
 							}),
 						},
-					},
-					
+					}),
+
 					-- Grid container (bottom 82%)
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "GridContainer",
 						Size = UDim2.fromScale(1, 0.82),
 						Position = UDim2.fromScale(0.5, 1),
 						AnchorPoint = Vector2.new(0.5, 1),
 						BackgroundTransparency = 1,
-						
+
 						[Children] = {
 							-- Shadow
-							scope:New("Frame") {
+							scope:New("Frame")({
 								Name = "Shadow",
 								Size = UDim2.fromScale(1, 0.99),
 								Position = UDim2.fromScale(0.5, 0.01),
 								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
-								
+
 								[Children] = {
-									scope:New("UICorner") {
+									scope:New("UICorner")({
 										CornerRadius = Theme.Layout.CornerRadius,
-									},
+									}),
 								},
-							},
-							
+							}),
+
 							-- Scrolling frame
-							scope:New("ScrollingFrame") {
+							scope:New("ScrollingFrame")({
 								Name = "Grid",
 								Size = UDim2.fromScale(1, 0.99),
 								Position = UDim2.fromScale(0.5, 0),
@@ -384,67 +390,70 @@ local function ShopScreen(props: ShopScreenProps)
 								AutomaticCanvasSize = Enum.AutomaticSize.Y,
 								CanvasSize = UDim2.new(0, 0, 0, 0),
 								ZIndex = 2,
-								
+
 								[Children] = {
-									scope:New("UICorner") {
+									scope:New("UICorner")({
 										CornerRadius = Theme.Layout.CornerRadius,
-									},
-									
-									scope:New("UIStroke") {
+									}),
+
+									scope:New("UIStroke")({
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
-									},
-									
-									scope:New("UIPadding") {
+									}),
+
+									scope:New("UIPadding")({
 										PaddingTop = UDim.new(0, 12),
 										PaddingBottom = UDim.new(0, 20),
 										PaddingLeft = UDim.new(0, 12),
 										PaddingRight = UDim.new(0, 12),
-									},
-									
-									scope:New("UIGridLayout") {
+									}),
+
+									scope:New("UIGridLayout")({
 										CellSize = gridCellSize,
 										CellPadding = gridCellPadding,
 										HorizontalAlignment = Enum.HorizontalAlignment.Center,
 										SortOrder = Enum.SortOrder.LayoutOrder,
-									},
-									
+									}),
+
 									-- Plant cards (reactive)
 									scope:Computed(function(use)
 										local plants = use(filteredPlants)
 										local coins = use(props.Coins) or 0
 										local unlocked = use(props.UnlockedPlants) or {}
-										
+
 										-- Build unlocked set
-										local unlockedSet: {[string]: boolean} = {}
+										local unlockedSet: { [string]: boolean } = {}
 										for _, pt in ipairs(unlocked) do
 											unlockedSet[pt] = true
 										end
-										
+
 										local cards = {}
 										for i, plant in ipairs(plants) do
-											table.insert(cards, ShopCard({
-												Scope = scope,
-												PlantType = plant.PlantType,
-												Cost = plant.Info.Cost,
-												IsUnlocked = scope:Value(unlockedSet[plant.PlantType] == true),
-												CanAfford = scope:Value(coins >= plant.Info.Cost),
-												OnPurchase = function()
-													props.OnPurchase(plant.PlantType)
-												end,
-												LayoutOrder = i,
-											}))
+											table.insert(
+												cards,
+												ShopCard({
+													Scope = scope,
+													PlantType = plant.PlantType,
+													Cost = plant.Info.Cost,
+													IsUnlocked = scope:Value(unlockedSet[plant.PlantType] == true),
+													CanAfford = scope:Value(coins >= plant.Info.Cost),
+													OnPurchase = function()
+														props.OnPurchase(plant.PlantType)
+													end,
+													LayoutOrder = i,
+												})
+											)
 										end
 										return cards
 									end),
 								},
-							},
+							}),
 						},
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return ShopScreen

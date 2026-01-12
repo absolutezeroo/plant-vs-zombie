@@ -51,7 +51,9 @@ local _selectedMutations: any = nil
 	Hide the tooltip
 ]]
 local function hideTooltip()
-	if not _initialized then return end
+	if not _initialized then
+		return
+	end
 	_tooltipVisible:set(false)
 end
 
@@ -67,36 +69,36 @@ function PlantTooltipController.Initialize()
 		Logger.Warn("PlantTooltipController", "Already initialized")
 		return
 	end
-	
+
 	local localPlayer = Players.LocalPlayer
 	if not localPlayer then
 		Logger.Error("PlantTooltipController", "No LocalPlayer found")
 		return
 	end
-	
+
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
-	
+
 	-- Create Fusion scope
 	_scope = Fusion.scoped(Fusion)
-	
+
 	-- Initialize reactive state (using scope:Value() syntax)
 	_tooltipVisible = _scope:Value(false)
 	_tooltipPosition = _scope:Value(UDim2.new(0.5, 0, 0.5, 0))
 	_selectedPlantType = _scope:Value(nil :: string?)
-	_selectedMutations = _scope:Value({} :: {string})
-	
+	_selectedMutations = _scope:Value({} :: { string })
+
 	-- Create ScreenGui for tooltip
-	local screenGui = _scope:New("ScreenGui") {
+	local screenGui = _scope:New("ScreenGui")({
 		Name = "PlantTooltipGui",
 		Parent = playerGui,
 		IgnoreGuiInset = true,
 		ResetOnSpawn = false,
 		DisplayOrder = 50,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		
+
 		[Fusion.Children] = {
 			-- Click-away background (darkens screen)
-			_scope:New("TextButton") {
+			_scope:New("TextButton")({
 				Name = "Backdrop",
 				Size = UDim2.new(1, 0, 1, 0),
 				BackgroundColor3 = Color3.new(0, 0, 0),
@@ -106,10 +108,10 @@ function PlantTooltipController.Initialize()
 				Text = "",
 				Visible = _tooltipVisible,
 				ZIndex = 1,
-				
+
 				[Fusion.OnEvent("Activated")] = hideTooltip,
-			},
-			
+			}),
+
 			-- The tooltip
 			PlantTooltip({
 				Scope = _scope,
@@ -120,9 +122,9 @@ function PlantTooltipController.Initialize()
 				OnClose = hideTooltip,
 			}),
 		},
-	}
+	})
 	_screenGui = screenGui :: ScreenGui
-	
+
 	_initialized = true
 	Logger.Info("PlantTooltipController", "Initialized")
 end
@@ -130,18 +132,18 @@ end
 --[[
 	Show tooltip for a specific plant type with mutations
 ]]
-function PlantTooltipController.ShowForPlant(plantType: string, mutations: {string}?)
+function PlantTooltipController.ShowForPlant(plantType: string, mutations: { string }?)
 	if not _initialized then
 		Logger.Warn("PlantTooltipController", "Not initialized")
 		return
 	end
-	
+
 	Logger.Debug("PlantTooltipController", `Showing tooltip for {plantType}`)
-	
+
 	-- Update reactive state
 	_selectedPlantType:set(plantType)
 	_selectedMutations:set(mutations or {})
-	
+
 	-- Position tooltip at center of screen
 	_tooltipPosition:set(UDim2.new(0.5, 0, 0.5, 0))
 	_tooltipVisible:set(true)
@@ -165,19 +167,21 @@ end
 	Dispose of the controller
 ]]
 function PlantTooltipController.Dispose()
-	if not _initialized then return end
-	
+	if not _initialized then
+		return
+	end
+
 	_trove:Destroy()
 	_trove = Trove.new()
-	
+
 	if _scope then
 		Fusion.doCleanup(_scope)
 		_scope = nil
 	end
-	
+
 	_screenGui = nil
 	_initialized = false
-	
+
 	Logger.Info("PlantTooltipController", "Disposed")
 end
 

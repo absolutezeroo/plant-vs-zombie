@@ -33,23 +33,25 @@ local CONFIG = table.freeze({
 local State = {
 	IsInitialized = false,
 	Trove = nil :: any,
-	PendingSync = {} :: {[Player]: boolean},
+	PendingSync = {} :: { [Player]: boolean },
 	World = nil :: any,
 }
 
 -- Helper: Sync all state to a player
 local function syncPlayer(player: Player, world: any)
-	if not player or not player.Parent then return end
-	
+	if not player or not player.Parent then
+		return
+	end
+
 	-- Sync all plants
 	for id, plant, pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
 		-- Get mutations if present
 		local mutationsComp = world:get(id, Components.MutationsComponent)
-		local mutations: {string} = {}
+		local mutations: { string } = {}
 		if mutationsComp and mutationsComp.MutationIds then
 			mutations = mutationsComp.MutationIds
 		end
-		
+
 		Network.PlantSpawned.Fire(player, {
 			EntityId = id,
 			PlantType = plant.PlantType :: any,
@@ -58,7 +60,7 @@ local function syncPlayer(player: Player, world: any)
 			Mutations = mutations :: any,
 		})
 	end
-	
+
 	-- Sync all zombies
 	for id, zombie, pos in world:query(Components.ZombieTypeComponent, Components.PositionComponent) do
 		Network.ZombieSpawned.Fire(player, {
@@ -68,7 +70,7 @@ local function syncPlayer(player: Player, world: any)
 			PositionX = pos.X,
 		})
 	end
-	
+
 	-- Sync all sun orbs
 	for id, sun, pos in world:query(Components.SunComponent, Components.PositionComponent) do
 		Network.SunSpawned.Fire(player, {
@@ -80,7 +82,7 @@ local function syncPlayer(player: Player, world: any)
 			TargetY = sun.TargetY or pos.Y,
 		})
 	end
-	
+
 	-- Sync base health
 	Network.BaseHealthUpdated.Fire(player, {
 		CurrentHealth = BaseHealth.GetHealth(),
@@ -91,15 +93,17 @@ end
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
-	
+
 	State.Trove = Trove.new()
-	
+
 	State.Trove:Connect(Players.PlayerAdded, function(player: Player)
 		State.PendingSync[player] = true
 	end)
-	
+
 	State.Trove:Connect(Players.PlayerRemoving, function(player: Player)
 		State.PendingSync[player] = nil
 	end)
@@ -119,7 +123,7 @@ end
 -- 6. MAIN LOOP
 local function OnStep(world)
 	State.World = world
-	
+
 	-- Process pending syncs (with small delay for client readiness)
 	for player, _ in State.PendingSync do
 		if player and player.Parent then

@@ -31,10 +31,10 @@ local peek = Fusion.peek
 
 -- Colors
 local Colors = {
-	Background = Color3.fromRGB(80, 60, 40),     -- Dark brown
-	Icon = Color3.fromRGB(255, 220, 50),         -- Sun yellow
-	Text = Color3.fromRGB(255, 255, 255),        -- White text
-	Stroke = Color3.fromRGB(50, 40, 30),         -- Dark stroke
+	Background = Color3.fromRGB(80, 60, 40), -- Dark brown
+	Icon = Color3.fromRGB(255, 220, 50), -- Sun yellow
+	Text = Color3.fromRGB(255, 255, 255), -- White text
+	Stroke = Color3.fromRGB(50, 40, 30), -- Dark stroke
 }
 
 export type SunCounterProps = {
@@ -55,19 +55,19 @@ export type SunCounterProps = {
 ]]
 local function SunCounter(props: SunCounterProps): Frame
 	local scope = props.Scope
-	
+
 	-- Track previous sun value for pop animation trigger
 	local previousSun = scope:Value(peek(SelectionState.SunCount))
 	local popScale = scope:Value(1)
-	
+
 	-- Animate the pop scale with a spring
 	local animatedScale = scope:Spring(popScale, 30, 0.6)
-	
+
 	-- Computed sun text (reacts to SelectionState.SunCount)
 	local sunText = scope:Computed(function(use): string
 		local current = use(SelectionState.SunCount)
 		local prev = peek(previousSun)
-		
+
 		-- Trigger pop animation when sun increases
 		if current > prev then
 			popScale:set(1.2)
@@ -75,10 +75,10 @@ local function SunCounter(props: SunCounterProps): Frame
 				popScale:set(1)
 			end)
 		end
-		
+
 		-- Update previous value
 		previousSun:set(current)
-		
+
 		-- Format large numbers (1000+ becomes 1.0K, etc.)
 		if current >= 10000 then
 			return string.format("%.0fK", current / 1000)
@@ -87,41 +87,41 @@ local function SunCounter(props: SunCounterProps): Frame
 		end
 		return tostring(current)
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "SunCounter",
 		Position = props.Position or UDim2.fromScale(0, 0),
 		AnchorPoint = props.AnchorPoint or Vector2.new(0, 0),
 		Size = UDim2.fromScale(0.08, 1), -- 8% width of screen, full height of parent
 		BackgroundColor3 = Colors.Background,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Size constraints
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(70, 32),
 				MaxSize = Vector2.new(120, 50),
-			},
-			
+			}),
+
 			-- Rounded corners
-			scope:New("UICorner") {
+			scope:New("UICorner")({
 				CornerRadius = UDim.new(0.3, 0),
-			},
-			
+			}),
+
 			-- Stroke
-			scope:New("UIStroke") {
+			scope:New("UIStroke")({
 				Color = Colors.Stroke,
 				Thickness = 2,
-			},
-			
+			}),
+
 			-- Padding
-			scope:New("UIPadding") {
+			scope:New("UIPadding")({
 				PaddingLeft = UDim.new(0.08, 0),
 				PaddingRight = UDim.new(0.08, 0),
-			},
-			
+			}),
+
 			-- Sun icon (left)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "SunIcon",
 				Size = UDim2.fromScale(0.35, 0.8),
 				Position = UDim2.fromScale(0, 0.5),
@@ -130,17 +130,17 @@ local function SunCounter(props: SunCounterProps): Frame
 				Text = "☀️",
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 22,
 						MinTextSize = 12,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Sun amount text
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "SunAmount",
 				Size = UDim2.fromScale(0.55, 0.8),
 				Position = UDim2.fromScale(0.4, 0.5),
@@ -154,20 +154,20 @@ local function SunCounter(props: SunCounterProps): Frame
 				TextScaled = true,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextTruncate = Enum.TextTruncate.AtEnd,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 20,
 						MinTextSize = 10,
-					},
+					}),
 					-- Scale transform for pop animation
-					scope:New("UIScale") {
+					scope:New("UIScale")({
 						Scale = animatedScale,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return SunCounter

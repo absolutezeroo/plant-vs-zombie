@@ -54,7 +54,9 @@ local function getAnimService()
 		local success, result = pcall(function()
 			return require(Modules.AnimationService)
 		end)
-		if success then _animService = result end
+		if success then
+			_animService = result
+		end
 	end
 	return _animService
 end
@@ -67,7 +69,7 @@ type ZombieVisual = {
 	TargetX: number,
 	FeetOffset: number, -- Distance from root to feet for ground alignment
 }
-local _zombieVisuals: {[number]: ZombieVisual} = {}
+local _zombieVisuals: { [number]: ZombieVisual } = {}
 
 -- Trove for cleanup
 local _trove = Trove.new()
@@ -84,7 +86,7 @@ local function getLaneZ(lane: number): number
 end
 
 -- Model fallback mapping (when specific model doesn't exist, use Basic)
-local MODEL_FALLBACKS: {[string]: string} = {
+local MODEL_FALLBACKS: { [string]: string } = {
 	Flag = "Basic",
 	Imp = "Basic",
 	MiniGargantuar = "Gargantuar",
@@ -93,26 +95,26 @@ local MODEL_FALLBACKS: {[string]: string} = {
 local function createZombieVisual(entityId: number, zombieType: string, lane: number, positionX: number): ZombieVisual
 	local z = getLaneZ(lane)
 	local groundY = if MapConfig.IsInitialized() then MapConfig.GetConfig().GridY else 0
-	
+
 	-- Try to get real model from Assets (with fallback)
 	local modelName = zombieType
 	local modelTemplate = ZombieAssets and ZombieAssets:FindFirstChild(modelName)
-	
+
 	-- Try specific fallback first, then default to Basic
 	if not modelTemplate then
 		modelName = MODEL_FALLBACKS[zombieType] or "Basic"
 		modelTemplate = ZombieAssets and ZombieAssets:FindFirstChild(modelName)
 	end
-	
+
 	if not modelTemplate or not modelTemplate:IsA("Model") then
 		Logger.Error("ZombieRender", `No model found for zombie {zombieType} (tried {modelName})`)
 		return nil :: any
 	end
-	
+
 	-- Clone real model
 	local model = modelTemplate:Clone()
 	model.Name = `Zombie_{entityId}_{zombieType}`
-	
+
 	-- Ensure PrimaryPart is set (required for animations)
 	if not model.PrimaryPart then
 		local humanoidRoot = model:FindFirstChild("HumanoidRootPart")
@@ -120,30 +122,30 @@ local function createZombieVisual(entityId: number, zombieType: string, lane: nu
 		local firstPart = model:FindFirstChildWhichIsA("BasePart")
 		model.PrimaryPart = humanoidRoot or torso or firstPart
 	end
-	
+
 	-- Calculate spawn position with feet offset
 	-- FeetOffset = distance from root to feet (so we add it to put feet at ground level)
 	local feetOffset = model:GetAttribute("FeetOffset") or 0
 	local spawnY = groundY + feetOffset
 	local worldPos = Vector3.new(positionX, spawnY, z)
-	
+
 	-- Position and rotate to face toward the house
 	local zombieDir = MapConfig.GetZombieDirection()
 	local facingCFrame = CFrame.lookAt(worldPos, worldPos + zombieDir) * CFrame.fromEulerAnglesXYZ(0, math.pi / 2, 0)
 	model:PivotTo(facingCFrame)
-	
+
 	model:SetAttribute("EntityId", entityId)
 	model.Parent = Workspace
-	
+
 	-- Play spawn/idle animations
 	local animService = getAnimService()
 	if animService then
 		animService.PlaySpawn(model)
 		animService.StartIdle(model)
 	end
-	
+
 	Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned at Y={spawnY}`)
-	
+
 	return {
 		Model = model,
 		ZombieType = zombieType,
@@ -170,7 +172,7 @@ local function setupNetworkListeners()
 		local zombieType = tostring(data.ZombieType) -- Convert enum to string
 		local lane = data.Lane
 		local positionX = data.PositionX
-		
+
 		if _zombieVisuals[entityId] then
 			Logger.Warn("ZombieRender", `Zombie {entityId} already exists, updating`)
 			_zombieVisuals[entityId].TargetX = positionX
@@ -179,11 +181,11 @@ local function setupNetworkListeners()
 			Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned in lane {lane}`)
 		end
 	end))
-	
+
 	_trove:Add(Network.ZombiePositionBatch.On(function(data)
 		local entityIds = data.EntityIds
 		local positionsX = data.PositionsX
-		
+
 		for i, entityId in entityIds do
 			local visual = _zombieVisuals[entityId]
 			if visual then
@@ -191,57 +193,58 @@ local function setupNetworkListeners()
 			end
 		end
 	end))
-	
+
 	_trove:Add(Network.EntityDied.On(function(data)
 		local entityId = data.EntityId
 		local visual = _zombieVisuals[entityId]
-		
+
 		if visual then
 			-- Remove from active tracking FIRST to prevent duplicate processing
 			_zombieVisuals[entityId] = nil
-			
+
 			local pos = visual.Model:GetPivot().Position
-			
+
 			-- Fire signal for VFX/Audio (decoupled)
 			GameSignals.OnZombieDeath:Fire({
 				Position = pos,
 				ZombieType = visual.ZombieType,
 			})
-			
+
 			-- Play death animation then destroy
 			local animService = getAnimService()
 			if animService then
 				animService.PlayDeath(visual.Model)
 			end
-			
+
 			-- Fade out and destroy after delay
 			task.delay(0.5, function()
 				if visual.Model and visual.Model.Parent then
 					visual.Model:Destroy()
 				end
 			end)
-			
+
 			Logger.Debug("ZombieRender", `Zombie {entityId} died`)
 		end
 	end))
-	
+
 	-- Show floating damage numbers
 	_trove:Add(Network.EntityDamaged.On(function(data)
 		local visual = _zombieVisuals[data.EntityId]
 		if visual then
 			local pos = visual.Model:GetPivot().Position
-			
+
 			-- Show floating damage number via signal
 			if data.DamageAmount > 0 then
-				local floatPos = pos + Vector3.new(
-					ChanceUtils.RandomOffset(1), -- Random X offset
-					1, -- Above zombie
-					0
-				)
-				
+				local floatPos = pos
+					+ Vector3.new(
+						ChanceUtils.RandomOffset(1), -- Random X offset
+						1, -- Above zombie
+						0
+					)
+
 				-- Pass DamageType if available (convert enum to string)
 				local damageType = if data.DamageType then tostring(data.DamageType) else "Normal"
-				
+
 				GameSignals.OnDamageDealt:Fire({
 					Position = floatPos,
 					Amount = data.DamageAmount,
@@ -250,7 +253,7 @@ local function setupNetworkListeners()
 			end
 		end
 	end))
-	
+
 	-- Status effect applied (show overlay on zombie model)
 	_trove:Add(Network.StatusApplied.On(function(data)
 		local entityId = data.EntityId
@@ -258,20 +261,20 @@ local function setupNetworkListeners()
 		if visual then
 			local statusType = tostring(data.StatusType)
 			local duration = data.Duration
-			
+
 			-- Apply status overlay to zombie model
 			VFXService.ApplyStatusOverlay(entityId, visual.Model, statusType, duration)
 			Logger.Debug("ZombieRender", `Status {statusType} overlay applied to zombie {entityId}`)
 		end
 	end))
-	
+
 	-- Status effect removed (cleanup overlay)
 	_trove:Add(Network.StatusRemoved.On(function(data)
 		local entityId = data.EntityId
 		local visual = _zombieVisuals[entityId]
 		if visual then
 			local statusType = tostring(data.StatusType)
-			
+
 			-- Remove status overlay from zombie model
 			VFXService.RemoveStatusOverlay(entityId, visual.Model, statusType)
 			Logger.Debug("ZombieRender", `Status {statusType} overlay removed from zombie {entityId}`)
@@ -289,8 +292,8 @@ end
 
 -- Movement config
 local MovementConfig = {
-	MIN_DT = 1/120,  -- Minimum deltaTime
-	MAX_DT = 1/15,   -- Maximum deltaTime
+	MIN_DT = 1 / 120, -- Minimum deltaTime
+	MAX_DT = 1 / 15, -- Maximum deltaTime
 }
 
 --[[
@@ -301,30 +304,30 @@ local function ZombieRenderSystem(_world)
 	if not MapConfig.IsInitialized() then
 		return
 	end
-	
+
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
 	local Matter = require(Packages:FindFirstChild("Matter"))
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 	local groundY = MapConfig.GetConfig().GridY
 	local zombieDir = MapConfig.GetZombieDirection()
-	
+
 	-- Interpolate zombie positions
 	for entityId, visual in _zombieVisuals do
 		if not visual.Model.Parent then
 			_zombieVisuals[entityId] = nil
 			continue
 		end
-		
+
 		local currentPos = visual.Model:GetPivot().Position
 		local currentX = currentPos.X
 		local targetX = visual.TargetX
 		local newX = currentX + (targetX - currentX) * math.min(1, INTERPOLATION_SPEED * dt)
-		
+
 		local z = getLaneZ(visual.Lane)
 		local spawnY = groundY + visual.FeetOffset -- Add feet offset for ground alignment
 		local newPos = Vector3.new(newX, spawnY, z)
-		
+
 		-- Update position with 90° rotation
 		local facingCFrame = CFrame.lookAt(newPos, newPos + zombieDir) * CFrame.Angles(0, math.pi / 2, 0)
 		visual.Model:PivotTo(facingCFrame)
@@ -337,12 +340,12 @@ end
 local function Dispose()
 	-- Disconnect all events
 	_trove:Clean()
-	
+
 	-- Destroy all zombie visuals
 	for entityId in _zombieVisuals do
 		destroyZombieVisual(entityId)
 	end
-	
+
 	Logger.Debug("ZombieRender", "Disposed")
 end
 

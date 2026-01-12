@@ -32,15 +32,17 @@ export type WinRateBannerProps = {
 local function WinRateBanner(props: WinRateBannerProps): Frame
 	local scope = props.Scope
 	local size = props.Size or UDim2.new(1, 0, 0, BANNER_HEIGHT + SHADOW_OFFSET)
-	
+
 	-- Calculate win rate (0-1)
 	local winRate = scope:Computed(function(use)
 		local won = use(props.GamesWon) or 0
 		local played = use(props.GamesPlayed) or 0
-		if played == 0 then return 0 end
+		if played == 0 then
+			return 0
+		end
 		return won / played
 	end)
-	
+
 	-- Color based on rate
 	local colorSet = scope:Computed(function(use)
 		local rate = use(winRate)
@@ -52,7 +54,7 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 			return Theme.Colors.Danger -- Red
 		end
 	end)
-	
+
 	-- Display text
 	local displayText = scope:Computed(function(use)
 		local played = use(props.GamesPlayed) or 0
@@ -63,16 +65,16 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 		local emoji = if rate >= 70 then "🔥" elseif rate >= 40 then "👍" else "💪"
 		return `{emoji} Win Rate: {rate}%`
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "WinRateBanner",
 		Size = size,
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Shadow
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Shadow",
 				Size = UDim2.new(1, 0, 0, BANNER_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
@@ -80,35 +82,35 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 					return use(colorSet).Shadow :: Color3
 				end),
 				ZIndex = 1,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Main banner
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Main",
 				Size = UDim2.new(1, 0, 0, BANNER_HEIGHT),
 				BackgroundColor3 = scope:Computed(function(use)
 					return use(colorSet).Main :: Color3
 				end),
 				ZIndex = 2,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
-					
-					scope:New("UIStroke") {
+					}),
+
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
-					},
-					
+					}),
+
 					-- Text
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Text",
 						Size = UDim2.new(1, 0, 1, 0),
 						BackgroundTransparency = 1,
@@ -116,11 +118,11 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 						TextColor3 = Color3.new(1, 1, 1),
 						TextSize = 20,
 						Font = Theme.Typography.Fonts.Title,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return WinRateBanner

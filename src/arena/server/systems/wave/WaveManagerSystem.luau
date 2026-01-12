@@ -69,7 +69,7 @@ local function advancePhase(world: any, state: any, spawner: any)
 		state.CurrentPhase = "Assault"
 		state.PhaseSpent = 0
 		state.PhaseBudget = spawner:GetPhaseBudget(state.TotalBudget, "Assault")
-		
+
 		-- Fire phase change event
 		world:spawn(Components.WaveStateEvent({
 			StateType = "Phase",
@@ -80,14 +80,14 @@ local function advancePhase(world: any, state: any, spawner: any)
 		state.CurrentPhase = "Flag"
 		state.PhaseSpent = 0
 		state.PhaseBudget = spawner:GetPhaseBudget(state.TotalBudget, "Flag")
-		
+
 		-- Fire phase change event
 		world:spawn(Components.WaveStateEvent({
 			StateType = "Phase",
 			WaveNumber = state.CurrentWave,
 			Phase = "Flag",
 		}))
-		
+
 		-- Spawn Flag zombie
 		local lane = ChanceUtils.RandomLane()
 		spawner:SpawnZombie(world, "Flag", lane, state.CurrentWave)
@@ -100,25 +100,25 @@ local function startWave(waveNumber: number, world: any, state: any, spawner: an
 	state.ZombiesSpawnedThisWave = 0
 	state.LastSpawnTime = os.clock()
 	state.WaveStartTime = os.clock()
-	
+
 	-- Fire WaveStateEvent for UI/Audio systems
 	world:spawn(Components.WaveStateEvent({
 		StateType = "Start",
 		WaveNumber = waveNumber,
 		TotalWaves = state.TotalWaves,
 	}))
-	
+
 	-- Reset Plant Food tracking
 	local PlantFoodService = WaveService.GetPlantFoodService()
 	if PlantFoodService then
 		PlantFoodService.ResetWaveTracking()
 	end
-	
+
 	-- Check if this wave has precise spawn definitions
 	if spawner:HasDefinedWave(waveNumber) then
 		state.UsingDefinedWave = true
 		local waveDef = spawner:GetWaveDefinition(waveNumber)
-		
+
 		-- Apply pre-delay if specified
 		local preDelay = waveDef and waveDef.PreDelay or 0
 		if preDelay > 0 then
@@ -136,7 +136,7 @@ local function startWave(waveNumber: number, world: any, state: any, spawner: an
 		state.PhaseSpent = 0
 		state.PhaseBudget = spawner:GetPhaseBudget(state.TotalBudget, "Trickle")
 	end
-	
+
 	broadcaster:BroadcastWaveStarted(waveNumber, 0)
 end
 
@@ -147,14 +147,14 @@ local function OnStep(world)
 	local state = WaveService.GetState()
 	local spawner = WaveService.GetSpawner()
 	local broadcaster = WaveService.GetBroadcaster()
-	
+
 	if not spawner or not broadcaster then
 		return -- Managers not yet initialized
 	end
-	
+
 	local currentTime = os.clock()
 	local gameState = WaveService.GetGameState()
-	
+
 	-- Auto-start when players join (testing only)
 	if gameState == "Waiting" and state.AutoStartEnabled then
 		if #Players:GetPlayers() > 0 then
@@ -162,18 +162,18 @@ local function OnStep(world)
 		end
 		return
 	end
-	
+
 	-- Game over states stop processing
 	if WaveService.IsGameOver() then
 		return
 	end
-	
+
 	-- Check defeat condition (only during active gameplay)
 	if WaveService.IsPlaying() and BaseHealth.IsDefeated() and gameState ~= "Defeat" then
 		WaveService.SetGameState("Defeat")
 		return
 	end
-	
+
 	-- Preparation phase countdown
 	if gameState == "Preparation" then
 		local remaining = math.ceil(state.WaveStartTime - currentTime)
@@ -189,7 +189,7 @@ local function OnStep(world)
 		end
 		return
 	end
-	
+
 	-- Intermission between waves
 	if gameState == "Intermission" then
 		if currentTime - state.WaveStartTime >= CONFIG.WAVE_DELAY then
@@ -198,27 +198,27 @@ local function OnStep(world)
 		end
 		return
 	end
-	
+
 	-- Wait for first wave
 	if state.CurrentWave == 0 then
 		-- In Studio Debug mode, don't auto-start
 		if WaveService.IsStudioDebug() and state.WaveStartTime == 0 then
 			return
 		end
-		
+
 		if currentTime >= state.WaveStartTime then
 			startWave(1, world, state, spawner, broadcaster)
 		end
 		return
 	end
-	
+
 	-- Check wave completion
 	local waveComplete = false
 	local activeZombies = 0
 	for _ in world:query(Components.ZombieTypeComponent) do
 		activeZombies += 1
 	end
-	
+
 	if state.UsingDefinedWave then
 		-- For defined waves, complete when all zombies dead after min time
 		local timeSinceWaveStart = currentTime - state.WaveStartTime
@@ -232,7 +232,7 @@ local function OnStep(world)
 			waveComplete = true
 		end
 	end
-	
+
 	if waveComplete then
 		-- Fire WaveStateEvent End for UI/Audio systems
 		world:spawn(Components.WaveStateEvent({
@@ -240,21 +240,21 @@ local function OnStep(world)
 			WaveNumber = state.CurrentWave,
 			TotalWaves = state.TotalWaves,
 		}))
-		
+
 		broadcaster:BroadcastWaveCompleted(state.CurrentWave, true)
-		
+
 		-- Check victory
 		if state.CurrentWave >= state.TotalWaves then
 			WaveService.SetGameState("Victory")
 			return
 		end
-		
+
 		-- Start intermission
 		WaveService.SetGameState("Intermission")
 		state.WaveStartTime = currentTime
 		return
 	end
-	
+
 	-- Budget-based spawning (only for non-defined waves)
 	if not state.UsingDefinedWave then
 		if currentTime - state.LastSpawnTime >= getSpawnInterval(state.CurrentPhase) then
@@ -264,10 +264,10 @@ local function OnStep(world)
 				end
 				return
 			end
-			
+
 			local remainingBudget = state.PhaseBudget - state.PhaseSpent
 			local zombieType = spawner:PickZombie(state.CurrentPhase, remainingBudget)
-			
+
 			if zombieType then
 				local lane = ChanceUtils.RandomLane()
 				spawner:SpawnZombie(world, zombieType, lane, state.CurrentWave)

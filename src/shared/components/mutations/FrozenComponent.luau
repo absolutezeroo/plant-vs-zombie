@@ -12,7 +12,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 export type FrozenComponent = {
 	RemainingDuration: number, -- Seconds left frozen
-	AppliedAt: number,         -- os.clock() when frozen
+	AppliedAt: number, -- os.clock() when frozen
 }
 
 return Matter.component("Frozen")

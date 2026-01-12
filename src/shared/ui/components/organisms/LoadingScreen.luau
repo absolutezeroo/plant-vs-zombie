@@ -58,13 +58,13 @@ export type LoadingStage = {
 }
 
 export type LoaderConfig = {
-	stages: {LoadingStage}?,
+	stages: { LoadingStage }?,
 	title: string?,
 	subtitle: string?,
 }
 
 -- Default loading stages
-local DEFAULT_STAGES: {LoadingStage} = {
+local DEFAULT_STAGES: { LoadingStage } = {
 	{ Name = "Initializing...", Weight = 0.10 },
 	{ Name = "Loading packages...", Weight = 0.15 },
 	{ Name = "Setting up systems...", Weight = 0.20 },
@@ -78,13 +78,13 @@ LoadingScreen.__index = LoadingScreen
 
 function LoadingScreen.new(config: LoaderConfig?)
 	local self = setmetatable({}, LoadingScreen)
-	
+
 	config = config or {}
-	
+
 	-- Create a Fusion scope
 	local scope = Fusion.scoped(Fusion)
 	self._scope = scope
-	
+
 	self._stages = config.stages or DEFAULT_STAGES
 	self._title = config.title or "🌻 Garden Swarm 🧟"
 	self._subtitle = config.subtitle or "Roblox Edition"
@@ -93,17 +93,17 @@ function LoadingScreen.new(config: LoaderConfig?)
 	self._statusText = Value(scope, "Loading...")
 	self._isVisible = Value(scope, true)
 	self._isFadingOut = Value(scope, false)
-	
+
 	-- Store references
 	local currentStage = self._currentStage
 	local stageProgress = self._stageProgress
 	local stagesRef = self._stages
-	
+
 	-- Calculate total progress (0-1)
 	self._totalProgress = Computed(scope, function(use)
 		local stageIndex = use(currentStage)
 		local progress = use(stageProgress)
-		
+
 		-- Sum up completed stages
 		local completed = 0
 		for i = 1, stageIndex - 1 do
@@ -111,173 +111,173 @@ function LoadingScreen.new(config: LoaderConfig?)
 				completed = completed + stagesRef[i].Weight
 			end
 		end
-		
+
 		-- Add current stage progress
 		local stage = stagesRef[stageIndex]
 		if stage then
 			completed = completed + (stage.Weight * progress)
 		end
-		
+
 		return math.clamp(completed, 0, 1)
 	end)
-	
+
 	-- Smooth animated progress
 	self._animatedProgress = Spring(scope, self._totalProgress, 25, 0.8)
-	
+
 	-- Percentage text
 	local animatedProgress = self._animatedProgress
 	self._percentText = Computed(scope, function(use)
 		return string.format("%d%%", math.floor(use(animatedProgress) * 100))
 	end)
-	
+
 	-- Create UI
 	self:_createUI()
-	
+
 	return self
 end
 
 function LoadingScreen:_createUI()
 	local scope = self._scope
 	local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-	
+
 	-- Enable blur effect
 	BlurManager.Enable()
-	
+
 	-- Animated dots for loading text
 	local dotCount = Value(scope, 0)
 	local isVisible = self._isVisible
-	
+
 	task.spawn(function()
 		while peek(isVisible) do
 			task.wait(0.4)
 			dotCount:set((peek(dotCount) + 1) % 4)
 		end
 	end)
-	
+
 	local dotsText = Computed(scope, function(use)
 		return string.rep(".", use(dotCount))
 	end)
-	
+
 	-- Main overlay opacity (for fade out)
 	local isFadingOut = self._isFadingOut
 	local overlayTransparency = Computed(scope, function(use)
 		return if use(isFadingOut) then 1 else 0
 	end)
-	
+
 	local animatedOverlayTransparency = Spring(scope, overlayTransparency, 15, 1)
-	
+
 	-- Store references
 	local statusText = self._statusText
 	local animatedProgress = self._animatedProgress
 	local percentText = self._percentText
 	local title = self._title
 	local subtitle = self._subtitle
-	
+
 	-- Random tip
 	local tip = ChanceUtils.PickRandom(TIPS) or TIPS[1]
-	
-	self._screenGui = New(scope, "ScreenGui") {
+
+	self._screenGui = New(scope, "ScreenGui")({
 		Name = "LoadingScreen",
 		Parent = PlayerGui,
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
 		DisplayOrder = 999,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		
+
 		[Children] = {
 			-- Dark overlay background
-			New(scope, "Frame") {
+			New(scope, "Frame")({
 				Name = "Overlay",
 				Size = UDim2.fromScale(1, 1),
 				BackgroundColor3 = Color3.fromRGB(30, 35, 45),
 				BackgroundTransparency = animatedOverlayTransparency,
 				BorderSizePixel = 0,
-				
+
 				[Children] = {
 					-- Center container
-					New(scope, "Frame") {
+					New(scope, "Frame")({
 						Name = "Container",
 						Size = UDim2.fromOffset(CONTAINER_WIDTH, 350),
 						Position = UDim2.fromScale(0.5, 0.5),
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
-						
+
 						[Children] = {
 							-- Main panel shadow
-							New(scope, "Frame") {
+							New(scope, "Frame")({
 								Name = "PanelShadow",
 								Size = UDim2.new(1, 0, 0, 220),
 								Position = UDim2.fromOffset(0, 70 + SHADOW_OFFSET),
 								BackgroundColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 1,
-								
+
 								[Children] = {
-									New(scope, "UICorner") {
+									New(scope, "UICorner")({
 										CornerRadius = Theme.Layout.CornerRadius,
-									},
+									}),
 								},
-							},
-							
+							}),
+
 							-- Main panel
-							New(scope, "Frame") {
+							New(scope, "Frame")({
 								Name = "Panel",
 								Size = UDim2.new(1, 0, 0, 220),
 								Position = UDim2.fromOffset(0, 70),
 								BackgroundColor3 = Theme.Colors.Surface.Main,
 								ZIndex = 2,
-								
+
 								[Children] = {
-									New(scope, "UICorner") {
+									New(scope, "UICorner")({
 										CornerRadius = Theme.Layout.CornerRadius,
-									},
-									
-									New(scope, "UIStroke") {
+									}),
+
+									New(scope, "UIStroke")({
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = Theme.Layout.StrokeThickness,
-									},
-									
-									New(scope, "UIPadding") {
+									}),
+
+									New(scope, "UIPadding")({
 										PaddingTop = UDim.new(0, 20),
 										PaddingBottom = UDim.new(0, 20),
 										PaddingLeft = UDim.new(0, 24),
 										PaddingRight = UDim.new(0, 24),
-									},
-									
+									}),
+
 									-- Progress bar container (shadow)
-									New(scope, "Frame") {
+									New(scope, "Frame")({
 										Name = "ProgressShadow",
 										Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
 										Position = UDim2.fromOffset(0, 10 + SHADOW_OFFSET),
 										BackgroundColor3 = Theme.Colors.Surface.Shadow,
 										ZIndex = 1,
-										
+
 										[Children] = {
-											New(scope, "UICorner") {
+											New(scope, "UICorner")({
 												CornerRadius = UDim.new(0, 12),
-											},
+											}),
 										},
-									},
-									
+									}),
+
 									-- Progress bar container
-									New(scope, "Frame") {
+									New(scope, "Frame")({
 										Name = "ProgressContainer",
 										Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
 										Position = UDim2.fromOffset(0, 10),
 										BackgroundColor3 = Theme.Colors.Surface.Shadow,
 										ZIndex = 2,
-										
+
 										[Children] = {
-											New(scope, "UICorner") {
+											New(scope, "UICorner")({
 												CornerRadius = UDim.new(0, 12),
-											},
-											
-											New(scope, "UIStroke") {
+											}),
+
+											New(scope, "UIStroke")({
 												Color = Theme.Colors.Surface.Stroke :: Color3,
 												Thickness = 2,
-											},
-											
+											}),
+
 											-- Progress bar fill
-											New(scope, "Frame") {
+											New(scope, "Frame")({
 												Name = "ProgressFill",
 												Size = Computed(scope, function(use)
 													return UDim2.new(use(animatedProgress), -8, 1, -8)
@@ -285,16 +285,16 @@ function LoadingScreen:_createUI()
 												Position = UDim2.fromOffset(4, 4),
 												BackgroundColor3 = Theme.Colors.Action.Main,
 												ZIndex = 3,
-												
+
 												[Children] = {
-													New(scope, "UICorner") {
+													New(scope, "UICorner")({
 														CornerRadius = UDim.new(0, 8),
-													},
+													}),
 												},
-											},
-											
+											}),
+
 											-- Percentage text
-											New(scope, "TextLabel") {
+											New(scope, "TextLabel")({
 												Name = "Percentage",
 												Size = UDim2.fromScale(1, 1),
 												BackgroundTransparency = 1,
@@ -303,12 +303,12 @@ function LoadingScreen:_createUI()
 												TextSize = 20,
 												Font = Theme.Typography.Fonts.Title,
 												ZIndex = 4,
-											},
+											}),
 										},
-									},
-									
+									}),
+
 									-- Status text
-									New(scope, "TextLabel") {
+									New(scope, "TextLabel")({
 										Name = "Status",
 										Size = UDim2.new(1, 0, 0, 30),
 										Position = UDim2.fromOffset(0, BAR_HEIGHT + 30),
@@ -325,10 +325,10 @@ function LoadingScreen:_createUI()
 										TextSize = 18,
 										Font = Theme.Typography.Fonts.Body,
 										ZIndex = 2,
-									},
-									
+									}),
+
 									-- Tip text
-									New(scope, "TextLabel") {
+									New(scope, "TextLabel")({
 										Name = "Tip",
 										Size = UDim2.new(1, 0, 0, 24),
 										Position = UDim2.fromOffset(0, BAR_HEIGHT + 70),
@@ -339,10 +339,10 @@ function LoadingScreen:_createUI()
 										Font = Theme.Typography.Fonts.Body,
 										TextTransparency = 0.2,
 										ZIndex = 2,
-									},
-									
+									}),
+
 									-- Decorative emojis
-									New(scope, "TextLabel") {
+									New(scope, "TextLabel")({
 										Size = UDim2.fromOffset(40, 40),
 										Position = UDim2.new(0, -10, 1, -10),
 										AnchorPoint = Vector2.new(0, 1),
@@ -351,9 +351,9 @@ function LoadingScreen:_createUI()
 										TextSize = 28,
 										TextTransparency = 0.4,
 										ZIndex = 2,
-									},
-									
-									New(scope, "TextLabel") {
+									}),
+
+									New(scope, "TextLabel")({
 										Size = UDim2.fromOffset(40, 40),
 										Position = UDim2.new(1, 10, 1, -10),
 										AnchorPoint = Vector2.new(1, 1),
@@ -362,12 +362,12 @@ function LoadingScreen:_createUI()
 										TextSize = 28,
 										TextTransparency = 0.4,
 										ZIndex = 2,
-									},
+									}),
 								},
-							},
-							
+							}),
+
 							-- Game logo/title
-							New(scope, "TextLabel") {
+							New(scope, "TextLabel")({
 								Name = "Title",
 								Size = UDim2.new(1, 0, 0, 50),
 								Position = UDim2.fromOffset(0, 0),
@@ -379,10 +379,10 @@ function LoadingScreen:_createUI()
 								TextStrokeTransparency = 0.7,
 								TextStrokeColor3 = Theme.Colors.Surface.Shadow,
 								ZIndex = 10,
-							},
-							
+							}),
+
 							-- Subtitle
-							New(scope, "TextLabel") {
+							New(scope, "TextLabel")({
 								Name = "Subtitle",
 								Size = UDim2.new(1, 0, 0, 25),
 								Position = UDim2.fromOffset(0, 45),
@@ -392,13 +392,13 @@ function LoadingScreen:_createUI()
 								TextSize = 18,
 								Font = Theme.Typography.Fonts.Body,
 								ZIndex = 10,
-							},
+							}),
 						},
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 -- Set the current loading stage
@@ -406,7 +406,7 @@ function LoadingScreen:SetStage(stageIndex: number, statusOverride: string?)
 	if stageIndex < 1 or stageIndex > #self._stages then
 		return
 	end
-	
+
 	self._currentStage:set(stageIndex)
 	self._stageProgress:set(0)
 	self._statusText:set(statusOverride or self._stages[stageIndex].Name)
@@ -425,7 +425,7 @@ end
 -- Complete current stage and move to next
 function LoadingScreen:CompleteStage()
 	self._stageProgress:set(1)
-	
+
 	local nextStage = peek(self._currentStage) + 1
 	if nextStage <= #self._stages then
 		task.delay(0.1, function()
@@ -440,24 +440,24 @@ function LoadingScreen:Complete(callback: (() -> ())?)
 	self._currentStage:set(#self._stages)
 	self._stageProgress:set(1)
 	self._statusText:set("Ready!")
-	
+
 	-- Wait a moment then fade out
 	task.delay(0.5, function()
 		self._isFadingOut:set(true)
-		
+
 		-- Wait for fade animation
 		task.delay(0.8, function()
 			self._isVisible:set(false)
-			
+
 			-- Disable blur
 			BlurManager.Disable()
-			
+
 			-- Clean up scope (destroys all Fusion objects)
 			if self._scope then
 				doCleanup(self._scope)
 				self._scope = nil
 			end
-			
+
 			if callback then
 				callback()
 			end
@@ -468,10 +468,10 @@ end
 -- Immediately hide (no animation)
 function LoadingScreen:Hide()
 	self._isVisible:set(false)
-	
+
 	-- Disable blur
 	BlurManager.Disable()
-	
+
 	-- Clean up scope
 	if self._scope then
 		doCleanup(self._scope)

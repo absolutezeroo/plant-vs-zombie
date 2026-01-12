@@ -39,26 +39,26 @@ local _isInitialized = false
 local _isClientMode = false -- If true, don't auto-initialize (wait for server sync)
 local _config = {
 	-- Grid bounds (world positions)
-	GridCornerA = Vector3.zero,  -- Top-left (min X, min Z)
-	GridCornerB = Vector3.zero,  -- Bottom-right (max X, max Z)
-	GridOrigin = Vector3.zero,   -- Calculated origin (same as CornerA)
-	GridY = 0,                   -- Ground level
-	
+	GridCornerA = Vector3.zero, -- Top-left (min X, min Z)
+	GridCornerB = Vector3.zero, -- Bottom-right (max X, max Z)
+	GridOrigin = Vector3.zero, -- Calculated origin (same as CornerA)
+	GridY = 0, -- Ground level
+
 	-- Calculated from corners
-	CellWidth = GridConfig.CELL_SIZE,   -- X size per cell
-	CellDepth = GridConfig.CELL_SIZE,   -- Z size per cell
-	GridWidth = GridConfig.GRID_WIDTH,  -- Total X span
+	CellWidth = GridConfig.CELL_SIZE, -- X size per cell
+	CellDepth = GridConfig.CELL_SIZE, -- Z size per cell
+	GridWidth = GridConfig.GRID_WIDTH, -- Total X span
 	GridDepth = GridConfig.GRID_HEIGHT, -- Total Z span
-	
+
 	-- Zombie spawn positions (per lane)
-	ZombieSpawns = {} :: {[number]: Vector3},  -- Lane -> spawn position
-	
+	ZombieSpawns = {} :: { [number]: Vector3 }, -- Lane -> spawn position
+
 	-- Base position
 	BasePosition = Vector3.zero,
-	
+
 	-- Direction zombies walk (normalized)
-	ZombieDirection = Vector3.new(-1, 0, 0),  -- Default: left
-	
+	ZombieDirection = Vector3.new(-1, 0, 0), -- Default: left
+
 	-- Are we using visual config or defaults?
 	UsingVisualConfig = false,
 }
@@ -90,20 +90,20 @@ function MapConfig.Initialize()
 		Logger.Warn("MapConfig", "Already initialized")
 		return
 	end
-	
+
 	-- Use WaitForChild with timeout to handle streaming/load order
 	-- Increased timeout for dynamic map loading via MapLoader
 	local arenaMap = Workspace:WaitForChild("ArenaMap", 30)
-	
+
 	if not arenaMap then
 		Logger.Info("MapConfig", "ArenaMap not found after WaitForChild, using GridConfig defaults")
 		MapConfig._UseDefaults()
 		_isInitialized = true
 		return
 	end
-	
+
 	Logger.Info("MapConfig", "Found ArenaMap, reading visual configuration...")
-	
+
 	-- Read grid bounds
 	local success = MapConfig._ReadGridBounds(arenaMap)
 	if not success then
@@ -112,19 +112,19 @@ function MapConfig.Initialize()
 		_isInitialized = true
 		return
 	end
-	
+
 	-- Read zombie spawns
 	MapConfig._ReadZombieSpawns(arenaMap)
-	
+
 	-- Read base position
 	MapConfig._ReadBasePosition(arenaMap)
-	
+
 	-- Calculate zombie direction
 	MapConfig._CalculateZombieDirection()
-	
+
 	_config.UsingVisualConfig = true
 	_isInitialized = true
-	
+
 	Logger.Info("MapConfig", `Initialized from visual config:`)
 	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)
 	Logger.Info("MapConfig", `  Cell size: {_config.CellWidth}x{_config.CellDepth}`)
@@ -136,7 +136,7 @@ end
 function MapConfig._ReadGridBounds(arenaMap: Instance): boolean
 	-- Use WaitForChild with timeout to handle streaming (30s for dynamic maps)
 	local gridBounds = arenaMap:WaitForChild("GridBounds", 30)
-	
+
 	-- DEBUG: Log what we find
 	if gridBounds then
 		Logger.Debug("MapConfig", `GridBounds found: {gridBounds.ClassName}, IsBasePart={gridBounds:IsA("BasePart")}`)
@@ -146,52 +146,44 @@ function MapConfig._ReadGridBounds(arenaMap: Instance): boolean
 			Logger.Warn("MapConfig", `  Child: {child.Name} ({child.ClassName})`)
 		end
 	end
-	
+
 	if not gridBounds or not gridBounds:IsA("BasePart") then
 		Logger.Warn("MapConfig", "GridBounds Part not found in ArenaMap")
 		return false
 	end
-	
+
 	local cornerA = gridBounds:FindFirstChild("CornerA")
 	local cornerB = gridBounds:FindFirstChild("CornerB")
-	
+
 	if not cornerA or not cornerA:IsA("Attachment") then
 		Logger.Warn("MapConfig", "CornerA Attachment not found in GridBounds")
 		return false
 	end
-	
+
 	if not cornerB or not cornerB:IsA("Attachment") then
 		Logger.Warn("MapConfig", "CornerB Attachment not found in GridBounds")
 		return false
 	end
-	
+
 	-- Get world positions
 	local posA = cornerA.WorldPosition
 	local posB = cornerB.WorldPosition
-	
+
 	-- Ensure CornerA is min and CornerB is max
-	_config.GridCornerA = Vector3.new(
-		math.min(posA.X, posB.X),
-		math.min(posA.Y, posB.Y),
-		math.min(posA.Z, posB.Z)
-	)
-	_config.GridCornerB = Vector3.new(
-		math.max(posA.X, posB.X),
-		math.max(posA.Y, posB.Y),
-		math.max(posA.Z, posB.Z)
-	)
-	
+	_config.GridCornerA = Vector3.new(math.min(posA.X, posB.X), math.min(posA.Y, posB.Y), math.min(posA.Z, posB.Z))
+	_config.GridCornerB = Vector3.new(math.max(posA.X, posB.X), math.max(posA.Y, posB.Y), math.max(posA.Z, posB.Z))
+
 	_config.GridOrigin = _config.GridCornerA
 	_config.GridY = (_config.GridCornerA.Y + _config.GridCornerB.Y) / 2
-	
+
 	-- Calculate grid dimensions
 	_config.GridWidth = _config.GridCornerB.X - _config.GridCornerA.X
 	_config.GridDepth = _config.GridCornerB.Z - _config.GridCornerA.Z
-	
+
 	-- Calculate cell sizes (divide by column/lane count from GridConfig)
 	_config.CellWidth = _config.GridWidth / GridConfig.GRID_COLUMNS
 	_config.CellDepth = _config.GridDepth / GridConfig.GRID_LANES
-	
+
 	return true
 end
 
@@ -208,12 +200,12 @@ function MapConfig._ReadZombieSpawns(arenaMap: Instance)
 		MapConfig._GenerateDefaultSpawns()
 		return
 	end
-	
+
 	-- Look for Lane1, Lane2, etc.
 	for lane = 1, GridConfig.GRID_LANES do
 		local laneName = "Lane" .. lane
 		local laneMarker = spawnsFolder:FindFirstChild(laneName)
-		
+
 		if laneMarker then
 			if laneMarker:IsA("Attachment") then
 				-- Direct Attachment
@@ -240,7 +232,7 @@ function MapConfig._ReadZombieSpawns(arenaMap: Instance)
 			Logger.Debug("MapConfig", `  {laneName}: Not found, using default`)
 		end
 	end
-	
+
 	Logger.Info("MapConfig", `Read {#_config.ZombieSpawns} zombie spawn points`)
 end
 
@@ -264,7 +256,7 @@ end
 function MapConfig._ReadBasePosition(arenaMap: Instance)
 	-- Use WaitForChild with timeout to handle streaming
 	local basePart = arenaMap:WaitForChild("BasePosition", 5)
-	
+
 	if basePart then
 		if basePart:IsA("Attachment") then
 			-- Direct Attachment - check if parent is a BasePart for proper WorldPosition
@@ -275,7 +267,10 @@ function MapConfig._ReadBasePosition(arenaMap: Instance)
 			else
 				-- Attachment without proper Part parent - use Position as world pos
 				_config.BasePosition = basePart.Position
-				Logger.Warn("MapConfig", `BasePosition Attachment has no Part parent, using Position: {_config.BasePosition}`)
+				Logger.Warn(
+					"MapConfig",
+					`BasePosition Attachment has no Part parent, using Position: {_config.BasePosition}`
+				)
 			end
 		elseif basePart:IsA("BasePart") then
 			-- Part - check for child Attachment first
@@ -293,7 +288,7 @@ function MapConfig._ReadBasePosition(arenaMap: Instance)
 	else
 		MapConfig._DeduceBaseFromSpawns()
 	end
-	
+
 	Logger.Debug("MapConfig", `Final base position: {_config.BasePosition}`)
 end
 
@@ -304,11 +299,11 @@ function MapConfig._DeduceBaseFromSpawns()
 		local middleSpawn = _config.ZombieSpawns[3] or _config.ZombieSpawns[1]
 		local gridCenterX = (_config.GridCornerA.X + _config.GridCornerB.X) / 2
 		local gridCenterZ = (_config.GridCornerA.Z + _config.GridCornerB.Z) / 2
-		
+
 		-- Determine which edge the spawns are on (compare to grid center)
 		local spawnOffsetX = middleSpawn.X - gridCenterX
 		local spawnOffsetZ = middleSpawn.Z - gridCenterZ
-		
+
 		-- Base is on the opposite side
 		if math.abs(spawnOffsetX) > math.abs(spawnOffsetZ) then
 			-- Spawns are on X edge, base on opposite X edge
@@ -327,11 +322,12 @@ function MapConfig._DeduceBaseFromSpawns()
 				_config.BasePosition = Vector3.new(gridCenterX, _config.GridY, _config.GridCornerB.Z + 5)
 			end
 		end
-		
+
 		Logger.Info("MapConfig", `Deduced base position from spawns: {_config.BasePosition}`)
 	else
 		-- Fallback: left of grid
-		_config.BasePosition = Vector3.new(_config.GridCornerA.X - 5, _config.GridY, (_config.GridCornerA.Z + _config.GridCornerB.Z) / 2)
+		_config.BasePosition =
+			Vector3.new(_config.GridCornerA.X - 5, _config.GridY, (_config.GridCornerA.Z + _config.GridCornerB.Z) / 2)
 	end
 end
 
@@ -341,12 +337,12 @@ function MapConfig._CalculateZombieDirection()
 		_config.ZombieDirection = Vector3.new(-1, 0, 0)
 		return
 	end
-	
+
 	-- Use lane 3 (middle) spawn as reference
 	local middleSpawn = _config.ZombieSpawns[3] or _config.ZombieSpawns[1]
 	local directionToBase = (_config.BasePosition - middleSpawn)
 	directionToBase = Vector3.new(directionToBase.X, 0, directionToBase.Z) -- Flatten Y
-	
+
 	if directionToBase.Magnitude > 0.01 then
 		_config.ZombieDirection = directionToBase.Unit
 	else
@@ -369,8 +365,12 @@ function MapConfig._UseDefaults()
 	_config.CellWidth = GridConfig.CELL_SIZE
 	_config.CellDepth = GridConfig.CELL_SIZE
 	_config.ZombieDirection = Vector3.new(-1, 0, 0)
-	_config.BasePosition = Vector3.new(GridConfig.GRID_ORIGIN_X - 5, GridConfig.GRID_ORIGIN_Y, GridConfig.GRID_ORIGIN_Z + GridConfig.GRID_HEIGHT / 2)
-	
+	_config.BasePosition = Vector3.new(
+		GridConfig.GRID_ORIGIN_X - 5,
+		GridConfig.GRID_ORIGIN_Y,
+		GridConfig.GRID_ORIGIN_Z + GridConfig.GRID_HEIGHT / 2
+	)
+
 	MapConfig._GenerateDefaultSpawns()
 	_config.UsingVisualConfig = false
 end
@@ -384,11 +384,11 @@ function MapConfig.GridToWorld(column: number, lane: number): Vector3
 	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
-	
+
 	local x = _config.GridOrigin.X + (column - 0.5) * _config.CellWidth
 	local y = _config.GridY
 	local z = _config.GridOrigin.Z + (lane - 0.5) * _config.CellDepth
-	
+
 	return Vector3.new(x, y, z)
 end
 
@@ -397,10 +397,10 @@ function MapConfig.WorldToGrid(position: Vector3): (number?, number?)
 	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
-	
+
 	local relativeX = position.X - _config.GridOrigin.X
 	local relativeZ = position.Z - _config.GridOrigin.Z
-	
+
 	-- Check bounds
 	if relativeX < 0 or relativeX >= _config.GridWidth then
 		return nil, nil
@@ -408,10 +408,10 @@ function MapConfig.WorldToGrid(position: Vector3): (number?, number?)
 	if relativeZ < 0 or relativeZ >= _config.GridDepth then
 		return nil, nil
 	end
-	
+
 	local column = math.floor(relativeX / _config.CellWidth) + 1
 	local lane = math.floor(relativeZ / _config.CellDepth) + 1
-	
+
 	return column, lane
 end
 
@@ -420,7 +420,7 @@ function MapConfig.GetZombieSpawn(lane: number): Vector3
 	if not _isInitialized and not _isClientMode then
 		MapConfig.Initialize()
 	end
-	
+
 	return _config.ZombieSpawns[lane] or MapConfig._GetDefaultSpawnForLane(lane)
 end
 
@@ -508,28 +508,28 @@ function MapConfig.LoadFromMap(mapModel: Instance)
 		Logger.Warn("MapConfig", "LoadFromMap called with nil model")
 		return
 	end
-	
+
 	Logger.Info("MapConfig", `Loading config from map: {mapModel.Name}`)
-	
+
 	-- Read grid bounds
 	local success = MapConfig._ReadGridBounds(mapModel)
 	if not success then
 		Logger.Warn("MapConfig", "Failed to read grid bounds from map, using defaults")
 		MapConfig._UseDefaults()
 	end
-	
+
 	-- Read zombie spawns
 	MapConfig._ReadZombieSpawns(mapModel)
-	
+
 	-- Read base position
 	MapConfig._ReadBasePosition(mapModel)
-	
+
 	-- Calculate zombie direction
 	MapConfig._CalculateZombieDirection()
-	
+
 	_config.UsingVisualConfig = true
 	_isInitialized = true
-	
+
 	Logger.Info("MapConfig", `Map config loaded:`)
 	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)
 	Logger.Info("MapConfig", `  Cell size: {_config.CellWidth}x{_config.CellDepth}`)
@@ -543,18 +543,25 @@ end
 ]]
 export type ServerMapConfig = {
 	MapId: string,
-	GridCornerAX: number, GridCornerAY: number, GridCornerAZ: number,
-	GridCornerBX: number, GridCornerBY: number, GridCornerBZ: number,
+	GridCornerAX: number,
+	GridCornerAY: number,
+	GridCornerAZ: number,
+	GridCornerBX: number,
+	GridCornerBY: number,
+	GridCornerBZ: number,
 	GridY: number,
 	CellWidth: number,
 	CellDepth: number,
-	BasePositionX: number, BasePositionY: number, BasePositionZ: number,
-	ZombieDirectionX: number, ZombieDirectionZ: number,
+	BasePositionX: number,
+	BasePositionY: number,
+	BasePositionZ: number,
+	ZombieDirectionX: number,
+	ZombieDirectionZ: number,
 }
 
 function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
 	Logger.Info("MapConfig", `Applying config from server for map: {serverConfig.MapId}`)
-	
+
 	_config.GridCornerA = Vector3.new(serverConfig.GridCornerAX, serverConfig.GridCornerAY, serverConfig.GridCornerAZ)
 	_config.GridCornerB = Vector3.new(serverConfig.GridCornerBX, serverConfig.GridCornerBY, serverConfig.GridCornerBZ)
 	_config.GridOrigin = _config.GridCornerA
@@ -563,15 +570,16 @@ function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
 	_config.CellDepth = serverConfig.CellDepth
 	_config.GridWidth = _config.GridCornerB.X - _config.GridCornerA.X
 	_config.GridDepth = _config.GridCornerB.Z - _config.GridCornerA.Z
-	_config.BasePosition = Vector3.new(serverConfig.BasePositionX, serverConfig.BasePositionY, serverConfig.BasePositionZ)
+	_config.BasePosition =
+		Vector3.new(serverConfig.BasePositionX, serverConfig.BasePositionY, serverConfig.BasePositionZ)
 	_config.ZombieDirection = Vector3.new(serverConfig.ZombieDirectionX, 0, serverConfig.ZombieDirectionZ).Unit
 	_config.UsingVisualConfig = true
-	
+
 	-- Generate zombie spawns from grid (client doesn't need exact positions)
 	MapConfig._GenerateDefaultSpawns()
-	
+
 	_isInitialized = true
-	
+
 	Logger.Info("MapConfig", `Config applied from server:`)
 	Logger.Info("MapConfig", `  GridY: {_config.GridY}`)
 	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)

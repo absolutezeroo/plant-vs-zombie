@@ -50,7 +50,7 @@ local CONFIG = table.freeze({
 -- [3] STATE (mutable runtime state)
 --------------------------------------------------------------------------------
 local State = {
-	ZombieAttackTimes = {} :: {[number]: number},
+	ZombieAttackTimes = {} :: { [number]: number },
 	FrameStats = {
 		projectileHits = 0,
 		splashHits = 0,
@@ -88,11 +88,11 @@ end
 -- Apply damage to an entity (returns true if killed)
 local function applyDamage(world: MatterWorld, entityId: number, damage: number, piercesShields: boolean?): boolean
 	local health = world:get(entityId, Components.HealthComponent)
-	
+
 	if not health then
 		return false
 	end
-	
+
 	-- Check if zombie has shield and projectile doesn't pierce
 	local zombie = world:get(entityId, Components.ZombieTypeComponent)
 
@@ -102,26 +102,29 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 			-- Shield absorbs ALL damage until destroyed (blocks projectiles)
 			-- Projectiles with PiercesShields bypass this entirely
 			-- Shield health is tracked separately from zombie health
-			
+
 			-- Get current shield health from component or initialize from data
 			local shield = world:get(entityId, Components.ShieldComponent)
-			
+
 			if not shield then
 				-- First hit: initialize shield from ZombieData
 				shield = { Current = zombieStats.ShieldHealth or 0, Max = zombieStats.ShieldHealth or 0 }
 				world:insert(entityId, Components.ShieldComponent(shield))
 			end
-			
+
 			if shield.Current > 0 then
 				-- Shield absorbs damage
 				local remainingDamage = math.max(0, damage - shield.Current)
 				local newShieldHealth = math.max(0, shield.Current - damage)
-				
-				world:insert(entityId, Components.ShieldComponent({
-					Current = newShieldHealth,
-					Max = shield.Max,
-				}))
-				
+
+				world:insert(
+					entityId,
+					Components.ShieldComponent({
+						Current = newShieldHealth,
+						Max = shield.Max,
+					})
+				)
+
 				if newShieldHealth <= 0 then
 					-- Broadcast shield destroyed event
 					Network.EntityDamaged.FireAll({
@@ -131,21 +134,21 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 						ShieldDestroyed = true,
 					})
 				end
-				
+
 				-- If shield absorbed all damage, no health damage
 				if remainingDamage <= 0 then
 					return false -- Not dead
 				end
-				
+
 				-- Overflow damage goes to health
 				damage = remainingDamage
 			end
 		end
 	end
-	
+
 	-- Apply damage using ECSUtils (handles clamping and returns actual damage)
 	local actualDamage, isDead = ECSUtils.DamageEntity(world, entityId, damage, Components)
-	
+
 	-- Broadcast damage event
 	local newHealth = world:get(entityId, Components.HealthComponent)
 	Network.EntityDamaged.FireAll({
@@ -153,46 +156,58 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 		NewHealth = newHealth and newHealth.Current or 0,
 		DamageAmount = actualDamage,
 	})
-	
+
 	return isDead
 end
 
 -- Apply splash damage to zombies near impact point
 -- OPTIMIZED: Uses LaneCache for O(lane_range) instead of O(all_zombies)
-local function applySplashDamage(world: MatterWorld, impactX: number, impactZ: number, splash: any, proj: any, impactLane: number?)
+local function applySplashDamage(
+	world: MatterWorld,
+	impactX: number,
+	impactZ: number,
+	splash: any,
+	proj: any,
+	impactLane: number?
+)
 	local hitCount = 0
-	
+
 	-- Calculate lane radius from splash radius
 	local laneRadius = math.ceil(splash.SplashRadius / GridConfig.CELL_SIZE)
 	local centerLane = impactLane or 3
-	
+
 	-- O(lane_range) lookup instead of O(N) world:query
 	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
-	
+
 	for _, zombieId in zombiesInRange do
 		local zombiePos = LaneCache.GetPosition(zombieId)
-		if not zombiePos then continue end
-		
+		if not zombiePos then
+			continue
+		end
+
 		local dx = zombiePos.X - impactX
 		local dz = zombiePos.Z - impactZ
 		local distance = math.sqrt(dx * dx + dz * dz)
-		
+
 		if distance <= splash.SplashRadius then
 			local killed = applyDamage(world, zombieId, splash.SplashDamage, proj.PiercesShields)
 			hitCount += 1
-			
+
 			-- Apply slow if frozen splash
 			if proj.IsFrozen and not killed and proj.SlowPercent then
-				world:insert(zombieId, Components.SlowComponent({
-					SlowPercent = proj.SlowPercent,
-					Duration = proj.SlowDuration,
-					AppliedAt = os.clock(),
-				}))
+				world:insert(
+					zombieId,
+					Components.SlowComponent({
+						SlowPercent = proj.SlowPercent,
+						Duration = proj.SlowDuration,
+						AppliedAt = os.clock(),
+					})
+				)
 				State.FrameStats.slowsApplied += 1
 			end
 		end
 	end
-	
+
 	State.FrameStats.splashHits += hitCount
 end
 
@@ -201,17 +216,20 @@ local function tryApplyStun(world: MatterWorld, zombieId: number, proj: any): bo
 	if not proj.CanStun or proj.StunChance <= 0 then
 		return false
 	end
-	
+
 	-- Roll for stun chance
 	if ChanceUtils.Roll(proj.StunChance) then
-		world:insert(zombieId, Components.StunComponent({
-			Duration = proj.StunDuration,
-			AppliedAt = os.clock(),
-		}))
+		world:insert(
+			zombieId,
+			Components.StunComponent({
+				Duration = proj.StunDuration,
+				AppliedAt = os.clock(),
+			})
+		)
 		State.FrameStats.stunsApplied += 1
 		return true
 	end
-	
+
 	return false
 end
 
@@ -243,10 +261,10 @@ end
 --------------------------------------------------------------------------------
 local function OnStep(world: MatterWorld)
 	local currentTime = os.clock()
-	
+
 	-- Reset frame stats at start of combat processing
 	resetFrameStats()
-	
+
 	-- Process stun effect expiration
 	for zombieId, stun in world:query(Components.StunComponent) do
 		if currentTime - stun.AppliedAt >= stun.Duration then
@@ -254,21 +272,21 @@ local function OnStep(world: MatterWorld)
 			State.FrameStats.stunsExpired += 1
 		end
 	end
-	
+
 	-- Process projectile-zombie collisions
 	-- OPTIMIZED: Uses LaneCache for O(lane_size) instead of O(all_zombies)
 	for projId, projPos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		local hitZombie = false
 		local hitZombieId = nil
-		
+
 		-- Check for multi-directional projectiles (Starfruit)
 		local isMultiDir = proj.DirectionZ and proj.DirectionZ ~= 0
-		
+
 		-- Check if projectile can hit flying zombies
 		local canHitFlying = proj.CanHitFlying or false
-		
+
 		-- Get zombies to check based on projectile type
-		local zombiesToCheck: {number}
+		local zombiesToCheck: { number }
 		if isMultiDir then
 			-- Multi-directional: check nearby lanes (±1 lane radius)
 			zombiesToCheck = LaneCache.GetEntitiesInLaneRange(proj.Lane or 3, 1)
@@ -276,24 +294,24 @@ local function OnStep(world: MatterWorld)
 			-- Normal: only check same lane (O(1) lookup)
 			zombiesToCheck = LaneCache.GetEntitiesInLane(proj.Lane)
 		end
-		
+
 		for _, zombieId in zombiesToCheck do
 			-- Get zombie components (already filtered by lane)
 			local zombiePos = world:get(zombieId, Components.PositionComponent)
 			local zombie = world:get(zombieId, Components.ZombieTypeComponent)
-			
+
 			if not zombiePos or not zombie then
 				continue
 			end
-			
+
 			-- Check if zombie is flying and projectile can't hit flying
 			local zombieStats = ZombieData[zombie.ZombieType]
 			if zombieStats and zombieStats.IsFlying and not canHitFlying then
 				continue -- Skip flying zombies for non-flying projectiles
 			end
-			
+
 			local inRange = false
-			
+
 			if isMultiDir then
 				-- Multi-directional: check 3D distance
 				local dx = math.abs(projPos.X - zombiePos.X)
@@ -305,7 +323,7 @@ local function OnStep(world: MatterWorld)
 				local distance = math.abs(projPos.X - zombiePos.X)
 				inRange = distance <= CONFIG.PROJECTILE_HIT_RADIUS
 			end
-			
+
 			if inRange then
 				-- Check if fire pea thaws frozen zombies
 				local enhanced = world:get(projId, Components.EnhancedProjectileComponent)
@@ -316,16 +334,16 @@ local function OnStep(world: MatterWorld)
 						State.FrameStats.thawsApplied += 1
 					end
 				end
-				
+
 				-- Calculate damage (with fire multiplier if applicable)
 				local damage = proj.Damage
 				if enhanced and enhanced.DamageMultiplier then
 					damage = math.floor(damage * enhanced.DamageMultiplier)
 				end
-				
+
 				-- Apply damage
 				local killed = applyDamage(world, zombieId, damage, proj.PiercesShields)
-				
+
 				-- Spawn ProjectileHitEvent for mutation systems to process
 				if proj.SourceEntity then
 					world:spawn(Components.ProjectileHitEvent({
@@ -339,39 +357,42 @@ local function OnStep(world: MatterWorld)
 						WasKill = killed,
 					}))
 				end
-				
+
 				-- Apply slow effect if frozen projectile (and not fire pea)
 				if proj.IsFrozen and not killed and proj.SlowPercent and proj.SlowDuration then
 					if not (enhanced and enhanced.IsFirePea) then
-						world:insert(zombieId, Components.SlowComponent({
-							SlowPercent = proj.SlowPercent,
-							Duration = proj.SlowDuration,
-							AppliedAt = currentTime,
-						}))
+						world:insert(
+							zombieId,
+							Components.SlowComponent({
+								SlowPercent = proj.SlowPercent,
+								Duration = proj.SlowDuration,
+								AppliedAt = currentTime,
+							})
+						)
 						State.FrameStats.slowsApplied += 1
 					end
 				end
-				
+
 				-- Try to apply stun (Kernel-pult butter)
 				if not killed then
 					tryApplyStun(world, zombieId, proj)
 				end
-				
+
 				State.FrameStats.projectileHits += 1
-				
+
 				hitZombie = true
 				hitZombieId = zombieId
 				break
 			end
 		end
-		
+
 		if hitZombie then
 			-- Check for splash damage (Melon-pult, Winter Melon)
 			local splash = world:get(projId, Components.SplashComponent)
 			if splash and splash.SplashRadius > 0 then
 				applySplashDamage(world, projPos.X, projPos.Z, splash, proj, proj.Lane)
 			end
-			
+
 			-- Notify client of impact for VFX
 			local enhanced = world:get(projId, Components.EnhancedProjectileComponent)
 			Network.ProjectileHit.FireAll({
@@ -383,7 +404,7 @@ local function OnStep(world: MatterWorld)
 				IsFrozen = proj.IsFrozen,
 				IsEnhanced = if enhanced then enhanced.IsFirePea else false,
 			})
-			
+
 			-- Release projectile back to pool
 			if EntityPool.IsPooledEntity(projId) then
 				EntityPool.Despawn(projId)
@@ -392,7 +413,7 @@ local function OnStep(world: MatterWorld)
 			end
 		end
 	end
-	
+
 	-- Process slow effect expiration
 	for zombieId, slow in world:query(Components.SlowComponent) do
 		if currentTime - slow.AppliedAt >= slow.Duration then
@@ -400,39 +421,44 @@ local function OnStep(world: MatterWorld)
 			State.FrameStats.slowsExpired += 1
 		end
 	end
-	
+
 	-- Skip stunned zombies from attacking
 	-- Process zombie eating plants
-	for zombieId, zombiePos, zombie, zombieHealth in world:query(Components.PositionComponent, Components.ZombieTypeComponent, Components.HealthComponent) do
+	for zombieId, zombiePos, zombie, zombieHealth in
+		world:query(Components.PositionComponent, Components.ZombieTypeComponent, Components.HealthComponent)
+	do
 		-- Skip stunned zombies
 		local stun = world:get(zombieId, Components.StunComponent)
 		if stun then
 			continue
 		end
-		
+
 		local stats = ZombieData[zombie.ZombieType]
 		if not stats then
 			continue
 		end
-		
+
 		-- Check if zombie has a target
 		local target = world:get(zombieId, Components.TargetComponent)
-		
+
 		if target then
 			-- Already eating - check if target still exists
 			if not world:contains(target.TargetEntity) then
 				-- Target destroyed, resume moving
 				local direction = State.CachedZombieDir
 				world:remove(zombieId, Components.TargetComponent)
-				world:insert(zombieId, Components.MovementComponent({
-					VelocityX = direction.X * stats.Speed,
-					VelocityY = 0,
-					VelocityZ = direction.Z * stats.Speed
-				}))
+				world:insert(
+					zombieId,
+					Components.MovementComponent({
+						VelocityX = direction.X * stats.Speed,
+						VelocityY = 0,
+						VelocityZ = direction.Z * stats.Speed,
+					})
+				)
 				State.ZombieAttackTimes[zombieId] = nil
 				continue
-			 end
-			
+			end
+
 			-- Check attack timer
 			local lastAttack = State.ZombieAttackTimes[zombieId] or 0
 			if currentTime - lastAttack >= stats.AttackSpeed then
@@ -440,16 +466,19 @@ local function OnStep(world: MatterWorld)
 				local killed = applyDamage(world, target.TargetEntity, stats.Damage)
 				State.ZombieAttackTimes[zombieId] = currentTime
 				State.FrameStats.zombieBites += 1
-				
+
 				if killed then
 					-- Plant destroyed, resume moving
 					local direction = State.CachedZombieDir
 					world:remove(zombieId, Components.TargetComponent)
-					world:insert(zombieId, Components.MovementComponent({
-						VelocityX = direction.X * stats.Speed,
-						VelocityY = 0,
-						VelocityZ = direction.Z * stats.Speed
-					}))
+					world:insert(
+						zombieId,
+						Components.MovementComponent({
+							VelocityX = direction.X * stats.Speed,
+							VelocityY = 0,
+							VelocityZ = direction.Z * stats.Speed,
+						})
+					)
 					State.ZombieAttackTimes[zombieId] = nil
 					State.FrameStats.plantsDestroyed += 1
 				end
@@ -458,40 +487,46 @@ local function OnStep(world: MatterWorld)
 			-- No target - check if there's a plant in our path
 			local column = getColumnFromX(zombiePos.X)
 			local zombieDir = State.CachedZombieDir
-			
+
 			-- Check current column and columns ahead of zombie (in its movement direction)
 			-- If zombie moves -X, check column and column-1; if +X, check column and column+1
 			local colStep = if zombieDir.X < 0 then -1 else 1
 			local startCol = column
 			local endCol = math.clamp(column + colStep * 2, 1, GridConfig.GRID_COLUMNS)
-			
+
 			for checkCol = startCol, endCol, colStep do
 				if checkCol < 1 or checkCol > GridConfig.GRID_COLUMNS then
 					continue
 				end
-				
+
 				local plantId = findPlantAtPosition(world, checkCol, zombie.Lane)
 				if plantId then
 					local plantPos = world:get(plantId, Components.PositionComponent)
 					if plantPos then
 						-- Use absolute distance for collision detection
 						local absDistance = math.abs(zombiePos.X - plantPos.X)
-						
+
 						-- Check if zombie is within bite range of plant
 						if absDistance <= CONFIG.ZOMBIE_BITE_RANGE then
 							-- Start eating!
-							world:insert(zombieId, Components.TargetComponent({
-								TargetEntity = plantId,
-								TargetType = "Plant"
-							}))
-							
+							world:insert(
+								zombieId,
+								Components.TargetComponent({
+									TargetEntity = plantId,
+									TargetType = "Plant",
+								})
+							)
+
 							-- Stop moving
-							world:insert(zombieId, Components.MovementComponent({
-								VelocityX = 0,
-								VelocityY = 0,
-								VelocityZ = 0
-							}))
-							
+							world:insert(
+								zombieId,
+								Components.MovementComponent({
+									VelocityX = 0,
+									VelocityY = 0,
+									VelocityZ = 0,
+								})
+							)
+
 							State.ZombieAttackTimes[zombieId] = currentTime
 							break
 						end
@@ -500,7 +535,7 @@ local function OnStep(world: MatterWorld)
 			end
 		end
 	end
-	
+
 	-- Clean up attack times for despawned zombies
 	for zombieId in State.ZombieAttackTimes do
 		if not world:contains(zombieId) then
@@ -513,8 +548,10 @@ end
 -- [6] INIT / DISPOSE
 --------------------------------------------------------------------------------
 local function Init(_world)
-	if State.IsInitialized then return end
-	
+	if State.IsInitialized then
+		return
+	end
+
 	-- Pre-cache MapConfig values to avoid yield in OnStep
 	if MapConfig.IsInitialized() then
 		State.CachedGridOrigin = MapConfig.GetGridOrigin()
@@ -526,7 +563,7 @@ local function Init(_world)
 		State.CachedCellWidth = MapConfig.GetCellSize()
 		State.CachedZombieDir = MapConfig.GetZombieDirection()
 	end
-	
+
 	State.IsInitialized = true
 end
 

@@ -57,17 +57,17 @@ end
 
 -- Projectile visual cache
 type ProjectileVisual = {
-	Model: Model?,       -- Cloned asset model (if available)
-	Part: Part?,         -- Fallback part (if no asset)
+	Model: Model?, -- Cloned asset model (if available)
+	Part: Part?, -- Fallback part (if no asset)
 	Lane: number,
 	Speed: number,
 	Variant: string,
 	IsFrozen: boolean,
 	IsEnhanced: boolean,
-	DirectionX: number,  -- Direction vector X (-1 or 1)
-	DirectionZ: number,  -- Direction vector Z (usually 0)
+	DirectionX: number, -- Direction vector X (-1 or 1)
+	DirectionZ: number, -- Direction vector Z (usually 0)
 }
-local _projectileVisuals: {[number]: ProjectileVisual} = {}
+local _projectileVisuals: { [number]: ProjectileVisual } = {}
 
 -- Trove for cleanup
 local _trove = Trove.new()
@@ -81,19 +81,91 @@ type FallbackConfig = {
 	Speed: number,
 }
 
-local FALLBACK_CONFIGS: {[string]: FallbackConfig} = {
-	Pea = { Size = Vector3.new(1, 1, 1), Color = Color3.fromRGB(100, 200, 100), Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Ball, Speed = 15 },
-	FrozenPea = { Size = Vector3.new(1, 1, 1), Color = Color3.fromRGB(150, 220, 255), Material = Enum.Material.Ice, Shape = Enum.PartType.Ball, Speed = 15 },
-	FirePea = { Size = Vector3.new(1.2, 1.2, 1.2), Color = Color3.fromRGB(255, 150, 50), Material = Enum.Material.Neon, Shape = Enum.PartType.Ball, Speed = 18 },
-	Spore = { Size = Vector3.new(0.6, 0.6, 0.6), Color = Color3.fromRGB(180, 150, 200), Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Ball, Speed = 12 },
-	Fume = { Size = Vector3.new(1.5, 1.5, 1.5), Color = Color3.fromRGB(150, 50, 180), Material = Enum.Material.ForceField, Shape = Enum.PartType.Ball, Speed = 20 },
-	Cabbage = { Size = Vector3.new(1.5, 1.2, 1.5), Color = Color3.fromRGB(100, 180, 80), Material = Enum.Material.Grass, Shape = Enum.PartType.Ball, Speed = 10 },
-	Kernel = { Size = Vector3.new(0.8, 1, 0.8), Color = Color3.fromRGB(255, 220, 100), Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Ball, Speed = 10 },
-	Butter = { Size = Vector3.new(1.2, 0.6, 1.2), Color = Color3.fromRGB(255, 230, 100), Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Block, Speed = 10 },
-	Melon = { Size = Vector3.new(2, 1.5, 2), Color = Color3.fromRGB(100, 200, 100), Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Ball, Speed = 8 },
-	Star = { Size = Vector3.new(0.8, 0.8, 0.2), Color = Color3.fromRGB(255, 255, 100), Material = Enum.Material.Neon, Shape = Enum.PartType.Block, Speed = 18 },
-	Spike = { Size = Vector3.new(0.4, 0.4, 1.5), Color = Color3.fromRGB(80, 120, 80), Material = Enum.Material.Metal, Shape = Enum.PartType.Block, Speed = 25 },
-	Seed = { Size = Vector3.new(0.5, 0.5, 0.5), Color = Color3.fromRGB(120, 80, 50), Material = Enum.Material.Wood, Shape = Enum.PartType.Ball, Speed = 12 },
+local FALLBACK_CONFIGS: { [string]: FallbackConfig } = {
+	Pea = {
+		Size = Vector3.new(1, 1, 1),
+		Color = Color3.fromRGB(100, 200, 100),
+		Material = Enum.Material.SmoothPlastic,
+		Shape = Enum.PartType.Ball,
+		Speed = 15,
+	},
+	FrozenPea = {
+		Size = Vector3.new(1, 1, 1),
+		Color = Color3.fromRGB(150, 220, 255),
+		Material = Enum.Material.Ice,
+		Shape = Enum.PartType.Ball,
+		Speed = 15,
+	},
+	FirePea = {
+		Size = Vector3.new(1.2, 1.2, 1.2),
+		Color = Color3.fromRGB(255, 150, 50),
+		Material = Enum.Material.Neon,
+		Shape = Enum.PartType.Ball,
+		Speed = 18,
+	},
+	Spore = {
+		Size = Vector3.new(0.6, 0.6, 0.6),
+		Color = Color3.fromRGB(180, 150, 200),
+		Material = Enum.Material.SmoothPlastic,
+		Shape = Enum.PartType.Ball,
+		Speed = 12,
+	},
+	Fume = {
+		Size = Vector3.new(1.5, 1.5, 1.5),
+		Color = Color3.fromRGB(150, 50, 180),
+		Material = Enum.Material.ForceField,
+		Shape = Enum.PartType.Ball,
+		Speed = 20,
+	},
+	Cabbage = {
+		Size = Vector3.new(1.5, 1.2, 1.5),
+		Color = Color3.fromRGB(100, 180, 80),
+		Material = Enum.Material.Grass,
+		Shape = Enum.PartType.Ball,
+		Speed = 10,
+	},
+	Kernel = {
+		Size = Vector3.new(0.8, 1, 0.8),
+		Color = Color3.fromRGB(255, 220, 100),
+		Material = Enum.Material.SmoothPlastic,
+		Shape = Enum.PartType.Ball,
+		Speed = 10,
+	},
+	Butter = {
+		Size = Vector3.new(1.2, 0.6, 1.2),
+		Color = Color3.fromRGB(255, 230, 100),
+		Material = Enum.Material.SmoothPlastic,
+		Shape = Enum.PartType.Block,
+		Speed = 10,
+	},
+	Melon = {
+		Size = Vector3.new(2, 1.5, 2),
+		Color = Color3.fromRGB(100, 200, 100),
+		Material = Enum.Material.SmoothPlastic,
+		Shape = Enum.PartType.Ball,
+		Speed = 8,
+	},
+	Star = {
+		Size = Vector3.new(0.8, 0.8, 0.2),
+		Color = Color3.fromRGB(255, 255, 100),
+		Material = Enum.Material.Neon,
+		Shape = Enum.PartType.Block,
+		Speed = 18,
+	},
+	Spike = {
+		Size = Vector3.new(0.4, 0.4, 1.5),
+		Color = Color3.fromRGB(80, 120, 80),
+		Material = Enum.Material.Metal,
+		Shape = Enum.PartType.Block,
+		Speed = 25,
+	},
+	Seed = {
+		Size = Vector3.new(0.5, 0.5, 0.5),
+		Color = Color3.fromRGB(120, 80, 50),
+		Material = Enum.Material.Wood,
+		Shape = Enum.PartType.Ball,
+		Speed = 12,
+	},
 }
 
 local DEFAULT_FALLBACK: FallbackConfig = FALLBACK_CONFIGS.Pea
@@ -130,13 +202,13 @@ end
 local function playMuzzleFlash(plantModel: Model, spawnPos: Vector3)
 	local vfxFolder = plantModel:FindFirstChild("VFX")
 	local shootVFX = vfxFolder and vfxFolder:FindFirstChild("Shoot")
-	
+
 	if shootVFX and shootVFX:IsA("ParticleEmitter") then
 		-- Use VFXUtils to clone, emit, and cleanup
 		VFXUtils.CloneAndEmit(shootVFX, spawnPos)
 		Logger.Debug("ProjectileRender", "Played muzzle flash VFX")
 	end
-	
+
 	-- Fire signal for audio (decoupled)
 	GameSignals.OnPlantShoot:Fire({
 		Position = spawnPos,
@@ -149,9 +221,9 @@ end
 	Priority: 1) Assets/Projectiles/{Variant} 2) Fallback Part
 ]]
 local function createProjectileVisual(
-	entityId: number, 
-	lane: number, 
-	startX: number, 
+	entityId: number,
+	lane: number,
+	startX: number,
 	variant: string?,
 	isFrozen: boolean?,
 	isEnhanced: boolean?
@@ -159,52 +231,52 @@ local function createProjectileVisual(
 	local actualVariant = variant or "Pea"
 	local actualFrozen = isFrozen or false
 	local actualEnhanced = isEnhanced or false
-	
+
 	-- Override variant if enhanced (Torchwood)
 	if actualEnhanced and actualVariant == "Pea" then
 		actualVariant = "FirePea"
 	end
-	
+
 	-- Calculate forward direction (opposite of zombie direction)
 	local zombieDir = MapConfig.GetZombieDirection()
 	local forwardDirX = -zombieDir.X
 	local forwardDirZ = -zombieDir.Z
-	
+
 	-- Get spawn position
 	local z = getLaneZ(lane)
 	local spawnPos = Vector3.new(startX, 2.5, z)
-	
+
 	-- Try to find source plant for muzzle position + VFX
 	local plantModel = findPlantModelInLane(lane, startX - 2)
 	if plantModel then
 		local muzzlePos = AttachmentUtils.GetWorldPosition(plantModel, AttachmentUtils.Names.Muzzle, false)
 		spawnPos = muzzlePos
-		
+
 		-- Play muzzle flash from plant's VFX folder
 		playMuzzleFlash(plantModel, spawnPos)
 	end
-	
+
 	-- Try to clone asset from Assets/Projectiles/{Variant}
 	local assetTemplate = ProjectileAssets and ProjectileAssets:FindFirstChild(actualVariant)
-	
+
 	if assetTemplate and assetTemplate:IsA("Model") then
 		-- Clone asset model
 		local model = assetTemplate:Clone()
 		model.Name = `Projectile_{entityId}_{actualVariant}`
-		
+
 		if model.PrimaryPart then
 			model:PivotTo(CFrame.new(spawnPos))
 		end
-		
+
 		model:SetAttribute("EntityId", entityId)
 		model.Parent = Workspace
-		
+
 		-- Get speed from asset attribute or fallback config
 		local config = FALLBACK_CONFIGS[actualVariant] or DEFAULT_FALLBACK
 		local speed = model:GetAttribute("Speed") or config.Speed
-		
+
 		Logger.Debug("ProjectileRender", `{actualVariant} {entityId} using asset model`)
-		
+
 		return {
 			Model = model,
 			Part = nil,
@@ -217,10 +289,10 @@ local function createProjectileVisual(
 			DirectionZ = forwardDirZ,
 		}
 	end
-	
+
 	-- Fallback: Create simple Part
 	local config = FALLBACK_CONFIGS[actualVariant] or DEFAULT_FALLBACK
-	
+
 	local part = Instance.new("Part")
 	part.Name = `Projectile_{entityId}_{actualVariant}`
 	part.Shape = config.Shape
@@ -235,9 +307,9 @@ local function createProjectileVisual(
 	part.Position = spawnPos
 	part:SetAttribute("EntityId", entityId)
 	part.Parent = Workspace
-	
+
 	Logger.Debug("ProjectileRender", `{actualVariant} {entityId} using fallback Part (no asset found)`)
-	
+
 	return {
 		Model = nil,
 		Part = part,
@@ -284,21 +356,19 @@ local function setupNetworkListeners()
 		local variant = if data.Variant then tostring(data.Variant) else "Pea"
 		local isFrozen = data.IsFrozen or false
 		local isEnhanced = data.IsEnhanced or false
-		
+
 		if not _projectileVisuals[entityId] then
-			_projectileVisuals[entityId] = createProjectileVisual(
-				entityId, lane, startX, variant, isFrozen, isEnhanced
-			)
+			_projectileVisuals[entityId] = createProjectileVisual(entityId, lane, startX, variant, isFrozen, isEnhanced)
 			Logger.Debug("ProjectileRender", `{variant} {entityId} spawned in lane {lane}`)
 		end
 	end))
-	
+
 	-- Projectile hit a target - play impact VFX
 	_trove:Add(Network.ProjectileHit.On(function(data)
 		local visual = _projectileVisuals[data.EntityId]
 		if visual then
 			local part = getVisualPart(visual)
-			
+
 			-- CRITICAL: Teleport visual to impact position (sync with server)
 			local impactPos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
 			if part then
@@ -308,9 +378,9 @@ local function setupNetworkListeners()
 					part.Position = impactPos
 				end
 			end
-			
+
 			local pos = impactPos
-			
+
 			-- Fire signal for VFX/Audio (decoupled)
 			GameSignals.OnProjectileImpact:Fire({
 				Position = pos,
@@ -318,13 +388,13 @@ local function setupNetworkListeners()
 				IsFrozen = visual.IsFrozen or data.IsFrozen,
 				IsEnhanced = visual.IsEnhanced or data.IsEnhanced,
 			})
-			
+
 			-- Hit animation (quick scale down) - immediate destroy to avoid traversal
 			if part then
 				local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Quad)
 				local tween = TweenService:Create(part, tweenInfo, {
 					Size = Vector3.new(0.1, 0.1, 0.1),
-					Transparency = 1
+					Transparency = 1,
 				})
 				tween:Play()
 				tween.Completed:Connect(function()
@@ -336,7 +406,7 @@ local function setupNetworkListeners()
 		end
 		_projectileVisuals[data.EntityId] = nil
 	end))
-	
+
 	-- Projectile despawned without hitting - just remove (no VFX)
 	_trove:Add(Network.ProjectileDespawned.On(function(data)
 		destroyProjectileVisual(data.EntityId)
@@ -353,8 +423,8 @@ end
 
 -- Movement config
 local MovementConfig = {
-	MIN_DT = 1/120,  -- Minimum deltaTime
-	MAX_DT = 1/15,   -- Maximum deltaTime
+	MIN_DT = 1 / 120, -- Minimum deltaTime
+	MAX_DT = 1 / 15, -- Maximum deltaTime
 }
 
 --[[
@@ -365,7 +435,7 @@ local function ProjectileRenderSystem(_world)
 	local Matter = require(Packages:FindFirstChild("Matter"))
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
-	
+
 	-- Move projectiles and check client-side collision for responsive visuals
 	for entityId, visual in _projectileVisuals do
 		local part = getVisualPart(visual)
@@ -373,12 +443,12 @@ local function ProjectileRenderSystem(_world)
 			destroyProjectileVisual(entityId)
 			continue
 		end
-		
+
 		local currentX = part.Position.X
 		local currentZ = part.Position.Z
 		local newX = currentX + visual.Speed * visual.DirectionX * dt
 		local newZ = currentZ + visual.Speed * visual.DirectionZ * dt
-		
+
 		-- Check if off-screen (past grid bounds)
 		local mapConfig = MapConfig.GetConfig()
 		local minX = mapConfig.GridCornerA.X - 50
@@ -387,12 +457,12 @@ local function ProjectileRenderSystem(_world)
 			destroyProjectileVisual(entityId)
 			continue
 		end
-		
+
 		-- CLIENT-SIDE COLLISION: Check if projectile visually hits any zombie
 		-- This makes impacts feel instant without waiting for server
 		local hitZombie = false
 		local hitPosition = Vector3.new(newX, part.Position.Y, newZ)
-		
+
 		-- Look for zombie models in workspace (tagged with Zombie_ prefix)
 		for _, child in Workspace:GetChildren() do
 			if child:IsA("Model") and child.Name:find("Zombie_") then
@@ -403,7 +473,7 @@ local function ProjectileRenderSystem(_world)
 					local zombieX = zombieRoot.Position.X
 					local laneMatch = math.abs(zombieZ - newZ) < 3 -- Same lane tolerance
 					local xDistance = math.abs(newX - zombieX)
-					
+
 					if laneMatch and xDistance < 2.5 then
 						hitZombie = true
 						hitPosition = Vector3.new(zombieX, part.Position.Y, zombieZ)
@@ -412,7 +482,7 @@ local function ProjectileRenderSystem(_world)
 				end
 			end
 		end
-		
+
 		if hitZombie then
 			-- Fire impact signal for VFX/Audio immediately
 			GameSignals.OnProjectileImpact:Fire({
@@ -421,7 +491,7 @@ local function ProjectileRenderSystem(_world)
 				IsFrozen = visual.IsFrozen,
 				IsEnhanced = visual.IsEnhanced,
 			})
-			
+
 			-- Destroy visual immediately (server will confirm damage)
 			destroyProjectileVisual(entityId)
 		else
@@ -441,12 +511,12 @@ end
 local function Dispose()
 	-- Disconnect all events
 	_trove:Clean()
-	
+
 	-- Destroy all projectile visuals
 	for entityId in _projectileVisuals do
 		destroyProjectileVisual(entityId)
 	end
-	
+
 	Logger.Debug("ProjectileRender", "Disposed")
 end
 

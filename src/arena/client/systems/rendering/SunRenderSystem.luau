@@ -45,7 +45,7 @@ type SunData = {
 	Falling: boolean,
 	Value: number,
 }
-local _sunData: {[number]: SunData} = {}
+local _sunData: { [number]: SunData } = {}
 
 -- Trove for cleanup
 local _trove = Trove.new()
@@ -69,7 +69,7 @@ local function createSunVisual(entityId: number, position: Vector3, targetY: num
 	part.CanQuery = true -- Raycast needs to hit it
 	part.CastShadow = false
 	part.Position = position
-	
+
 	-- Add highlight for visibility
 	local highlight = Instance.new("Highlight")
 	highlight.FillColor = SUN_COLOR
@@ -77,12 +77,12 @@ local function createSunVisual(entityId: number, position: Vector3, targetY: num
 	highlight.OutlineColor = Color3.new(1, 1, 1)
 	highlight.OutlineTransparency = 0.5
 	highlight.Parent = part
-	
+
 	-- Add attribute for entity tracking
 	part:SetAttribute("EntityId", entityId)
-	
+
 	part.Parent = Workspace
-	
+
 	return {
 		Part = part,
 		TargetY = targetY,
@@ -93,71 +93,74 @@ end
 
 local function collectSun(entityId: number, sunData: SunData)
 	local part = sunData.Part
-	
+
 	-- Play collection effects
 	-- Fire signal for VFX/Audio (position + amount)
 	GameSignals.OnSunCollected:Fire({
 		Position = part.Position,
 		Amount = sunData.Value,
 	})
-	
+
 	-- Animate collection (tween up and fade)
 	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local targetPos = part.Position + Vector3.new(0, 5, 0)
-	
+
 	local tween = TweenService:Create(part, tweenInfo, {
 		Position = targetPos,
 		Size = Vector3.new(0.5, 0.5, 0.5),
-		Transparency = 1
+		Transparency = 1,
 	})
-	
+
 	tween:Play()
 	tween.Completed:Connect(function()
 		part:Destroy()
 	end)
-	
+
 	-- Remove from cache
 	_sunData[entityId] = nil
-	
+
 	-- Optimistic update: add sun locally
 	SelectionState.AddSun(sunData.Value)
-	
+
 	-- Send CollectSun request to server
 	Network.CollectSunRequest.Fire({
 		RequestId = entityId % 65535, -- Use entityId as request ID
 		SunEntityId = entityId,
 	})
-	
+
 	Logger.Debug("SunRender", `Collected sun {entityId} (+{sunData.Value})`)
 end
 
 local function handleInput(input: InputObject, gameProcessed: boolean)
-	if gameProcessed then return end
-	
-	if input.UserInputType ~= Enum.UserInputType.MouseButton1 
-		and input.UserInputType ~= Enum.UserInputType.Touch then
+	if gameProcessed then
 		return
 	end
-	
+
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
 	-- Raycast to find sun
 	local camera = Workspace.CurrentCamera
-	if not camera then return end
-	
+	if not camera then
+		return
+	end
+
 	local mousePos = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-	
+
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Include
-	
+
 	-- Build filter list of sun visuals
-	local sunParts: {Instance} = {}
+	local sunParts: { Instance } = {}
 	for _, data in _sunData do
 		table.insert(sunParts, data.Part :: Instance)
 	end
 	rayParams.FilterDescendantsInstances = sunParts
-	
+
 	local result = Workspace:Raycast(ray.Origin, ray.Direction * 100, rayParams)
-	
+
 	if result and result.Instance then
 		local entityId = result.Instance:GetAttribute("EntityId")
 		if entityId and _sunData[entityId] then
@@ -171,46 +174,47 @@ end
 ]]
 local function setupListeners()
 	_trove:Connect(UserInputService.InputBegan, handleInput)
-	
+
 	_trove:Add(Network.SunSpawned.On(function(data)
 		local entityId = data.EntityId
 		local position = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
-		
+
 		if _sunData[entityId] then
 			-- Already exists, update position
 			_sunData[entityId].Part.Position = position
 		else
 			-- Create new sun visual
 			_sunData[entityId] = createSunVisual(entityId, position, data.TargetY, data.Value)
-			Logger.Debug("SunRender", `Sun {entityId} spawned at ({math.floor(data.PositionX)}, {math.floor(data.PositionY)}, {math.floor(data.PositionZ)})`)
+			Logger.Debug(
+				"SunRender",
+				`Sun {entityId} spawned at ({math.floor(data.PositionX)}, {math.floor(data.PositionY)}, {math.floor(
+					data.PositionZ
+				)})`
+			)
 		end
 	end))
-	
+
 	_trove:Add(Network.SunDespawned.On(function(data)
 		local entityId = data.EntityId
 		local sunData = _sunData[entityId]
-		
+
 		if sunData then
 			sunData.Part:Destroy()
 			_sunData[entityId] = nil
 			Logger.Debug("SunRender", `Sun {entityId} despawned`)
 		end
 	end))
-	
+
 	_trove:Add(Network.SunPositionUpdate.On(function(data)
 		local sunData = _sunData[data.EntityId]
 		if sunData then
 			sunData.Falling = data.Falling
 			if not data.Falling then
-				sunData.Part.Position = Vector3.new(
-					sunData.Part.Position.X,
-					data.PositionY,
-					sunData.Part.Position.Z
-				)
+				sunData.Part.Position = Vector3.new(sunData.Part.Position.X, data.PositionY, sunData.Part.Position.Z)
 			end
 		end
 	end))
-	
+
 	_trove:Add(Network.SunCollected.On(function(data)
 		-- Another player collected the sun, remove visual
 		local sunData = _sunData[data.SunEntityId]
@@ -218,7 +222,7 @@ local function setupListeners()
 			sunData.Part:Destroy()
 			_sunData[data.SunEntityId] = nil
 		end
-		
+
 		-- Update our sun count if we were the collector
 		local localPlayer = Players.LocalPlayer
 		if localPlayer and data.CollectorId == localPlayer.UserId then
@@ -248,8 +252,8 @@ end
 
 -- Movement config
 local MovementConfig = {
-	MIN_DT = 1/120,  -- Minimum deltaTime
-	MAX_DT = 1/15,   -- Maximum deltaTime
+	MIN_DT = 1 / 120, -- Minimum deltaTime
+	MAX_DT = 1 / 15, -- Maximum deltaTime
 }
 
 --[[
@@ -260,22 +264,18 @@ local function SunRenderSystem(_world)
 	local Matter = require(Packages:FindFirstChild("Matter"))
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
-	
+
 	for entityId, sunData in _sunData do
 		if sunData.Falling then
 			local currentY = sunData.Part.Position.Y
 			local newY = currentY - FALL_SPEED * dt
-			
+
 			if newY <= sunData.TargetY then
 				newY = sunData.TargetY
 				sunData.Falling = false
 			end
-			
-			sunData.Part.Position = Vector3.new(
-				sunData.Part.Position.X,
-				newY,
-				sunData.Part.Position.Z
-			)
+
+			sunData.Part.Position = Vector3.new(sunData.Part.Position.X, newY, sunData.Part.Position.Z)
 		end
 	end
 end
@@ -286,12 +286,12 @@ end
 local function Dispose()
 	-- Disconnect all events
 	_trove:Clean()
-	
+
 	-- Destroy all sun visuals
 	for entityId in _sunData do
 		destroySunVisual(entityId)
 	end
-	
+
 	Logger.Debug("SunRender", "Disposed")
 end
 

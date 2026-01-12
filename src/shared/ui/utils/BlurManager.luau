@@ -31,7 +31,7 @@ local _blur: BlurEffect? = nil
 ]]
 function BlurManager.Enable()
 	_refCount = _refCount + 1
-	
+
 	if _refCount == 1 then
 		-- Create blur only on first enable
 		if not _blur then
@@ -50,7 +50,7 @@ end
 ]]
 function BlurManager.Disable()
 	_refCount = math.max(0, _refCount - 1)
-	
+
 	if _refCount == 0 and _blur then
 		_blur:Destroy()
 		_blur = nil

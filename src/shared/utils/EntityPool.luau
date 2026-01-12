@@ -24,7 +24,7 @@ local EntityPool = {}
 local _world: any = nil
 local _initialized: boolean = false
 local _activeCount: number = 0
-local _trackedEntities: {[number]: boolean} = {}
+local _trackedEntities: { [number]: boolean } = {}
 
 --[[
 	Initialize the entity pool
@@ -33,17 +33,17 @@ local _trackedEntities: {[number]: boolean} = {}
 	@param InactiveTag - UNUSED (kept for API compatibility)
 	@param components - UNUSED (kept for API compatibility)
 ]]
-function EntityPool.Initialize(world: any, _InactiveTag: any?, _components: {[string]: any}?)
+function EntityPool.Initialize(world: any, _InactiveTag: any?, _components: { [string]: any }?)
 	if _initialized then
 		ErrorHandler.Report("EntityPool already initialized", "EntityPool.Initialize", "Important")
 		return
 	end
-	
+
 	_world = world
 	_initialized = true
 	_activeCount = 0
 	table.clear(_trackedEntities)
-	
+
 	Logger.Info("EntityPool", `Initialized with cap of {PerformanceConfig.ENTITY_CAP} entities`)
 end
 
@@ -60,7 +60,7 @@ function EntityPool.Spawn(...: any): number?
 		ErrorHandler.Report("EntityPool not initialized", "EntityPool.Spawn", "Critical")
 		return nil
 	end
-	
+
 	-- Check cap
 	if _activeCount >= PerformanceConfig.ENTITY_CAP then
 		ErrorHandler.Report(
@@ -70,14 +70,14 @@ function EntityPool.Spawn(...: any): number?
 		)
 		return nil
 	end
-	
+
 	-- Spawn directly via Matter (already optimized internally)
 	local entityId = _world:spawn(...)
-	
+
 	-- Track it
 	_trackedEntities[entityId] = true
 	_activeCount += 1
-	
+
 	return entityId
 end
 
@@ -93,16 +93,16 @@ function EntityPool.Despawn(entityId: number)
 		ErrorHandler.Report("EntityPool not initialized", "EntityPool.Despawn", "Critical")
 		return
 	end
-	
+
 	-- Only track entities we spawned
 	if not _trackedEntities[entityId] then
 		return
 	end
-	
+
 	-- Clean up tracking
 	_trackedEntities[entityId] = nil
 	_activeCount -= 1
-	
+
 	-- Despawn if still exists
 	if _world:contains(entityId) then
 		_world:despawn(entityId)

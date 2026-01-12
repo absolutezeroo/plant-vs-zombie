@@ -19,7 +19,7 @@ local Components = require(Shared.components)
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
 	WARNING_THRESHOLD = 0.8, -- Warn at 80% capacity
-	WARNING_COOLDOWN = 5,    -- Seconds between warnings
+	WARNING_COOLDOWN = 5, -- Seconds between warnings
 })
 
 -- 3. STATE
@@ -30,7 +30,9 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -44,7 +46,7 @@ end
 local function OnStep(world)
 	local activeCount = 0
 	local inactiveCount = 0
-	
+
 	-- Count entities by type (skip InactiveTag - managed by EntityPool)
 	for entityId in world do
 		if world:get(entityId, Components.Tags.InactiveTag) then
@@ -53,9 +55,9 @@ local function OnStep(world)
 			activeCount = activeCount + 1
 		end
 	end
-	
+
 	local warningLimit = math.floor(PerformanceConfig.ENTITY_CAP * CONFIG.WARNING_THRESHOLD)
-	
+
 	-- Only warn, don't take action - EntityPool manages entity lifecycle
 	if activeCount > PerformanceConfig.ENTITY_CAP then
 		Logger.Warn("SafetySystem", "CRITICAL: Active entity cap exceeded!", {

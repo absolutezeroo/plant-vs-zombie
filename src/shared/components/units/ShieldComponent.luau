@@ -12,8 +12,8 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type ShieldComponent = {
-	Current: number,  -- Current shield health
-	Max: number,      -- Maximum shield health (from ZombieData.ShieldHealth)
+	Current: number, -- Current shield health
+	Max: number, -- Maximum shield health (from ZombieData.ShieldHealth)
 }
 
 return Matter.component("ShieldComponent", {

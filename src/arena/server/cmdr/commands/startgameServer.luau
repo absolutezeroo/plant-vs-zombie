@@ -18,16 +18,16 @@ local WaveService = require(Server.services.WaveService)
 return function(_context, worldId: string?, difficulty: string?)
 	local world = worldId or "day"
 	local diff = difficulty or "normal"
-	
+
 	-- Check if game already running
 	local currentState = WaveService.GetGameState()
 	if currentState ~= "Waiting" and currentState ~= nil then
 		return `Game already running! State: {currentState}. Use 'reset' command first.`
 	end
-	
+
 	-- Start the game using WaveService
 	local success = WaveService.StartGame(world, diff)
-	
+
 	if success then
 		Logger.Info("Cmdr", `Game started: {world}/{diff}`)
 		return `🎮 Game started! World: {world}, Difficulty: {diff}`

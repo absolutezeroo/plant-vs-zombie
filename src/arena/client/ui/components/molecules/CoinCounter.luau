@@ -29,10 +29,10 @@ local Children = Fusion.Children
 
 -- Colors
 local Colors = {
-	Background = Color3.fromRGB(60, 50, 70),     -- Dark purple/grey
-	Icon = Color3.fromRGB(255, 215, 0),          -- Gold
-	Text = Color3.fromRGB(255, 255, 255),        -- White text
-	Stroke = Color3.fromRGB(40, 35, 50),         -- Dark stroke
+	Background = Color3.fromRGB(60, 50, 70), -- Dark purple/grey
+	Icon = Color3.fromRGB(255, 215, 0), -- Gold
+	Text = Color3.fromRGB(255, 255, 255), -- White text
+	Stroke = Color3.fromRGB(40, 35, 50), -- Dark stroke
 }
 
 export type CoinCounterProps = {
@@ -53,14 +53,14 @@ export type CoinCounterProps = {
 ]]
 local function CoinCounter(props: CoinCounterProps): Frame
 	local scope = props.Scope
-	
+
 	-- Get reactive coins value from PlayerDataClient
 	local coinsValue = PlayerDataClient.GetCoinsValue()
-	
+
 	-- Computed coin text with formatting
 	local coinText = scope:Computed(function(use): string
 		local coins = use(coinsValue)
-		
+
 		-- Format large numbers
 		if coins >= 1000000 then
 			return string.format("%.1fM", coins / 1000000)
@@ -71,41 +71,41 @@ local function CoinCounter(props: CoinCounterProps): Frame
 		end
 		return tostring(coins)
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "CoinCounter",
 		Position = props.Position or UDim2.fromScale(0, 0),
 		AnchorPoint = props.AnchorPoint or Vector2.new(0, 0),
 		Size = UDim2.fromScale(0.08, 1), -- 8% width of screen, full height of parent
 		BackgroundColor3 = Colors.Background,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Size constraints
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(70, 32),
 				MaxSize = Vector2.new(120, 50),
-			},
-			
+			}),
+
 			-- Rounded corners
-			scope:New("UICorner") {
+			scope:New("UICorner")({
 				CornerRadius = UDim.new(0.3, 0),
-			},
-			
+			}),
+
 			-- Stroke
-			scope:New("UIStroke") {
+			scope:New("UIStroke")({
 				Color = Colors.Stroke,
 				Thickness = 2,
-			},
-			
+			}),
+
 			-- Padding
-			scope:New("UIPadding") {
+			scope:New("UIPadding")({
 				PaddingLeft = UDim.new(0.08, 0),
 				PaddingRight = UDim.new(0.08, 0),
-			},
-			
+			}),
+
 			-- Coin icon (left)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "CoinIcon",
 				Size = UDim2.fromScale(0.35, 0.8),
 				Position = UDim2.fromScale(0, 0.5),
@@ -114,17 +114,17 @@ local function CoinCounter(props: CoinCounterProps): Frame
 				Text = "👛",
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 20,
 						MinTextSize = 10,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Coin amount text
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "CoinAmount",
 				Size = UDim2.fromScale(0.55, 0.8),
 				Position = UDim2.fromScale(0.4, 0.5),
@@ -138,16 +138,16 @@ local function CoinCounter(props: CoinCounterProps): Frame
 				TextScaled = true,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextTruncate = Enum.TextTruncate.AtEnd,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 18,
 						MinTextSize = 10,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return CoinCounter

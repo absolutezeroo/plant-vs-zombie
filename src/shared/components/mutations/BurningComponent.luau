@@ -11,9 +11,9 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type BurningComponent = {
-	DamagePerSecond: number,  -- Damage taken per second
+	DamagePerSecond: number, -- Damage taken per second
 	RemainingDuration: number, -- Seconds left
-	LastTickTime: number,     -- os.clock() of last damage tick
+	LastTickTime: number, -- os.clock() of last damage tick
 }
 
 return Matter.component("Burning")

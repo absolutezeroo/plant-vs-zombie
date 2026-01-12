@@ -40,22 +40,22 @@ export type LobbyScreenProps = {
 	-- Navigation
 	ActiveView: any,
 	OnNavigate: (view: string) -> (),
-	OnPlantClick: (plantType: string, mutations: {string}) -> (),
+	OnPlantClick: (plantType: string, mutations: { string }) -> (),
 }
 
 local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 	local scope = props.Scope
-	
-	return scope:New("ScreenGui") {
+
+	return scope:New("ScreenGui")({
 		Name = "LobbyHUD",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		IgnoreGuiInset = true,
-		
+
 		[Children] = {
 			-- Responsive scaling for all HUD elements
 			ResponsiveUtils.CreateUIScale(scope),
-			
+
 			-- Top-left: Player info (avatar, level, resources)
 			-- Position: 1% from left, 6% from top (avoids Roblox UI)
 			PlayerInfoBar({
@@ -68,7 +68,7 @@ local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 				Position = UDim2.fromScale(0.01, 0.06),
 				AnchorPoint = Vector2.new(0, 0),
 			}),
-			
+
 			-- Right side: Navigation bar
 			-- Position: 1% from right edge, centered vertically
 			NavBar({
@@ -78,7 +78,7 @@ local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 				Position = UDim2.fromScale(0.99, 0.5),
 				AnchorPoint = Vector2.new(1, 0.5),
 			}),
-			
+
 			-- Bottom center: Seed bank (deck preview)
 			-- Position: centered horizontally, 2% from bottom
 			SeedBank({
@@ -90,7 +90,7 @@ local function LobbyScreen(props: LobbyScreenProps): ScreenGui
 				AnchorPoint = Vector2.new(0.5, 1),
 			}),
 		},
-	}
+	})
 end
 
 return LobbyScreen

@@ -62,7 +62,7 @@ local CONFIG = table.freeze({
 local State = {
 	World = nil :: any?,
 	Trove = Trove.new(),
-	PlayerCooldowns = {} :: {[Player]: {[string]: number}},
+	PlayerCooldowns = {} :: { [Player]: { [string]: number } },
 }
 
 -- ============================================================
@@ -85,39 +85,39 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	if not world then
 		return false, "World not ready"
 	end
-	
+
 	-- Check plant type exists
 	local stats = PlantData[plantType]
 	if not stats then
 		return false, "Invalid plant type"
 	end
-	
+
 	-- Check bounds
 	if not GridUtils.IsValidCell(column, lane) then
 		return false, "Cell out of bounds"
 	end
-	
+
 	-- Get what's currently in the cell
 	local existingEntityId = GridService.GetEntity(column, lane)
 	local existingPlant = nil
 	local existingStats = nil
-	
+
 	if existingEntityId and world:contains(existingEntityId) then
 		existingPlant = world:get(existingEntityId, Components.PlantTypeComponent)
 		if existingPlant then
 			existingStats = PlantData[existingPlant.PlantType]
 		end
 	end
-	
+
 	-- ==============================================
 	-- Water/Platform validation (DATA-DRIVEN)
 	-- ==============================================
-	
+
 	-- Get current world config from WaveService
 	local worldConfig = WaveService.GetCurrentWorldConfig()
-	local waterLanes: {number} = if worldConfig then worldConfig.WaterLanes or {} else {}
+	local waterLanes: { number } = if worldConfig then worldConfig.WaterLanes or {} else {}
 	local isWaterLane = table.find(waterLanes, lane) ~= nil
-	
+
 	-- Rule 1: Plants with RequiresWater can ONLY be placed on water lanes
 	if stats.RequiresWater then
 		if not isWaterLane then
@@ -125,7 +125,7 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		end
 		-- RequiresWater plants go directly in water (no LilyPad needed)
 	end
-	
+
 	-- Rule 2: Platform plants have lane restrictions
 	if stats.IsPlatform and stats.AllowsPlantOnTop then
 		-- DATA-DRIVEN: Use IsWaterPlatform and IsGroundPlatform flags
@@ -136,21 +136,21 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 			return false, "Flower Pot cannot be placed on water"
 		end
 	end
-	
+
 	-- Rule 3: RequiresLilyPad plants need a LilyPad underneath
 	if stats.RequiresLilyPad then
 		if not existingEntityId or not existingStats or not existingStats.IsPlatform then
 			return false, "This plant requires a Lily Pad"
 		end
 	end
-	
+
 	-- Rule 4: Normal plants on water lanes MUST have a LilyPad
 	if isWaterLane and not stats.RequiresWater and not stats.IsPlatform then
 		if not existingEntityId or not existingStats or not existingStats.IsPlatform then
 			return false, "Plants on water lanes require a Lily Pad"
 		end
 	end
-	
+
 	-- ==============================================
 	-- Check stacking rules
 	if stats.CanStackOnPlant then
@@ -191,13 +191,13 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 			end
 		end
 	end
-	
+
 	-- Check player has enough sun (via SunService)
 	local sun = SunService.GetSun(player)
 	if sun < stats.Cost then
 		return false, "Not enough sun"
 	end
-	
+
 	-- Check cooldown
 	local cooldowns = State.PlayerCooldowns[player]
 	if cooldowns then
@@ -206,7 +206,7 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 			return false, "Plant on cooldown"
 		end
 	end
-	
+
 	return true, nil
 end
 
@@ -217,15 +217,15 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 		Logger.Error("PlacementSystem", "World not initialized")
 		return -1
 	end
-	
+
 	local stats = PlantData[plantType]
 	if not stats then
 		Logger.Error("PlacementSystem", `Invalid plant type: {plantType}`)
 		return -1
 	end
-	
+
 	local worldPos = GridUtils.GridToWorld(column, lane)
-	
+
 	-- Check for special stacking cases
 	local existingEntityId = GridService.GetEntity(column, lane)
 
@@ -241,7 +241,7 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 				PositionY = worldPos.Y,
 				PositionZ = worldPos.Z,
 			}))
-			
+
 			-- Coffee Bean is consumed - don't spawn entity
 			-- Deduct sun and start cooldown
 			SunService.SpendSun(player, stats.Cost)
@@ -249,60 +249,63 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 			if cooldowns then
 				cooldowns[plantType] = os.clock() + stats.Cooldown
 			end
-			
+
 			Logger.Info("PlacementSystem", `Coffee Bean woke mushroom at ({column}, {lane}) for {player.Name}`)
 			return -1 -- No entity spawned
 		end
 	end
-	
+
 	local entityId = EntityPool.Spawn(
 		Components.PositionComponent({
 			X = worldPos.X,
 			Y = worldPos.Y + 2, -- Slightly above ground
-			Z = worldPos.Z
+			Z = worldPos.Z,
 		}),
 		Components.HealthComponent({
 			Current = stats.Health,
-			Max = stats.Health
+			Max = stats.Health,
 		}),
 		Components.PlantTypeComponent({
 			PlantType = plantType,
 			Column = column,
-			Lane = lane
+			Lane = lane,
 		}),
 		Components.OwnerComponent({
-			PlayerId = player.UserId
+			PlayerId = player.UserId,
 		})
 	)
-	
+
 	if not entityId then
 		Logger.Error("PlacementSystem", "EntityPool exhausted! Cannot spawn plant")
 		return nil :: any
 	end
-	
+
 	-- Mark cell as occupied (only if not stacking)
 	if not stats.CanStackOnPlant and not existingEntityId then
 		GridService.Occupy(column, lane, entityId)
 	end
-	
+
 	-- Deduct sun via SunService
 	SunService.SpendSun(player, stats.Cost)
-	
+
 	-- Start cooldown
 	local cooldowns = State.PlayerCooldowns[player]
 	if cooldowns then
 		cooldowns[plantType] = os.clock() + stats.Cooldown
 	end
-	
+
 	-- Get equipped mutations for this plant (via MutationService)
 	local mutations = MutationService.GetPlantMutations(player.UserId, plantType)
 	local mutationInfo = ""
 	if #mutations > 0 then
 		mutationInfo = ` with {#mutations} mutation(s): {table.concat(mutations, ", ")}`
 	end
-	
-	Logger.Info("PlacementSystem", `Spawned {plantType} at ({column}, {lane}) for {player.Name} - Entity {entityId}{mutationInfo}`)
-	
+
+	Logger.Info(
+		"PlacementSystem",
+		`Spawned {plantType} at ({column}, {lane}) for {player.Name} - Entity {entityId}{mutationInfo}`
+	)
+
 	-- Broadcast to all clients (with mutations as enum array)
 	Network.PlantSpawned.FireAll({
 		EntityId = entityId,
@@ -312,7 +315,7 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 		OwnerId = player.UserId,
 		Mutations = mutations :: any,
 	})
-	
+
 	-- Spawn SpawnEvent for presentation systems (VFX, Audio)
 	-- MushroomSystem and SpecialPlantSystem will also react to this event
 	-- to initialize mushroom sleeping state or arm explosives
@@ -323,25 +326,30 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 		PositionY = worldPos.Y + 2,
 		PositionZ = worldPos.Z,
 	}))
-	
+
 	return entityId
 end
 
 -- Handle placement request
-local function handlePlacementRequest(player: Player, column: number, lane: number, plantType: string): (boolean, string?)
+local function handlePlacementRequest(
+	player: Player,
+	column: number,
+	lane: number,
+	plantType: string
+): (boolean, string?)
 	local success, reason = validatePlacement(player, column, lane, plantType)
-	
+
 	if not success then
 		Logger.Warn("PlacementSystem", `Placement denied for {player.Name}: {reason}`)
 		return false, reason
 	end
-	
+
 	local entityId = spawnPlant(player, column, lane, plantType)
 	if entityId < 0 and not PlantData[plantType].CanStackOnMushroom then
 		-- entityId -1 is valid for Coffee Bean (consumed on use)
 		return false, "Spawn failed"
 	end
-	
+
 	return true, nil
 end
 
@@ -351,54 +359,54 @@ local function handleShovelRequest(player: Player, plantEntityId: number): (bool
 	if not world then
 		return false, "World not ready"
 	end
-	
+
 	-- Validate entity exists
 	if not world:contains(plantEntityId) then
 		return false, "Plant not found"
 	end
-	
+
 	-- Get plant info
 	local plantType = world:get(plantEntityId, Components.PlantTypeComponent)
 	local owner = world:get(plantEntityId, Components.OwnerComponent)
-	
+
 	if not plantType then
 		return false, "Not a plant"
 	end
-	
+
 	-- Check ownership
 	if not owner or owner.PlayerId ~= player.UserId then
 		return false, "Not your plant"
 	end
-	
+
 	-- Get plant stats for refund calculation
 	local stats = PlantData[plantType.PlantType]
 	if not stats then
 		return false, "Invalid plant type"
 	end
-	
+
 	-- Calculate refund (50% of cost)
 	local refundAmount = math.floor(stats.Cost * 0.5)
-	
+
 	-- Clear grid cell
 	GridService.ClearByEntity(plantEntityId)
-	
+
 	-- Release plant back to pool
 	if EntityPool.IsPooledEntity(plantEntityId) then
 		EntityPool.Despawn(plantEntityId)
 	else
 		world:despawn(plantEntityId)
 	end
-	
+
 	-- Refund sun to player via SunService
 	SunService.AddSun(player, refundAmount)
-	
+
 	Logger.Info("PlacementSystem", `{player.Name} shoveled {plantType.PlantType} - refunded {refundAmount} sun`)
-	
+
 	-- Broadcast removal to all clients (use EntityDied event)
 	Network.EntityDied.FireAll({
 		EntityId = plantEntityId,
 	})
-	
+
 	return true, nil
 end
 
@@ -415,13 +423,13 @@ local function setupNetworkHandlers()
 			})
 			return
 		end
-		
+
 		local plantType = tostring(data.PlantType)
 		local column = data.Column
 		local lane = data.Lane
-		
+
 		local success, reason = handlePlacementRequest(player, column, lane, plantType)
-		
+
 		-- Map reason to error code
 		local errorCode = 0
 		if reason == "Not enough sun" then
@@ -431,14 +439,14 @@ local function setupNetworkHandlers()
 		elseif reason == "Cell out of bounds" then
 			errorCode = 3
 		end
-		
+
 		Network.RequestResponse.Fire(player, {
 			RequestId = data.RequestId,
 			Success = success,
 			ErrorCode = if success then nil else errorCode,
 		})
 	end)
-	
+
 	-- Shovel request handler
 	Network.ShovelPlantRequest.SetCallback(function(player: Player, data)
 		if not State.World then
@@ -450,9 +458,9 @@ local function setupNetworkHandlers()
 			})
 			return
 		end
-		
+
 		local success, reason = handleShovelRequest(player, data.PlantEntityId)
-		
+
 		-- Map reason to error code
 		local errorCode = 0
 		if reason == "Plant not found" then
@@ -462,7 +470,7 @@ local function setupNetworkHandlers()
 		elseif reason == "Not a plant" then
 			errorCode = 7
 		end
-		
+
 		Network.RequestResponse.Fire(player, {
 			RequestId = data.RequestId,
 			Success = success,
@@ -487,15 +495,15 @@ local function Init(_world)
 	-- Setup player listeners
 	State.Trove:Connect(Players.PlayerAdded, onPlayerAdded)
 	State.Trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-	
+
 	-- Initialize existing players
 	for _, player in Players:GetPlayers() do
 		onPlayerAdded(player)
 	end
-	
+
 	-- Setup network handlers
 	setupNetworkHandlers()
-	
+
 	Logger.Debug("PlacementSystem", "Initialized")
 end
 

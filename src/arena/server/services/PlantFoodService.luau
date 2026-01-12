@@ -38,7 +38,7 @@ local Config = GameConstants.PlantFood
 -- SECTION 2: STATE (all mutable data)
 -- ============================================================
 local State = {
-	PlayerCharges = {} :: {[number]: number}, -- UserId -> charge count
+	PlayerCharges = {} :: { [number]: number }, -- UserId -> charge count
 	GlowingSpawnedThisWave = 0,
 	Trove = Trove.new(),
 	Initialized = false,
@@ -50,7 +50,7 @@ local State = {
 
 local function onPlayerAdded(player: Player)
 	State.PlayerCharges[player.UserId] = 0
-	
+
 	Network.PlantFoodChargeUpdate.Fire(player, {
 		ChargeCount = 0,
 	})
@@ -61,16 +61,18 @@ local function onPlayerRemoving(player: Player)
 end
 
 local function initialize()
-	if State.Initialized then return end
-	
+	if State.Initialized then
+		return
+	end
+
 	State.Trove:Connect(Players.PlayerAdded, onPlayerAdded)
 	State.Trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-	
+
 	-- Initialize existing players
 	for _, player in Players:GetPlayers() do
 		onPlayerAdded(player)
 	end
-	
+
 	State.Initialized = true
 	Logger.Debug("PlantFoodService", "Initialized")
 end
@@ -102,12 +104,12 @@ function PlantFoodService.AddCharge(player: Player, amount: number?): number
 	local current = State.PlayerCharges[userId] or 0
 	local newCount = math.min(current + (amount or 1), Config.MAX_CHARGES)
 	State.PlayerCharges[userId] = newCount
-	
+
 	-- Notify client
 	Network.PlantFoodChargeUpdate.Fire(player, {
 		ChargeCount = newCount,
 	})
-	
+
 	Logger.Info("PlantFoodService", `Player {player.Name} gained charge: {current} -> {newCount}`)
 	return newCount
 end
@@ -121,18 +123,18 @@ function PlantFoodService.UseCharge(player: Player): boolean
 	initialize()
 	local userId = player.UserId
 	local current = State.PlayerCharges[userId] or 0
-	
+
 	if current <= 0 then
 		return false
 	end
-	
+
 	State.PlayerCharges[userId] = current - 1
-	
+
 	-- Notify client
 	Network.PlantFoodChargeUpdate.Fire(player, {
 		ChargeCount = current - 1,
 	})
-	
+
 	Logger.Info("PlantFoodService", `Player {player.Name} used charge: {current} -> {current - 1}`)
 	return true
 end
@@ -148,7 +150,7 @@ function PlantFoodService.ShouldZombieBeGlowing(): boolean
 		State.GlowingSpawnedThisWave += 1
 		return true
 	end
-	
+
 	-- Random chance for additional glowing zombies
 	return ChanceUtils.Roll(Config.GLOWING_ZOMBIE_CHANCE)
 end

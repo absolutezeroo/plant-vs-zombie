@@ -30,7 +30,7 @@ type FloatingTextData = FloatingText.FloatingTextData
 
 -- Configuration
 local CONFIG = {
-	CRIT_THRESHOLD = 50,  -- Damage above this uses crit styling
+	CRIT_THRESHOLD = 50, -- Damage above this uses crit styling
 	COIN_ICON = "🪙",
 }
 
@@ -45,7 +45,7 @@ local DAMAGE_TYPE_STYLES = {
 }
 
 -- Module state
-local _activeTexts: {FloatingTextData} = {}
+local _activeTexts: { FloatingTextData } = {}
 local _trove = Trove.new()
 local _initialized = false
 
@@ -61,18 +61,18 @@ function FloatingTextController.Initialize()
 		return
 	end
 	_initialized = true
-	
+
 	-- Update loop for animating floating texts
 	_trove:Connect(RunService.RenderStepped, function(_dt)
 		FloatingTextController._Update()
 	end)
-	
+
 	-- Connect to combat signals
 	_trove:Connect(GameSignals.OnDamageDealt, function(data)
 		local damageType = data.DamageType or "Normal"
 		FloatingTextController.ShowDamage(data.Position, data.Amount, damageType)
 	end)
-	
+
 	Logger.Info("FloatingTextController", "Initialized")
 end
 
@@ -82,12 +82,12 @@ end
 ]]
 function FloatingTextController._Update()
 	local currentTime = tick()
-	local toRemove: {number} = {}
-	
+	local toRemove: { number } = {}
+
 	for i, ft in _activeTexts do
 		local elapsed = currentTime - ft.StartTime
 		local progress = elapsed / ft.Duration
-		
+
 		if progress >= 1 then
 			toRemove = Sift.Array.push(toRemove, i)
 			FloatingText.Destroy(ft)
@@ -95,7 +95,7 @@ function FloatingTextController._Update()
 			FloatingText.UpdateAnimation(ft, elapsed, progress)
 		end
 	end
-	
+
 	-- Remove completed texts (reverse order to maintain indices)
 	for i = #toRemove, 1, -1 do
 		_activeTexts = Sift.Array.removeIndex(_activeTexts, toRemove[i])
@@ -111,18 +111,18 @@ end
 ]]
 function FloatingTextController.ShowDamage(position: Vector3, damage: number, damageType: string?)
 	local isCrit = damage >= CONFIG.CRIT_THRESHOLD
-	
+
 	-- Get style based on damage type, defaulting to normal Damage
 	local styleName = DAMAGE_TYPE_STYLES[damageType or "Normal"] or "Damage"
 	local style = FloatingText.Styles[styleName] or FloatingText.Styles.Damage
-	
+
 	-- Override with crit style for very high damage (unless already special type)
 	if isCrit and damageType == "Normal" then
 		style = FloatingText.Styles.DamageCrit
 	end
-	
+
 	local text = tostring(math.floor(damage))
-	
+
 	local ft = FloatingText.Create(position, text, style)
 	_activeTexts = Sift.Array.push(_activeTexts, ft)
 end
@@ -187,7 +187,7 @@ end
 function FloatingTextController.Dispose()
 	Logger.Info("FloatingTextController", "Disposing...")
 	_trove:Clean()
-	
+
 	-- Destroy all remaining floating texts
 	for _, ft in _activeTexts do
 		FloatingText.Destroy(ft)

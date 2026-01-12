@@ -19,13 +19,13 @@ local Network = require(Shared.network.generated.server)
 -- Configuration
 local Config = {
 	MAX_HEALTH = 1000,
-	ZOMBIE_DAMAGE = 100,  -- Damage per zombie that reaches house
+	ZOMBIE_DAMAGE = 100, -- Damage per zombie that reaches house
 }
 
 -- State
 local _currentHealth = Config.MAX_HEALTH
 local _isDefeated = false
-local _damageEventCount = 0  -- Track how many times base was hit (for star rating)
+local _damageEventCount = 0 -- Track how many times base was hit (for star rating)
 
 local BaseHealth = {}
 
@@ -45,25 +45,25 @@ function BaseHealth.TakeDamage(amount: number)
 	if _isDefeated then
 		return
 	end
-	
+
 	local oldHealth = _currentHealth
 	_currentHealth = math.max(0, _currentHealth - amount)
-	_damageEventCount += 1  -- Track damage events for star rating
-	
+	_damageEventCount += 1 -- Track damage events for star rating
+
 	Logger.Warn("BaseHealth", `Base took {amount} damage! ({oldHealth} -> {_currentHealth}/{Config.MAX_HEALTH})`)
-	
+
 	-- Broadcast to clients
 	Network.BaseHealthUpdated.FireAll({
 		CurrentHealth = _currentHealth,
 		MaxHealth = Config.MAX_HEALTH,
 		DamageAmount = amount,
 	})
-	
+
 	-- Check for defeat
 	if _currentHealth <= 0 and not _isDefeated then
 		_isDefeated = true
 		Logger.Error("BaseHealth", "💀 BASE DESTROYED - DEFEAT!")
-		
+
 		-- Broadcast game over
 		Network.GameOver.FireAll({
 			Victory = false,
@@ -97,10 +97,10 @@ end
 function BaseHealth.Reset()
 	_currentHealth = Config.MAX_HEALTH
 	_isDefeated = false
-	_damageEventCount = 0  -- Reset damage tracking
-	
+	_damageEventCount = 0 -- Reset damage tracking
+
 	Logger.Info("BaseHealth", `Base health reset to {Config.MAX_HEALTH}`)
-	
+
 	-- Broadcast initial state
 	Network.BaseHealthUpdated.FireAll({
 		CurrentHealth = _currentHealth,

@@ -16,14 +16,14 @@ local SunService = require(Server.services.SunService)
 
 return function(context, amount: number)
 	local player = context.Executor
-	
+
 	-- Add sun using SunService
 	SunService.AddSun(player, amount)
 	local newTotal = SunService.GetSun(player)
-	
+
 	-- Sync to client
 	SunService.BroadcastSunUpdate(player)
-	
+
 	Logger.Info("Cmdr", `Added {amount} sun to {player.Name}`)
 	return `Added {amount} sun (total: {newTotal})`
 end

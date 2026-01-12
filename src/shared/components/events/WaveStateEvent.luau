@@ -17,10 +17,10 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type WaveStateEvent = {
-    StateType: string,       -- "Start" | "End" | "Phase"
-    WaveNumber: number,      -- Current wave number
-    Phase: string?,          -- Current phase (for Phase events): "Trickle" | "Assault" | "Flag"
-    TotalWaves: number?,     -- For UI display (e.g., "Wave 3/10")
+	StateType: string, -- "Start" | "End" | "Phase"
+	WaveNumber: number, -- Current wave number
+	Phase: string?, -- Current phase (for Phase events): "Trickle" | "Assault" | "Flag"
+	TotalWaves: number?, -- For UI display (e.g., "Wave 3/10")
 }
 
 return Matter.component("WaveStateEvent")

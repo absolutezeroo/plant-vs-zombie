@@ -11,9 +11,9 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type PoisonCloudComponent = {
-	Radius: number,           -- Cloud radius in studs
-	DamagePerSecond: number,  -- Damage to zombies inside
-	Duration: number,         -- How long cloud lasts
+	Radius: number, -- Cloud radius in studs
+	DamagePerSecond: number, -- Damage to zombies inside
+	Duration: number, -- How long cloud lasts
 }
 
 return Matter.component("PoisonCloud")

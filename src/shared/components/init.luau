@@ -34,7 +34,7 @@ return {
 	OwnerComponent = require(Core.OwnerComponent),
 	PositionComponent = require(Core.PositionComponent),
 	Tags = require(Core.Tags),
-	
+
 	-- Combat components
 	ArmedComponent = require(Combat.ArmedComponent),
 	ChewingComponent = require(Combat.ChewingComponent),
@@ -46,7 +46,7 @@ return {
 	SplashComponent = require(Combat.SplashComponent),
 	StunComponent = require(Combat.StunComponent),
 	TargetComponent = require(Combat.TargetComponent),
-	
+
 	-- Unit type components
 	GhostComponent = require(Units.GhostComponent),
 	JumpingComponent = require(Units.JumpingComponent),
@@ -54,11 +54,11 @@ return {
 	ShieldComponent = require(Units.ShieldComponent),
 	SleepingComponent = require(Units.SleepingComponent),
 	ZombieTypeComponent = require(Units.ZombieTypeComponent),
-	
+
 	-- Economy components
 	CoinComponent = require(Economy.CoinComponent),
 	SunComponent = require(Economy.SunComponent),
-	
+
 	-- Event components
 	DamageEvent = require(Events.DamageEvent),
 	DeathEvent = require(Events.DeathEvent),
@@ -67,7 +67,7 @@ return {
 	WaveStateEvent = require(Events.WaveStateEvent),
 	CoinDropEvent = require(Events.CoinDropEvent),
 	PlantActionEvent = require(Events.PlantActionEvent),
-	
+
 	-- Mutation components
 	BurnEffectComponent = require(Mutations.BurnEffectComponent),
 	BurningComponent = require(Mutations.BurningComponent),

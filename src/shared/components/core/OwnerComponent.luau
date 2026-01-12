@@ -14,7 +14,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type OwnerComponent = {
-	PlayerId: number,       -- Player.UserId who owns this entity
+	PlayerId: number, -- Player.UserId who owns this entity
 }
 
 return Matter.component("Owner")

@@ -7,11 +7,11 @@
 ]]
 
 export type CoinComponent = {
-	Value: number,         -- Coin value
-	SpawnTime: number,     -- When coin was spawned
-	CollectDelay: number,  -- Delay before auto-collect (for VFX)
-	PositionX: number,     -- World X position
-	PositionZ: number,     -- World Z position
+	Value: number, -- Coin value
+	SpawnTime: number, -- When coin was spawned
+	CollectDelay: number, -- Delay before auto-collect (for VFX)
+	PositionX: number, -- World X position
+	PositionZ: number, -- World Z position
 	TargetPlayerId: number, -- Player who killed the zombie (gets the coins)
 }
 

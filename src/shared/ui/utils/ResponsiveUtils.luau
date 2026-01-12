@@ -47,14 +47,14 @@ local BASE_HEIGHT = 1080
 -- Scale limits to prevent extreme sizes
 -- For overlay screens (92% of screen), we cap at 1.0 to avoid overflow
 -- For fixed-size elements, scaling helps on larger screens
-local MIN_SCALE = 0.5  -- Minimum 50% (very small screens)
-local MAX_SCALE = 2.5  -- Maximum 250% (large screens like 4K)
+local MIN_SCALE = 0.5 -- Minimum 50% (very small screens)
+local MAX_SCALE = 2.5 -- Maximum 250% (large screens like 4K)
 
 -- Responsive breakpoints
 local BREAKPOINTS = {
-	Mobile = 600,      -- Width < 600px = Mobile
-	Tablet = 1024,     -- Width < 1024px = Tablet
-	Desktop = 1920,    -- Width < 1920px = Desktop
+	Mobile = 600, -- Width < 600px = Mobile
+	Tablet = 1024, -- Width < 1024px = Tablet
+	Desktop = 1920, -- Width < 1920px = Desktop
 	Large = math.huge, -- Width >= 1920px = Large
 }
 
@@ -79,13 +79,13 @@ local function calculateScale(viewportSize: Vector2): number
 	-- This ensures content fits on screen regardless of aspect ratio
 	local widthScale = viewportSize.X / BASE_WIDTH
 	local heightScale = viewportSize.Y / BASE_HEIGHT
-	
+
 	-- Use the smaller scale to ensure everything fits
 	local scale = math.min(widthScale, heightScale)
-	
+
 	-- Clamp to reasonable limits
 	scale = math.clamp(scale, MIN_SCALE, MAX_SCALE)
-	
+
 	return scale
 end
 
@@ -103,17 +103,21 @@ end
 
 local function updateScale()
 	local player = Players.LocalPlayer
-	if not player then return end
-	
+	if not player then
+		return
+	end
+
 	local camera = workspace.CurrentCamera
-	if not camera then return end
-	
+	if not camera then
+		return
+	end
+
 	local viewportSize = camera.ViewportSize
 	_screenSize:set(viewportSize)
-	
+
 	local newScale = calculateScale(viewportSize)
 	local oldScale = peek(_scale)
-	
+
 	if math.abs(newScale - oldScale) > 0.01 then
 		_scale:set(newScale)
 		_deviceType:set(getDeviceType(viewportSize.X))
@@ -122,18 +126,20 @@ local function updateScale()
 end
 
 local function initialize()
-	if _initialized then return end
+	if _initialized then
+		return
+	end
 	_initialized = true
-	
+
 	-- Initial calculation
 	updateScale()
-	
+
 	-- Listen to viewport size changes
 	local camera = workspace.CurrentCamera
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
 	end
-	
+
 	-- Handle camera changes (rare but possible)
 	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 		local newCamera = workspace.CurrentCamera
@@ -223,13 +229,13 @@ end
 ]]
 function ResponsiveUtils.CreateUIScale(scope: any): any
 	initialize()
-	
-	return scope:New("UIScale") {
+
+	return scope:New("UIScale")({
 		Name = "ResponsiveScale",
 		Scale = scope:Computed(function(use)
 			return use(_scale)
 		end),
-	}
+	})
 end
 
 --[[
@@ -272,7 +278,7 @@ ResponsiveUtils.OnScaleChanged = _onScaleChanged
 function ResponsiveUtils.GetOverlaySize(): UDim2
 	initialize()
 	local device = peek(_deviceType)
-	
+
 	if device == "Mobile" then
 		return UDim2.fromScale(0.98, 0.98)
 	elseif device == "Tablet" then
@@ -291,12 +297,12 @@ function ResponsiveUtils.GetFontSize(baseSize: number): number
 	initialize()
 	local device = peek(_deviceType)
 	local scale = peek(_scale)
-	
+
 	-- On mobile, bump up font size slightly for readability
 	if device == "Mobile" then
 		return math.round(baseSize * scale * 1.2)
 	end
-	
+
 	return math.round(baseSize * scale)
 end
 

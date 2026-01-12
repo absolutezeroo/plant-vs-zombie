@@ -39,7 +39,7 @@ local STORE_NAME = "PlayerData_v1"
 local PlayerStore = ProfileStore.New(STORE_NAME, PROFILE_TEMPLATE)
 
 -- Active profiles cache
-local _profiles: {[Player]: any} = {}
+local _profiles: { [Player]: any } = {}
 
 -- Trove for cleanup
 local _trove = Trove.new()
@@ -73,13 +73,13 @@ function PlayerDataService.AddCoins(player: Player, amount: number): boolean
 	if not profile then
 		return false
 	end
-	
+
 	profile.Data.Coins += amount
 	profile.Data.TotalCoinsEarned += amount
-	
+
 	Logger.Debug("PlayerData", `{player.Name} +{amount} coins (Total: {profile.Data.Coins})`)
 	PlayerDataService._notifyDataChanged(player)
-	
+
 	return true
 end
 
@@ -89,15 +89,15 @@ function PlayerDataService.SpendCoins(player: Player, amount: number): boolean
 	if not profile then
 		return false
 	end
-	
+
 	if profile.Data.Coins < amount then
 		return false
 	end
-	
+
 	profile.Data.Coins -= amount
 	Logger.Debug("PlayerData", `{player.Name} -{amount} coins (Remaining: {profile.Data.Coins})`)
 	PlayerDataService._notifyDataChanged(player)
-	
+
 	return true
 end
 
@@ -117,13 +117,13 @@ function PlayerDataService.AddGems(player: Player, amount: number): boolean
 	if not profile then
 		return false
 	end
-	
+
 	profile.Data.Gems += amount
 	profile.Data.TotalGemsEarned += amount
-	
+
 	Logger.Info("PlayerData", `{player.Name} +{amount} gems (Total: {profile.Data.Gems})`)
 	PlayerDataService._notifyDataChanged(player)
-	
+
 	return true
 end
 
@@ -133,15 +133,15 @@ function PlayerDataService.SpendGems(player: Player, amount: number): boolean
 	if not profile then
 		return false
 	end
-	
+
 	if profile.Data.Gems < amount then
 		return false
 	end
-	
+
 	profile.Data.Gems -= amount
 	Logger.Debug("PlayerData", `{player.Name} -{amount} gems (Remaining: {profile.Data.Gems})`)
 	PlayerDataService._notifyDataChanged(player)
-	
+
 	return true
 end
 
@@ -166,26 +166,26 @@ function PlayerDataService.AddXP(player: Player, amount: number): number
 	if not profile then
 		return 0
 	end
-	
+
 	local oldLevel = profile.Data.Level
 	profile.Data.XP += amount
-	
+
 	-- Check for level ups
 	local levelsGained = 0
 	while profile.Data.Level < ProgressionData.MAX_LEVEL do
 		local xpNeeded = ProgressionData.GetXPForLevel(profile.Data.Level + 1)
 		local currentLevelXP = profile.Data.XP - ProgressionData.GetTotalXPForLevel(profile.Data.Level)
-		
+
 		if currentLevelXP >= xpNeeded then
 			profile.Data.Level += 1
 			levelsGained += 1
-			
+
 			Logger.Info("PlayerData", `🎉 {player.Name} leveled up to {profile.Data.Level}!`)
-			
+
 			-- Award level-up gems
 			profile.Data.Gems += ProgressionData.GEMS_PER_LEVEL_UP
 			profile.Data.TotalGemsEarned += ProgressionData.GEMS_PER_LEVEL_UP
-			
+
 			-- Check for milestone rewards
 			local reward = ProgressionData.LevelRewards[profile.Data.Level]
 			if reward then
@@ -208,11 +208,11 @@ function PlayerDataService.AddXP(player: Player, amount: number): number
 			break
 		end
 	end
-	
+
 	if levelsGained > 0 or amount > 0 then
 		Logger.Debug("PlayerData", `{player.Name} +{amount} XP (Level {profile.Data.Level}, Total: {profile.Data.XP})`)
 		PlayerDataService._notifyDataChanged(player)
-		
+
 		-- Fire XPGained event to client
 		local levelProgress = PlayerDataService.GetLevelProgress(player)
 		Network.XPGained.Fire(player, {
@@ -221,7 +221,7 @@ function PlayerDataService.AddXP(player: Player, amount: number): number
 			CurrentLevel = profile.Data.Level,
 			LevelProgress = levelProgress,
 		})
-		
+
 		-- Fire LevelUp event for each level gained
 		if levelsGained > 0 then
 			-- Get rewards for the new level
@@ -229,18 +229,18 @@ function PlayerDataService.AddXP(player: Player, amount: number): number
 			local rewardCoins = if reward and reward.Coins then reward.Coins else nil
 			local rewardGems = if reward and reward.Gems then reward.Gems else ProgressionData.GEMS_PER_LEVEL_UP
 			local unlockedPlant = if reward and reward.UnlockPlant then reward.UnlockPlant else nil
-			
+
 			Network.LevelUp.Fire(player, {
 				NewLevel = profile.Data.Level,
 				RewardCoins = rewardCoins,
 				RewardGems = rewardGems,
 				UnlockedPlant = unlockedPlant,
 			})
-			
+
 			Logger.Info("PlayerData", `📣 Sent LevelUp event to {player.Name}: Level {profile.Data.Level}`)
 		end
 	end
-	
+
 	return levelsGained
 end
 
@@ -250,16 +250,16 @@ function PlayerDataService.GetLevelProgress(player: Player): number
 	if not data then
 		return 0
 	end
-	
+
 	if data.Level >= ProgressionData.MAX_LEVEL then
 		return 1.0
 	end
-	
+
 	local currentLevelTotalXP = ProgressionData.GetTotalXPForLevel(data.Level)
 	local nextLevelTotalXP = ProgressionData.GetTotalXPForLevel(data.Level + 1)
 	local xpInCurrentLevel = data.XP - currentLevelTotalXP
 	local xpNeededForLevel = nextLevelTotalXP - currentLevelTotalXP
-	
+
 	return math.clamp(xpInCurrentLevel / xpNeededForLevel, 0, 1)
 end
 
@@ -273,12 +273,12 @@ function PlayerDataService.IsPlantUnlocked(player: Player, plantType: string): b
 end
 
 -- Get all unlocked plants
-function PlayerDataService.GetUnlockedPlants(player: Player): {string}
+function PlayerDataService.GetUnlockedPlants(player: Player): { string }
 	local data = PlayerDataService.GetProfile(player)
 	if not data then
-		return {"Sunflower", "Peashooter", "WallNut"} -- Default starters
+		return { "Sunflower", "Peashooter", "WallNut" } -- Default starters
 	end
-	
+
 	local unlocked = {}
 	for plantType, isUnlocked in data.UnlockedPlants do
 		if isUnlocked then
@@ -294,30 +294,30 @@ function PlayerDataService.UnlockPlant(player: Player, plantType: string): (bool
 	if not profile then
 		return false, "Profile not loaded"
 	end
-	
+
 	-- Already unlocked?
 	if profile.Data.UnlockedPlants[plantType] then
 		return false, "Already unlocked"
 	end
-	
+
 	-- Get cost
 	local unlockInfo = ProgressionData.PlantUnlocks[plantType]
 	if not unlockInfo then
 		return false, "Unknown plant type"
 	end
-	
+
 	-- Check coins
 	if profile.Data.Coins < unlockInfo.Cost then
 		return false, "Not enough coins"
 	end
-	
+
 	-- Spend and unlock
 	profile.Data.Coins -= unlockInfo.Cost
 	profile.Data.UnlockedPlants[plantType] = true
-	
+
 	Logger.Info("PlayerData", `{player.Name} unlocked {plantType} for {unlockInfo.Cost} coins`)
 	PlayerDataService._notifyDataChanged(player)
-	
+
 	return true, nil
 end
 
@@ -326,37 +326,37 @@ end
 -- ============================================
 
 -- Get player's current deck
-function PlayerDataService.GetDeck(player: Player): {string}
+function PlayerDataService.GetDeck(player: Player): { string }
 	local data = PlayerDataService.GetProfile(player)
 	if not data then
-		return {"Sunflower", "Peashooter", "WallNut"} -- Default starters
+		return { "Sunflower", "Peashooter", "WallNut" } -- Default starters
 	end
-	return data.Deck or {"Sunflower", "Peashooter", "WallNut"}
+	return data.Deck or { "Sunflower", "Peashooter", "WallNut" }
 end
 
 -- Save player's deck (validates plants are unlocked)
-function PlayerDataService.SaveDeck(player: Player, deck: {string}): (boolean, string?)
+function PlayerDataService.SaveDeck(player: Player, deck: { string }): (boolean, string?)
 	local profile = _profiles[player]
 	if not profile then
 		return false, "Profile not loaded"
 	end
-	
+
 	-- Validate deck size
 	if #deck < 1 then
 		return false, "Deck must have at least 1 plant"
 	end
-	
+
 	if #deck > 6 then
 		return false, "Deck cannot have more than 6 plants"
 	end
-	
+
 	-- Validate all plants are unlocked
 	for _, plantType in deck do
 		if not profile.Data.UnlockedPlants[plantType] then
 			return false, `Plant {plantType} is not unlocked`
 		end
 	end
-	
+
 	-- Check for duplicates
 	local seen = {}
 	for _, plantType in deck do
@@ -365,12 +365,12 @@ function PlayerDataService.SaveDeck(player: Player, deck: {string}): (boolean, s
 		end
 		seen[plantType] = true
 	end
-	
+
 	-- Save deck
 	profile.Data.Deck = deck
 	Logger.Info("PlayerData", `{player.Name} saved deck: {table.concat(deck, ", ")}`)
 	PlayerDataService._notifyDataChanged(player)
-	
+
 	return true, nil
 end
 
@@ -384,7 +384,7 @@ function PlayerDataService.IncrementStat(player: Player, statName: string, amoun
 	if not profile then
 		return
 	end
-	
+
 	local currentValue = profile.Data.Stats[statName] or 0
 	profile.Data.Stats[statName] = currentValue + (amount or 1)
 end
@@ -420,22 +420,22 @@ end
 ]]
 local function loadProfile(player: Player)
 	Logger.Info("PlayerData", `Loading profile for {player.Name}...`)
-	
+
 	return Promise.new(function(resolve, reject)
 		local profile = PlayerStore:StartSessionAsync(`Player_{player.UserId}`, {
 			Cancel = function()
 				return player.Parent ~= Players
 			end,
 		})
-		
+
 		if not profile then
 			reject(`Failed to load profile for {player.Name}`)
 			return
 		end
-		
+
 		profile:AddUserId(player.UserId)
 		profile:Reconcile() -- Fill in missing fields from template
-		
+
 		profile.OnSessionEnd:Connect(function()
 			_profiles[player] = nil
 			if player.Parent == Players then
@@ -443,29 +443,29 @@ local function loadProfile(player: Player)
 				player:Kick("Profile session ended. Please rejoin.")
 			end
 		end)
-		
+
 		if player.Parent ~= Players then
 			profile:EndSession()
 			reject("Player left during profile load")
 			return
 		end
-		
+
 		_profiles[player] = profile
 		Logger.Info("PlayerData", `Profile loaded for {player.Name}: {profile.Data.Coins} coins`)
-		
+
 		-- Fire profile waiter callbacks (for WaitForProfile)
 		_profileWaiter.FireCallbacks(player, profile.Data)
-		
+
 		-- Notify TeleportDataHandler that profile is ready
 		-- This will load mutations from profile and fire OnPlayerReady
 		-- which will then call SyncPlayerData with mutations loaded
 		local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
 		TeleportDataHandler.NotifyProfileLoaded(player, profile.Data)
-		
+
 		-- NOTE: We do NOT call _notifyDataChanged here anymore!
 		-- The TeleportDataHandler flow (via OnPlayerReady) will handle syncing
 		-- after mutations are loaded, preventing race conditions
-		
+
 		resolve(profile.Data)
 	end):catch(function(err)
 		Logger.Warn("PlayerData", `Profile load failed for {player.Name}: {err}`)
@@ -481,7 +481,7 @@ local function unloadProfile(player: Player)
 		_profiles[player] = nil
 		Logger.Info("PlayerData", `Profile saved for {player.Name}`)
 	end
-	
+
 	-- Cleanup profile waiter
 	_profileWaiter.Cleanup(player)
 end
@@ -492,11 +492,11 @@ function PlayerDataService.Initialize()
 	for _, player in Players:GetPlayers() do
 		task.spawn(loadProfile, player)
 	end
-	
+
 	-- Handle new players
 	_trove:Connect(Players.PlayerAdded, loadProfile)
 	_trove:Connect(Players.PlayerRemoving, unloadProfile)
-	
+
 	-- Ensure profiles are saved on shutdown
 	game:BindToClose(function()
 		_trove:Destroy()
@@ -504,7 +504,7 @@ function PlayerDataService.Initialize()
 			profile:EndSession()
 		end
 	end)
-	
+
 	Logger.Info("PlayerData", "PlayerDataService initialized")
 end
 

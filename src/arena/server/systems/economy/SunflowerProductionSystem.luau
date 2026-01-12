@@ -35,7 +35,7 @@ local CONFIG = table.freeze({
 -- 3. STATE
 local State = {
 	IsInitialized = false,
-	ProductionTimers = {} :: {[number]: number}, -- entityId -> nextProductionTime
+	ProductionTimers = {} :: { [number]: number }, -- entityId -> nextProductionTime
 	WaveService = nil :: any, -- Lazy-loaded reference
 }
 
@@ -49,7 +49,9 @@ end
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -63,32 +65,32 @@ end
 -- 6. MAIN LOOP
 local function OnStep(world)
 	local currentTime = os.clock()
-	
+
 	-- Only produce sun during "Playing" or "Preparation" states
 	local WaveService = getWaveService()
 	local gameState = WaveService.GetGameState()
-	
+
 	if gameState ~= "Playing" and gameState ~= "Preparation" then
 		return
 	end
-	
+
 	-- Find all plants with ProducesSun flag
 	for id, plant, pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.ProducesSun then
 			continue
 		end
-		
+
 		-- Read production values from PlantData (with defaults)
 		local firstDelay = stats.FirstSunDelay or CONFIG.FIRST_PRODUCTION_DELAY
 		local productionInterval = stats.SunProductionInterval or CONFIG.PRODUCTION_INTERVAL
 		local sunValue = stats.SunValue or CONFIG.SUN_VALUE
-		
+
 		-- Initialize timer for new sun-producing plants
 		if not State.ProductionTimers[id] then
 			State.ProductionTimers[id] = currentTime + firstDelay
 		end
-		
+
 		-- Check if it's time to produce
 		if currentTime >= State.ProductionTimers[id] then
 			-- Spawn sun at plant position (slightly above)
@@ -106,12 +108,12 @@ local function OnStep(world)
 					SourceType = plant.PlantType,
 				})
 			)
-			
+
 			if not sunId then
 				State.ProductionTimers[id] = currentTime + productionInterval
 				continue
 			end
-			
+
 			-- Broadcast to clients
 			Network.SunSpawned.FireAll({
 				EntityId = sunId,
@@ -121,12 +123,12 @@ local function OnStep(world)
 				Value = sunValue,
 				TargetY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
 			})
-			
+
 			-- Reset timer for next production
 			State.ProductionTimers[id] = currentTime + productionInterval
 		end
 	end
-	
+
 	-- Cleanup timers for despawned sunflowers
 	for id in State.ProductionTimers do
 		if not world:contains(id) then

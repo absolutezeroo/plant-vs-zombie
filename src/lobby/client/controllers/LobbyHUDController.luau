@@ -35,8 +35,8 @@ export type PlayerData = {
 	Level: number,
 	XP: number,
 	TotalXPForNextLevel: number,
-	Deck: {string},
-	EquippedMutations: {[string]: {string}},
+	Deck: { string },
+	EquippedMutations: { [string]: { string } },
 }
 
 local LobbyHUDController = {}
@@ -44,25 +44,25 @@ LobbyHUDController.__index = LobbyHUDController
 
 function LobbyHUDController.new()
 	local self = setmetatable({}, LobbyHUDController)
-	
+
 	self._scope = Fusion.scoped(Fusion)
 	self._trove = Trove.new()
-	
+
 	-- State (using scope:Value() syntax)
 	self._level = self._scope:Value(1)
 	self._xp = self._scope:Value(0)
 	self._xpRequired = self._scope:Value(100)
 	self._coins = self._scope:Value(0)
 	self._gems = self._scope:Value(0)
-	self._deck = self._scope:Value({} :: {string})
-	self._equippedMutations = self._scope:Value({} :: {[string]: {string}})
-	
+	self._deck = self._scope:Value({} :: { string })
+	self._equippedMutations = self._scope:Value({} :: { [string]: { string } })
+
 	-- Navigation state
-	self._activeView = self._scope:Value("")  -- Empty = no view open
-	
+	self._activeView = self._scope:Value("") -- Empty = no view open
+
 	-- GUI instance
 	self._gui = nil :: ScreenGui?
-	
+
 	return self
 end
 
@@ -84,14 +84,14 @@ end
 --[[
 	Update deck only
 ]]
-function LobbyHUDController:UpdateDeck(deck: {string})
+function LobbyHUDController:UpdateDeck(deck: { string })
 	self._deck:set(deck)
 end
 
 --[[
 	Update equipped mutations only
 ]]
-function LobbyHUDController:UpdateMutations(mutations: {[string]: {string}})
+function LobbyHUDController:UpdateMutations(mutations: { [string]: { string } })
 	self._equippedMutations:set(mutations)
 end
 
@@ -148,19 +148,21 @@ end
 ]]
 function LobbyHUDController:Mount()
 	local player = Players.LocalPlayer
-	if not player then return end
-	
+	if not player then
+		return
+	end
+
 	local playerGui = player:WaitForChild("PlayerGui")
-	
+
 	-- Initialize tooltip controller
 	PlantTooltipController.Initialize()
-	
+
 	-- Connect to ZoneInteractionController for UI close events
 	ZoneInteractionController.SetOnUIClose(function()
 		self._activeView:set("")
 		Logger.Debug("LobbyHUD", "Active view cleared (UI closed)")
 	end)
-	
+
 	self._gui = LobbyScreen({
 		Scope = self._scope,
 		-- Player data
@@ -177,14 +179,14 @@ function LobbyHUDController:Mount()
 		OnNavigate = function(view: string)
 			self:SetActiveView(view)
 		end,
-		OnPlantClick = function(plantType: string, mutations: {string})
+		OnPlantClick = function(plantType: string, mutations: { string })
 			Logger.Debug("LobbyHUD", `Plant {plantType} clicked, showing tooltip`)
 			PlantTooltipController.ShowForPlant(plantType, mutations)
 		end,
 	})
-	
+
 	self._gui.Parent = playerGui
-	
+
 	Logger.Info("LobbyHUD", "Controller mounted")
 end
 
@@ -194,15 +196,15 @@ end
 function LobbyHUDController:Unmount()
 	self._trove:Destroy()
 	Fusion.doCleanup(self._scope)
-	
+
 	-- Dispose tooltip controller
 	PlantTooltipController.Dispose()
-	
+
 	if self._gui then
 		self._gui:Destroy()
 		self._gui = nil
 	end
-	
+
 	Logger.Info("LobbyHUD", "Controller unmounted")
 end
 

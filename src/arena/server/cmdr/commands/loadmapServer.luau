@@ -16,26 +16,26 @@ return function(context, mapId: string)
 	if not services then
 		return "MapLoader service not found"
 	end
-	
+
 	local MapLoaderModule = services:FindFirstChild("MapLoader")
 	if not MapLoaderModule then
 		return "MapLoader module not found"
 	end
-	
+
 	local MapLoader = require(MapLoaderModule)
-	
+
 	Logger.Info("Cmdr", `Loading map: {mapId}`)
-	
+
 	-- Load map (may yield)
 	task.spawn(function()
 		local success, err = pcall(function()
 			MapLoader.LoadMap(mapId)
 		end)
-		
+
 		if not success then
 			Logger.Error("Cmdr", `Failed to load map: {err}`)
 		end
 	end)
-	
+
 	return `Loading map: {mapId}`
 end

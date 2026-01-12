@@ -35,53 +35,53 @@ export type FloatingTextStyle = {
 -- Preset styles
 local Styles = {
 	Damage = {
-		Color = Color3.fromRGB(255, 80, 80),       -- Red
+		Color = Color3.fromRGB(255, 80, 80), -- Red
 		FontSize = 24,
 		IsBig = false,
 	},
 	DamageCrit = {
-		Color = Color3.fromRGB(255, 50, 255),     -- Purple
+		Color = Color3.fromRGB(255, 50, 255), -- Purple
 		FontSize = 36,
 		IsBig = true,
 	},
 	-- Damage type styles for mutations
 	DamageFire = {
-		Color = Color3.fromRGB(255, 140, 50),     -- Orange
+		Color = Color3.fromRGB(255, 140, 50), -- Orange
 		FontSize = 26,
 		IsBig = false,
 	},
 	DamageIce = {
-		Color = Color3.fromRGB(100, 200, 255),    -- Cyan
+		Color = Color3.fromRGB(100, 200, 255), -- Cyan
 		FontSize = 26,
 		IsBig = false,
 	},
 	DamageLightning = {
-		Color = Color3.fromRGB(255, 255, 100),    -- Yellow electric
+		Color = Color3.fromRGB(255, 255, 100), -- Yellow electric
 		FontSize = 26,
 		IsBig = false,
 	},
 	DamagePoison = {
-		Color = Color3.fromRGB(100, 200, 100),    -- Toxic green
+		Color = Color3.fromRGB(100, 200, 100), -- Toxic green
 		FontSize = 26,
 		IsBig = false,
 	},
 	DamageSplash = {
-		Color = Color3.fromRGB(200, 100, 255),    -- Splash purple
+		Color = Color3.fromRGB(200, 100, 255), -- Splash purple
 		FontSize = 24,
 		IsBig = false,
 	},
 	Sun = {
-		Color = Color3.fromRGB(255, 220, 50),     -- Yellow
+		Color = Color3.fromRGB(255, 220, 50), -- Yellow
 		FontSize = 24,
 		IsBig = false,
 	},
 	Coin = {
-		Color = Color3.fromRGB(255, 200, 50),     -- Gold
+		Color = Color3.fromRGB(255, 200, 50), -- Gold
 		FontSize = 24,
 		IsBig = false,
 	},
 	Heal = {
-		Color = Color3.fromRGB(100, 255, 100),    -- Green
+		Color = Color3.fromRGB(100, 255, 100), -- Green
 		FontSize = 24,
 		IsBig = false,
 	},
@@ -110,7 +110,7 @@ function FloatingText.Create(
 	duration: number?
 ): FloatingTextData
 	local actualDuration = duration or DEFAULT_DURATION
-	
+
 	-- Create anchor part (invisible, just for positioning)
 	local anchor = Instance.new("Part")
 	anchor.Name = "FloatingTextAnchor"
@@ -122,7 +122,7 @@ function FloatingText.Create(
 	anchor.Size = Vector3.new(0.1, 0.1, 0.1)
 	anchor.Position = worldPosition
 	anchor.Parent = Workspace
-	
+
 	-- Create BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "FloatingText"
@@ -133,7 +133,7 @@ function FloatingText.Create(
 	gui.LightInfluence = 0
 	gui.MaxDistance = 100
 	gui.Parent = anchor
-	
+
 	-- Create text label
 	local label = Instance.new("TextLabel")
 	label.Name = "Text"
@@ -146,7 +146,7 @@ function FloatingText.Create(
 	label.TextStrokeColor3 = Color3.new(0, 0, 0)
 	label.TextStrokeTransparency = 0.3
 	label.Parent = gui
-	
+
 	return {
 		Gui = gui,
 		Label = label,
@@ -166,24 +166,24 @@ end
 ]]
 function FloatingText.UpdateAnimation(data: FloatingTextData, elapsed: number, progress: number)
 	local yOffset = data.StartY + data.RiseSpeed * elapsed
-	
+
 	-- Ease out the fade
 	local fadeAlpha = 1 - (progress * progress)
-	
+
 	-- Scale effect (pop in then shrink)
 	local scale: number
 	if progress < 0.1 then
-		scale = progress / 0.1 * 1.2  -- Pop in
+		scale = progress / 0.1 * 1.2 -- Pop in
 	elseif progress < 0.2 then
-		scale = 1.2 - (progress - 0.1) / 0.1 * 0.2  -- Settle
+		scale = 1.2 - (progress - 0.1) / 0.1 * 0.2 -- Settle
 	else
-		scale = 1 - (progress - 0.2) / 0.8 * 0.3  -- Shrink out
+		scale = 1 - (progress - 0.2) / 0.8 * 0.3 -- Shrink out
 	end
-	
+
 	data.Gui.StudsOffset = Vector3.new(0, yOffset, 0)
 	data.Label.TextTransparency = 1 - fadeAlpha
 	data.Label.TextStrokeTransparency = 1 - fadeAlpha * 0.5
-	data.Label.TextSize = math.floor(24 * scale)  -- Base size * scale
+	data.Label.TextSize = math.floor(24 * scale) -- Base size * scale
 end
 
 --[[
@@ -193,7 +193,7 @@ end
 ]]
 function FloatingText.Destroy(data: FloatingTextData)
 	if data.Anchor and data.Anchor.Parent then
-		data.Anchor:Destroy()  -- This also destroys the child BillboardGui
+		data.Anchor:Destroy() -- This also destroys the child BillboardGui
 	end
 end
 

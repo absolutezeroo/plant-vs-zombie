@@ -31,7 +31,9 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -45,23 +47,29 @@ local function OnStep(world)
 	-- Process ProjectileHitEvents: heal plants with LifestealComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
-		if not world:contains(sourcePlant) then continue end
-		
+		if not world:contains(sourcePlant) then
+			continue
+		end
+
 		local lifesteal = world:get(sourcePlant, Components.LifestealComponent)
-		if not lifesteal then continue end
-		
+		if not lifesteal then
+			continue
+		end
+
 		-- Calculate heal amount
 		local lifestealPercent = lifesteal.Percent :: number
 		local healAmount = math.floor(hitEvent.Damage * lifestealPercent)
-		if healAmount < CONFIG.MIN_HEAL_AMOUNT then continue end
-		
+		if healAmount < CONFIG.MIN_HEAL_AMOUNT then
+			continue
+		end
+
 		-- Get zombie position for VFX
 		local zombiePos = world:get(hitEvent.TargetZombie, Components.PositionComponent)
-		
+
 		-- Apply healing using ECSUtils
 		Logger.Debug("Lifesteal", "Plant", sourcePlant, "healed for", healAmount, "HP")
 		ECSUtils.HealEntity(world, sourcePlant, healAmount, Components)
-		
+
 		-- Fire VFX event for lifesteal drain
 		if zombiePos then
 			Network.LifestealVFX.FireAll({

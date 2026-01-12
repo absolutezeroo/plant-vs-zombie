@@ -17,10 +17,10 @@ local Logger = require(Shared.utils.Logger)
 
 return function(context, wave: number?)
 	local player = context.Executor
-	
+
 	-- Default to wave 3
 	local waveReached = math.clamp(wave or 3, 1, 10)
-	
+
 	-- Generate fake rewards data (reduced for defeat)
 	local rewardsData = {
 		Victory = false,
@@ -34,10 +34,10 @@ return function(context, wave: number?)
 		NewLevel = 0,
 		LevelsGained = 0,
 	}
-	
+
 	-- Send to the player
 	Network.GameEndRewards.Fire(player, rewardsData)
-	
+
 	Logger.Info("Cmdr", `Sent DEFEAT to {player.Name} at wave {waveReached}`)
 	return `Defeat at wave {waveReached}. {rewardsData.CoinsEarned} coins, {rewardsData.XPEarned} XP`
 end

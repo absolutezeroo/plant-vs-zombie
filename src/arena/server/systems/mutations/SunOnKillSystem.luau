@@ -28,7 +28,9 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -42,21 +44,29 @@ local function OnStep(world)
 	-- Process ProjectileHitEvents: spawn sun on kills from plants with SunOnKillComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		-- Only process kills
-		if not hitEvent.WasKill then continue end
-		
+		if not hitEvent.WasKill then
+			continue
+		end
+
 		local sourcePlant = hitEvent.SourcePlant
-		if not world:contains(sourcePlant) then continue end
-		
+		if not world:contains(sourcePlant) then
+			continue
+		end
+
 		local sunOnKill = world:get(sourcePlant, Components.SunOnKillComponent)
-		if not sunOnKill then continue end
-		
+		if not sunOnKill then
+			continue
+		end
+
 		local owner = world:get(sourcePlant, Components.OwnerComponent)
-		if not owner then continue end
-		
+		if not owner then
+			continue
+		end
+
 		-- Spawn sun at zombie death location
 		local sunAmount = sunOnKill.SunAmount
 		Logger.Debug("SunOnKill", "Spawning", sunAmount, "sun from kill by plant", sourcePlant)
-		
+
 		EntityPool.Spawn(
 			Components.PositionComponent({
 				X = hitEvent.PositionX,

@@ -17,19 +17,19 @@ return function(_context, zombieType: string, lane: number)
 	if lane < 1 or lane > 5 then
 		return "Lane must be between 1 and 5"
 	end
-	
+
 	-- Get spawner from WaveService
 	local spawner = WaveService.GetSpawner()
-	
+
 	if not spawner then
 		return "WaveSpawner not initialized. Start a game first with 'startgame'."
 	end
-	
+
 	Logger.Info("Cmdr", `Spawning {zombieType} in lane {lane}`)
-	
+
 	task.spawn(function()
 		spawner:SpawnZombie(zombieType, lane)
 	end)
-	
+
 	return `Spawned {zombieType} zombie in lane {lane}`
 end

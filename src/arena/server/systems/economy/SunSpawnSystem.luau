@@ -36,8 +36,8 @@ local CONFIG = table.freeze({
 	SPAWN_HEIGHT_OFFSET = GameConstants.Economy.SKY_SUN_SPAWN_HEIGHT,
 	FALL_SPEED = GameConstants.Economy.SKY_SUN_FALL_SPEED,
 	GROUND_OFFSET = 1.5,
-	MIN_DT = 1/120,
-	MAX_DT = 1/15,
+	MIN_DT = 1 / 120,
+	MAX_DT = 1 / 15,
 })
 
 -- 3. STATE
@@ -75,10 +75,10 @@ local function getRandomGridPosition(): (number, number, number)
 	local cellCenter = MapConfig.GridToWorld(column, lane) -- Safe: MapConfig initialized at bootstrap
 	local cellW = State.CachedCellWidth
 	local cellD = State.CachedCellDepth
-	
+
 	local offsetX = ChanceUtils.RandomOffset(cellW * 0.3)
 	local offsetZ = ChanceUtils.RandomOffset(cellD * 0.3)
-	
+
 	return cellCenter.X + offsetX, getSpawnHeight(), cellCenter.Z + offsetZ
 end
 
@@ -86,12 +86,12 @@ end
 local function spawnSkySun(world: any): number
 	local x, y, z = getRandomGridPosition()
 	local targetY = getGroundY() + CONFIG.GROUND_OFFSET + ChanceUtils.RandomFloat(0, 2)
-	
+
 	local entityId = EntityPool.Spawn(
 		Components.PositionComponent({
 			X = x,
 			Y = y,
-			Z = z
+			Z = z,
 		}),
 		Components.SunComponent({
 			Value = CONFIG.SUN_VALUE,
@@ -102,9 +102,11 @@ local function spawnSkySun(world: any): number
 			SourceType = "Sky",
 		})
 	)
-	
-	if not entityId then return -1 end
-	
+
+	if not entityId then
+		return -1
+	end
+
 	Network.SunSpawned.FireAll({
 		EntityId = entityId,
 		PositionX = x,
@@ -113,14 +115,16 @@ local function spawnSkySun(world: any): number
 		Value = CONFIG.SUN_VALUE,
 		TargetY = targetY,
 	})
-	
+
 	return entityId
 end
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
-	
+	if State.IsInitialized then
+		return
+	end
+
 	-- Pre-cache config values to avoid yield in OnStep
 	if MapConfig.IsInitialized() then
 		local config = MapConfig.GetConfigIfReady()
@@ -129,12 +133,12 @@ local function Init(_world)
 		-- Fallback: force init (should not happen if bootstrap is correct)
 		State.CachedGridY = MapConfig.GetConfig().GridY
 	end
-	
+
 	-- Cache cell size
 	local cellW, cellD = MapConfig.GetCellSize()
 	State.CachedCellWidth = cellW
 	State.CachedCellDepth = cellD
-	
+
 	State.IsInitialized = true
 end
 
@@ -152,23 +156,23 @@ end
 -- 6. MAIN LOOP
 local function OnStep(world)
 	local currentTime = os.clock()
-	
+
 	-- Only spawn sun during "Playing" state
 	local WaveService = getWaveService()
 	local gameState = WaveService.GetGameState()
-	
+
 	if gameState ~= "Playing" then
 		State.LastSpawnTime = currentTime
 		return
 	end
-	
+
 	-- Check if it's time to spawn new sun
 	if currentTime - State.LastSpawnTime >= State.NextSpawnDelay then
 		spawnSkySun(world)
 		State.LastSpawnTime = currentTime
 		State.NextSpawnDelay = CONFIG.SPAWN_INTERVAL + ChanceUtils.RandomOffset(CONFIG.SPAWN_INTERVAL_VARIANCE)
 	end
-	
+
 	-- Process falling sun and despawning
 	for id, pos, sun in world:query(Components.PositionComponent, Components.SunComponent) do
 		-- Despawn check
@@ -179,27 +183,28 @@ local function OnStep(world)
 			else
 				world:despawn(id)
 			end
-			
+
 			Network.SunDespawned.FireAll({
 				EntityId = id,
 			})
 			continue
 		end
-		
+
 		-- Falling physics (frame-rate independent)
 		if sun.IsFalling then
 			local dtSun = Matter.useDeltaTime()
 			dtSun = math.clamp(dtSun, CONFIG.MIN_DT, CONFIG.MAX_DT)
 			local newY = pos.Y - CONFIG.FALL_SPEED * dtSun
 			local targetY = sun.TargetY or (getGroundY() + CONFIG.GROUND_OFFSET)
-			
+
 			if newY <= targetY then
 				-- Landed
-				world:insert(id, 
+				world:insert(
+					id,
 					Components.PositionComponent({
 						X = pos.X,
 						Y = targetY,
-						Z = pos.Z
+						Z = pos.Z,
 					}),
 					Components.SunComponent({
 						Value = sun.Value,
@@ -210,7 +215,7 @@ local function OnStep(world)
 						SourceType = sun.SourceType,
 					})
 				)
-				
+
 				Network.SunPositionUpdate.FireAll({
 					EntityId = id,
 					PositionY = targetY,
@@ -218,11 +223,14 @@ local function OnStep(world)
 				})
 			else
 				-- Still falling
-				world:insert(id, Components.PositionComponent({
-					X = pos.X,
-					Y = newY,
-					Z = pos.Z
-				}))
+				world:insert(
+					id,
+					Components.PositionComponent({
+						X = pos.X,
+						Y = newY,
+						Z = pos.Z,
+					})
+				)
 			end
 		end
 	end

@@ -46,23 +46,23 @@ function VFXService.Initialize()
 	_vfxFolder = Instance.new("Folder")
 	_vfxFolder.Name = "VFX"
 	_vfxFolder.Parent = Workspace
-	
+
 	-- Create Trove for signal connections
 	_trove = Trove.new()
-	
+
 	-- Connect to combat signals (observer pattern)
 	_trove:Connect(GameSignals.OnZombieDeath, function(data)
 		VFXService.PlayZombieDeath(data.Position)
 	end)
-	
+
 	_trove:Connect(GameSignals.OnProjectileImpact, function(data)
 		VFXService.PlayProjectileImpact(data.Position, data.ProjectileType, data.IsFrozen, data.IsEnhanced)
 	end)
-	
+
 	_trove:Connect(GameSignals.OnSunCollected, function(data)
 		VFXService.PlaySunCollect(data.Position)
 	end)
-	
+
 	Logger.Info("VFX", "VFXService initialized with signal listeners")
 end
 
@@ -77,7 +77,9 @@ end
 local _vfxAssets: Folder? = nil
 
 local function getVFXAssets(): Folder?
-	if _vfxAssets then return _vfxAssets end
+	if _vfxAssets then
+		return _vfxAssets
+	end
 	local Assets = ReplicatedStorage:FindFirstChild("Assets")
 	_vfxAssets = Assets and Assets:FindFirstChild("VFX") :: Folder?
 	return _vfxAssets
@@ -90,9 +92,9 @@ end
 local function playVFXFromAsset(position: Vector3, vfxName: string, fallbackColor: Color3?): boolean
 	local vfxAssets = getVFXAssets()
 	local vfxTemplate = vfxAssets and vfxAssets:FindFirstChild(vfxName)
-	
+
 	local part = createVFXPart(position)
-	
+
 	if vfxTemplate then
 		-- Clone and play all ParticleEmitters from the asset
 		for _, child in vfxTemplate:GetChildren() do
@@ -132,10 +134,10 @@ end
 ]]
 function VFXService.PlayExplosion(position: Vector3, radius: number?)
 	local actualRadius = radius or 9
-	
+
 	-- Try asset-based VFX
 	local played = playVFXFromAsset(position, "Explosion", Color3.fromRGB(255, 150, 50))
-	
+
 	-- Always add shockwave ring (procedural - hard to do in particle editor)
 	local ring = Instance.new("Part")
 	ring.Name = "Shockwave"
@@ -149,15 +151,15 @@ function VFXService.PlayExplosion(position: Vector3, radius: number?)
 	ring.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
 	ring.Transparency = 0.3
 	ring.Parent = _vfxFolder
-	
+
 	local ringTween = TweenService:Create(ring, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Size = Vector3.new(0.2, actualRadius * 2, actualRadius * 2),
 		Transparency = 1,
 	})
 	ringTween:Play()
-	
+
 	Debris:AddItem(ring, 0.5)
-	
+
 	if not played then
 		Logger.Debug("VFX", `Explosion fallback at {position}`)
 	end
@@ -168,9 +170,14 @@ end
 	ASSET-BASED: Looks for VFX in Assets/VFX/{Variant}_Impact
 	Falls back to generic VFX if not found
 ]]
-function VFXService.PlayProjectileImpact(position: Vector3, projectileType: string?, isFrozen: boolean?, isEnhanced: boolean?)
+function VFXService.PlayProjectileImpact(
+	position: Vector3,
+	projectileType: string?,
+	isFrozen: boolean?,
+	isEnhanced: boolean?
+)
 	local variant = projectileType or "Pea"
-	
+
 	-- Determine which VFX asset to use
 	local vfxName: string
 	if isEnhanced or variant == "FirePea" then
@@ -180,14 +187,13 @@ function VFXService.PlayProjectileImpact(position: Vector3, projectileType: stri
 	else
 		vfxName = variant .. "_Impact"
 	end
-	
+
 	-- Determine fallback color
-	local fallbackColor = if isFrozen or variant == "FrozenPea" 
+	local fallbackColor = if isFrozen or variant == "FrozenPea"
 		then Color3.fromRGB(150, 220, 255)
-		elseif isEnhanced or variant == "FirePea"
-		then Color3.fromRGB(255, 150, 50)
+		elseif isEnhanced or variant == "FirePea" then Color3.fromRGB(255, 150, 50)
 		else Color3.fromRGB(100, 200, 50)
-	
+
 	-- Try asset, fallback to Pea_Impact, then fallback to code
 	local played = playVFXFromAsset(position, vfxName, nil)
 	if not played then
@@ -244,11 +250,13 @@ end
 	💥 DAMAGE FLASH - Flash a part red briefly
 ]]
 function VFXService.FlashDamage(part: BasePart)
-	if not part then return end
-	
+	if not part then
+		return
+	end
+
 	local originalColor = part.Color
 	part.Color = Color3.fromRGB(255, 100, 100)
-	
+
 	task.delay(0.1, function()
 		if part and part.Parent then
 			part.Color = originalColor
@@ -262,21 +270,23 @@ end
 function VFXService.ScreenShake(intensity: number?, duration: number?)
 	local actualIntensity = intensity or 0.5
 	local actualDuration = duration or 0.2
-	
+
 	local camera = Workspace.CurrentCamera
-	if not camera then return end
-	
+	if not camera then
+		return
+	end
+
 	local originalCFrame = camera.CFrame
 	local startTime = tick()
-	
+
 	task.spawn(function()
 		while tick() - startTime < actualDuration do
 			local progress = (tick() - startTime) / actualDuration
 			local shake = actualIntensity * (1 - progress) -- Decay
-			
+
 			local offsetX = ChanceUtils.RandomOffset(shake)
 			local offsetY = ChanceUtils.RandomOffset(shake)
-			
+
 			camera.CFrame = camera.CFrame * CFrame.new(offsetX, offsetY, 0)
 			task.wait()
 		end
@@ -304,23 +314,21 @@ end
 function VFXService.PlayPlantShootFromModel(model: Model, isFrozen: boolean?)
 	-- Get position from Muzzle Attachment (never hardcode!)
 	local position = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Muzzle)
-	
+
 	-- Try model-specific VFX first
 	local vfxFolder = model:FindFirstChild("VFX")
 	local shootVFX = vfxFolder and vfxFolder:FindFirstChild("Shoot")
-	
+
 	if shootVFX and shootVFX:IsA("ParticleEmitter") then
 		local part = createVFXPart(position)
 		VFXUtils.CloneEmitAndCleanup(shootVFX, part)
 		Debris:AddItem(part, shootVFX.Lifetime.Max + 0.5)
 		return
 	end
-	
+
 	-- Fallback: Asset-based generic shoot
 	local vfxName = if isFrozen then "FrozenPlant_Shoot" else "Plant_Shoot"
-	local fallbackColor = if isFrozen 
-		then Color3.fromRGB(150, 220, 255)
-		else Color3.fromRGB(100, 200, 50)
+	local fallbackColor = if isFrozen then Color3.fromRGB(150, 220, 255) else Color3.fromRGB(100, 200, 50)
 	playVFXFromAsset(position, vfxName, fallbackColor)
 end
 
@@ -334,12 +342,12 @@ function VFXService.PlayPlantShoot(model: Model?, position: Vector3, isFrozen: b
 		local muzzlePos = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Muzzle, false)
 		position = muzzlePos
 	end
-	
+
 	-- Try model-specific VFX first
 	if model then
 		local vfxFolder = model:FindFirstChild("VFX")
 		local shootVFX = vfxFolder and vfxFolder:FindFirstChild("Shoot")
-		
+
 		if shootVFX and shootVFX:IsA("ParticleEmitter") then
 			local part = createVFXPart(position)
 			VFXUtils.CloneEmitAndCleanup(shootVFX, part)
@@ -347,12 +355,10 @@ function VFXService.PlayPlantShoot(model: Model?, position: Vector3, isFrozen: b
 			return
 		end
 	end
-	
+
 	-- Fallback: Asset-based generic shoot
 	local vfxName = if isFrozen then "FrozenPlant_Shoot" else "Plant_Shoot"
-	local fallbackColor = if isFrozen 
-		then Color3.fromRGB(150, 220, 255)
-		else Color3.fromRGB(100, 200, 50)
+	local fallbackColor = if isFrozen then Color3.fromRGB(150, 220, 255) else Color3.fromRGB(100, 200, 50)
 	playVFXFromAsset(position, vfxName, fallbackColor)
 end
 
@@ -363,18 +369,18 @@ end
 function VFXService.PlayPlantDeathFromModel(model: Model)
 	-- Get position from Center Attachment (never hardcode!)
 	local position = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Center)
-	
+
 	-- Try model-specific VFX first
 	local vfxFolder = model:FindFirstChild("VFX")
 	local deathVFX = vfxFolder and vfxFolder:FindFirstChild("Death")
-	
+
 	if deathVFX and deathVFX:IsA("ParticleEmitter") then
 		local part = createVFXPart(position)
 		VFXUtils.CloneEmitAndCleanup(deathVFX, part, 15)
 		Debris:AddItem(part, deathVFX.Lifetime.Max + 0.5)
 		return
 	end
-	
+
 	-- Fallback: Asset-based generic plant death
 	playVFXFromAsset(position, "Plant_Death", Color3.fromRGB(100, 180, 100))
 end
@@ -389,12 +395,12 @@ function VFXService.PlayPlantDeath(model: Model?, position: Vector3)
 		local centerPos = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Center, false)
 		position = centerPos
 	end
-	
+
 	-- Try model-specific VFX first
 	if model then
 		local vfxFolder = model:FindFirstChild("VFX")
 		local deathVFX = vfxFolder and vfxFolder:FindFirstChild("Death")
-		
+
 		if deathVFX and deathVFX:IsA("ParticleEmitter") then
 			local part = createVFXPart(position)
 			VFXUtils.CloneEmitAndCleanup(deathVFX, part, 15)
@@ -402,7 +408,7 @@ function VFXService.PlayPlantDeath(model: Model?, position: Vector3)
 			return
 		end
 	end
-	
+
 	-- Fallback: Asset-based generic plant death
 	playVFXFromAsset(position, "Plant_Death", Color3.fromRGB(100, 180, 100))
 end
@@ -466,15 +472,15 @@ end
 function VFXService.PlayChainLightning(sourcePos: Vector3, targetPos: Vector3, damage: number?)
 	-- Create beam
 	VFXUtils.CreateBeam(sourcePos, targetPos, "Lightning_Beam", Color3.fromRGB(255, 255, 100), 0.25)
-	
+
 	-- Play spark at target
 	playVFXFromAsset(targetPos, "Electric_Spark", Color3.fromRGB(255, 255, 100))
-	
+
 	-- Screen shake for powerful hits
 	if damage and damage >= 50 then
 		VFXService.ScreenShake(0.3, 0.1)
 	end
-	
+
 	Logger.Debug("VFX", `Chain lightning from {sourcePos} to {targetPos}`)
 end
 
@@ -484,11 +490,11 @@ end
 ]]
 function VFXService.PlayPoisonCloud(position: Vector3, radius: number, duration: number)
 	local played = playVFXFromAsset(position, "Poison_Cloud", Color3.fromRGB(100, 255, 100))
-	
+
 	if not played then
 		-- Create procedural poison cloud (multiple emitters for coverage)
 		local part = createVFXPart(position)
-		
+
 		local emitter = Instance.new("ParticleEmitter")
 		emitter.Color = ColorSequence.new(Color3.fromRGB(100, 200, 100))
 		emitter.Size = NumberSequence.new({
@@ -508,17 +514,17 @@ function VFXService.PlayPoisonCloud(position: Vector3, radius: number, duration:
 		emitter.RotSpeed = NumberRange.new(-30, 30)
 		emitter.LightEmission = 0.3
 		emitter.Parent = part
-		
+
 		-- Schedule cleanup after duration
 		task.delay(duration, function()
 			if emitter and emitter.Parent then
 				emitter.Enabled = false
 			end
 		end)
-		
+
 		Debris:AddItem(part, duration + 3)
 	end
-	
+
 	Logger.Debug("VFX", `Poison cloud at {position}, radius {radius}, duration {duration}`)
 end
 
@@ -528,10 +534,10 @@ end
 function VFXService.PlayLifesteal(zombiePos: Vector3, plantPos: Vector3, healAmount: number)
 	-- Create drain beam
 	VFXUtils.CreateBeam(zombiePos, plantPos, "Lifesteal_Beam", Color3.fromRGB(80, 40, 120), 0.3)
-	
+
 	-- Play heal VFX at plant
 	playVFXFromAsset(plantPos, "Shadow_Heal", Color3.fromRGB(80, 40, 120))
-	
+
 	Logger.Debug("VFX", `Lifesteal {healAmount} from {zombiePos} to {plantPos}`)
 end
 
@@ -540,7 +546,7 @@ end
 ]]
 function VFXService.PlaySplashDamage(position: Vector3, radius: number)
 	local played = playVFXFromAsset(position, "Splash_Ring", Color3.fromRGB(255, 200, 100))
-	
+
 	if not played then
 		-- Create procedural splash ring
 		local ring = Instance.new("Part")
@@ -555,13 +561,14 @@ function VFXService.PlaySplashDamage(position: Vector3, radius: number)
 		ring.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
 		ring.Transparency = 0.3
 		ring.Parent = _vfxFolder
-		
-		local ringTween = TweenService:Create(ring, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = Vector3.new(0.1, radius * 2, radius * 2),
-			Transparency = 1,
-		})
+
+		local ringTween =
+			TweenService:Create(ring, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = Vector3.new(0.1, radius * 2, radius * 2),
+				Transparency = 1,
+			})
 		ringTween:Play()
-		
+
 		Debris:AddItem(ring, 0.4)
 	end
 end
@@ -585,7 +592,7 @@ end
 -- ============================================
 
 -- Cache of active status overlays per entity
-local _statusOverlays: {[number]: {[string]: Instance}} = {}
+local _statusOverlays: { [number]: { [string]: Instance } } = {}
 
 --[[
 	Apply a status overlay to a zombie model
@@ -599,12 +606,12 @@ function VFXService.ApplyStatusOverlay(entityId: number, model: Model, statusTyp
 	if not _statusOverlays[entityId] then
 		_statusOverlays[entityId] = {}
 	end
-	
+
 	-- Remove existing overlay of same type
 	if _statusOverlays[entityId][statusType] then
 		VFXUtils.RemoveStatusOverlay(model, statusType)
 	end
-	
+
 	-- Apply new overlay
 	local overlay = VFXUtils.ApplyStatusOverlay(model, statusType, duration)
 	if overlay then
@@ -617,7 +624,7 @@ end
 ]]
 function VFXService.RemoveStatusOverlay(entityId: number, model: Model, statusType: string)
 	VFXUtils.RemoveStatusOverlay(model, statusType)
-	
+
 	if _statusOverlays[entityId] then
 		_statusOverlays[entityId][statusType] = nil
 	end

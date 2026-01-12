@@ -48,65 +48,65 @@ local function ResourcePill(props: ResourcePillProps): Frame
 	local scope = props.Scope
 	local colorKey = props.Color or "Gold"
 	local width = props.Width or 90
-	
+
 	local colorSet = (Theme.Colors :: any)[colorKey] or Theme.Colors.Gold
-	
+
 	local displayText = scope:Computed(function(use)
 		local value = use(props.Value)
 		return formatNumber(value)
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "ResourcePill",
 		Size = UDim2.fromOffset(width, PILL_HEIGHT + SHADOW_OFFSET),
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Shadow
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Shadow",
 				Size = UDim2.fromOffset(width, PILL_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
 				BackgroundColor3 = colorSet.Shadow :: Color3,
 				ZIndex = 1,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Main pill
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Main",
 				Size = UDim2.fromOffset(width, PILL_HEIGHT),
 				BackgroundColor3 = colorSet.Main :: Color3,
 				ZIndex = 2,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
-					
-					scope:New("UIStroke") {
+					}),
+
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
-					},
-					
+					}),
+
 					-- Icon
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Icon",
 						Size = UDim2.fromOffset(28, PILL_HEIGHT),
 						Position = UDim2.fromOffset(6, 0),
 						BackgroundTransparency = 1,
 						Text = props.Icon,
 						TextSize = 20,
-					},
-					
+					}),
+
 					-- Value
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Value",
 						Size = UDim2.new(1, -40, 1, 0),
 						Position = UDim2.fromOffset(32, 0),
@@ -116,11 +116,11 @@ local function ResourcePill(props: ResourcePillProps): Frame
 						TextSize = 16,
 						Font = Enum.Font.GothamBold,
 						TextXAlignment = Enum.TextXAlignment.Center,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return ResourcePill

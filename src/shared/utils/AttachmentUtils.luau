@@ -49,8 +49,10 @@ local AttachmentUtils = {}
 	@return The Attachment instance, or nil if not found
 ]]
 function AttachmentUtils.FindAttachment(model: Model, attachmentName: string): Attachment?
-	if not model then return nil end
-	
+	if not model then
+		return nil
+	end
+
 	-- Priority 1: Check PrimaryPart (most common location)
 	local primaryPart = model.PrimaryPart
 	if primaryPart then
@@ -59,14 +61,14 @@ function AttachmentUtils.FindAttachment(model: Model, attachmentName: string): A
 			return attachment
 		end
 	end
-	
+
 	-- Priority 2: Search all descendants
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA("Attachment") and descendant.Name == attachmentName then
 			return descendant
 		end
 	end
-	
+
 	return nil
 end
 
@@ -83,17 +85,17 @@ end
 ]]
 function AttachmentUtils.GetWorldPosition(model: Model, attachmentName: string, logWarning: boolean?): Vector3
 	local shouldLog = if logWarning == nil then true else logWarning
-	
+
 	-- Find the attachment
 	local attachment = AttachmentUtils.FindAttachment(model, attachmentName)
-	
+
 	if attachment then
 		return attachment.WorldPosition
 	end
-	
+
 	-- Fallback: Use model center
 	local fallbackPos = Vector3.zero
-	
+
 	if model.PrimaryPart then
 		fallbackPos = model.PrimaryPart.Position
 	else
@@ -101,11 +103,11 @@ function AttachmentUtils.GetWorldPosition(model: Model, attachmentName: string, 
 		local cf, size = model:GetBoundingBox()
 		fallbackPos = cf.Position
 	end
-	
+
 	if shouldLog then
 		Logger.Warn("Attachment", `Attachment "{attachmentName}" not found in {model.Name}, using fallback position`)
 	end
-	
+
 	return fallbackPos
 end
 
@@ -119,16 +121,16 @@ end
 ]]
 function AttachmentUtils.GetWorldCFrame(model: Model, attachmentName: string): CFrame
 	local attachment = AttachmentUtils.FindAttachment(model, attachmentName)
-	
+
 	if attachment then
 		return attachment.WorldCFrame
 	end
-	
+
 	-- Fallback
 	if model.PrimaryPart then
 		return model.PrimaryPart.CFrame
 	end
-	
+
 	local cf, _ = model:GetBoundingBox()
 	Logger.Warn("Attachment", `Attachment "{attachmentName}" not found in {model.Name}, using fallback CFrame`)
 	return cf
@@ -154,14 +156,14 @@ end
 	@param attachmentNames Array of Attachment names
 	@return Dictionary of {name -> WorldPosition}, missing ones are nil
 ]]
-function AttachmentUtils.GetMultiplePositions(model: Model, attachmentNames: {string}): {[string]: Vector3?}
-	local result: {[string]: Vector3?} = {}
-	
+function AttachmentUtils.GetMultiplePositions(model: Model, attachmentNames: { string }): { [string]: Vector3? }
+	local result: { [string]: Vector3? } = {}
+
 	for _, name in attachmentNames do
 		local attachment = AttachmentUtils.FindAttachment(model, name)
 		result[name] = attachment and attachment.WorldPosition or nil
 	end
-	
+
 	return result
 end
 
@@ -169,11 +171,11 @@ end
 	Standard Attachment names for easy reference
 ]]
 AttachmentUtils.Names = {
-	Muzzle = "Muzzle",       -- Projectile spawn point
-	Center = "Center",       -- Mass center (targeting)
-	Overhead = "Overhead",   -- Health bar position
-	Torso = "Torso",         -- Zombie targeting point
-	Head = "Head",           -- Headshot targeting
+	Muzzle = "Muzzle", -- Projectile spawn point
+	Center = "Center", -- Mass center (targeting)
+	Overhead = "Overhead", -- Health bar position
+	Torso = "Torso", -- Zombie targeting point
+	Head = "Head", -- Headshot targeting
 }
 
 return AttachmentUtils

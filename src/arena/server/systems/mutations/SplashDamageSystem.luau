@@ -33,7 +33,9 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -45,8 +47,8 @@ end
 -- Helper: Apply splash damage at a position
 -- Uses LaneCache for O(lane_range) lookup instead of O(N) world:query
 local function applySplashDamage(
-	world, 
-	impactPosition: {X: number, Y: number, Z: number},
+	world,
+	impactPosition: { X: number, Y: number, Z: number },
 	baseDamage: number,
 	splashRadius: number,
 	splashDamagePercent: number,
@@ -55,28 +57,36 @@ local function applySplashDamage(
 	impactLane: number?
 )
 	local splashDamage = math.floor(baseDamage * splashDamagePercent)
-	if splashDamage <= 0 then return end
-	
+	if splashDamage <= 0 then
+		return
+	end
+
 	-- Calculate how many lanes the splash radius covers
 	local laneRadius = math.ceil(splashRadius / GridConfig.CELL_SIZE)
 	local centerLane = impactLane or CONFIG.DEFAULT_CENTER_LANE
-	
+
 	-- O(lane_range) lookup instead of O(N) world:query
 	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
-	
+
 	for _, entityId in zombiesInRange do
-		if excludeEntityId and entityId == excludeEntityId then continue end
-		if not world:contains(entityId) then continue end
-		
+		if excludeEntityId and entityId == excludeEntityId then
+			continue
+		end
+		if not world:contains(entityId) then
+			continue
+		end
+
 		local pos = world:get(entityId, Components.PositionComponent)
-		if not pos then continue end
-		
+		if not pos then
+			continue
+		end
+
 		local distance = MathUtils.Distance2D(pos.X, pos.Z, impactPosition.X, impactPosition.Z)
-		
+
 		if distance <= splashRadius then
 			local distanceMultiplier = 1 - (distance / splashRadius) * CONFIG.DISTANCE_FALLOFF
 			local finalDamage = math.floor(splashDamage * distanceMultiplier)
-			
+
 			if finalDamage > 0 then
 				local actualDamage = ECSUtils.DamageEntity(world, entityId, finalDamage, Components)
 				if actualDamage > 0 then
@@ -97,8 +107,10 @@ local function OnStep(world)
 	-- Process ProjectileHitEvents: apply splash damage from plants with SplashDamageComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
-		if not world:contains(sourcePlant) then continue end
-		
+		if not world:contains(sourcePlant) then
+			continue
+		end
+
 		local splashDamage = world:get(sourcePlant, Components.SplashDamageComponent)
 		if splashDamage then
 			-- Fire VFX event for splash damage ring
@@ -108,10 +120,10 @@ local function OnStep(world)
 				PositionZ = hitEvent.PositionZ,
 				Radius = splashDamage.Radius,
 			})
-			
+
 			applySplashDamage(
 				world,
-				{X = hitEvent.PositionX, Y = hitEvent.PositionY, Z = hitEvent.PositionZ},
+				{ X = hitEvent.PositionX, Y = hitEvent.PositionY, Z = hitEvent.PositionZ },
 				hitEvent.Damage,
 				splashDamage.Radius,
 				splashDamage.Percent,

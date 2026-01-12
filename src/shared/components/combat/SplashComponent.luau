@@ -10,6 +10,6 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("SplashComponent", {
-	SplashRadius = 0,      -- Studs - radius of splash damage
-	SplashDamage = 0,      -- Damage dealt to splash targets (usually less than direct hit)
+	SplashRadius = 0, -- Studs - radius of splash damage
+	SplashDamage = 0, -- Damage dealt to splash targets (usually less than direct hit)
 })

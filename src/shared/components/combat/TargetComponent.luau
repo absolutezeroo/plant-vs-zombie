@@ -11,6 +11,6 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 return Matter.component("TargetComponent", {
-	EntityId = 0,   -- Target entity's numeric ID
-	Distance = 0,   -- Cached distance to target (studs)
+	EntityId = 0, -- Target entity's numeric ID
+	Distance = 0, -- Cached distance to target (studs)
 })

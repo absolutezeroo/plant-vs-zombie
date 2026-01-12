@@ -38,11 +38,13 @@ local State = {
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
-	
+
 	State.Trove = Trove.new()
-	
+
 	-- Hook into frame start to measure time
 	State.Trove:Connect(RunService.Heartbeat, function()
 		State.FrameStartTime = tick()
@@ -68,11 +70,11 @@ local function OnStep(_world)
 	if State.FrameStartTime == 0 then
 		return
 	end
-	
+
 	local frameTime = (tick() - State.FrameStartTime) * 1000 -- Convert to ms
 	State.FrameCount = State.FrameCount + 1
 	State.TotalFrameTime = State.TotalFrameTime + frameTime
-	
+
 	-- Detect frame spikes
 	if frameTime > PerformanceConfig.FRAME_BUDGET_TOTAL then
 		if frameTime > CONFIG.SPIKE_THRESHOLD then
@@ -83,19 +85,19 @@ local function OnStep(_world)
 			})
 		end
 	end
-	
+
 	-- Periodic summary
 	local now = tick()
 	if now - State.LastLogTime >= CONFIG.LOG_INTERVAL then
 		local avgFrameTime = State.TotalFrameTime / math.max(1, State.FrameCount)
-		
+
 		Logger.Performance("PerformanceMonitor", "Frame time summary", {
 			AvgFrameTimeMs = string.format("%.2f", avgFrameTime),
 			SpikeCount = State.SpikeCount,
 			FrameCount = State.FrameCount,
 			UnderBudget = avgFrameTime < PerformanceConfig.FRAME_BUDGET_TOTAL,
 		})
-		
+
 		-- Reset counters
 		State.SpikeCount = 0
 		State.FrameCount = 0

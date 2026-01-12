@@ -27,13 +27,13 @@ local PlayerData = {
 	Gems = Value(_scope, 0),
 	XP = Value(_scope, 0),
 	Level = Value(_scope, 1),
-	LevelProgress = Value(_scope, 0),  -- 0.0 to 1.0
-	UnlockedPlants = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
+	LevelProgress = Value(_scope, 0), -- 0.0 to 1.0
+	UnlockedPlants = Value(_scope, { "Sunflower", "Peashooter", "WallNut" } :: { string }),
 	-- Plant mutations (replaces old upgrade system)
-	PlantMutations = Value(_scope, {} :: {[string]: {string}}),
+	PlantMutations = Value(_scope, {} :: { [string]: { string } }),
 	-- Current deck (up to 6 plants)
-	Deck = Value(_scope, {"Sunflower", "Peashooter", "WallNut"} :: {string}),
-	
+	Deck = Value(_scope, { "Sunflower", "Peashooter", "WallNut" } :: { string }),
+
 	-- Session stats (reset per game)
 	SessionCoinsEarned = Value(_scope, 0),
 	SessionZombiesKilled = Value(_scope, 0),
@@ -45,7 +45,7 @@ type CoinGainEvent = {
 	PositionX: number?,
 	PositionZ: number?,
 }
-local _coinGainCallbacks: {(CoinGainEvent) -> ()} = {}
+local _coinGainCallbacks: { (CoinGainEvent) -> () } = {}
 
 local PlayerDataClient = {}
 
@@ -100,7 +100,7 @@ function PlayerDataClient.GetUnlockedPlantsValue()
 end
 
 -- Get unlocked plants (current list)
-function PlayerDataClient.GetUnlockedPlants(): {string}
+function PlayerDataClient.GetUnlockedPlants(): { string }
 	return Fusion.peek(PlayerData.UnlockedPlants)
 end
 
@@ -116,7 +116,7 @@ function PlayerDataClient.IsPlantUnlocked(plantType: string): boolean
 end
 
 -- Get mutations for a plant
-function PlayerDataClient.GetPlantMutations(plantType: string): {string}
+function PlayerDataClient.GetPlantMutations(plantType: string): { string }
 	local mutations = Fusion.peek(PlayerData.PlantMutations)
 	return mutations[plantType] or {}
 end
@@ -165,7 +165,7 @@ function PlayerDataClient.GetDeckValue()
 end
 
 -- Get deck (current list)
-function PlayerDataClient.GetDeck(): {string}
+function PlayerDataClient.GetDeck(): { string }
 	return Fusion.peek(PlayerData.Deck)
 end
 
@@ -176,9 +176,9 @@ function PlayerDataClient.IsInDeck(plantType: string): boolean
 end
 
 -- Save deck to server
-function PlayerDataClient.RequestSaveDeck(deck: {string})
+function PlayerDataClient.RequestSaveDeck(deck: { string })
 	Logger.Debug("PlayerData", `Requesting save deck: {table.concat(deck, ", ")}`)
-	
+
 	-- Build request with slots
 	Network.SaveDeckRequest.Fire({
 		Slot1 = deck[1] :: any,
@@ -191,7 +191,7 @@ function PlayerDataClient.RequestSaveDeck(deck: {string})
 end
 
 -- Optimistic deck update (update UI immediately, will sync from server)
-function PlayerDataClient.SetDeckLocal(deck: {string})
+function PlayerDataClient.SetDeckLocal(deck: { string })
 	PlayerData.Deck:set(deck)
 end
 
@@ -200,33 +200,33 @@ function PlayerDataClient.Initialize()
 	-- Handle full data sync from server (SingleAsync = SetCallback)
 	Network.PlayerDataSync.SetCallback(function(data)
 		Logger.Info("PlayerData", `Received player data: {data.Coins} coins, {data.Gems} gems, Lv{data.Level}`)
-		
+
 		-- Update currencies
 		PlayerData.Coins:set(data.Coins)
 		PlayerData.Gems:set(data.Gems or 0)
-		
+
 		-- Update XP/Level
 		PlayerData.XP:set(data.XP or 0)
 		PlayerData.Level:set(data.Level or 1)
 		PlayerData.LevelProgress:set(data.LevelProgress or 0)
-		
+
 		-- Note: Mutations are synced via SyncAllMutations event (separate call)
-		
+
 		-- Update unlocked plants
 		local unlockedList = {}
 		for _, plantType in data.UnlockedPlants do
 			table.insert(unlockedList, tostring(plantType))
 		end
 		PlayerData.UnlockedPlants:set(unlockedList)
-		
+
 		Logger.Debug("PlayerData", `Synced: {#unlockedList} unlocked plants`)
 	end)
-	
+
 	-- Handle mutations sync from server (sent separately after PlayerDataSync)
 	Network.SyncAllMutations.On(function(data)
 		-- Convert EquippedMutations array format from Zap to dictionary
-		local mutationsDict: {[string]: {string}} = {}
-		
+		local mutationsDict: { [string]: { string } } = {}
+
 		if data.EquippedMutations then
 			for _, entry in data.EquippedMutations do
 				local plantType = tostring(entry.PlantType)
@@ -236,9 +236,9 @@ function PlayerDataClient.Initialize()
 				end
 			end
 		end
-		
+
 		PlayerData.PlantMutations:set(mutationsDict)
-		
+
 		local mutationCount = 0
 		local plantCount = 0
 		for _, mutations in mutationsDict do
@@ -247,19 +247,19 @@ function PlayerDataClient.Initialize()
 		end
 		Logger.Info("PlayerData", `Received {mutationCount} equipped mutations for {plantCount} plants`)
 	end)
-	
+
 	-- Handle coin gain events
 	Network.CoinGained.On(function(data)
 		-- Update total coins
 		PlayerData.Coins:set(data.TotalCoins)
-		
+
 		-- Update session stats
 		local currentSession = Fusion.peek(PlayerData.SessionCoinsEarned)
 		PlayerData.SessionCoinsEarned:set(currentSession + data.Amount)
-		
+
 		local currentKills = Fusion.peek(PlayerData.SessionZombiesKilled)
 		PlayerData.SessionZombiesKilled:set(currentKills + 1)
-		
+
 		-- Notify VFX callbacks
 		local event: CoinGainEvent = {
 			Amount = data.Amount,
@@ -269,25 +269,37 @@ function PlayerDataClient.Initialize()
 		for _, callback in _coinGainCallbacks do
 			task.spawn(callback, event)
 		end
-		
+
 		Logger.Debug("PlayerData", `+{data.Amount} coins (Total: {data.TotalCoins})`)
 	end)
-	
+
 	-- Handle deck sync from server
 	Network.DeckSync.SetCallback(function(data)
 		Logger.Info("PlayerData", `DeckSync received:`, data)
 		local deck = {}
-		if data.Slot1 then table.insert(deck, tostring(data.Slot1)) end
-		if data.Slot2 then table.insert(deck, tostring(data.Slot2)) end
-		if data.Slot3 then table.insert(deck, tostring(data.Slot3)) end
-		if data.Slot4 then table.insert(deck, tostring(data.Slot4)) end
-		if data.Slot5 then table.insert(deck, tostring(data.Slot5)) end
-		if data.Slot6 then table.insert(deck, tostring(data.Slot6)) end
-		
+		if data.Slot1 then
+			table.insert(deck, tostring(data.Slot1))
+		end
+		if data.Slot2 then
+			table.insert(deck, tostring(data.Slot2))
+		end
+		if data.Slot3 then
+			table.insert(deck, tostring(data.Slot3))
+		end
+		if data.Slot4 then
+			table.insert(deck, tostring(data.Slot4))
+		end
+		if data.Slot5 then
+			table.insert(deck, tostring(data.Slot5))
+		end
+		if data.Slot6 then
+			table.insert(deck, tostring(data.Slot6))
+		end
+
 		PlayerData.Deck:set(deck)
 		Logger.Info("PlayerData", `Deck updated ({#deck} plants): {table.concat(deck, ", ")}`)
 	end)
-	
+
 	-- Handle deck save response
 	Network.DeckSaved.SetCallback(function(data)
 		if data.Success then
@@ -296,7 +308,7 @@ function PlayerDataClient.Initialize()
 			Logger.Warn("PlayerData", `Failed to save deck: {data.Error or "unknown error"}`)
 		end
 	end)
-	
+
 	Logger.Info("PlayerData", "PlayerDataClient initialized")
 end
 

@@ -44,12 +44,12 @@ export type PlantViewportProps = {
 	LayoutOrder: number?,
 	ZIndex: number?,
 	-- Camera settings
-	CameraFOV: number?,      -- Default: 35 (narrower = larger plant)
+	CameraFOV: number?, -- Default: 35 (narrower = larger plant)
 	CameraDistance: number?, -- Multiplier for distance (default: 1.5)
-	CameraHeight: number?,   -- Vertical offset multiplier (default: 0.2)
+	CameraHeight: number?, -- Vertical offset multiplier (default: 0.2)
 	-- Optional idle animation
 	EnableRotation: boolean?, -- Slowly rotate the plant
-	RotationSpeed: number?,   -- Degrees per second (default: 15)
+	RotationSpeed: number?, -- Degrees per second (default: 15)
 }
 
 --[[
@@ -61,7 +61,7 @@ export type PlantViewportProps = {
 ]]
 local function PlantViewport(props: PlantViewportProps): (ViewportFrame, () -> ())
 	local plantType = props.PlantType
-	
+
 	-- Create viewport frame
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Name = "PlantViewport"
@@ -71,23 +71,23 @@ local function PlantViewport(props: PlantViewportProps): (ViewportFrame, () -> (
 	viewport.LayoutOrder = props.LayoutOrder or 0
 	viewport.ZIndex = props.ZIndex or 1
 	viewport.BackgroundTransparency = 1
-	
+
 	-- Lighting setup
 	viewport.Ambient = Color3.fromRGB(200, 200, 200)
 	viewport.LightColor = Color3.fromRGB(255, 255, 255)
 	viewport.LightDirection = Vector3.new(-1, -1, -1)
-	
+
 	-- Camera settings
 	local fov = props.CameraFOV or 35
 	local distanceMultiplier = props.CameraDistance or 1.5
 	local heightMultiplier = props.CameraHeight or 0.2
-	
+
 	-- Rotation animation state
 	local rotationConnection: RBXScriptConnection? = nil
 	local worldModel: WorldModel? = nil
 	local model: Model? = nil
 	local baseCFrame: CFrame? = nil
-	
+
 	-- Setup viewport with plant model
 	local function setup()
 		-- Clear previous content
@@ -96,51 +96,48 @@ local function PlantViewport(props: PlantViewportProps): (ViewportFrame, () -> (
 				child:Destroy()
 			end
 		end
-		
+
 		-- Get plant model template
 		local modelTemplate = PlantModels:FindFirstChild(plantType)
 		if not modelTemplate then
 			warn("[PlantViewport] Plant model not found:", plantType)
 			return
 		end
-		
+
 		-- Create WorldModel for proper rendering
 		worldModel = Instance.new("WorldModel")
 		worldModel.Parent = viewport
-		
+
 		-- Clone and add model
 		model = modelTemplate:Clone() :: Model
 		model.Parent = worldModel
-		
+
 		-- Position model at origin, rotate 90° to face camera
 		baseCFrame = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
 		if model.PrimaryPart then
 			model:PivotTo(baseCFrame)
 		end
-		
+
 		-- Create camera
 		local camera = Instance.new("Camera")
 		camera.FieldOfView = fov
 		camera.Parent = viewport
 		viewport.CurrentCamera = camera
-		
+
 		-- Calculate framing based on model bounds
 		local cframe, size = model:GetBoundingBox()
 		local maxSize = math.max(size.X, size.Y, size.Z)
 		local distance = maxSize * distanceMultiplier
-		
+
 		-- Position camera in front of the plant
 		local modelCenter = cframe.Position
-		camera.CFrame = CFrame.new(
-			modelCenter + Vector3.new(0, distance * heightMultiplier, distance),
-			modelCenter
-		)
-		
+		camera.CFrame = CFrame.new(modelCenter + Vector3.new(0, distance * heightMultiplier, distance), modelCenter)
+
 		-- Setup idle rotation if enabled
 		if props.EnableRotation then
 			local rotationSpeed = props.RotationSpeed or 15 -- degrees per second
 			local currentAngle = 90 -- Start at 90 since we already rotated
-			
+
 			rotationConnection = RunService.Heartbeat:Connect(function(dt)
 				if model and model.PrimaryPart and baseCFrame then
 					currentAngle = currentAngle + (rotationSpeed * dt)
@@ -149,7 +146,7 @@ local function PlantViewport(props: PlantViewportProps): (ViewportFrame, () -> (
 			end)
 		end
 	end
-	
+
 	-- Cleanup function
 	local function cleanup()
 		if rotationConnection then
@@ -158,10 +155,10 @@ local function PlantViewport(props: PlantViewportProps): (ViewportFrame, () -> (
 		end
 		viewport:Destroy()
 	end
-	
+
 	-- Defer setup to ensure proper initialization
 	task.defer(setup)
-	
+
 	return viewport, cleanup
 end
 
@@ -174,12 +171,12 @@ end
 ]]
 local function CreateWithScope(scope: any, props: PlantViewportProps): ViewportFrame
 	local viewport, cleanup = PlantViewport(props)
-	
+
 	-- Add cleanup to scope
 	table.insert(scope, {
-		Destroy = cleanup
+		Destroy = cleanup,
 	})
-	
+
 	return viewport
 end
 

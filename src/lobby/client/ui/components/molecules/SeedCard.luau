@@ -53,11 +53,11 @@ local function SeedCard(props: SeedCardProps): Frame
 	local plantType = props.PlantType
 	local equippedMutations = props.EquippedMutations
 	local layoutOrder = props.LayoutOrder or 0
-	
+
 	-- Get plant stats
 	local plantStats = PlantData.GetStats(plantType)
 	local cost = if plantStats then plantStats.Cost else 100
-	
+
 	-- Create ViewportFrame using shared PlantViewport atom
 	local viewportFrame = PlantViewport.CreateWithScope(scope, {
 		PlantType = plantType,
@@ -69,17 +69,17 @@ local function SeedCard(props: SeedCardProps): Frame
 		CameraDistance = 1.5,
 		CameraHeight = 0.2,
 	})
-	
+
 	-- Internal state
 	local isHovered = scope:Value(false)
 	local isPressed = scope:Value(false)
-	
+
 	-- Has mutations (for gold border) - reactive
 	local hasMutations = scope:Computed(function(use)
 		local mutations = use(equippedMutations)
 		return mutations and #mutations > 0
 	end)
-	
+
 	-- Border color based on mutations
 	local borderColor = scope:Computed(function(use)
 		if use(hasMutations) then
@@ -87,109 +87,124 @@ local function SeedCard(props: SeedCardProps): Frame
 		end
 		return Theme.Colors.Surface.Stroke :: Color3
 	end)
-	
+
 	-- Border thickness
 	local borderThickness = Theme.Layout.StrokeThickness
-	
+
 	-- Press animation (shadow offset as percentage)
-	local pressOffset = scope:Spring(scope:Computed(function(use)
-		return if use(isPressed) then 0.06 else 0
-	end), 40, 0.7)
-	
+	local pressOffset = scope:Spring(
+		scope:Computed(function(use)
+			return if use(isPressed) then 0.06 else 0
+		end),
+		40,
+		0.7
+	)
+
 	-- Scale animation for hover
-	local hoverScale = scope:Spring(scope:Computed(function(use)
-		if use(isPressed) then return 0.95 end
-		if use(isHovered) then return 1.05 end
-		return 1
-	end), 35, 0.7)
-	
+	local hoverScale = scope:Spring(
+		scope:Computed(function(use)
+			if use(isPressed) then
+				return 0.95
+			end
+			if use(isHovered) then
+				return 1.05
+			end
+			return 1
+		end),
+		35,
+		0.7
+	)
+
 	local cardColor = Theme.Colors.Surface.Main
 	local shadowColor = Theme.Colors.Surface.Shadow
-	
+
 	-- Build mutation icons reactively
 	local mutationIconsComputed = scope:Computed(function(use)
 		local mutations = use(equippedMutations) or {}
-		local icons: {any} = {}
-		
+		local icons: { any } = {}
+
 		for i, mutationId in mutations do
 			local mutation = MutationData.Get(mutationId)
 			if mutation and i <= 3 then -- Max 3 icons
-				table.insert(icons, scope:New("Frame") {
-					Name = `Mutation_{mutationId}`,
-					Size = UDim2.fromScale(0.22, 1), -- Relative to icon row
-					BackgroundColor3 = mutation.Color,
-					BackgroundTransparency = 0.3,
-					LayoutOrder = i,
-					
-					[Children] = {
-						scope:New("UIAspectRatioConstraint") {
-							AspectRatio = 1,
-						},
-						scope:New("UICorner") {
-							CornerRadius = UDim.new(0.2, 0),
-						},
-						scope:New("TextLabel") {
-							Size = UDim2.fromScale(1, 1),
-							BackgroundTransparency = 1,
-							Text = mutation.Icon or "?",
-							TextScaled = true,
-							Font = Enum.Font.GothamBold,
-							TextColor3 = Color3.new(1, 1, 1),
-							
-							[Children] = {
-								scope:New("UITextSizeConstraint") {
-									MaxTextSize = 14,
-									MinTextSize = 6,
+				table.insert(
+					icons,
+					scope:New("Frame")({
+						Name = `Mutation_{mutationId}`,
+						Size = UDim2.fromScale(0.22, 1), -- Relative to icon row
+						BackgroundColor3 = mutation.Color,
+						BackgroundTransparency = 0.3,
+						LayoutOrder = i,
+
+						[Children] = {
+							scope:New("UIAspectRatioConstraint")({
+								AspectRatio = 1,
+							}),
+							scope:New("UICorner")({
+								CornerRadius = UDim.new(0.2, 0),
+							}),
+							scope:New("TextLabel")({
+								Size = UDim2.fromScale(1, 1),
+								BackgroundTransparency = 1,
+								Text = mutation.Icon or "?",
+								TextScaled = true,
+								Font = Enum.Font.GothamBold,
+								TextColor3 = Color3.new(1, 1, 1),
+
+								[Children] = {
+									scope:New("UITextSizeConstraint")({
+										MaxTextSize = 14,
+										MinTextSize = 6,
+									}),
 								},
-							},
+							}),
 						},
-					},
-				})
+					})
+				)
 			end
 		end
-		
+
 		return icons
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = `SeedCard_{plantType}`,
 		Size = UDim2.fromScale(1, 1), -- Size determined by parent
 		BackgroundTransparency = 1,
 		LayoutOrder = layoutOrder,
-		
+
 		[Children] = {
 			-- Aspect ratio constraint (square)
-			scope:New("UIAspectRatioConstraint") {
+			scope:New("UIAspectRatioConstraint")({
 				AspectRatio = 1,
-			},
-			
+			}),
+
 			-- Scale container for hover animation
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Size = UDim2.fromScale(1, 1),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
 				BackgroundTransparency = 1,
-				
+
 				[Children] = {
-					scope:New("UIScale") { Scale = hoverScale },
-					
+					scope:New("UIScale")({ Scale = hoverScale }),
+
 					-- Shadow Layer (6% offset)
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Shadow",
 						Size = UDim2.fromScale(1, 0.94),
 						Position = UDim2.fromScale(0, 0.06),
 						BackgroundColor3 = shadowColor,
 						ZIndex = 1,
-						
+
 						[Children] = {
-							scope:New("UICorner") {
+							scope:New("UICorner")({
 								CornerRadius = Theme.Layout.CornerRadius,
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Surface Layer (interactive)
-					scope:New("TextButton") {
+					scope:New("TextButton")({
 						Name = "Surface",
 						Size = scope:Computed(function(use)
 							local offset = use(pressOffset)
@@ -202,74 +217,74 @@ local function SeedCard(props: SeedCardProps): Frame
 						AutoButtonColor = false,
 						Text = "",
 						ZIndex = 2,
-						
+
 						[OnEvent("MouseButton1Down")] = function()
 							isHovered:set(true)
 							isPressed:set(true)
 						end,
-						
+
 						[OnEvent("MouseButton1Up")] = function()
 							isPressed:set(false)
 							if peek(isHovered) then
 								props.OnClick()
 							end
 						end,
-						
+
 						[OnEvent("MouseEnter")] = function()
 							isHovered:set(true)
 						end,
-						
+
 						[OnEvent("MouseLeave")] = function()
 							isHovered:set(false)
 							isPressed:set(false)
 						end,
-						
+
 						[Children] = {
-							scope:New("UICorner") {
+							scope:New("UICorner")({
 								CornerRadius = Theme.Layout.CornerRadius,
-							},
-							
+							}),
+
 							-- Dynamic border (gold for mutations)
-							scope:New("UIStroke") {
+							scope:New("UIStroke")({
 								Color = borderColor,
 								Thickness = borderThickness,
-							},
-							
+							}),
+
 							-- 3D Plant Model Preview
 							viewportFrame,
-							
+
 							-- Mutation Icons (bottom-center row) - reactive frame
 							scope:Computed(function(use)
 								local icons = use(mutationIconsComputed)
 								if #icons > 0 then
-									return scope:New("Frame") {
+									return scope:New("Frame")({
 										Name = "MutationIcons",
 										Size = UDim2.fromScale(0.7, 0.22),
 										Position = UDim2.fromScale(0.55, 0.95),
 										AnchorPoint = Vector2.new(0.5, 1),
 										BackgroundTransparency = 1,
 										ZIndex = 5,
-										
+
 										[Children] = {
-											scope:New("UIListLayout") {
+											scope:New("UIListLayout")({
 												FillDirection = Enum.FillDirection.Horizontal,
 												HorizontalAlignment = Enum.HorizontalAlignment.Left,
 												VerticalAlignment = Enum.VerticalAlignment.Bottom,
 												Padding = UDim.new(0.05, 0),
-											},
+											}),
 											table.unpack(icons),
 										},
-									}
+									})
 								else
 									return nil
 								end
 							end),
 						},
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return SeedCard

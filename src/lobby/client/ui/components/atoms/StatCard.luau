@@ -49,65 +49,65 @@ local function StatCard(props: StatCardProps): Frame
 	local scope = props.Scope
 	local colorKey = props.Color or "Gold"
 	local size = props.Size or UDim2.new(0.5, -8, 0, CARD_HEIGHT)
-	
+
 	local colorSet = (Theme.Colors :: any)[colorKey] or Theme.Colors.Gold
-	
+
 	local displayText = scope:Computed(function(use)
 		local value = use(props.Value)
 		return formatNumber(value)
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "StatCard",
 		Size = size,
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Shadow
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Shadow",
 				Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
 				BackgroundColor3 = Theme.Colors.Surface.Shadow,
 				ZIndex = 1,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Main card
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Main",
 				Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
 				BackgroundColor3 = Theme.Colors.Surface.Main,
 				ZIndex = 2,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
-					
-					scope:New("UIStroke") {
+					}),
+
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
-					},
-					
+					}),
+
 					-- Icon (top-left)
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Icon",
 						Size = UDim2.fromOffset(40, 40),
 						Position = UDim2.fromOffset(12, 10),
 						BackgroundTransparency = 1,
 						Text = props.Icon,
 						TextSize = 28,
-					},
-					
+					}),
+
 					-- Label (next to icon)
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Label",
 						Size = UDim2.new(1, -60, 0, 24),
 						Position = UDim2.fromOffset(50, 18),
@@ -117,10 +117,10 @@ local function StatCard(props: StatCardProps): Frame
 						TextSize = 14,
 						Font = Theme.Typography.Fonts.Body,
 						TextXAlignment = Enum.TextXAlignment.Left,
-					},
-					
+					}),
+
 					-- Value (big number, bottom)
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Value",
 						Size = UDim2.new(1, -20, 0, 32),
 						Position = UDim2.new(0, 12, 1, -38),
@@ -130,11 +130,11 @@ local function StatCard(props: StatCardProps): Frame
 						TextSize = 26,
 						Font = Theme.Typography.Fonts.Title,
 						TextXAlignment = Enum.TextXAlignment.Left,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return StatCard

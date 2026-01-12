@@ -21,19 +21,21 @@ local Network = require(Shared.network.generated.server)
 
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({
-	TORCHWOOD_HIT_RADIUS = 2,     -- Studs - how close pea must pass
-	DEFAULT_FIRE_MULTIPLIER = 2,  -- 2x damage
+	TORCHWOOD_HIT_RADIUS = 2, -- Studs - how close pea must pass
+	DEFAULT_FIRE_MULTIPLIER = 2, -- 2x damage
 })
 
 -- 3. STATE
 local State = {
 	IsInitialized = false,
-	EnhancedProjectiles = {} :: {[number]: boolean}, -- Prevent double-enhancement
+	EnhancedProjectiles = {} :: { [number]: boolean }, -- Prevent double-enhancement
 }
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -58,72 +60,88 @@ local function OnStep(world)
 			})
 		end
 	end
-	
+
 	-- No torchwoods = nothing to do
-	if #torchwoods == 0 then return end
-	
+	if #torchwoods == 0 then
+		return
+	end
+
 	-- Check each projectile
 	for projId, projPos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		-- Skip already enhanced
-		if State.EnhancedProjectiles[projId] then continue end
-		
+		if State.EnhancedProjectiles[projId] then
+			continue
+		end
+
 		-- Skip non-pea projectiles (catapults don't get enhanced)
-		if proj.IsCatapult then continue end
-		
+		if proj.IsCatapult then
+			continue
+		end
+
 		-- Skip if already a fire pea
 		local existing = world:get(projId, Components.EnhancedProjectileComponent)
-		if existing and existing.IsFirePea then continue end
-		
+		if existing and existing.IsFirePea then
+			continue
+		end
+
 		-- Check if passing through any Torchwood
 		for _, torch in torchwoods do
 			-- Must be in same lane
-			if torch.lane ~= proj.Lane then continue end
-			
+			if torch.lane ~= proj.Lane then
+				continue
+			end
+
 			-- Check if projectile is passing through Torchwood position
 			local distance = math.abs(projPos.X - torch.pos.X)
 			if distance <= CONFIG.TORCHWOOD_HIT_RADIUS then
 				-- Enhance the projectile!
-				world:insert(projId, Components.EnhancedProjectileComponent({
-					IsFirePea = true,
-					DamageMultiplier = torch.multiplier,
-					ThawsFrozen = true,
-				}))
-				
+				world:insert(
+					projId,
+					Components.EnhancedProjectileComponent({
+						IsFirePea = true,
+						DamageMultiplier = torch.multiplier,
+						ThawsFrozen = true,
+					})
+				)
+
 				State.EnhancedProjectiles[projId] = true
-				
+
 				-- If it was a frozen pea, it's no longer frozen (fire melts ice)
 				if proj.IsFrozen then
-					world:insert(projId, Components.ProjectileComponent({
-						Damage = proj.Damage,
-						Speed = proj.Speed,
-						SourceEntity = proj.SourceEntity,
-						Lane = proj.Lane,
-						SpawnX = proj.SpawnX,
-						IsFrozen = false,
-						SlowPercent = nil,
-						SlowDuration = nil,
-						IsCatapult = proj.IsCatapult,
-						PiercesShields = proj.PiercesShields,
-						CanStun = proj.CanStun,
-						StunChance = proj.StunChance,
-						StunDuration = proj.StunDuration,
-						MaxRange = proj.MaxRange,
-						DirectionX = proj.DirectionX,
-						DirectionZ = proj.DirectionZ,
-					}))
+					world:insert(
+						projId,
+						Components.ProjectileComponent({
+							Damage = proj.Damage,
+							Speed = proj.Speed,
+							SourceEntity = proj.SourceEntity,
+							Lane = proj.Lane,
+							SpawnX = proj.SpawnX,
+							IsFrozen = false,
+							SlowPercent = nil,
+							SlowDuration = nil,
+							IsCatapult = proj.IsCatapult,
+							PiercesShields = proj.PiercesShields,
+							CanStun = proj.CanStun,
+							StunChance = proj.StunChance,
+							StunDuration = proj.StunDuration,
+							MaxRange = proj.MaxRange,
+							DirectionX = proj.DirectionX,
+							DirectionZ = proj.DirectionZ,
+						})
+					)
 				end
-				
+
 				-- Broadcast to clients for VFX change
 				Network.ProjectileEnhanced.FireAll({
 					EntityId = projId,
 					EnhancementType = "fire",
 				})
-				
+
 				break -- Only enhance once
 			end
 		end
 	end
-	
+
 	-- Cleanup tracked projectiles
 	for projId in State.EnhancedProjectiles do
 		if not world:contains(projId) then

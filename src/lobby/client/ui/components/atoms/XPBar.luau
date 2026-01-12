@@ -33,80 +33,82 @@ export type XPBarProps = {
 local function XPBar(props: XPBarProps): Frame
 	local scope = props.Scope
 	local size = props.Size or UDim2.new(1, 0, 0, BAR_HEIGHT + SHADOW_OFFSET)
-	
+
 	-- Progress 0-1
 	local progress = scope:Computed(function(use)
 		local current = use(props.XP) or 0
 		local required = use(props.XPRequired) or 100
-		if required <= 0 then return 0 end
+		if required <= 0 then
+			return 0
+		end
 		return math.clamp(current / required, 0, 1)
 	end)
-	
+
 	-- Display text
 	local displayText = scope:Computed(function(use)
 		local current = use(props.XP) or 0
 		local required = use(props.XPRequired) or 100
 		return `{current} / {required} XP`
 	end)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "XPBar",
 		Size = size,
 		Position = props.Position,
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
-		
+
 		[Children] = {
 			-- Shadow
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Shadow",
 				Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
 				BackgroundColor3 = Theme.Colors.Purple.Shadow,
 				ZIndex = 1,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Background bar
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Background",
 				Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
 				BackgroundColor3 = Theme.Colors.Surface.Shadow,
 				ZIndex = 2,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
-					
-					scope:New("UIStroke") {
+					}),
+
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
-					},
-					
+					}),
+
 					-- Fill bar
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Fill",
 						Size = scope:Computed(function(use)
 							return UDim2.new(use(progress), 0, 1, 0)
 						end),
 						BackgroundColor3 = Theme.Colors.Purple.Main,
 						ZIndex = 1,
-						
+
 						[Children] = {
-							scope:New("UICorner") {
+							scope:New("UICorner")({
 								CornerRadius = UDim.new(0.5, 0),
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Text overlay
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "Text",
 						Size = UDim2.new(1, 0, 1, 0),
 						BackgroundTransparency = 1,
@@ -115,11 +117,11 @@ local function XPBar(props: XPBarProps): Frame
 						TextSize = 14,
 						Font = Theme.Typography.Fonts.Body,
 						ZIndex = 2,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return XPBar

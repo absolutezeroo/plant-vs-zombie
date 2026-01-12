@@ -50,23 +50,23 @@ local GridService = require(Server.services.GridService)
 -- ============================================================
 local CONFIG = table.freeze({
 	PRIORITY = 175,
-	
+
 	-- Explosion defaults
 	FUSE_TIME = 0.5,
 	EXPLOSION_RADIUS = 9,
-	
+
 	-- Armed plant defaults
 	ARM_DURATION = 15,
 	TRIGGER_RADIUS = 2,
-	
+
 	-- Chomper defaults
 	CHEW_DURATION = 42,
 	CHOMP_RANGE = 6,
-	
+
 	-- Squash defaults
 	JUMP_DURATION = 0.5,
 	SQUASH_RANGE = 6,
-	
+
 	-- Freeze defaults
 	FREEZE_DURATION = 4,
 })
@@ -76,9 +76,9 @@ local CONFIG = table.freeze({
 -- ============================================================
 local State = {
 	-- Track plants with fuse timers
-	FusePlants = {} :: {[number]: {explodeTime: number, plantType: string}},
+	FusePlants = {} :: { [number]: { explodeTime: number, plantType: string } },
 	-- Track Squash jumping state
-	SquashJumps = {} :: {[number]: {targetX: number, targetZ: number, startTime: number, startX: number, startZ: number}},
+	SquashJumps = {} :: { [number]: { targetX: number, targetZ: number, startTime: number, startX: number, startZ: number } },
 }
 
 -- ============================================================
@@ -88,51 +88,60 @@ local State = {
 -- Handle explosion for various plant types
 local function handleExplosion(world: any, entityId: number, pos: any, plantType: string)
 	local stats = PlantData[plantType]
-	if not stats then return end
-	
+	if not stats then
+		return
+	end
+
 	local killCount = 0
 	local currentTime = os.clock()
-	
+
 	if stats.FreezesAll then
 		-- IceShroom: Freeze ALL zombies on screen
 		local freezeDuration = stats.FreezeDuration or CONFIG.FREEZE_DURATION
 		for zombieId, zombiePos, zombie in world:query(Components.PositionComponent, Components.ZombieTypeComponent) do
 			-- Apply freeze (slow to 0%)
-			world:insert(zombieId, Components.SlowComponent({
-				SlowPercent = 1.0,
-				Duration = freezeDuration,
-				AppliedAt = currentTime,
-			}))
-			
+			world:insert(
+				zombieId,
+				Components.SlowComponent({
+					SlowPercent = 1.0,
+					Duration = freezeDuration,
+					AppliedAt = currentTime,
+				})
+			)
+
 			-- Stop movement
-			world:insert(zombieId, Components.MovementComponent({
-				VelocityX = 0,
-				VelocityY = 0,
-				VelocityZ = 0,
-			}))
-			
+			world:insert(
+				zombieId,
+				Components.MovementComponent({
+					VelocityX = 0,
+					VelocityY = 0,
+					VelocityZ = 0,
+				})
+			)
+
 			-- Small damage
 			ECSUtils.DamageEntity(world, zombieId, stats.Damage or 20, Components)
 			killCount += 1
 		end
 		Logger.Info("SpecialPlant", `IceShroom {entityId} froze {killCount} zombies for {freezeDuration}s`)
-		
 	elseif stats.IsLaneWide then
 		-- Jalapeno: Destroy entire lane
 		local plant = world:get(entityId, Components.PlantTypeComponent)
 		if plant then
 			local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
-			
+
 			for _, zombieId in zombiesInLane do
-				if not world:contains(zombieId) then continue end
-				
+				if not world:contains(zombieId) then
+					continue
+				end
+
 				if ECSUtils.KillEntity(world, zombieId, Components) then
 					killCount += 1
 				end
 			end
 		end
 		Logger.Info("SpecialPlant", `Jalapeno {entityId} burned lane, killed {killCount} zombies`)
-		
+
 		-- Fire VFX for entire lane
 		Network.ExplosionVFX.FireAll({
 			PositionX = pos.X,
@@ -140,37 +149,38 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			PositionZ = pos.Z,
 			Radius = GridConfig.GRID_COLUMNS * GridConfig.CELL_SIZE,
 		})
-		
 	else
 		-- Normal explosion (CherryBomb, DoomShroom)
 		-- OPTIMIZED: Uses LaneCache for O(lane_range) instead of O(all_zombies)
 		local explosionRadius = (stats.Range and stats.Range > 0) and stats.Range or CONFIG.EXPLOSION_RADIUS
-		
+
 		-- Get plant lane for optimized lookup
 		local plantComp = world:get(entityId, Components.PlantTypeComponent)
 		local centerLane = if plantComp then plantComp.Lane else 3
 		local laneRadius = math.ceil(explosionRadius / GridConfig.CELL_SIZE)
-		
+
 		-- O(lane_range) lookup instead of O(N) world:query
 		local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
-		
+
 		for _, zombieId in zombiesInRange do
 			local zombiePos = LaneCache.GetPosition(zombieId)
-			if not zombiePos then continue end
-			
+			if not zombiePos then
+				continue
+			end
+
 			local dx = zombiePos.X - pos.X
 			local dz = zombiePos.Z - pos.Z
 			local distance = math.sqrt(dx * dx + dz * dz)
-			
+
 			if distance <= explosionRadius then
 				if ECSUtils.KillEntity(world, zombieId, Components) then
 					killCount += 1
 				end
 			end
 		end
-		
+
 		Logger.Info("SpecialPlant", `{plantType} {entityId} exploded! Killed {killCount} zombies`)
-		
+
 		-- Broadcast explosion VFX
 		Network.ExplosionVFX.FireAll({
 			PositionX = pos.X,
@@ -179,7 +189,7 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 			Radius = explosionRadius,
 		})
 	end
-	
+
 	-- Clear grid cell
 	local plant = world:get(entityId, Components.PlantTypeComponent)
 	if plant then
@@ -190,7 +200,7 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	Network.EntityDied.FireAll({
 		EntityId = entityId,
 	})
-	
+
 	-- Release plant back to pool
 	if EntityPool.IsPooledEntity(entityId) then
 		EntityPool.Despawn(entityId)
@@ -202,10 +212,10 @@ end
 -- Explode PotatoMine: kill the triggering zombie
 local function explodePotatoMine(world: any, mineId: number, minePos: any, triggeredByZombieId: number)
 	Logger.Info("SpecialPlant", `PotatoMine {mineId} detonated by zombie {triggeredByZombieId}!`)
-	
+
 	-- Kill the zombie
 	ECSUtils.KillEntity(world, triggeredByZombieId, Components)
-	
+
 	-- Clear grid cell
 	local plant = world:get(mineId, Components.PlantTypeComponent)
 	if plant then
@@ -219,12 +229,12 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 		PositionZ = minePos.Z,
 		Radius = 6,
 	})
-	
+
 	-- Broadcast entity death
 	Network.EntityDied.FireAll({
 		EntityId = mineId,
 	})
-	
+
 	-- Release mine back to pool
 	if EntityPool.IsPooledEntity(mineId) then
 		EntityPool.Despawn(mineId)
@@ -238,15 +248,19 @@ local function findNearestZombieInRange(world: any, plantPos: any, lane: number,
 	local nearestId = nil
 	local nearestPos = nil
 	local nearestDist = range + 1
-	
+
 	local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
-	
+
 	for _, zombieId in zombiesInLane do
-		if not world:contains(zombieId) then continue end
-		
+		if not world:contains(zombieId) then
+			continue
+		end
+
 		local zombiePos = world:get(zombieId, Components.PositionComponent)
-		if not zombiePos then continue end
-		
+		if not zombiePos then
+			continue
+		end
+
 		local distance = zombiePos.X - plantPos.X
 		if distance > 0 and distance <= range and distance < nearestDist then
 			nearestId = zombieId
@@ -254,7 +268,7 @@ local function findNearestZombieInRange(world: any, plantPos: any, lane: number,
 			nearestDist = distance
 		end
 	end
-	
+
 	return nearestId, nearestPos
 end
 
@@ -263,20 +277,28 @@ end
 -- ============================================================
 local function OnStep(world)
 	local currentTime = os.clock()
-	
+
 	-- React to SpawnEvent for new special plants
 	for _, event in world:query(Components.SpawnEvent) do
-		if event.EntityType ~= "Plant" then continue end
-		
+		if event.EntityType ~= "Plant" then
+			continue
+		end
+
 		local entityId = event.Target
-		if not world:contains(entityId) then continue end
-		
+		if not world:contains(entityId) then
+			continue
+		end
+
 		local plant = world:get(entityId, Components.PlantTypeComponent)
-		if not plant then continue end
-		
+		if not plant then
+			continue
+		end
+
 		local stats = PlantData[plant.PlantType]
-		if not stats then continue end
-		
+		if not stats then
+			continue
+		end
+
 		-- Initialize special plant behaviors
 		if stats.ExplodesOnPlace then
 			local fuseTime = stats.FuseTime or CONFIG.FUSE_TIME
@@ -287,15 +309,18 @@ local function OnStep(world)
 			Logger.Debug("SpecialPlant", `{plant.PlantType} {entityId} fuse started ({fuseTime}s)`)
 		elseif stats.NeedsArming then
 			local armDuration = stats.ArmDuration or CONFIG.ARM_DURATION
-			world:insert(entityId, Components.ArmedComponent({
-				IsArmed = false,
-				ArmTime = currentTime,
-				ArmDuration = armDuration,
-			}))
+			world:insert(
+				entityId,
+				Components.ArmedComponent({
+					IsArmed = false,
+					ArmTime = currentTime,
+					ArmDuration = armDuration,
+				})
+			)
 			Logger.Debug("SpecialPlant", `{plant.PlantType} {entityId} placed, arming in {armDuration}s`)
 		end
 	end
-	
+
 	-- Process fuse plants (CherryBomb, DoomShroom, IceShroom, Jalapeno)
 	for entityId, fuseData in State.FusePlants do
 		if currentTime >= fuseData.explodeTime then
@@ -308,38 +333,47 @@ local function OnStep(world)
 			State.FusePlants[entityId] = nil
 		end
 	end
-	
+
 	-- Process armed plants (PotatoMine) triggering
-	for mineId, pos, plant, armed in world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ArmedComponent) do
+	for mineId, pos, plant, armed in
+		world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ArmedComponent)
+	do
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.NeedsArming then
 			continue
 		end
-		
+
 		-- Check if still arming
 		if not armed.IsArmed then
 			if currentTime - armed.ArmTime >= armed.ArmDuration then
 				-- Now armed!
-				world:insert(mineId, Components.ArmedComponent({
-					IsArmed = true,
-					ArmTime = armed.ArmTime,
-					ArmDuration = armed.ArmDuration,
-				}))
+				world:insert(
+					mineId,
+					Components.ArmedComponent({
+						IsArmed = true,
+						ArmTime = armed.ArmTime,
+						ArmDuration = armed.ArmDuration,
+					})
+				)
 				Logger.Debug("SpecialPlant", `{plant.PlantType} {mineId} is now armed!`)
 			end
 			continue
 		end
-		
+
 		-- Armed mine - check for zombie contact
 		local triggerRadius = stats.TriggerRadius or CONFIG.TRIGGER_RADIUS
 		local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
-		
+
 		for _, zombieId in zombiesInLane do
-			if not world:contains(zombieId) then continue end
-			
+			if not world:contains(zombieId) then
+				continue
+			end
+
 			local zombiePos = world:get(zombieId, Components.PositionComponent)
-			if not zombiePos then continue end
-			
+			if not zombiePos then
+				continue
+			end
+
 			local distance = math.abs(zombiePos.X - pos.X)
 			if distance <= triggerRadius then
 				explodePotatoMine(world, mineId, pos, zombieId)
@@ -347,67 +381,82 @@ local function OnStep(world)
 			end
 		end
 	end
-	
+
 	-- Process Chomper chewing completion
-	for plantId, pos, plant, chewing in world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ChewingComponent) do
+	for plantId, pos, plant, chewing in
+		world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ChewingComponent)
+	do
 		if currentTime - chewing.ChewStartTime >= chewing.ChewDuration then
 			world:remove(plantId, Components.ChewingComponent)
 			Logger.Debug("SpecialPlant", `Chomper {plantId} finished chewing`)
 		end
 	end
-	
+
 	-- Process Chomper looking for targets (when not chewing)
 	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[plant.PlantType]
-		if not stats or not stats.IsInstantKill then continue end
-		if stats.JumpsToTarget then continue end -- Squash handled separately
-		
+		if not stats or not stats.IsInstantKill then
+			continue
+		end
+		if stats.JumpsToTarget then
+			continue
+		end -- Squash handled separately
+
 		-- Skip if already chewing
-		if world:get(plantId, Components.ChewingComponent) then continue end
-		
+		if world:get(plantId, Components.ChewingComponent) then
+			continue
+		end
+
 		local chompRange = stats.Range or CONFIG.CHOMP_RANGE
 		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, chompRange)
-		
+
 		if zombieId then
 			-- Chomp! Instant kill
 			ECSUtils.KillEntity(world, zombieId, Components)
-			
+
 			-- Start chewing
 			local chewDuration = stats.ChewDuration or CONFIG.CHEW_DURATION
-			world:insert(plantId, Components.ChewingComponent({
-				ChewDuration = chewDuration,
-				ChewStartTime = currentTime,
-			}))
-			
+			world:insert(
+				plantId,
+				Components.ChewingComponent({
+					ChewDuration = chewDuration,
+					ChewStartTime = currentTime,
+				})
+			)
+
 			Logger.Info("SpecialPlant", `Chomper {plantId} ate zombie {zombieId}, chewing for {chewDuration}s`)
-			
+
 			Network.EntityDied.FireAll({
 				EntityId = zombieId,
 			})
 		end
 	end
-	
+
 	-- Process Squash jumping
 	for plantId, jumpData in State.SquashJumps do
 		if not world:contains(plantId) then
 			State.SquashJumps[plantId] = nil
 			continue
 		end
-		
+
 		local jumpProgress = (currentTime - jumpData.startTime) / CONFIG.JUMP_DURATION
-		
+
 		if jumpProgress >= 1 then
 			-- Landed! Kill zombie at target location
 			local plant = world:get(plantId, Components.PlantTypeComponent)
 			if plant then
 				local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
-				
+
 				for _, zombieId in zombiesInLane do
-					if not world:contains(zombieId) then continue end
-					
+					if not world:contains(zombieId) then
+						continue
+					end
+
 					local zombiePos = world:get(zombieId, Components.PositionComponent)
-					if not zombiePos then continue end
-					
+					if not zombiePos then
+						continue
+					end
+
 					local dx = math.abs(zombiePos.X - jumpData.targetX)
 					local dz = math.abs(zombiePos.Z - jumpData.targetZ)
 					if dx < 3 and dz < 3 then
@@ -418,7 +467,7 @@ local function OnStep(world)
 						break
 					end
 				end
-				
+
 				-- Squash dies after landing
 				GridService.Clear(plant.Column, plant.Lane)
 				Network.EntityDied.FireAll({ EntityId = plantId })
@@ -434,26 +483,33 @@ local function OnStep(world)
 			local arcHeight = math.sin(jumpProgress * math.pi) * 5
 			local newX = jumpData.startX + (jumpData.targetX - jumpData.startX) * jumpProgress
 			local newZ = jumpData.startZ + (jumpData.targetZ - jumpData.startZ) * jumpProgress
-			
-			world:insert(plantId, Components.PositionComponent({
-				X = newX,
-				Y = 2.5 + arcHeight,
-				Z = newZ,
-			}))
+
+			world:insert(
+				plantId,
+				Components.PositionComponent({
+					X = newX,
+					Y = 2.5 + arcHeight,
+					Z = newZ,
+				})
+			)
 		end
 	end
-	
+
 	-- Process Squash looking for targets
 	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[plant.PlantType]
-		if not stats or not stats.JumpsToTarget then continue end
-		
+		if not stats or not stats.JumpsToTarget then
+			continue
+		end
+
 		-- Skip if already jumping
-		if State.SquashJumps[plantId] then continue end
-		
+		if State.SquashJumps[plantId] then
+			continue
+		end
+
 		local squashRange = stats.Range or CONFIG.SQUASH_RANGE
 		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, squashRange)
-		
+
 		if zombieId and zombiePos then
 			State.SquashJumps[plantId] = {
 				targetX = zombiePos.X,
@@ -465,7 +521,7 @@ local function OnStep(world)
 			Logger.Debug("SpecialPlant", `Squash {plantId} jumping to zombie {zombieId}`)
 		end
 	end
-	
+
 	-- Cleanup tracking for despawned entities
 	for entityId in State.FusePlants do
 		if not world:contains(entityId) then

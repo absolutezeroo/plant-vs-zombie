@@ -69,26 +69,26 @@ local _requestId = 0
 
 -- Track pending placement requests for refund on failure
 -- { [requestId]: { plantType: string, cost: number } }
-local _pendingPlacements: {[number]: {plantType: string, cost: number}} = {}
+local _pendingPlacements: { [number]: { plantType: string, cost: number } } = {}
 
 -- Trove for cleanup (connections, instances)
 local _trove = Trove.new()
 
 -- Ghost visual state
 local _ghostModel: Model? = nil
-local _ghostPlantType: string? = nil  -- Track which plant type is currently shown
-local _currentCell: {Column: number, Lane: number}? = nil
+local _ghostPlantType: string? = nil -- Track which plant type is currently shown
+local _currentCell: { Column: number, Lane: number }? = nil
 local _isValid = false
-local _warnedPlantTypes: {[string]: boolean} = {} -- Track warned plant types to avoid spam
+local _warnedPlantTypes: { [string]: boolean } = {} -- Track warned plant types to avoid spam
 
 -- Shovel highlight state
 local _highlightedPlant: Model? = nil
-local _originalPartData: {[BasePart]: {Color: Color3, Material: Enum.Material, Transparency: number}} = {}
+local _originalPartData: { [BasePart]: { Color: Color3, Material: Enum.Material, Transparency: number } } = {}
 
 -- Colors
-local VALID_COLOR = Color3.fromRGB(100, 255, 100)   -- Green
+local VALID_COLOR = Color3.fromRGB(100, 255, 100) -- Green
 local INVALID_COLOR = Color3.fromRGB(255, 100, 100) -- Red
-local SHOVEL_COLOR = Color3.fromRGB(255, 80, 80)    -- Red for shovel target
+local SHOVEL_COLOR = Color3.fromRGB(255, 80, 80) -- Red for shovel target
 local GHOST_TRANSPARENCY = 0.5
 local SHOVEL_TRANSPARENCY = 0.3
 
@@ -151,8 +151,10 @@ end
 	Update ghost color based on validity
 ]]
 local function updateGhostColor(valid: boolean)
-	if not _ghostModel then return end
-	
+	if not _ghostModel then
+		return
+	end
+
 	local color = if valid then VALID_COLOR else INVALID_COLOR
 	for _, descendant in _ghostModel:GetDescendants() do
 		if descendant:IsA("BasePart") and descendant.Name ~= "Root" then
@@ -165,19 +167,21 @@ end
 	Create ghost model from plant assets
 ]]
 local function createGhostModel(plantType: string): Model?
-	if not PlantAssets then return nil end
-	
+	if not PlantAssets then
+		return nil
+	end
+
 	local template = PlantAssets:FindFirstChild(plantType)
 	if not template or not template:IsA("Model") then
 		return nil
 	end
-	
+
 	local ghost = template:Clone()
 	ghost.Name = "PlantGhost_" .. plantType
-	
+
 	-- Apply ghost effect (transparent green)
 	applyGhostEffect(ghost, VALID_COLOR)
-	
+
 	ghost.Parent = Workspace
 	return ghost
 end
@@ -192,17 +196,17 @@ local function ensureGhostModel(plantType: string): Model?
 		_ghostModel = nil
 		_ghostPlantType = nil
 	end
-	
+
 	-- Create if needed
 	if not _ghostModel then
 		-- Skip if assets not available
 		if not PlantAssets then
 			return nil
 		end
-		
+
 		_ghostModel = createGhostModel(plantType)
 		_ghostPlantType = plantType
-		
+
 		if not _ghostModel then
 			-- Only warn once per plant type
 			if not _warnedPlantTypes[plantType] then
@@ -211,26 +215,28 @@ local function ensureGhostModel(plantType: string): Model?
 			end
 		end
 	end
-	
+
 	return _ghostModel
 end
 
 local function updateGhostPosition(column: number, lane: number, valid: boolean, plantType: string)
 	local ghost = ensureGhostModel(plantType)
-	if not ghost then return end
-	
+	if not ghost then
+		return
+	end
+
 	local worldPos = GridUtils.GridToWorld(column, lane)
-	
+
 	-- Calculate rotation based on zombie direction (same as PlantRenderSystem)
 	local zombieDir = getCachedZombieDir()
 	local facingDir = Vector3.new(-zombieDir.X, 0, -zombieDir.Z)
 	local facingCFrame = CFrame.lookAt(worldPos, worldPos + facingDir)
 	-- Add -90° rotation to correct model orientation (same as PlantRenderSystem)
 	ghost:PivotTo(facingCFrame * CFrame.Angles(0, math.rad(-90), 0))
-	
+
 	-- Update color based on validity
 	updateGhostColor(valid)
-	
+
 	_currentCell = { Column = column, Lane = lane }
 	_isValid = valid
 end
@@ -279,10 +285,10 @@ local function applyShovelHighlight(plantModel: Model)
 	if _highlightedPlant == plantModel then
 		return
 	end
-	
+
 	-- Restore previous highlight
 	restoreHighlightedPlant()
-	
+
 	-- Save original appearance and apply red highlight
 	_highlightedPlant = plantModel
 	for _, descendant in plantModel:GetDescendants() do
@@ -306,18 +312,20 @@ end
 ]]
 local function getPlantUnderCursor(): Model?
 	local camera = Workspace.CurrentCamera
-	if not camera then return nil end
-	
+	if not camera then
+		return nil
+	end
+
 	local mouseLocation = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-	
+
 	-- Raycast all objects (plants are in Workspace root with EntityId attribute)
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	rayParams.FilterDescendantsInstances = {} -- Hit everything
-	
+
 	local rayResult = Workspace:Raycast(ray.Origin, ray.Direction * 1000, rayParams)
-	
+
 	if rayResult and rayResult.Instance then
 		-- Find the plant model (parent with EntityId attribute)
 		local current: Instance? = rayResult.Instance
@@ -336,7 +344,7 @@ local function getPlantUnderCursor(): Model?
 			current = current.Parent
 		end
 	end
-	
+
 	return nil
 end
 
@@ -345,7 +353,7 @@ end
 ]]
 local function updateShovelPreview()
 	local plantModel = getPlantUnderCursor()
-	
+
 	if plantModel then
 		applyShovelHighlight(plantModel)
 	else
@@ -358,21 +366,21 @@ local function getMouseWorldPosition(): Vector3?
 	if not camera then
 		return nil
 	end
-	
+
 	local mouseLocation = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-	
+
 	-- Raycast to grid plane (Y = actual grid height from MapConfig)
 	local gridY = getCachedGridY()
 	if ray.Direction.Y >= 0 then
 		return nil -- Looking up, no intersection
 	end
-	
+
 	local t = (gridY - ray.Origin.Y) / ray.Direction.Y
 	if t < 0 then
 		return nil
 	end
-	
+
 	return ray.Origin + ray.Direction * t
 end
 
@@ -382,26 +390,26 @@ local function checkPlacementValid(column: number, lane: number, plantType: stri
 	if not GridUtils.IsValidCell(column, lane) then
 		return false
 	end
-	
+
 	-- Check if can afford
 	local stats = PlantData[plantType]
 	if not stats then
 		return false
 	end
-	
+
 	if not SelectionState.CanAfford(stats.Cost) then
 		return false
 	end
-	
+
 	-- Check cooldown
 	if SelectionState.IsOnCooldown(plantType) then
 		return false
 	end
-	
+
 	-- Note: Cell occupancy check requires server state
 	-- For now, client optimistically assumes empty (server validates)
 	-- In future, we'd sync occupied cells from server
-	
+
 	return true
 end
 
@@ -412,35 +420,35 @@ local function GhostPreviewSystem(world)
 		updateShovelPreview()
 		return
 	end
-	
+
 	-- Not in shovel mode, restore any highlighted plant
 	restoreHighlightedPlant()
-	
+
 	local selectedPlant = Fusion.peek(SelectionState.SelectedPlant)
-	
+
 	-- No plant selected, hide ghost
 	if not selectedPlant then
 		hideGhost()
 		return
 	end
-	
+
 	-- Get mouse world position
 	local worldPos = getMouseWorldPosition()
 	if not worldPos then
 		hideGhost()
 		return
 	end
-	
+
 	-- Convert to grid coordinates
 	local column, lane = GridUtils.WorldToGrid(worldPos)
 	if not column or not lane then
 		hideGhost()
 		return
 	end
-	
+
 	-- Check validity
 	local isValid = checkPlacementValid(column, lane, selectedPlant)
-	
+
 	-- Update ghost visual with the real plant model
 	updateGhostPosition(column, lane, isValid, selectedPlant)
 end
@@ -450,39 +458,39 @@ local function handleShovel()
 	if not SelectionState.IsShovelActive() then
 		return
 	end
-	
+
 	-- Get mouse world position
 	local worldPos = getMouseWorldPosition()
 	if not worldPos then
 		return
 	end
-	
+
 	-- Convert to grid coordinates
 	local column, lane = GridUtils.WorldToGrid(worldPos)
 	if not column or not lane or not GridUtils.IsValidCell(column, lane) then
 		Logger.Debug("GhostPreview", "Shovel: clicked outside grid")
 		return
 	end
-	
+
 	-- Find plant model under cursor (reuse the same logic as preview)
 	local plantModel = getPlantUnderCursor()
-	
+
 	if plantModel then
 		local entityId = plantModel:GetAttribute("EntityId")
 		if entityId and typeof(entityId) == "number" then
 			Logger.Info("GhostPreview", `Shovel: removing plant entity {entityId}`)
-			
+
 			-- Clear highlight state (plant will be destroyed by server)
 			_highlightedPlant = nil
 			table.clear(_originalPartData)
-			
+
 			-- Send shovel request to server
 			_requestId = (_requestId + 1) % 65535
 			Network.ShovelPlantRequest.Fire({
 				RequestId = _requestId,
 				PlantEntityId = entityId,
 			})
-			
+
 			-- Play shovel sound
 			local audio = getAudioService()
 			if audio and audio.PlayShovel then
@@ -490,13 +498,13 @@ local function handleShovel()
 			elseif audio and audio.PlayPlantPlaced then
 				audio.PlayPlantPlaced() -- Fallback
 			end
-			
+
 			-- Deactivate shovel mode after use
 			SelectionState.DeactivateShovel()
 			return
 		end
 	end
-	
+
 	-- No plant found at click location - play error sound
 	Logger.Debug("GhostPreview", `Shovel: no plant found at grid ({column}, {lane})`)
 	local audio = getAudioService()
@@ -511,43 +519,45 @@ local function handlePlacement()
 	if not selectedPlant or not _currentCell or not _isValid then
 		return
 	end
-	
+
 	local stats = PlantData[selectedPlant]
 	if not stats then
 		return
 	end
-	
+
 	Logger.Info("GhostPreview", `Placement requested: {selectedPlant} at ({_currentCell.Column}, {_currentCell.Lane})`)
-	
+
 	-- Play placement effects
 	local audio = getAudioService()
-	if audio then audio.PlayPlantPlaced() end
-	
+	if audio then
+		audio.PlayPlantPlaced()
+	end
+
 	-- Optimistic update: deduct sun, start cooldown
 	SelectionState.DeductSun(stats.Cost)
 	SelectionState.StartCooldown(selectedPlant, stats.Cooldown)
 	SelectionState.Select(nil) -- Deselect after placement
-	
+
 	-- Send PlacePlant request to server via Zap
 	_requestId = (_requestId + 1) % 65535
-	
+
 	-- Track this request for potential refund
 	_pendingPlacements[_requestId] = {
 		plantType = selectedPlant,
 		cost = stats.Cost,
 	}
-	
+
 	-- Map selected plant name to network enum
 	-- The PlantType enum in Zap accepts string keys directly
 	local plantTypeEnum = selectedPlant
-	
+
 	Network.PlacePlantRequest.Fire({
 		RequestId = _requestId,
 		PlantType = plantTypeEnum :: any,
 		Lane = _currentCell.Lane :: any,
 		Column = _currentCell.Column :: any,
 	})
-	
+
 	hideGhost()
 end
 
@@ -560,9 +570,11 @@ local function setupListeners()
 		if gameProcessed then
 			return
 		end
-		
-		if input.UserInputType == Enum.UserInputType.MouseButton1 
-			or input.UserInputType == Enum.UserInputType.Touch then
+
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
 			-- Check if shovel mode is active first
 			if SelectionState.IsShovelActive() then
 				handleShovel()
@@ -571,34 +583,33 @@ local function setupListeners()
 			end
 		end
 	end)
-	
+
 	-- Right-click or ESC to cancel selection or shovel mode
 	_trove:Connect(UserInputService.InputBegan, function(input, _gameProcessed)
-		if input.UserInputType == Enum.UserInputType.MouseButton2
-			or input.KeyCode == Enum.KeyCode.Escape then
+		if input.UserInputType == Enum.UserInputType.MouseButton2 or input.KeyCode == Enum.KeyCode.Escape then
 			SelectionState.Select(nil)
 			SelectionState.DeactivateShovel()
 			destroyGhost() -- Fully destroy when canceling
 			restoreHighlightedPlant() -- Restore any highlighted plant
 		end
 	end)
-	
+
 	-- Handle placement response from server - refund on failure
 	_trove:Add(Network.RequestResponse.On(function(data)
 		local pending = _pendingPlacements[data.RequestId]
 		if not pending then
 			return -- Not a placement request we're tracking
 		end
-		
+
 		-- Remove from pending
 		_pendingPlacements[data.RequestId] = nil
-		
+
 		if not data.Success then
 			-- Refund the sun!
 			SelectionState.AddSun(pending.cost)
 			-- Cancel the cooldown
 			SelectionState.CancelCooldown(pending.plantType)
-			
+
 			Logger.Warn("GhostPreview", `Placement failed (error {data.ErrorCode}), refunded {pending.cost} sun`)
 		else
 			Logger.Debug("GhostPreview", `Placement confirmed for {pending.plantType}`)
@@ -621,14 +632,14 @@ local function Init(_world)
 		-- Will use defaults until MapConfigSync arrives
 		Logger.Debug("GhostPreview", "MapConfig not yet synced, using defaults")
 	end
-	
+
 	-- Listen for MapConfigSync to update cached values when server sends config
 	_trove:Add(Network.MapConfigSync.On(function(data)
 		Logger.Debug("GhostPreview", `MapConfigSync received, updating cache: GridY={data.GridY}`)
 		_cachedGridY = data.GridY
 		_cachedZombieDir = Vector3.new(data.ZombieDirectionX, 0, data.ZombieDirectionZ).Unit
 	end))
-	
+
 	setupListeners()
 	Logger.Debug("GhostPreview", "Initialized")
 end
@@ -640,12 +651,12 @@ local function Dispose()
 	-- Trove handles all connection cleanup
 	_trove:Destroy()
 	_trove = Trove.new() -- Reset for potential reuse
-	
+
 	-- Cleanup ghost visuals
 	destroyGhost()
 	restoreHighlightedPlant()
 	table.clear(_pendingPlacements)
-	
+
 	Logger.Debug("GhostPreview", "Disposed")
 end
 

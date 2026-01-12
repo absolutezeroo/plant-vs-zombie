@@ -11,7 +11,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type LifestealComponent = {
-	Percent: number,  -- 0.0-1.0, how much of damage heals (0.15 = 15%)
+	Percent: number, -- 0.0-1.0, how much of damage heals (0.15 = 15%)
 }
 
 return Matter.component("Lifesteal")

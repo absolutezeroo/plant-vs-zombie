@@ -17,10 +17,10 @@ local Logger = require(Shared.utils.Logger)
 
 return function(context, stars: number?)
 	local player = context.Executor
-	
+
 	-- Default to 3 stars
 	local starCount = math.clamp(stars or 3, 1, 3)
-	
+
 	-- Generate fake rewards data
 	local rewardsData = {
 		Victory = true,
@@ -34,10 +34,10 @@ return function(context, stars: number?)
 		NewLevel = 5,
 		LevelsGained = 0,
 	}
-	
+
 	-- Send to the player
 	Network.GameEndRewards.Fire(player, rewardsData)
-	
+
 	Logger.Info("Cmdr", `Sent VICTORY to {player.Name} with {starCount} stars`)
 	return `Victory! {starCount} stars, {rewardsData.CoinsEarned} coins, {rewardsData.XPEarned} XP`
 end

@@ -48,31 +48,31 @@ local function RewardRow(props: RewardRowProps): Frame
 	local color = props.Color or Theme.Colors.Surface.Stroke
 	local prefix = props.Prefix or ""
 	local suffix = props.Suffix or ""
-	
+
 	local displayText = scope:Computed(function(use)
 		local value = use(props.Value)
 		return `{prefix}{value}{suffix}`
 	end)
-	
+
 	-- Handle visibility (default true if not provided)
 	local visible = if props.Visible then props.Visible else true
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = `RewardRow_{props.Label}`,
 		Size = UDim2.new(1, 0, 0, 32),
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
 		Visible = visible,
-		
+
 		[Children] = {
 			-- Size constraint for min/max
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(150, 24),
 				MaxSize = Vector2.new(400, 40),
-			},
-			
+			}),
+
 			-- Icon (left, square aspect)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "Icon",
 				Size = UDim2.fromScale(0.12, 0.9),
 				Position = UDim2.fromScale(0, 0.5),
@@ -81,21 +81,21 @@ local function RewardRow(props: RewardRowProps): Frame
 				Text = props.Icon,
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
-				
+
 				[Children] = {
-					scope:New("UIAspectRatioConstraint") {
+					scope:New("UIAspectRatioConstraint")({
 						AspectRatio = 1,
 						DominantAxis = Enum.DominantAxis.Height,
-					},
-					scope:New("UITextSizeConstraint") {
+					}),
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 22,
 						MinTextSize = 14,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Label (center-left)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "Label",
 				Size = UDim2.fromScale(0.45, 1),
 				Position = UDim2.fromScale(0.14, 0),
@@ -105,17 +105,17 @@ local function RewardRow(props: RewardRowProps): Frame
 				TextScaled = true,
 				Font = Theme.Typography.Fonts.Body,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 16,
 						MinTextSize = 10,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Value (right-aligned)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "Value",
 				Size = UDim2.fromScale(0.38, 1),
 				Position = UDim2.fromScale(1, 0),
@@ -126,16 +126,16 @@ local function RewardRow(props: RewardRowProps): Frame
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
 				TextXAlignment = Enum.TextXAlignment.Right,
-				
+
 				[Children] = {
-					scope:New("UITextSizeConstraint") {
+					scope:New("UITextSizeConstraint")({
 						MaxTextSize = 20,
 						MinTextSize = 12,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return RewardRow

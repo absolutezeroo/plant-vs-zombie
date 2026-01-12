@@ -40,7 +40,7 @@ local CONFIG = table.freeze({
 -- 3. STATE
 local State = {
 	IsInitialized = false,
-	SunShroomPlanted = {} :: {[number]: number}, -- entityId -> plantTime
+	SunShroomPlanted = {} :: { [number]: number }, -- entityId -> plantTime
 	WaveService = nil :: any,
 }
 
@@ -66,15 +66,15 @@ local function getSunShroomValue(entityId: number): number
 	if not plantTime then
 		return CONFIG.SUN_SHROOM_LARGE_VALUE
 	end
-	
+
 	local elapsed = os.clock() - plantTime
 	if elapsed >= CONFIG.SUN_SHROOM_GROW_TIME then
 		return CONFIG.SUN_SHROOM_LARGE_VALUE
 	else
 		-- Linear interpolation from small to large
 		local progress = elapsed / CONFIG.SUN_SHROOM_GROW_TIME
-		local value = CONFIG.SUN_SHROOM_SMALL_VALUE + 
-			(CONFIG.SUN_SHROOM_LARGE_VALUE - CONFIG.SUN_SHROOM_SMALL_VALUE) * progress
+		local value = CONFIG.SUN_SHROOM_SMALL_VALUE
+			+ (CONFIG.SUN_SHROOM_LARGE_VALUE - CONFIG.SUN_SHROOM_SMALL_VALUE) * progress
 		return math.floor(value)
 	end
 end
@@ -82,30 +82,38 @@ end
 -- Initialize a newly spawned mushroom
 local function initializeMushroom(world, entityId: number, plantType: string)
 	local stats = PlantData[plantType]
-	if not stats or not stats.IsMushroom then return end
-	
+	if not stats or not stats.IsMushroom then
+		return
+	end
+
 	-- Check if mushroom sleeps during day
 	if stats.SleepsDuringDay and isDay() then
-		world:insert(entityId, Components.SleepingComponent({
-			IsSleeping = true,
-			WokeAt = nil,
-		}))
+		world:insert(
+			entityId,
+			Components.SleepingComponent({
+				IsSleeping = true,
+				WokeAt = nil,
+			})
+		)
 		Logger.Debug("Mushroom", `{plantType} {entityId} is sleeping (day time)`)
 	end
-	
+
 	-- Track SunShroom growth
 	if stats.GrowsOverTime then
 		State.SunShroomPlanted[entityId] = os.clock()
 		Logger.Debug("Mushroom", `SunShroom {entityId} planted, will grow over time`)
 	end
-	
+
 	-- Initialize Scaredy-shroom hiding component
 	if stats.HidesWhenNear then
 		local hideRadius = stats.HideRadius or CONFIG.DEFAULT_HIDE_RADIUS
-		world:insert(entityId, Components.HidingComponent({
-			IsHiding = false,
-			HideRadius = hideRadius,
-		}))
+		world:insert(
+			entityId,
+			Components.HidingComponent({
+				IsHiding = false,
+				HideRadius = hideRadius,
+			})
+		)
 	end
 end
 
@@ -113,17 +121,22 @@ end
 local function wakeMushroom(world, entityId: number)
 	local sleeping = world:get(entityId, Components.SleepingComponent)
 	if sleeping and sleeping.IsSleeping then
-		world:insert(entityId, Components.SleepingComponent({
-			IsSleeping = false,
-			WokeAt = os.clock(),
-		}))
+		world:insert(
+			entityId,
+			Components.SleepingComponent({
+				IsSleeping = false,
+				WokeAt = os.clock(),
+			})
+		)
 		Logger.Info("Mushroom", `Mushroom {entityId} woke up!`)
 	end
 end
 
 -- 5. LIFECYCLE: INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
 end
 
@@ -138,66 +151,89 @@ end
 local function OnStep(world)
 	-- React to SpawnEvent for new mushroom plants
 	for _, event in world:query(Components.SpawnEvent) do
-		if event.EntityType ~= "Plant" then continue end
-		
+		if event.EntityType ~= "Plant" then
+			continue
+		end
+
 		local entityId = event.Target
-		if not world:contains(entityId) then continue end
-		
+		if not world:contains(entityId) then
+			continue
+		end
+
 		local plant = world:get(entityId, Components.PlantTypeComponent)
-		if not plant then continue end
-		
+		if not plant then
+			continue
+		end
+
 		initializeMushroom(world, entityId, plant.PlantType)
 	end
-	
+
 	-- React to PlantActionEvent for Coffee Bean waking mushrooms
 	for _, actionEvent in world:query(Components.PlantActionEvent) do
-		if actionEvent.ActionType ~= "WakeMushroom" then continue end
-		
+		if actionEvent.ActionType ~= "WakeMushroom" then
+			continue
+		end
+
 		local targetId = actionEvent.TargetEntity
-		if not world:contains(targetId) then continue end
-		
+		if not world:contains(targetId) then
+			continue
+		end
+
 		wakeMushroom(world, targetId)
 	end
-	
+
 	-- Process Scaredy-shroom hiding behavior
 	for plantId, hiding in world:query(Components.HidingComponent) do
 		local plant = world:get(plantId, Components.PlantTypeComponent)
-		if not plant then continue end
-		
+		if not plant then
+			continue
+		end
+
 		local stats = PlantData[plant.PlantType]
-		if not stats or not stats.HidesWhenNear then continue end
-		
+		if not stats or not stats.HidesWhenNear then
+			continue
+		end
+
 		-- Skip if sleeping
 		local sleeping = world:get(plantId, Components.SleepingComponent)
-		if sleeping and sleeping.IsSleeping then continue end
-		
+		if sleeping and sleeping.IsSleeping then
+			continue
+		end
+
 		local pos = world:get(plantId, Components.PositionComponent)
-		if not pos then continue end
-		
+		if not pos then
+			continue
+		end
+
 		-- Check for zombies within hide radius
 		local shouldHide = false
-		
+
 		-- O(1) lane lookup instead of O(N) world:query
 		local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
-		
+
 		for _, zombieId in zombiesInLane do
 			local zombiePos = LaneCache.GetPosition(zombieId)
-			if not zombiePos then continue end
-			
+			if not zombiePos then
+				continue
+			end
+
 			local distance = math.abs(zombiePos.X - pos.X)
 			if distance <= hiding.HideRadius then
 				shouldHide = true
 				break
 			end
 		end
-		
+
 		-- Update hiding state
 		if shouldHide ~= hiding.IsHiding then
-			world:insert(plantId, Components.HidingComponent({
-				IsHiding = shouldHide,
-				HideRadius = hiding.HideRadius,
-			}))
-			
+			world:insert(
+				plantId,
+				Components.HidingComponent({
+					IsHiding = shouldHide,
+					HideRadius = hiding.HideRadius,
+				})
+			)
+
 			if shouldHide then
 				Logger.Debug("Mushroom", `ScaredyShroom {plantId} is hiding!`)
 			else
@@ -205,7 +241,7 @@ local function OnStep(world)
 			end
 		end
 	end
-	
+
 	-- Cleanup for despawned entities
 	for entityId in State.SunShroomPlanted do
 		if not world:contains(entityId) then

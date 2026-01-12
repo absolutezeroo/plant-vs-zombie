@@ -17,9 +17,9 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type PlantActionEvent = {
-	ActionType: string,      -- "WakeMushroom" | "Arm" | "Explode"
-	TargetEntity: number,    -- Entity receiving the action
-	SourceEntity: number?,   -- Entity triggering the action (e.g., Coffee Bean)
+	ActionType: string, -- "WakeMushroom" | "Arm" | "Explode"
+	TargetEntity: number, -- Entity receiving the action
+	SourceEntity: number?, -- Entity triggering the action (e.g., Coffee Bean)
 	PositionX: number?,
 	PositionY: number?,
 	PositionZ: number?,

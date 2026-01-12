@@ -43,7 +43,7 @@ local _trove = Trove.new()
 local function createLine(from: Vector3, to: Vector3, parent: Instance): Part
 	local distance = (to - from).Magnitude
 	local midpoint = (from + to) / 2
-	
+
 	local line = Instance.new("Part")
 	line.Name = "GridLine"
 	line.Anchored = true
@@ -56,7 +56,7 @@ local function createLine(from: Vector3, to: Vector3, parent: Instance): Part
 	line.Size = Vector3.new(distance, GRID_LINE_THICKNESS, GRID_LINE_THICKNESS)
 	line.CFrame = CFrame.lookAt(midpoint, to) * CFrame.Angles(0, math.rad(90), 0)
 	line.Parent = parent
-	
+
 	return line
 end
 
@@ -64,21 +64,21 @@ local function createGrid()
 	if not DEBUG_GRID_VISIBLE then
 		return
 	end
-	
+
 	if _gridFolder then
 		_gridFolder:Destroy()
 	end
-	
+
 	local folder = Instance.new("Folder")
 	folder.Name = "DebugGrid"
 	folder.Parent = Workspace
 	_gridFolder = folder
-	
+
 	-- Use MapConfig for dynamic grid bounds
 	local config = MapConfig.GetConfig()
 	local cellW, cellD = MapConfig.GetCellSize()
 	local y = config.GridY + GRID_LINE_HEIGHT
-	
+
 	-- Log detailed config for debugging
 	Logger.Info("GridVisualization", `=== GRID CONFIG ===`)
 	Logger.Info("GridVisualization", `  UsingVisualConfig: {config.UsingVisualConfig}`)
@@ -87,33 +87,25 @@ local function createGrid()
 	Logger.Info("GridVisualization", `  GridCornerB: {config.GridCornerB}`)
 	Logger.Info("GridVisualization", `  Creating lines at Y={y}`)
 	Logger.Info("GridVisualization", `===================`)
-	
+
 	-- Vertical lines (columns)
 	for col = 0, GridConfig.GRID_COLUMNS do
 		local x = config.GridCornerA.X + col * cellW
 		local startZ = config.GridCornerA.Z
 		local endZ = config.GridCornerB.Z
-		
-		createLine(
-			Vector3.new(x, y, startZ),
-			Vector3.new(x, y, endZ),
-			folder
-		)
+
+		createLine(Vector3.new(x, y, startZ), Vector3.new(x, y, endZ), folder)
 	end
-	
+
 	-- Horizontal lines (lanes)
 	for lane = 0, GridConfig.GRID_LANES do
 		local z = config.GridCornerA.Z + lane * cellD
 		local startX = config.GridCornerA.X
 		local endX = config.GridCornerB.X
-		
-		createLine(
-			Vector3.new(startX, y, z),
-			Vector3.new(endX, y, z),
-			folder
-		)
+
+		createLine(Vector3.new(startX, y, z), Vector3.new(endX, y, z), folder)
 	end
-	
+
 	Logger.Info("GridVisualization", "Grid created", {
 		Columns = GridConfig.GRID_COLUMNS,
 		Lanes = GridConfig.GRID_LANES,
@@ -143,7 +135,7 @@ local function Init(_world: any)
 			createGrid()
 		end)
 	end))
-	
+
 	-- IMPORTANT: Do NOT create grid if MapConfig was initialized locally
 	-- We MUST wait for server's MapConfigSync to ensure correct GridY
 	-- Only create grid when config comes from server (UsingVisualConfig + correct GridY)
@@ -154,10 +146,13 @@ local function Init(_world: any)
 			Logger.Info("GridVisualization", "MapConfig already synced from server, creating grid")
 			createGrid()
 		else
-			Logger.Warn("GridVisualization", `Skipping grid creation - suspicious GridY={config.GridY}, waiting for server sync`)
+			Logger.Warn(
+				"GridVisualization",
+				`Skipping grid creation - suspicious GridY={config.GridY}, waiting for server sync`
+			)
 		end
 	end
-	
+
 	Logger.Debug("GridVisualizationSystem", "Initialized with MapConfigSync listener")
 end
 
@@ -177,10 +172,10 @@ local function Dispose(_player: Player?)
 		-- Player-specific cleanup (none for this system)
 		return
 	end
-	
+
 	-- Disconnect all listeners
 	_trove:Clean()
-	
+
 	-- Full cleanup
 	destroyGrid()
 	Logger.Debug("GridVisualizationSystem", "Disposed")

@@ -12,10 +12,10 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type CoinDropEvent = {
-	Amount: number,        -- Number of coins dropped
-	PositionX: number,     -- World position X
-	PositionY: number,     -- World position Y
-	PositionZ: number,     -- World position Z
+	Amount: number, -- Number of coins dropped
+	PositionX: number, -- World position X
+	PositionY: number, -- World position Y
+	PositionZ: number, -- World position Z
 	SourceEntityId: number, -- Entity that dropped coins (zombie)
 }
 

@@ -50,27 +50,27 @@ local State = {
 	WaveStartTime = 0,
 	LastSpawnTime = 0,
 	ZombiesSpawnedThisWave = 0,
-	
+
 	-- Phase tracking (budget-based)
 	CurrentPhase = "Trickle" :: SpawnPhase,
 	PhaseSpent = 0,
 	PhaseBudget = 0,
 	TotalBudget = 0,
 	UsingDefinedWave = false,
-	
+
 	-- World + Difficulty config
 	CurrentWorldId = "day",
 	CurrentDifficulty = "normal",
 	CurrentWorldConfig = nil :: WorldData.WorldConfig?,
 	CurrentDifficultyConfig = nil :: DifficultyData.DifficultyConfig?,
 	AutoStartEnabled = false,
-	
+
 	-- Manager instances (lazy-loaded)
 	StateManager = nil :: GameStateManager.GameStateManager?,
 	Spawner = nil :: WaveSpawner.WaveSpawner?,
 	RewardCalc = nil :: RewardCalculator.RewardCalculator?,
 	Broadcaster = nil :: WaveBroadcaster.WaveBroadcaster?,
-	
+
 	-- Lazy-loaded dependencies
 	PlayerDataService = nil :: any,
 	StatsService = nil :: any,
@@ -166,19 +166,19 @@ local function handleGameEnd(isVictory: boolean)
 	local ArenaService = getArenaService()
 	local rewardCalc = getRewardCalc()
 	local broadcaster = getBroadcaster()
-	
+
 	local starRating = if isVictory then BaseHealth.GetStarRating() else 0
 	local difficultyConfig = State.CurrentDifficultyConfig
-	
+
 	-- Process rewards for each player
 	for _, player in Players:GetPlayers() do
 		local sessionStats = StatsService.GetSessionStats(player)
-		
+
 		-- Calculate base rewards from difficulty config
 		local baseCoins = if difficultyConfig then difficultyConfig.CoinReward else 100
 		local baseXP = if difficultyConfig then difficultyConfig.XPReward else 50
 		local waveMultiplier = State.CurrentWave / (if State.TotalWaves > 0 then State.TotalWaves else 1)
-		
+
 		-- Calculate rewards
 		local rewards = rewardCalc:CalculateRewards({
 			IsVictory = isVictory,
@@ -197,25 +197,25 @@ local function handleGameEnd(isVictory: boolean)
 			IsFirstClear = false,
 			IsNewBest = false,
 		})
-		
+
 		-- Award rewards
 		if isVictory then
 			PlayerDataService.AddCoins(player, rewards.TotalCoins or (baseCoins * waveMultiplier))
 		end
-		
+
 		local levelsGained = PlayerDataService.AddXP(player, rewards.XPEarned or baseXP)
 		local newLevel = PlayerDataService.GetLevel(player)
-		
+
 		if rewards.GemsEarned and rewards.GemsEarned > 0 then
 			PlayerDataService.AddGems(player, rewards.GemsEarned)
 		end
-		
+
 		-- Update stats
 		PlayerDataService.IncrementStat(player, "GamesPlayed", 1)
 		if isVictory then
 			PlayerDataService.IncrementStat(player, "GamesWon", 1)
 		end
-		
+
 		-- Broadcast to client
 		broadcaster:BroadcastGameEndRewards(player, {
 			Victory = isVictory,
@@ -230,23 +230,23 @@ local function handleGameEnd(isVictory: boolean)
 			LevelsGained = levelsGained,
 		})
 	end
-	
+
 	-- Teleport countdown
 	task.spawn(function()
 		for countdown = 5, 1, -1 do
 			broadcaster:BroadcastTeleportCountdown(countdown)
 			task.wait(1)
 		end
-		
+
 		-- Teleport all players
 		for _, player in Players:GetPlayers() do
 			ArenaService.EndBattle(player, isVictory, starRating, 0, 0)
 		end
 	end)
-	
+
 	-- Reset session stats
 	StatsService.ResetAllSessionStats()
-	
+
 	-- Broadcast game over
 	broadcaster:BroadcastGameOver(isVictory, State.CurrentWave)
 end
@@ -299,9 +299,9 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 	local stateManager = getStateManager()
 	local spawner = getSpawnerManager()
 	local broadcaster = getBroadcaster()
-	
+
 	local WaveConfig = GameConstants.Wave
-	
+
 	-- If no worldId/difficulty provided, use defaults (for testing)
 	if not worldId or not difficulty then
 		if not stateManager:CanStartGame() then
@@ -312,30 +312,30 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 		State.WaveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
 		return true
 	end
-	
+
 	if not stateManager:CanStartGame() then
 		return false
 	end
-	
+
 	-- Load World config
 	local worldConfig = WorldData.GetWorld(worldId)
 	if not worldConfig then
 		return false
 	end
-	
+
 	-- Load Difficulty config
 	local difficultyConfig = DifficultyData.GetDifficulty(difficulty)
 	if not difficultyConfig then
 		return false
 	end
-	
+
 	-- Configure game session
 	State.CurrentWorldId = worldId
 	State.CurrentDifficulty = difficulty
 	State.CurrentWorldConfig = worldConfig
 	State.CurrentDifficultyConfig = difficultyConfig
 	State.TotalWaves = difficultyConfig.WaveCount or 10
-	
+
 	-- Build merged config for spawner
 	local spawnerConfig = {
 		Name = worldConfig.Name,
@@ -347,17 +347,17 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 		SpawnInterval = difficultyConfig.SpawnInterval or 2.5,
 		TotalWaves = State.TotalWaves,
 	}
-	
+
 	spawner:SetWorldConfig(spawnerConfig)
-	
+
 	-- Start preparation phase
 	State.CurrentWave = 0
 	stateManager:SetState("Preparation")
 	State.WaveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
-	
+
 	broadcaster:BroadcastGameStarted(worldId, difficulty, worldConfig.Name, difficultyConfig.Name, State.TotalWaves)
 	broadcaster:BroadcastWaveStarted(0, 0)
-	
+
 	return true
 end
 
@@ -366,7 +366,7 @@ function WaveService.StartWaves(): boolean
 	if stateManager:GetState() ~= "Preparation" then
 		return false
 	end
-	
+
 	stateManager:SetState("Playing")
 	State.WaveStartTime = os.clock()
 	return true
@@ -408,7 +408,7 @@ end
 function WaveService.ResetGameState()
 	local stateManager = getStateManager()
 	stateManager:Reset()
-	
+
 	State.CurrentWave = 0
 	State.WaveStartTime = 0
 	State.LastSpawnTime = 0
@@ -423,7 +423,7 @@ function WaveService.ResetGameState()
 	State.CurrentWorldConfig = nil
 	State.CurrentDifficultyConfig = nil
 	State.UsingDefinedWave = false
-	
+
 	-- Reset base health for new game
 	BaseHealth.Reset()
 end

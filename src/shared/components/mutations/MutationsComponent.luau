@@ -11,8 +11,8 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
 
 export type MutationsComponent = {
-	MutationIds: {string},    -- List of active mutation IDs
-	OwnerId: number,          -- Player.UserId who owns the plant
+	MutationIds: { string }, -- List of active mutation IDs
+	OwnerId: number, -- Player.UserId who owns the plant
 }
 
 return Matter.component("Mutations")

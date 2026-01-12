@@ -56,7 +56,9 @@ local function getAnimService()
 		local success, result = pcall(function()
 			return require(Modules.AnimationService)
 		end)
-		if success then _animService = result end
+		if success then
+			_animService = result
+		end
 	end
 	return _animService
 end
@@ -67,23 +69,25 @@ local function getVFXService()
 		local success, result = pcall(function()
 			return require(Modules.VFXService)
 		end)
-		if success then _vfxService = result end
+		if success then
+			_vfxService = result
+		end
 	end
 	return _vfxService
 end
 
 -- Plant visual cache: entityId -> visual data
 type PlantVisual = {
-	Model: Model?,       -- Real model (if available)
-	Part: Part?,         -- Fallback cube (if no model)
+	Model: Model?, -- Real model (if available)
+	Part: Part?, -- Fallback cube (if no model)
 	PlantType: string,
 	Column: number,
 	Lane: number,
 }
-local _plantVisuals: {[number]: PlantVisual} = {}
+local _plantVisuals: { [number]: PlantVisual } = {}
 
 -- Mutations cache: entityId -> mutation list (cleaner than model attributes)
-local _plantMutations: {[number]: {string}} = {}
+local _plantMutations: { [number]: { string } } = {}
 
 -- Trove for cleanup (connections)
 local _trove = Trove.new()
@@ -105,33 +109,34 @@ local FALLBACK_COLORS = {
 ]]
 local function createPlantVisual(entityId: number, plantType: string, column: number, lane: number): PlantVisual
 	local worldPos = GridUtils.GridToWorld(column, lane)
-	
+
 	-- Try to get real model from Assets
 	local modelTemplate = PlantAssets and PlantAssets:FindFirstChild(plantType)
-	
+
 	if modelTemplate and modelTemplate:IsA("Model") then
 		-- Clone real model
 		local model = modelTemplate:Clone()
 		model.Name = `Plant_{entityId}_{plantType}`
-		
+
 		-- Position using PrimaryPart (Root)
 		-- Model front = +Z, but lookAt points -Z toward target
 		-- Add 180° rotation to flip so +Z faces the intended direction
 		if model.PrimaryPart then
 			local zombieDir = MapConfig.GetZombieDirection()
 			-- Plants face toward zombie spawns (-zombieDir)
-			local facingCFrame = CFrame.lookAt(worldPos, worldPos - zombieDir) * CFrame.fromEulerAnglesXYZ(0, -math.pi / 2, 0)
+			local facingCFrame = CFrame.lookAt(worldPos, worldPos - zombieDir)
+				* CFrame.fromEulerAnglesXYZ(0, -math.pi / 2, 0)
 			model:PivotTo(facingCFrame)
 		else
 			Logger.Warn("PlantRender", `Model {plantType} has no PrimaryPart`)
 		end
-		
+
 		-- Add entity tracking attributes
 		model:SetAttribute("EntityId", entityId)
 		model:SetAttribute("PlantType", plantType)
-		
+
 		model.Parent = Workspace
-		
+
 		-- Play spawn animation via AnimationService
 		local animService = getAnimService()
 		if animService then
@@ -139,13 +144,15 @@ local function createPlantVisual(entityId: number, plantType: string, column: nu
 			-- Start idle animation
 			animService.StartIdle(model)
 		end
-		
+
 		-- Attach idle VFX if available
 		local vfx = getVFXService()
-		if vfx then vfx.AttachIdleVFX(model) end
-		
+		if vfx then
+			vfx.AttachIdleVFX(model)
+		end
+
 		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) using real model`)
-		
+
 		return {
 			Model = model,
 			Part = nil,
@@ -165,21 +172,21 @@ local function createPlantVisual(entityId: number, plantType: string, column: nu
 		part.CanTouch = false
 		part.CanQuery = true
 		part.CastShadow = true
-		
+
 		part.Position = worldPos + Vector3.new(0, FALLBACK_SIZE.Y / 2, 0)
 		part:SetAttribute("EntityId", entityId)
 		part:SetAttribute("PlantType", plantType)
-		
+
 		-- Spawn animation (scale up)
 		part.Size = Vector3.new(0.1, 0.1, 0.1)
 		local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		local tween = TweenService:Create(part, tweenInfo, { Size = FALLBACK_SIZE })
-		
+
 		part.Parent = Workspace
 		tween:Play()
-		
+
 		Logger.Warn("PlantRender", `Plant {entityId} ({plantType}) using fallback cube - model not found`)
-		
+
 		return {
 			Model = nil,
 			Part = part,
@@ -216,25 +223,28 @@ local function setupNetworkListeners()
 		local column = data.Column
 		local lane = data.Lane
 		local mutations = data.Mutations or {}
-		
+
 		if _plantVisuals[entityId] then
 			Logger.Warn("PlantRender", `Plant {entityId} already exists`)
 			return
 		end
-		
+
 		_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
-		
+
 		-- Store mutations in local cache (cleaner than model attributes)
-		local mutationStrings: {string} = {}
+		local mutationStrings: { string } = {}
 		for _, mutation in ipairs(mutations) do
 			table.insert(mutationStrings, tostring(mutation))
 		end
 		_plantMutations[entityId] = mutationStrings
-		
+
 		if #mutationStrings > 0 then
-			Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) has mutations: {table.concat(mutationStrings, ", ")}`)
+			Logger.Debug(
+				"PlantRender",
+				`Plant {entityId} ({plantType}) has mutations: {table.concat(mutationStrings, ", ")}`
+			)
 		end
-		
+
 		-- Play placement VFX
 		-- Use Center Attachment if model available, otherwise fallback to grid position
 		local visual = _plantVisuals[entityId]
@@ -250,34 +260,40 @@ local function setupNetworkListeners()
 				vfx.PlayPlantPlaced(worldPos)
 			end
 		end
-		
+
 		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
 	end))
 
 	_trove:Add(Network.EntityDied.On(function(data)
 		local entityId = data.EntityId
 		local visual = _plantVisuals[entityId]
-		
+
 		if visual then
 			local animService = getAnimService()
 			local vfx = getVFXService()
-			
+
 			-- Remove from tracking immediately to prevent double-processing
 			_plantVisuals[entityId] = nil
 			_plantMutations[entityId] = nil
-			
+
 			if visual.Model then
 				-- Stop idle animation and VFX
-				if animService then animService.StopIdle(visual.Model) end
-				if vfx then vfx.DetachIdleVFX(visual.Model) end
-				
+				if animService then
+					animService.StopIdle(visual.Model)
+				end
+				if vfx then
+					vfx.DetachIdleVFX(visual.Model)
+				end
+
 				-- Get position for death VFX
-				local pos = visual.Model.PrimaryPart and visual.Model.PrimaryPart.Position 
+				local pos = visual.Model.PrimaryPart and visual.Model.PrimaryPart.Position
 					or GridUtils.GridToWorld(visual.Column, visual.Lane)
-				
+
 				-- Play death VFX (model-aware)
-				if vfx then vfx.PlayPlantDeath(visual.Model, pos) end
-				
+				if vfx then
+					vfx.PlayPlantDeath(visual.Model, pos)
+				end
+
 				-- Play death animation then destroy
 				if animService then
 					task.spawn(function()
@@ -296,9 +312,9 @@ local function setupNetworkListeners()
 				local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 				local tween = TweenService:Create(visual.Part, tweenInfo, {
 					Size = Vector3.new(0.1, 0.1, 0.1),
-					Transparency = 1
+					Transparency = 1,
 				})
-				
+
 				tween:Play()
 				tween.Completed:Connect(function()
 					if visual.Part then
@@ -306,7 +322,7 @@ local function setupNetworkListeners()
 					end
 				end)
 			end
-			
+
 			Logger.Debug("PlantRender", `Plant {entityId} died`)
 		end
 	end))
@@ -314,15 +330,17 @@ local function setupNetworkListeners()
 	-- Damage flash effect
 	_trove:Add(Network.EntityDamaged.On(function(data)
 		local visual = _plantVisuals[data.EntityId]
-		if not visual then return end
-		
+		if not visual then
+			return
+		end
+
 		local vfx = getVFXService()
-		
+
 		if visual.Model then
 			-- Flash all parts in the model
-			local partsToFlash: {BasePart} = {}
-			local originalColors: {Color3} = {}
-			
+			local partsToFlash: { BasePart } = {}
+			local originalColors: { Color3 } = {}
+
 			for _, part in visual.Model:GetDescendants() do
 				if part:IsA("BasePart") and part.Transparency < 1 then
 					table.insert(partsToFlash, part)
@@ -330,7 +348,7 @@ local function setupNetworkListeners()
 					part.Color = Color3.fromRGB(255, 100, 100)
 				end
 			end
-			
+
 			task.delay(0.1, function()
 				for i, part in partsToFlash do
 					if part and part.Parent then
@@ -388,22 +406,22 @@ local function Dispose()
 	-- Trove handles all connection cleanup
 	_trove:Destroy()
 	_trove = Trove.new() -- Reset for potential reuse
-	
+
 	-- Destroy all plant visuals
 	for entityId in _plantVisuals do
 		destroyPlantVisual(entityId)
 	end
-	
+
 	-- Clear mutations cache
 	table.clear(_plantMutations)
-	
+
 	Logger.Debug("PlantRender", "Disposed")
 end
 
 --[[
 	Get mutations for an entity (used by tooltip)
 ]]
-local function getMutations(entityId: number): {string}
+local function getMutations(entityId: number): { string }
 	return _plantMutations[entityId] or {}
 end
 

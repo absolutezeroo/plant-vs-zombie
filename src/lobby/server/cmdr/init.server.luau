@@ -21,8 +21,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
 -- Whitelisted UserIds (add your UserId here for production testing)
-local WHITELISTED_USERS: {number} = {
-    353813522
+local WHITELISTED_USERS: { number } = {
+	353813522,
 	-- Add your Roblox UserId here for production testing
 	-- Example: 12345678,
 }
@@ -46,7 +46,7 @@ Cmdr.Registry:RegisterHook("BeforeRun", function(context)
 	if RunService:IsStudio() then
 		return nil -- Allow
 	end
-	
+
 	-- In production: check if player is developer/admin
 	local player = context.Executor
 	for _, userId in WHITELISTED_USERS do
@@ -54,7 +54,7 @@ Cmdr.Registry:RegisterHook("BeforeRun", function(context)
 			return nil -- Allow
 		end
 	end
-	
+
 	-- Block unauthorized users in production
 	return "Permission denied - dev commands are restricted"
 end)

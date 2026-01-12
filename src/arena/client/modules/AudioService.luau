@@ -29,27 +29,27 @@ local SOUNDS = {
 	PeaImpact = "rbxassetid://83662029103234", -- Splat
 	PlantPlaced = "rbxassetid://101826567553108", -- Dirt/place
 	Explosion = "rbxassetid://100749525232283", -- Boom
-	
+
 	-- Zombie sounds
 	ZombieGroan = "rbxassetid://122508006619291", -- Groan
 	ZombieDeath = "rbxassetid://", -- Death groan
 	ZombieBite = "rbxassetid://99729332638497", -- Chomp
-	
+
 	-- Collection sounds
 	SunCollect = "rbxassetid://73530939144429", -- Sparkle/chime
 	CoinCollect = "rbxassetid://98363900764760", -- Coin ding
-	
+
 	-- UI sounds
 	UIClick = "rbxassetid://", -- Click
 	UIError = "rbxassetid://", -- Error buzz
 	UISuccess = "rbxassetid://", -- Success chime
 	CardSelect = "rbxassetid://", -- Select card
-	
+
 	-- Game events
 	WaveStart = "rbxassetid://81385124977604", -- Alert/horn
 	Victory = "rbxassetid://", -- Fanfare
 	Defeat = "rbxassetid://", -- Doom
-	
+
 	-- Music
 	MusicCalm = "rbxassetid://", -- Peaceful background
 	MusicWave = "rbxassetid://", -- Tense wave music
@@ -70,36 +70,36 @@ function AudioService.Initialize()
 	_soundFolder = Instance.new("Folder")
 	_soundFolder.Name = "GameSounds"
 	_soundFolder.Parent = SoundService
-	
+
 	-- Pre-cache frequently used sounds
 	AudioService._PreloadSound("PeaShoot")
 	AudioService._PreloadSound("PeaImpact")
 	AudioService._PreloadSound("SunCollect")
 	AudioService._PreloadSound("ZombieDeath")
 	AudioService._PreloadSound("PlantPlaced")
-	
+
 	-- Create Trove for signal connections
 	_trove = Trove.new()
-	
+
 	-- Connect to combat signals (observer pattern)
 	_trove:Connect(GameSignals.OnZombieDeath, function(data)
 		AudioService.PlayZombieDeath(data.Position)
 	end)
-	
+
 	_trove:Connect(GameSignals.OnProjectileImpact, function(data)
 		AudioService.PlayPeaImpact(data.Position)
 	end)
-	
+
 	_trove:Connect(GameSignals.OnSunCollected, function(data)
 		AudioService.PlaySunCollect()
 	end)
-	
+
 	-- Note: OnExplosion is handled via Network.ExplosionVFX -> VFXAudioSystem
-	
+
 	_trove:Connect(GameSignals.OnCoinGained, function(data)
 		AudioService.PlayCoinCollect()
 	end)
-	
+
 	Logger.Info("Audio", "AudioService initialized with signal listeners")
 end
 
@@ -110,36 +110,41 @@ function AudioService._PreloadSound(soundName: string): Sound?
 		Logger.Warn("Audio", `Unknown sound: {soundName}`)
 		return nil
 	end
-	
+
 	if _cachedSounds[soundName] then
 		return _cachedSounds[soundName]
 	end
-	
+
 	local sound = Instance.new("Sound")
 	sound.Name = soundName
 	sound.SoundId = soundId
 	sound.Volume = _sfxVolume
 	sound.Parent = _soundFolder
-	
+
 	_cachedSounds[soundName] = sound
 	return sound
 end
 
 -- Play a sound effect
-function AudioService.PlaySound(soundName: string, options: {
-	Volume: number?,
-	PlaybackSpeed: number?,
-	Position: Vector3?,
-}?)
+function AudioService.PlaySound(
+	soundName: string,
+	options: {
+		Volume: number?,
+		PlaybackSpeed: number?,
+		Position: Vector3?,
+	}?
+)
 	local opts = options or {}
 	local sound = AudioService._PreloadSound(soundName)
-	if not sound then return end
-	
+	if not sound then
+		return
+	end
+
 	-- Clone for overlapping sounds
 	local playSound = sound:Clone()
 	playSound.Volume = (opts.Volume or 1) * _sfxVolume
 	playSound.PlaybackSpeed = opts.PlaybackSpeed or 1
-	
+
 	-- Positional audio (optional)
 	if opts.Position then
 		local part = Instance.new("Part")
@@ -150,10 +155,10 @@ function AudioService.PlaySound(soundName: string, options: {
 		part.Size = Vector3.new(0.1, 0.1, 0.1)
 		part.Position = opts.Position
 		part.Parent = _soundFolder
-		
+
 		playSound.Parent = part
 		playSound:Play()
-		
+
 		-- Cleanup after sound ends
 		playSound.Ended:Connect(function()
 			part:Destroy()
@@ -161,12 +166,12 @@ function AudioService.PlaySound(soundName: string, options: {
 	else
 		playSound.Parent = _soundFolder
 		playSound:Play()
-		
+
 		playSound.Ended:Connect(function()
 			playSound:Destroy()
 		end)
 	end
-	
+
 	Logger.Debug("Audio", `Playing sound: {soundName}`)
 end
 
@@ -272,7 +277,7 @@ function AudioService.PlayDefeat()
 end
 
 function AudioService.PlayStarEarned()
-	AudioService.PlaySound("UISuccess", { 
+	AudioService.PlaySound("UISuccess", {
 		Volume = 0.8,
 		PlaybackSpeed = 1.2,
 	})
@@ -280,7 +285,7 @@ end
 
 function AudioService.PlayCoinCount()
 	-- Rapid coin counting sound (lighter version)
-	AudioService.PlaySound("CoinCollect", { 
+	AudioService.PlaySound("CoinCollect", {
 		Volume = 0.4,
 		PlaybackSpeed = 1.3,
 	})
@@ -292,15 +297,16 @@ end
 export type MusicIntensity = "calm" | "wave" | "intense"
 
 function AudioService.SetMusic(intensity: MusicIntensity)
-	local soundId = if intensity == "calm" then SOUNDS.MusicCalm
+	local soundId = if intensity == "calm"
+		then SOUNDS.MusicCalm
 		elseif intensity == "wave" then SOUNDS.MusicWave
 		else SOUNDS.MusicIntense
-	
+
 	-- Same music already playing?
 	if _currentMusic and _currentMusic.SoundId == soundId then
 		return
 	end
-	
+
 	-- Fade out current music
 	if _currentMusic then
 		local oldMusic = _currentMusic
@@ -313,7 +319,7 @@ function AudioService.SetMusic(intensity: MusicIntensity)
 			oldMusic:Destroy()
 		end)
 	end
-	
+
 	-- Create new music
 	local newMusic = Instance.new("Sound")
 	newMusic.Name = "BackgroundMusic"
@@ -321,15 +327,15 @@ function AudioService.SetMusic(intensity: MusicIntensity)
 	newMusic.Volume = 0
 	newMusic.Looped = true
 	newMusic.Parent = _soundFolder
-	
+
 	newMusic:Play()
-	
+
 	-- Fade in
 	local fadeIn = TweenService:Create(newMusic, TweenInfo.new(1), {
 		Volume = _musicVolume,
 	})
 	fadeIn:Play()
-	
+
 	_currentMusic = newMusic
 	Logger.Info("Audio", `Music changed to: {intensity}`)
 end

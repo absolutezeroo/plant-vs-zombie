@@ -98,13 +98,13 @@ function VFXUtils.CloneEmitAndCleanup(
 ): ParticleEmitter
 	local clone = sourceEmitter:Clone()
 	clone.Parent = parent
-	
+
 	local count = emitCount or VFXUtils.GetEmitCount(clone)
 	clone:Emit(count)
-	
+
 	local delay = cleanupDelay or (clone.Lifetime.Max + 0.5)
 	Debris:AddItem(clone, delay)
-	
+
 	return clone
 end
 
@@ -126,16 +126,16 @@ function VFXUtils.CloneAndEmit(
 	cleanupDelay: number?
 ): (Part, ParticleEmitter)
 	local anchor = VFXUtils.CreateVFXAnchor(position, "VFX_" .. sourceEmitter.Name)
-	
+
 	local clone = sourceEmitter:Clone()
 	clone.Parent = anchor
-	
+
 	local count = emitCount or VFXUtils.GetEmitCount(clone)
 	clone:Emit(count)
-	
+
 	local delay = cleanupDelay or (clone.Lifetime.Max + 0.5)
 	Debris:AddItem(anchor, delay)
-	
+
 	return anchor, clone
 end
 
@@ -158,9 +158,9 @@ function VFXUtils.PlayFromFolder(
 	colorOverride: Color3?,
 	cleanupDelay: number?
 ): Part?
-	local emitters: {ParticleEmitter} = {}
+	local emitters: { ParticleEmitter } = {}
 	local maxLifetime = 0
-	
+
 	-- Collect all ParticleEmitters
 	for _, child in vfxFolder:GetChildren() do
 		if child:IsA("ParticleEmitter") then
@@ -168,29 +168,29 @@ function VFXUtils.PlayFromFolder(
 			maxLifetime = math.max(maxLifetime, child.Lifetime.Max)
 		end
 	end
-	
+
 	if #emitters == 0 then
 		return nil
 	end
-	
+
 	local anchor = VFXUtils.CreateVFXAnchor(position, "VFX_" .. vfxFolder.Name)
-	
+
 	for _, emitter in emitters do
 		local clone = emitter:Clone()
-		
+
 		if colorOverride then
 			clone.Color = ColorSequence.new(colorOverride)
 		end
-		
+
 		clone.Parent = anchor
-		
+
 		local count = VFXUtils.GetEmitCount(clone)
 		clone:Emit(count)
 	end
-	
+
 	local delay = cleanupDelay or (maxLifetime + 0.5)
 	Debris:AddItem(anchor, delay)
-	
+
 	return anchor
 end
 
@@ -205,24 +205,19 @@ end
 	@param defaultEmitCount number? - Default emit count if no attribute
 	@return boolean - True if VFX was found and played
 ]]
-function VFXUtils.PlayFromModel(
-	model: Model,
-	vfxName: string,
-	position: Vector3?,
-	defaultEmitCount: number?
-): boolean
+function VFXUtils.PlayFromModel(model: Model, vfxName: string, position: Vector3?, defaultEmitCount: number?): boolean
 	local vfxFolder = model:FindFirstChild("VFX")
 	if not vfxFolder then
 		return false
 	end
-	
+
 	local vfx = vfxFolder:FindFirstChild(vfxName)
 	if not vfx then
 		return false
 	end
-	
+
 	local pos = position or model:GetPivot().Position
-	
+
 	if vfx:IsA("ParticleEmitter") then
 		VFXUtils.CloneAndEmit(vfx, pos, defaultEmitCount)
 		return true
@@ -230,7 +225,7 @@ function VFXUtils.PlayFromModel(
 		VFXUtils.PlayFromFolder(vfx, pos)
 		return true
 	end
-	
+
 	return false
 end
 
@@ -246,20 +241,16 @@ end
 	@param fadeTime number? - Time to fade out (default 0.5)
 	@return Light - The cloned light
 ]]
-function VFXUtils.CloneAndFadeLight(
-	sourceLight: Light,
-	parent: Instance,
-	fadeTime: number?
-): Light
+function VFXUtils.CloneAndFadeLight(sourceLight: Light, parent: Instance, fadeTime: number?): Light
 	local clone = sourceLight:Clone() :: Light
 	clone.Parent = parent
-	
+
 	local fade = fadeTime or 0.5
 	local tween = TweenService:Create(clone, TweenInfo.new(fade), { Brightness = 0 })
 	tween:Play()
-	
+
 	Debris:AddItem(clone, fade + 0.1)
-	
+
 	return clone
 end
 
@@ -278,27 +269,27 @@ end
 ]]
 function VFXUtils.AttachIdleVFX(model: Model, vfxName: string?): ParticleEmitter?
 	local name = vfxName or "Idle"
-	
+
 	local vfxFolder = model:FindFirstChild("VFX")
 	local idleVFX = vfxFolder and vfxFolder:FindFirstChild(name)
-	
+
 	if not idleVFX or not idleVFX:IsA("ParticleEmitter") then
 		return nil
 	end
-	
+
 	-- Find target part (Visual folder's first BasePart)
 	local visual = model:FindFirstChild("Visual")
 	local targetPart = visual and visual:FindFirstChildWhichIsA("BasePart")
-	
+
 	if not targetPart then
 		return nil
 	end
-	
+
 	local clone = idleVFX:Clone()
 	clone.Name = "IdleVFX_Active"
 	clone.Parent = targetPart
 	clone.Enabled = true
-	
+
 	return clone
 end
 
@@ -309,8 +300,10 @@ end
 ]]
 function VFXUtils.DetachIdleVFX(model: Model)
 	local visual = model:FindFirstChild("Visual")
-	if not visual then return end
-	
+	if not visual then
+		return
+	end
+
 	for _, part in visual:GetDescendants() do
 		if part:IsA("ParticleEmitter") and part.Name == "IdleVFX_Active" then
 			part.Enabled = false
@@ -344,27 +337,27 @@ function VFXUtils.CreateBeam(
 ): (Part, Part, Beam?)
 	local actualDuration = duration or 0.2
 	local actualColor = color or Color3.fromRGB(255, 255, 100) -- Electric yellow
-	
+
 	-- Create start and end anchors
 	local startAnchor = VFXUtils.CreateVFXAnchor(startPos, "BeamStart")
 	local endAnchor = VFXUtils.CreateVFXAnchor(endPos, "BeamEnd")
-	
+
 	-- Create attachments
 	local startAttachment = Instance.new("Attachment")
 	startAttachment.Name = "BeamAttachment"
 	startAttachment.Parent = startAnchor
-	
+
 	local endAttachment = Instance.new("Attachment")
 	endAttachment.Name = "BeamAttachment"
 	endAttachment.Parent = endAnchor
-	
+
 	-- Try to find beam template in Assets
 	local Assets = game:GetService("ReplicatedStorage"):FindFirstChild("Assets")
 	local VFXAssets = Assets and Assets:FindFirstChild("VFX")
 	local beamTemplate = VFXAssets and VFXAssets:FindFirstChild(beamName or "Lightning_Beam")
-	
+
 	local beam: Beam?
-	
+
 	if beamTemplate and beamTemplate:FindFirstChildWhichIsA("Beam") then
 		-- Clone from asset
 		beam = beamTemplate:FindFirstChildWhichIsA("Beam"):Clone()
@@ -391,7 +384,7 @@ function VFXUtils.CreateBeam(
 		beam.TextureMode = Enum.TextureMode.Stretch
 		beam.Parent = startAnchor
 	end
-	
+
 	-- Animate fade out and cleanup
 	task.delay(actualDuration * 0.5, function()
 		if beam then
@@ -404,11 +397,11 @@ function VFXUtils.CreateBeam(
 			end
 		end
 	end)
-	
+
 	-- Schedule cleanup
 	Debris:AddItem(startAnchor, actualDuration + 0.1)
 	Debris:AddItem(endAnchor, actualDuration + 0.1)
-	
+
 	return startAnchor, endAnchor, beam
 end
 
@@ -419,13 +412,11 @@ end
 	@param color Color3? - Beam color
 	@param duration number? - Duration per beam
 ]]
-function VFXUtils.CreateChainedBeams(
-	positions: {Vector3},
-	color: Color3?,
-	duration: number?
-)
-	if #positions < 2 then return end
-	
+function VFXUtils.CreateChainedBeams(positions: { Vector3 }, color: Color3?, duration: number?)
+	if #positions < 2 then
+		return
+	end
+
 	for i = 1, #positions - 1 do
 		-- Slight delay between each chain for visual effect
 		task.delay((i - 1) * 0.05, function()
@@ -442,24 +433,24 @@ end
 	@param duration number? - How long overlay lasts (nil = permanent until removed)
 	@return Instance? - The overlay effect for manual cleanup
 ]]
-function VFXUtils.ApplyStatusOverlay(
-	model: Model,
-	effectType: string,
-	duration: number?
-): Instance?
+function VFXUtils.ApplyStatusOverlay(model: Model, effectType: string, duration: number?): Instance?
 	local visual = model:FindFirstChild("Visual")
-	if not visual then return nil end
-	
+	if not visual then
+		return nil
+	end
+
 	-- Find first BasePart for particle attachment
 	local targetPart = visual:FindFirstChildWhichIsA("BasePart")
-	if not targetPart then return nil end
-	
+	if not targetPart then
+		return nil
+	end
+
 	-- Try to find overlay template
 	local Assets = game:GetService("ReplicatedStorage"):FindFirstChild("Assets")
 	local VFXAssets = Assets and Assets:FindFirstChild("VFX")
 	local overlayName = effectType .. "_Overlay"
 	local overlayTemplate = VFXAssets and VFXAssets:FindFirstChild(overlayName)
-	
+
 	-- Color mappings for procedural fallback
 	local colorMap = {
 		Burn = Color3.fromRGB(255, 100, 0),
@@ -467,9 +458,9 @@ function VFXUtils.ApplyStatusOverlay(
 		Poison = Color3.fromRGB(100, 255, 100),
 		Stun = Color3.fromRGB(255, 255, 100),
 	}
-	
+
 	local overlay: ParticleEmitter
-	
+
 	if overlayTemplate and overlayTemplate:FindFirstChildWhichIsA("ParticleEmitter") then
 		overlay = overlayTemplate:FindFirstChildWhichIsA("ParticleEmitter"):Clone()
 	else
@@ -487,11 +478,11 @@ function VFXUtils.ApplyStatusOverlay(
 		overlay.SpreadAngle = Vector2.new(180, 180)
 		overlay.LightEmission = 0.5
 	end
-	
+
 	overlay.Name = "StatusOverlay_" .. effectType
 	overlay.Parent = targetPart
 	overlay.Enabled = true
-	
+
 	-- Schedule cleanup if duration specified
 	if duration then
 		task.delay(duration, function()
@@ -501,7 +492,7 @@ function VFXUtils.ApplyStatusOverlay(
 			end
 		end)
 	end
-	
+
 	return overlay
 end
 
@@ -513,10 +504,12 @@ end
 ]]
 function VFXUtils.RemoveStatusOverlay(model: Model, effectType: string)
 	local visual = model:FindFirstChild("Visual")
-	if not visual then return end
-	
+	if not visual then
+		return
+	end
+
 	local overlayName = "StatusOverlay_" .. effectType
-	
+
 	for _, part in visual:GetDescendants() do
 		if part:IsA("ParticleEmitter") and part.Name == overlayName then
 			part.Enabled = false

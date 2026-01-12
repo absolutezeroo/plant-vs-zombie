@@ -138,7 +138,7 @@ end
 	@param array {T} - Array to pick from
 	@return T? - Random element, or nil if array is empty
 ]]
-function ChanceUtils.PickRandom<T>(array: {T}): T?
+function ChanceUtils.PickRandom<T>(array: { T }): T?
 	local count = #array
 	if count == 0 then
 		return nil
@@ -159,32 +159,32 @@ end
 		{Item = "Epic", Weight = 5},
 	})
 ]]
-function ChanceUtils.WeightedPick<T>(items: {{Item: T, Weight: number}}): T?
+function ChanceUtils.WeightedPick<T>(items: { { Item: T, Weight: number } }): T?
 	if #items == 0 then
 		return nil
 	end
-	
+
 	-- Calculate total weight
 	local totalWeight = 0
 	for _, entry in items do
 		totalWeight += entry.Weight
 	end
-	
+
 	if totalWeight <= 0 then
 		return nil
 	end
-	
+
 	-- Roll and find matching item
 	local roll = math.random() * totalWeight
 	local cumulative = 0
-	
+
 	for _, entry in items do
 		cumulative += entry.Weight
 		if roll <= cumulative then
 			return entry.Item
 		end
 	end
-	
+
 	-- Fallback (shouldn't reach here)
 	return items[#items].Item
 end
@@ -195,7 +195,7 @@ end
 	@param array {T} - Array to shuffle
 	@return {T} - Same array, shuffled
 ]]
-function ChanceUtils.Shuffle<T>(array: {T}): {T}
+function ChanceUtils.Shuffle<T>(array: { T }): { T }
 	for i = #array, 2, -1 do
 		local j = math.random(1, i)
 		array[i], array[j] = array[j], array[i]

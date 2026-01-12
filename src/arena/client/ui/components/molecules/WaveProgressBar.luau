@@ -49,54 +49,59 @@ export type WaveProgressBarProps = {
 ]]
 local function WaveProgressBar(props: WaveProgressBarProps): Frame
 	local scope = props.Scope
-	
+
 	local position = props.Position or UDim2.fromScale(0, 0)
 	local anchorPoint = props.AnchorPoint or Vector2.new(0, 0)
 	local layoutOrder = props.LayoutOrder or 0
 	local zIndex = props.ZIndex or 1
-	
+
 	-- Internal state
 	local currentWave = scope:Value(0)
 	local maxWaves = scope:Value(10) -- Default to 10 waves
-	
+
 	-- Progress ratio (0 to 1)
 	local progressRatio = scope:Computed(function(use)
 		local current = use(currentWave)
 		local max = use(maxWaves)
-		if max <= 0 then return 0 end
+		if max <= 0 then
+			return 0
+		end
 		return math.clamp(current / max, 0, 1)
 	end)
-	
+
 	-- Animated progress with spring
 	local animatedProgress = scope:Spring(progressRatio, 20, 0.8)
-	
+
 	-- Fill bar width
 	local fillWidth = scope:Computed(function(use)
 		local progress = use(animatedProgress)
 		return UDim2.fromScale(progress, 1)
 	end)
-	
+
 	-- Wave text
 	local waveText = scope:Computed(function(use)
 		local current = use(currentWave)
 		local max = use(maxWaves)
 		return `{current}/{max}`
 	end)
-	
+
 	-- Setup signal listener with Trove for cleanup
 	local trove = Trove.new()
 	table.insert(scope, function()
 		trove:Destroy()
 	end)
-	
-	trove:Connect(GameSignals.OnWaveChanged, function(data: {WaveNumber: number, MaxWaves: number?, IsPreparation: boolean?})
-		currentWave:set(data.WaveNumber)
-		if data.MaxWaves then
-			maxWaves:set(data.MaxWaves)
+
+	trove:Connect(
+		GameSignals.OnWaveChanged,
+		function(data: { WaveNumber: number, MaxWaves: number?, IsPreparation: boolean? })
+			currentWave:set(data.WaveNumber)
+			if data.MaxWaves then
+				maxWaves:set(data.MaxWaves)
+			end
 		end
-	end)
-	
-	return scope:New("Frame") {
+	)
+
+	return scope:New("Frame")({
 		Name = "WaveProgressBar",
 		Size = UDim2.fromScale(0.18, 0.045), -- 18% width, 4.5% height
 		Position = position,
@@ -104,14 +109,14 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 		LayoutOrder = layoutOrder,
 		ZIndex = zIndex,
 		BackgroundTransparency = 1,
-		
+
 		[Children] = {
 			-- Size constraints
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(180, 35),
 				MaxSize = Vector2.new(350, 55),
-			},
-			
+			}),
+
 			-- Track container (the bar itself)
 			ToonPanel({
 				Scope = scope,
@@ -119,26 +124,26 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				Position = UDim2.fromScale(0.12, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				ZIndex = 1,
-				
+
 				[Children] = {
 					-- Dark track background
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Track",
 						Size = UDim2.fromScale(0.98, 0.85),
 						Position = UDim2.fromScale(0.5, 0.5),
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundColor3 = TRACK_COLOR,
 						ZIndex = 1,
-						
+
 						[Children] = {
-							scope:New("UICorner") {
+							scope:New("UICorner")({
 								CornerRadius = UDim.new(0.4, 0),
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Fill bar (animated)
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Fill",
 						Size = fillWidth,
 						Position = UDim2.fromScale(0.01, 0.5),
@@ -146,30 +151,30 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 						BackgroundColor3 = FILL_COLOR,
 						ClipsDescendants = true,
 						ZIndex = 2,
-						
+
 						[Children] = {
-							scope:New("UISizeConstraint") {
+							scope:New("UISizeConstraint")({
 								MaxSize = Vector2.new(9999, 30),
-							},
-							
-							scope:New("UICorner") {
+							}),
+
+							scope:New("UICorner")({
 								CornerRadius = UDim.new(0.4, 0),
-							},
-							
+							}),
+
 							-- Gradient for 3D effect
-							scope:New("UIGradient") {
+							scope:New("UIGradient")({
 								Color = ColorSequence.new({
 									ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
 									ColorSequenceKeypoint.new(0.5, Color3.new(0.95, 0.95, 0.95)),
 									ColorSequenceKeypoint.new(1, Color3.new(0.8, 0.8, 0.8)),
 								}),
 								Rotation = 90,
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Wave text (centered)
-					scope:New("TextLabel") {
+					scope:New("TextLabel")({
 						Name = "WaveText",
 						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
@@ -178,24 +183,24 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 						Font = Theme.Typography.Fonts.Body,
 						TextScaled = true,
 						ZIndex = 5,
-						
+
 						[Children] = {
-							scope:New("UITextSizeConstraint") {
+							scope:New("UITextSizeConstraint")({
 								MaxTextSize = 16,
 								MinTextSize = 10,
-							},
-							scope:New("UIStroke") {
+							}),
+							scope:New("UIStroke")({
 								Color = Color3.new(0, 0, 0),
 								Thickness = 1,
 								Transparency = 0.3,
-							},
+							}),
 						},
-					},
+					}),
 				},
 			}),
-			
+
 			-- Zombie emoji (moves along bar)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "ZombieHead",
 				Size = UDim2.fromScale(0.12, 0.9),
 				Position = scope:Computed(function(use)
@@ -210,24 +215,24 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
 				ZIndex = 10,
-				
+
 				[Children] = {
-					scope:New("UIAspectRatioConstraint") {
+					scope:New("UIAspectRatioConstraint")({
 						AspectRatio = 1,
 						DominantAxis = Enum.DominantAxis.Height,
-					},
-					scope:New("UICorner") {
+					}),
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
-					scope:New("UIStroke") {
+					}),
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Flag emoji (end of bar)
-			scope:New("TextLabel") {
+			scope:New("TextLabel")({
 				Name = "FlagIcon",
 				Size = UDim2.fromScale(0.12, 0.9),
 				Position = UDim2.fromScale(0.92, 0.5),
@@ -237,23 +242,23 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
 				ZIndex = 5,
-				
+
 				[Children] = {
-					scope:New("UIAspectRatioConstraint") {
+					scope:New("UIAspectRatioConstraint")({
 						AspectRatio = 1,
 						DominantAxis = Enum.DominantAxis.Height,
-					},
-					scope:New("UICorner") {
+					}),
+					scope:New("UICorner")({
 						CornerRadius = UDim.new(0.5, 0),
-					},
-					scope:New("UIStroke") {
+					}),
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return WaveProgressBar

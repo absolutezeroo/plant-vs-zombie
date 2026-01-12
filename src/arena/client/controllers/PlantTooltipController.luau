@@ -67,17 +67,19 @@ local _selectedEntityId: any = nil
 ]]
 local function getPlantUnderCursor(): Model?
 	local camera = Workspace.CurrentCamera
-	if not camera then return nil end
-	
+	if not camera then
+		return nil
+	end
+
 	local mouseLocation = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-	
+
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	rayParams.FilterDescendantsInstances = {}
-	
+
 	local rayResult = Workspace:Raycast(ray.Origin, ray.Direction * 1000, rayParams)
-	
+
 	if rayResult and rayResult.Instance then
 		local current: Instance? = rayResult.Instance
 		while current and current ~= Workspace do
@@ -94,7 +96,7 @@ local function getPlantUnderCursor(): Model?
 			current = current.Parent
 		end
 	end
-	
+
 	return nil
 end
 
@@ -102,29 +104,31 @@ end
 	Show tooltip for a plant
 ]]
 local function showTooltip(plantModel: Model)
-	if not _initialized then return end
-	
+	if not _initialized then
+		return
+	end
+
 	local entityId = plantModel:GetAttribute("EntityId") :: number?
 	local plantType: string = plantModel:GetAttribute("PlantType") :: string? or plantModel.Name
-	
+
 	-- Get mutations from PlantRenderSystem cache (cleaner than model attributes)
-	local mutationList: {string} = {}
+	local mutationList: { string } = {}
 	if entityId then
 		mutationList = PlantRenderSystem.getMutations(entityId)
 	end
-	
+
 	-- Remove "Plant_" prefix if present
 	if string.find(plantType, "^Plant_") then
 		plantType = string.sub(plantType, 7)
 	end
-	
+
 	Logger.Debug("PlantTooltipController", `Showing tooltip for {plantType} (Entity #{entityId})`)
-	
+
 	-- Update reactive state
 	_selectedPlantType:set(plantType)
 	_selectedMutations:set(mutationList)
 	_selectedEntityId:set(entityId)
-	
+
 	-- Position tooltip at center of screen (could be improved to follow mouse)
 	_tooltipPosition:set(UDim2.new(0.5, 0, 0.5, 0))
 	_tooltipVisible:set(true)
@@ -134,7 +138,9 @@ end
 	Hide the tooltip
 ]]
 local function hideTooltip()
-	if not _initialized then return end
+	if not _initialized then
+		return
+	end
 	_tooltipVisible:set(false)
 end
 
@@ -142,27 +148,29 @@ end
 	Handle mouse click for plant selection
 ]]
 local function onInputBegan(input: InputObject, gameProcessed: boolean)
-	if gameProcessed then return end
-	
+	if gameProcessed then
+		return
+	end
+
 	-- Only handle left click
 	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
 		return
 	end
-	
+
 	-- Don't show tooltip if in placement or shovel mode
 	local selectedPlant = peek(SelectionState.SelectedPlant)
 	local shovelMode = peek(SelectionState.ShovelMode)
-	
+
 	if selectedPlant or shovelMode then
 		return
 	end
-	
+
 	-- Check if tooltip is already visible (clicking to close)
 	if peek(_tooltipVisible) then
 		hideTooltip()
 		return
 	end
-	
+
 	-- Find plant under cursor
 	local plantModel = getPlantUnderCursor()
 	if plantModel then
@@ -182,37 +190,37 @@ function PlantTooltipController.Initialize()
 		Logger.Warn("PlantTooltipController", "Already initialized")
 		return
 	end
-	
+
 	local localPlayer = Players.LocalPlayer
 	if not localPlayer then
 		Logger.Error("PlantTooltipController", "No LocalPlayer found")
 		return
 	end
-	
+
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
-	
+
 	-- Create Fusion scope
 	_scope = Fusion.scoped({})
-	
+
 	-- Initialize reactive state
 	_tooltipVisible = Value(_scope, false)
 	_tooltipPosition = Value(_scope, UDim2.new(0.5, 0, 0.5, 0))
 	_selectedPlantType = Value(_scope, nil :: string?)
-	_selectedMutations = Value(_scope, {} :: {string})
+	_selectedMutations = Value(_scope, {} :: { string })
 	_selectedEntityId = Value(_scope, nil :: number?)
-	
+
 	-- Create ScreenGui for tooltip
-	local screenGui = New(_scope, "ScreenGui") {
+	local screenGui = New(_scope, "ScreenGui")({
 		Name = "PlantTooltipGui",
 		Parent = playerGui,
 		IgnoreGuiInset = true,
 		ResetOnSpawn = false,
 		DisplayOrder = 50,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		
+
 		[Fusion.Children] = {
 			-- Click-away background (darkens screen)
-			New(_scope, "TextButton") {
+			New(_scope, "TextButton")({
 				Name = "Backdrop",
 				Size = UDim2.new(1, 0, 1, 0),
 				BackgroundColor3 = Color3.new(0, 0, 0),
@@ -222,10 +230,10 @@ function PlantTooltipController.Initialize()
 				Text = "",
 				Visible = _tooltipVisible,
 				ZIndex = 1,
-				
+
 				[Fusion.OnEvent("Activated")] = hideTooltip,
-			},
-			
+			}),
+
 			-- The tooltip
 			PlantTooltip({
 				Scope = _scope,
@@ -237,12 +245,12 @@ function PlantTooltipController.Initialize()
 				OnClose = hideTooltip,
 			}),
 		},
-	}
+	})
 	_screenGui = screenGui :: ScreenGui
-	
+
 	-- Connect input events
 	_trove:Connect(UserInputService.InputBegan, onInputBegan)
-	
+
 	_initialized = true
 	Logger.Info("PlantTooltipController", "Initialized")
 end
@@ -272,19 +280,21 @@ end
 	Dispose of the controller
 ]]
 function PlantTooltipController.Dispose()
-	if not _initialized then return end
-	
+	if not _initialized then
+		return
+	end
+
 	_trove:Destroy()
 	_trove = Trove.new()
-	
+
 	if _scope then
 		Fusion.doCleanup(_scope)
 		_scope = nil
 	end
-	
+
 	_screenGui = nil
 	_initialized = false
-	
+
 	Logger.Info("PlantTooltipController", "Disposed")
 end
 

@@ -40,7 +40,7 @@ local CONFIG = table.freeze({
 -- SECTION 3: STATE (all mutable data)
 -- ============================================================
 local State = {
-	PlayerSun = {} :: {[Player]: number},
+	PlayerSun = {} :: { [Player]: number },
 	Trove = Trove.new(),
 	Initialized = false,
 }
@@ -59,16 +59,18 @@ local function onPlayerRemoving(player: Player)
 end
 
 local function initialize()
-	if State.Initialized then return end
-	
+	if State.Initialized then
+		return
+	end
+
 	State.Trove:Connect(Players.PlayerAdded, onPlayerAdded)
 	State.Trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-	
+
 	-- Initialize existing players
 	for _, player in Players:GetPlayers() do
 		onPlayerAdded(player)
 	end
-	
+
 	State.Initialized = true
 	Logger.Debug("SunService", "Initialized")
 end

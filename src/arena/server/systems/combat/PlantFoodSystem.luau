@@ -54,7 +54,7 @@ local CONFIG = table.freeze({
 -- SECTION 3: STATE (all mutable data)
 -- ============================================================
 local State = {
-	PendingRequests = {} :: {{player: Player, plantEntityId: number}},
+	PendingRequests = {} :: { { player: Player, plantEntityId: number } },
 }
 
 -- ============================================================
@@ -68,12 +68,14 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 		Logger.Warn("PlantFood", `No Plant Food ability defined for {plantType}`)
 		return
 	end
-	
+
 	local pos = world:get(plantId, Components.PositionComponent)
-	if not pos then return end
-	
+	if not pos then
+		return
+	end
+
 	Logger.Info("PlantFood", `Executing {ability.Name} for {plantType}`)
-	
+
 	-- Instant Sun (Sunflower)
 	if ability.InstantSun then
 		local SunService = require(Server.services.SunService)
@@ -81,19 +83,23 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 		SunService.BroadcastSunUpdate(player)
 		Logger.Info("PlantFood", `{plantType} produced {ability.InstantSun} instant sun`)
 	end
-	
+
 	-- Rapid Fire (Peashooter, Repeater, etc.)
 	if ability.RapidFireShots and ability.ShotInterval then
 		local shots = ability.RapidFireShots
 		local interval = ability.ShotInterval
-		
+
 		task.spawn(function()
 			for i = 1, shots do
-				if not world:contains(plantId) then break end
-				
+				if not world:contains(plantId) then
+					break
+				end
+
 				local plantPos = world:get(plantId, Components.PositionComponent)
-				if not plantPos then break end
-				
+				if not plantPos then
+					break
+				end
+
 				-- Create rapid-fire projectile
 				local projId = EntityPool.Spawn(
 					Components.ProjectileComponent({
@@ -108,63 +114,70 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 						Z = plantPos.Z,
 					})
 				)
-				
-				if not projId then break end
-				
+
+				if not projId then
+					break
+				end
+
 				task.wait(interval)
 			end
 		end)
 	end
-	
+
 	-- Freeze All (Snow Pea)
 	if ability.FreezeAll and ability.FreezeDuration then
 		for zombieId, _ in world:query(Components.ZombieTypeComponent) do
 			if not world:get(zombieId, Components.SlowComponent) then
-				world:insert(zombieId, Components.SlowComponent({
-					Multiplier = 0,
-					Duration = ability.FreezeDuration,
-					AppliedAt = os.clock(),
-				}))
+				world:insert(
+					zombieId,
+					Components.SlowComponent({
+						Multiplier = 0,
+						Duration = ability.FreezeDuration,
+						AppliedAt = os.clock(),
+					})
+				)
 			end
 		end
 		Logger.Info("PlantFood", `Froze all zombies for {ability.FreezeDuration}s`)
 	end
-	
+
 	-- Armor Boost (Wall-nut)
 	if ability.ArmorBoost then
 		if ECSUtils.BoostHealth(world, plantId, ability.ArmorBoost, Components) then
 			Logger.Info("PlantFood", `{plantType} gained {ability.ArmorBoost} armor`)
 		end
 	end
-	
+
 	-- Instant Explode (CherryBomb, PotatoMine)
 	-- OPTIMIZED: Uses LaneCache for O(lane_range) instead of O(all_zombies)
 	if ability.InstantExplode then
 		local radius = ability.ExplosionRadius or 9
-		
+
 		Network.ExplosionVFX.FireAll({
 			PositionX = pos.X,
 			PositionY = pos.Y,
 			PositionZ = pos.Z,
 			Radius = radius,
 		})
-		
+
 		-- Get plant lane for optimized lookup
 		local plantComp = world:get(plantId, Components.PlantTypeComponent)
 		local centerLane = if plantComp then plantComp.Lane else 3
 		local laneRadius = math.ceil(radius / GridConfig.CELL_SIZE)
-		
+
 		-- O(lane_range) lookup instead of O(N) world:query
 		local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
-		
+
 		for _, zombieId in zombiesInRange do
 			local zombiePos = LaneCache.GetPosition(zombieId)
-			if not zombiePos then continue end
-			
+			if not zombiePos then
+				continue
+			end
+
 			local dx = zombiePos.X - pos.X
 			local dz = zombiePos.Z - pos.Z
 			local dist = math.sqrt(dx * dx + dz * dz)
-			
+
 			if dist <= radius then
 				if EntityPool.IsPooledEntity(zombieId) then
 					EntityPool.Despawn(zombieId)
@@ -173,7 +186,7 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 				end
 			end
 		end
-		
+
 		if EntityPool.IsPooledEntity(plantId) then
 			EntityPool.Despawn(plantId)
 		else
@@ -191,24 +204,24 @@ local function OnStep(world)
 	for _, request in State.PendingRequests do
 		local player = request.player
 		local plantId = request.plantEntityId
-		
+
 		-- Validate plant exists
 		local plant = world:get(plantId, Components.PlantTypeComponent)
-		
+
 		if not plant then
 			Logger.Warn("PlantFood", `Invalid plant entity {plantId}`)
 			continue
 		end
-		
+
 		-- Try to use a charge
 		if not PlantFoodService.UseCharge(player) then
 			Logger.Warn("PlantFood", `Player {player.Name} has no Plant Food charges`)
 			continue
 		end
-		
+
 		-- Execute the ability
 		executeAbility(world, plantId, plant.PlantType, player)
-		
+
 		-- Broadcast activation event
 		Network.PlantFoodActivated.FireAll({
 			PlantEntityId = plantId,
@@ -216,10 +229,10 @@ local function OnStep(world)
 			OwnerId = player.UserId,
 		})
 	end
-	
+
 	-- Clear processed requests
 	table.clear(State.PendingRequests)
-	
+
 	-- Handle glowing zombie deaths (grant Plant Food charges)
 	for entityId, record in world:queryChanged(Components.HealthComponent) do
 		-- Check if entity just died
@@ -227,19 +240,19 @@ local function OnStep(world)
 			-- Check if it was a glowing zombie
 			local plantFood = world:get(entityId, Components.PlantFoodComponent)
 			local zombie = world:get(entityId, Components.ZombieTypeComponent)
-			
+
 			if plantFood and zombie then
 				-- Grant charge to all players (coop friendly)
 				for _, player in Players:GetPlayers() do
 					local newCharges = PlantFoodService.AddCharge(player)
-					
+
 					Network.PlantFoodCollected.FireAll({
 						CollectorId = player.UserId,
 						NewChargeCount = newCharges,
 						ZombieEntityId = entityId,
 					})
 				end
-				
+
 				Logger.Info("PlantFood", `Glowing zombie killed, Plant Food collected!`)
 			end
 		end
@@ -257,7 +270,7 @@ local function Init(_world)
 			plantEntityId = data.PlantEntityId,
 		})
 	end)
-	
+
 	Logger.Debug("PlantFoodSystem", "Initialized")
 end
 

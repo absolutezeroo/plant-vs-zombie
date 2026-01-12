@@ -39,7 +39,7 @@ type IdleAnimation = {
 	BasePosition: Vector3,
 	Playing: boolean,
 }
-local _idleAnimations: {[Model]: IdleAnimation} = {}
+local _idleAnimations: { [Model]: IdleAnimation } = {}
 
 -- Track active Humanoid animations for cleanup
 type HumanoidAnimData = {
@@ -48,7 +48,7 @@ type HumanoidAnimData = {
 	AttackTrack: AnimationTrack?,
 	DeathTrack: AnimationTrack?,
 }
-local _humanoidAnimations: {[Model]: HumanoidAnimData} = {}
+local _humanoidAnimations: { [Model]: HumanoidAnimData } = {}
 
 -- Default animation values
 local DEFAULTS = {
@@ -73,8 +73,10 @@ end
 ]]
 local function getAnimator(model: Model): Animator?
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return nil end
-	
+	if not humanoid then
+		return nil
+	end
+
 	local animator = humanoid:FindFirstChildOfClass("Animator")
 	if not animator then
 		local newAnimator = Instance.new("Animator")
@@ -89,21 +91,23 @@ end
 ]]
 local function loadZombieAnimations(model: Model): HumanoidAnimData?
 	local animator = getAnimator(model)
-	if not animator then return nil end
-	
+	if not animator then
+		return nil
+	end
+
 	local animFolder = model:FindFirstChild("Animations")
 	if not animFolder then
 		Logger.Warn("Animation", `No Animations folder in {model.Name}`)
 		return nil
 	end
-	
+
 	local data: HumanoidAnimData = {
 		Animator = animator,
 		WalkTrack = nil,
 		AttackTrack = nil,
 		DeathTrack = nil,
 	}
-	
+
 	-- Helper to check if Animation has valid ID
 	local function isValidAnimation(anim: Animation?): boolean
 		if not anim or not anim:IsA("Animation") then
@@ -112,7 +116,7 @@ local function loadZombieAnimations(model: Model): HumanoidAnimData?
 		local id = anim.AnimationId
 		return id ~= nil and id ~= ""
 	end
-	
+
 	-- Load each animation if it exists and has a valid ID
 	local walkAnim = animFolder:FindFirstChild("Walk")
 	if isValidAnimation(walkAnim) then
@@ -121,7 +125,7 @@ local function loadZombieAnimations(model: Model): HumanoidAnimData?
 		track.Priority = Enum.AnimationPriority.Movement
 		data.WalkTrack = track
 	end
-	
+
 	local attackAnim = animFolder:FindFirstChild("Attack")
 	if isValidAnimation(attackAnim) then
 		local track = animator:LoadAnimation(attackAnim)
@@ -129,7 +133,7 @@ local function loadZombieAnimations(model: Model): HumanoidAnimData?
 		track.Priority = Enum.AnimationPriority.Action
 		data.AttackTrack = track
 	end
-	
+
 	local deathAnim = animFolder:FindFirstChild("Death")
 	if isValidAnimation(deathAnim) then
 		local track = animator:LoadAnimation(deathAnim)
@@ -137,7 +141,7 @@ local function loadZombieAnimations(model: Model): HumanoidAnimData?
 		track.Priority = Enum.AnimationPriority.Action4
 		data.DeathTrack = track
 	end
-	
+
 	_humanoidAnimations[model] = data
 	return data
 end
@@ -178,28 +182,28 @@ function AnimationService.StartIdle(model: Model)
 		end
 		return
 	end
-	
+
 	-- TWEEN MODE: Bob animation for plants
 	if _idleAnimations[model] then
 		return -- Already playing
 	end
-	
+
 	local root = model.PrimaryPart
 	if not root then
 		Logger.Warn("Animation", `Cannot start idle - no PrimaryPart on {model.Name}`)
 		return
 	end
-	
+
 	local bobHeight = getAnimParam(model, "IdleBobHeight")
 	local bobSpeed = getAnimParam(model, "IdleBobSpeed")
-	
+
 	if bobHeight <= 0 then
 		return -- No idle animation
 	end
-	
+
 	local basePosition = root.Position
 	local duration = 1 / bobSpeed
-	
+
 	local idleData: IdleAnimation = {
 		Model = model,
 		Tween = nil :: any,
@@ -207,37 +211,31 @@ function AnimationService.StartIdle(model: Model)
 		Playing = true,
 	}
 	_idleAnimations[model] = idleData
-	
+
 	-- Coroutine for continuous bob
 	task.spawn(function()
 		local goingUp = true
-		
+
 		while idleData.Playing and model.Parent do
-			local targetY = if goingUp 
-				then basePosition.Y + bobHeight 
-				else basePosition.Y
-			
-			local tweenInfo = TweenInfo.new(
-				duration,
-				Enum.EasingStyle.Sine,
-				Enum.EasingDirection.InOut
-			)
-			
+			local targetY = if goingUp then basePosition.Y + bobHeight else basePosition.Y
+
+			local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+
 			local tween = TweenService:Create(root, tweenInfo, {
-				Position = Vector3.new(basePosition.X, targetY, basePosition.Z)
+				Position = Vector3.new(basePosition.X, targetY, basePosition.Z),
 			})
-			
+
 			idleData.Tween = tween
 			tween:Play()
 			tween.Completed:Wait()
-			
+
 			goingUp = not goingUp
 		end
-		
+
 		-- Cleanup when stopped
 		_idleAnimations[model] = nil
 	end)
-	
+
 	Logger.Debug("Animation", `Started idle animation on {model.Name}`)
 end
 
@@ -250,7 +248,7 @@ function AnimationService.StopIdle(model: Model)
 	if animData and animData.WalkTrack then
 		animData.WalkTrack:Stop()
 	end
-	
+
 	-- TWEEN MODE: Stop bob animation
 	local idleData = _idleAnimations[model]
 	if idleData then
@@ -271,18 +269,18 @@ function AnimationService.PlaySpawn(model: Model): ()
 	if hasHumanoid(model) then
 		return
 	end
-	
+
 	local visual = model:FindFirstChild("Visual")
 	if not visual or not visual:IsA("Model") then
 		return
 	end
-	
+
 	local duration = DEFAULTS.SpawnDuration
-	
+
 	-- Scale all parts from 0 to normal
-	local parts: {BasePart} = {}
-	local originalSizes: {Vector3} = {}
-	
+	local parts: { BasePart } = {}
+	local originalSizes: { Vector3 } = {}
+
 	for _, part in visual:GetDescendants() do
 		if part:IsA("BasePart") then
 			table.insert(parts, part)
@@ -290,19 +288,19 @@ function AnimationService.PlaySpawn(model: Model): ()
 			part.Size = Vector3.new(0.1, 0.1, 0.1)
 		end
 	end
-	
+
 	-- Animate all parts
 	local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	local lastTween: Tween? = nil
-	
+
 	for i, part in parts do
 		local tween = TweenService:Create(part, tweenInfo, {
-			Size = originalSizes[i]
+			Size = originalSizes[i],
 		})
 		tween:Play()
 		lastTween = tween
 	end
-	
+
 	-- Wait for completion
 	if lastTween then
 		lastTween.Completed:Wait()
@@ -319,16 +317,16 @@ function AnimationService.PlayShoot(model: Model)
 	if not visual or not root then
 		return
 	end
-	
+
 	local recoilDistance = getAnimParam(model, "ShootRecoil")
 	if recoilDistance <= 0 then
 		return
 	end
-	
+
 	-- Check for custom Shoot pose
 	local poses = model:FindFirstChild("Poses")
 	local shootPose = poses and poses:FindFirstChild("Shoot")
-	
+
 	if shootPose and shootPose:IsA("Model") then
 		-- Use custom pose (interpolate to it and back)
 		AnimationService._playPoseAnimation(model, shootPose, 0.1, 0.1)
@@ -336,19 +334,21 @@ function AnimationService.PlayShoot(model: Model)
 		-- Generic recoil animation
 		local basePosition = root.Position
 		local recoilPosition = basePosition - Vector3.new(recoilDistance, 0, 0)
-		
+
 		-- Quick recoil back
-		local recoilTween = TweenService:Create(root, 
+		local recoilTween = TweenService:Create(
+			root,
 			TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 			{ Position = recoilPosition }
 		)
-		
+
 		-- Return to base
-		local returnTween = TweenService:Create(root,
+		local returnTween = TweenService:Create(
+			root,
 			TweenInfo.new(0.15, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
 			{ Position = basePosition }
 		)
-		
+
 		task.spawn(function()
 			recoilTween:Play()
 			recoilTween.Completed:Wait()
@@ -363,7 +363,7 @@ end
 function AnimationService.PlayDeath(model: Model): ()
 	-- Stop idle/walk first
 	AnimationService.StopIdle(model)
-	
+
 	-- HUMANOID MODE: Play death animation
 	if hasHumanoid(model) then
 		local animData = _humanoidAnimations[model]
@@ -375,29 +375,29 @@ function AnimationService.PlayDeath(model: Model): ()
 		_humanoidAnimations[model] = nil
 		return
 	end
-	
+
 	-- TWEEN MODE: Shrink and fade for plants
 	local visual = model:FindFirstChild("Visual")
 	if not visual then
 		return
 	end
-	
+
 	local duration = DEFAULTS.DeathDuration
 	local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-	
+
 	local lastTween: Tween? = nil
-	
+
 	for _, part in visual:GetDescendants() do
 		if part:IsA("BasePart") then
 			local tween = TweenService:Create(part, tweenInfo, {
 				Size = Vector3.new(0.1, 0.1, 0.1),
-				Transparency = 1
+				Transparency = 1,
 			})
 			tween:Play()
 			lastTween = tween
 		end
 	end
-	
+
 	if lastTween then
 		lastTween.Completed:Wait()
 	end
@@ -410,7 +410,7 @@ function AnimationService.PlayAttack(model: Model)
 	if not hasHumanoid(model) then
 		return -- Plants don't attack
 	end
-	
+
 	local animData = getZombieAnimData(model)
 	if animData and animData.AttackTrack then
 		animData.AttackTrack:Play()
@@ -426,9 +426,9 @@ function AnimationService._playPoseAnimation(model: Model, pose: Model, toPoseDu
 	if not visual or not visual:IsA("Model") then
 		return
 	end
-	
+
 	-- Build part name -> pose CFrame/Size map
-	local poseData: {[string]: {CFrame: CFrame, Size: Vector3}} = {}
+	local poseData: { [string]: { CFrame: CFrame, Size: Vector3 } } = {}
 	for _, posePart in pose:GetDescendants() do
 		if posePart:IsA("BasePart") then
 			poseData[posePart.Name] = {
@@ -437,9 +437,9 @@ function AnimationService._playPoseAnimation(model: Model, pose: Model, toPoseDu
 			}
 		end
 	end
-	
+
 	-- Store original state
-	local originalState: {[BasePart]: {CFrame: CFrame, Size: Vector3}} = {}
+	local originalState: { [BasePart]: { CFrame: CFrame, Size: Vector3 } } = {}
 	for _, part in visual:GetDescendants() do
 		if part:IsA("BasePart") then
 			originalState[part] = {
@@ -448,7 +448,7 @@ function AnimationService._playPoseAnimation(model: Model, pose: Model, toPoseDu
 			}
 		end
 	end
-	
+
 	task.spawn(function()
 		-- Tween to pose
 		local toPoseInfo = TweenInfo.new(toPoseDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -463,7 +463,7 @@ function AnimationService._playPoseAnimation(model: Model, pose: Model, toPoseDu
 			end
 		end
 		task.wait(toPoseDuration)
-		
+
 		-- Return to original
 		local returnInfo = TweenInfo.new(returnDuration, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
 		for part, original in originalState do
@@ -484,15 +484,21 @@ function AnimationService.Cleanup()
 	for model, _ in _idleAnimations do
 		AnimationService.StopIdle(model)
 	end
-	
+
 	-- Cleanup humanoid animations (zombies)
 	for model, animData in _humanoidAnimations do
-		if animData.WalkTrack then animData.WalkTrack:Stop() end
-		if animData.AttackTrack then animData.AttackTrack:Stop() end
-		if animData.DeathTrack then animData.DeathTrack:Stop() end
+		if animData.WalkTrack then
+			animData.WalkTrack:Stop()
+		end
+		if animData.AttackTrack then
+			animData.AttackTrack:Stop()
+		end
+		if animData.DeathTrack then
+			animData.DeathTrack:Stop()
+		end
 	end
 	table.clear(_humanoidAnimations)
-	
+
 	Logger.Info("Animation", "AnimationService cleaned up")
 end
 

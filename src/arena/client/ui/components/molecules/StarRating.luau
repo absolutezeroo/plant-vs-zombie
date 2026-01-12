@@ -38,32 +38,32 @@ local function AnimatedStar(scope: Fusion.Scope<any>, index: number, starCount: 
 			return 1 -- Empty
 		end
 	end)
-	
+
 	-- Scale animation
 	local targetScale = scope:Computed(function(use)
 		local state = use(starState)
 		return if state == 2 then 1.0 else 0.8
 	end)
 	local animatedScale = scope:Spring(targetScale, 25, 0.5)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = `Star{index}`,
 		Size = UDim2.fromScale(0.28, 0.8), -- Responsive within parent
 		BackgroundTransparency = 1,
 		LayoutOrder = index,
-		
+
 		[Children] = {
 			-- Keep square aspect ratio
-			scope:New("UIAspectRatioConstraint") {
+			scope:New("UIAspectRatioConstraint")({
 				AspectRatio = 1,
 				DominantAxis = Enum.DominantAxis.Height,
-			},
-			
-			scope:New("UIScale") {
+			}),
+
+			scope:New("UIScale")({
 				Scale = animatedScale,
-			},
-			
-			scope:New("TextLabel") {
+			}),
+
+			scope:New("TextLabel")({
 				Name = "StarIcon",
 				Size = UDim2.fromScale(1, 1),
 				BackgroundTransparency = 1,
@@ -73,15 +73,13 @@ local function AnimatedStar(scope: Fusion.Scope<any>, index: number, starCount: 
 				end),
 				TextColor3 = scope:Computed(function(use)
 					local state = use(starState)
-					return if state == 2 
-						then Color3.fromRGB(255, 215, 0) 
-						else Color3.fromRGB(150, 150, 150)
+					return if state == 2 then Color3.fromRGB(255, 215, 0) else Color3.fromRGB(150, 150, 150)
 				end),
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
-			},
+			}),
 		},
-	}
+	})
 end
 
 --[[
@@ -96,8 +94,8 @@ end
 local function StarRating(props: StarRatingProps): Frame
 	local scope = props.Scope
 	local visible = props.Visible or scope:Value(true)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "StarRating",
 		Size = UDim2.fromScale(1, 0.15), -- 15% of parent height
 		BackgroundTransparency = 1,
@@ -105,28 +103,28 @@ local function StarRating(props: StarRatingProps): Frame
 		Visible = scope:Computed(function(use)
 			return use(visible)
 		end),
-		
+
 		[Children] = {
 			-- Size constraints
-			scope:New("UISizeConstraint") {
+			scope:New("UISizeConstraint")({
 				MinSize = Vector2.new(120, 40),
 				MaxSize = Vector2.new(300, 70),
-			},
-			
+			}),
+
 			-- Center layout with responsive padding
-			scope:New("UIListLayout") {
+			scope:New("UIListLayout")({
 				FillDirection = Enum.FillDirection.Horizontal,
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 				Padding = UDim.new(0.03, 0), -- 3% padding between stars
-			},
-			
+			}),
+
 			-- 3 Stars
 			AnimatedStar(scope, 1, props.StarCount),
 			AnimatedStar(scope, 2, props.StarCount),
 			AnimatedStar(scope, 3, props.StarCount),
 		},
-	}
+	})
 end
 
 return StarRating

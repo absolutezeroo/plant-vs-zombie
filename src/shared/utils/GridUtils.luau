@@ -51,8 +51,7 @@ end
 	@return boolean - True if within grid bounds
 ]]
 function GridUtils.IsValidCell(column: number, lane: number): boolean
-	return column >= 1 and column <= GridConfig.GRID_COLUMNS
-		and lane >= 1 and lane <= GridConfig.GRID_LANES
+	return column >= 1 and column <= GridConfig.GRID_COLUMNS and lane >= 1 and lane <= GridConfig.GRID_LANES
 end
 
 --[[
@@ -62,7 +61,10 @@ end
 	@param lane number - Lane index (1-5)
 	@return { TopLeft: Vector3, TopRight: Vector3, BottomLeft: Vector3, BottomRight: Vector3 }
 ]]
-function GridUtils.GetCellCorners(column: number, lane: number): {
+function GridUtils.GetCellCorners(
+	column: number,
+	lane: number
+): {
 	TopLeft: Vector3,
 	TopRight: Vector3,
 	BottomLeft: Vector3,
@@ -71,11 +73,11 @@ function GridUtils.GetCellCorners(column: number, lane: number): {
 	local config = MapConfig.GetConfig()
 	local cellW, cellD = MapConfig.GetCellSize()
 	local origin = MapConfig.GetGridOrigin()
-	
+
 	local baseX = origin.X + (column - 1) * cellW
 	local baseZ = origin.Z + (lane - 1) * cellD
 	local y = config.GridY + 0.1 -- Slightly above ground
-	
+
 	return {
 		TopLeft = Vector3.new(baseX, y, baseZ),
 		TopRight = Vector3.new(baseX + cellW, y, baseZ),
@@ -89,7 +91,7 @@ end
 	
 	@return {{Column: number, Lane: number, Position: Vector3}}
 ]]
-function GridUtils.GetAllCellCenters(): {{Column: number, Lane: number, Position: Vector3}}
+function GridUtils.GetAllCellCenters(): { { Column: number, Lane: number, Position: Vector3 } }
 	local cells = {}
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do

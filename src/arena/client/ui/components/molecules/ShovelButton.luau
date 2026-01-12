@@ -46,16 +46,16 @@ export type ShovelButtonProps = {
 local function ShovelButton(props: ShovelButtonProps): Frame
 	local scope = props.Scope
 	local layoutOrder = props.LayoutOrder or 999
-	
+
 	-- Internal state
 	local isHovered = scope:Value(false)
 	local isPressed = scope:Value(false)
-	
+
 	-- Reactive: Is shovel mode active?
 	local isShovelActive = scope:Computed(function(use)
 		return use(SelectionState.ShovelMode)
 	end)
-	
+
 	-- Border color based on active state
 	local borderColor = scope:Computed(function(use)
 		if use(isShovelActive) then
@@ -63,7 +63,7 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 		end
 		return Theme.Colors.Surface.Stroke :: Color3
 	end)
-	
+
 	-- Border thickness when active
 	local borderThickness = scope:Computed(function(use)
 		if use(isShovelActive) then
@@ -71,19 +71,31 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 		end
 		return Theme.Layout.StrokeThickness
 	end)
-	
+
 	-- Press animation (as percentage)
-	local pressOffset = scope:Spring(scope:Computed(function(use)
-		return if use(isPressed) then 0.06 else 0
-	end), 40, 0.7)
-	
+	local pressOffset = scope:Spring(
+		scope:Computed(function(use)
+			return if use(isPressed) then 0.06 else 0
+		end),
+		40,
+		0.7
+	)
+
 	-- Scale animation for hover
-	local hoverScale = scope:Spring(scope:Computed(function(use)
-		if use(isPressed) then return 0.95 end
-		if use(isHovered) then return 1.05 end
-		return 1
-	end), 35, 0.7)
-	
+	local hoverScale = scope:Spring(
+		scope:Computed(function(use)
+			if use(isPressed) then
+				return 0.95
+			end
+			if use(isHovered) then
+				return 1.05
+			end
+			return 1
+		end),
+		35,
+		0.7
+	)
+
 	-- Card background color
 	local cardColor = scope:Computed(function(use)
 		if use(isShovelActive) then
@@ -91,53 +103,53 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 		end
 		return Theme.Colors.Surface.Main
 	end)
-	
+
 	local shadowColor = Theme.Colors.Surface.Shadow
-	
+
 	-- Toggle shovel mode
 	local function toggleShovel()
 		SelectionState.ToggleShovel()
 	end
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "ShovelButton",
 		Size = UDim2.fromScale(1, 1), -- Size determined by parent grid
 		BackgroundTransparency = 1,
 		LayoutOrder = layoutOrder,
-		
+
 		[Children] = {
 			-- Aspect ratio constraint (square)
-			scope:New("UIAspectRatioConstraint") {
+			scope:New("UIAspectRatioConstraint")({
 				AspectRatio = 1,
-			},
-			
+			}),
+
 			-- Scale container for hover animation
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Size = UDim2.fromScale(1, 1),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
 				BackgroundTransparency = 1,
-				
+
 				[Children] = {
-					scope:New("UIScale") { Scale = hoverScale },
-					
+					scope:New("UIScale")({ Scale = hoverScale }),
+
 					-- Shadow Layer (6% offset)
-					scope:New("Frame") {
+					scope:New("Frame")({
 						Name = "Shadow",
 						Size = UDim2.fromScale(1, 0.94),
 						Position = UDim2.fromScale(0, 0.06),
 						BackgroundColor3 = shadowColor,
 						ZIndex = 1,
-						
+
 						[Children] = {
-							scope:New("UICorner") {
+							scope:New("UICorner")({
 								CornerRadius = Theme.Layout.CornerRadius,
-							},
+							}),
 						},
-					},
-					
+					}),
+
 					-- Surface Layer (interactive)
-					scope:New("TextButton") {
+					scope:New("TextButton")({
 						Name = "Surface",
 						Size = scope:Computed(function(use)
 							local offset = use(pressOffset)
@@ -150,40 +162,40 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 						AutoButtonColor = false,
 						Text = "",
 						ZIndex = 2,
-						
+
 						[OnEvent("MouseButton1Down")] = function()
 							isPressed:set(true)
 						end,
-						
+
 						[OnEvent("MouseButton1Up")] = function()
 							isPressed:set(false)
 							if peek(isHovered) then
 								toggleShovel()
 							end
 						end,
-						
+
 						[OnEvent("MouseEnter")] = function()
 							isHovered:set(true)
 						end,
-						
+
 						[OnEvent("MouseLeave")] = function()
 							isHovered:set(false)
 							isPressed:set(false)
 						end,
-						
+
 						[Children] = {
-							scope:New("UICorner") {
+							scope:New("UICorner")({
 								CornerRadius = Theme.Layout.CornerRadius,
-							},
-							
+							}),
+
 							-- Dynamic border (orange when active)
-							scope:New("UIStroke") {
+							scope:New("UIStroke")({
 								Color = borderColor,
 								Thickness = borderThickness,
-							},
-							
+							}),
+
 							-- Shovel Icon
-							scope:New("TextLabel") {
+							scope:New("TextLabel")({
 								Name = "ShovelIcon",
 								Size = UDim2.fromScale(0.7, 0.7),
 								Position = UDim2.fromScale(0.5, 0.5),
@@ -198,19 +210,19 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 										else Color3.new(0.3, 0.3, 0.3)
 								end),
 								ZIndex = 3,
-								
+
 								[Children] = {
-									scope:New("UITextSizeConstraint") {
+									scope:New("UITextSizeConstraint")({
 										MaxTextSize = 40,
 										MinTextSize = 12,
-									},
+									}),
 								},
-							},
-							
+							}),
+
 							-- "Active" indicator label
 							scope:Computed(function(use)
 								if use(isShovelActive) then
-									return scope:New("TextLabel") {
+									return scope:New("TextLabel")({
 										Name = "ActiveLabel",
 										Size = UDim2.fromScale(1, 0.2),
 										Position = UDim2.fromScale(0.5, 0.95),
@@ -221,24 +233,24 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 										Font = Enum.Font.GothamBold,
 										TextColor3 = Color3.fromHex("#FF6B35"),
 										ZIndex = 4,
-										
+
 										[Children] = {
-											scope:New("UITextSizeConstraint") {
+											scope:New("UITextSizeConstraint")({
 												MaxTextSize = 10,
 												MinTextSize = 6,
-											},
+											}),
 										},
-									}
+									})
 								else
 									return nil
 								end
 							end),
 						},
-					},
+					}),
 				},
-			},
+			}),
 		},
-	}
+	})
 end
 
 return ShovelButton

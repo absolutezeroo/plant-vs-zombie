@@ -49,19 +49,19 @@ export type ToonPanelProps = {
 ]]
 local function ToonPanel(props: ToonPanelProps): Frame
 	local scope = props.Scope
-	
+
 	local size = props.Size or UDim2.fromScale(0.2, 0.1)
 	local position = props.Position or UDim2.new(0, 0, 0, 0)
 	local anchorPoint = props.AnchorPoint or Vector2.new(0, 0)
 	local layoutOrder = props.LayoutOrder or 0
 	local zIndex = props.ZIndex or 1
 	local automaticSize = props.AutomaticSize or Enum.AutomaticSize.None
-	
+
 	-- For AutomaticSize to work, sub-frames need proper sizing
 	local useAutoWidth = automaticSize == Enum.AutomaticSize.X or automaticSize == Enum.AutomaticSize.XY
 	local subFrameSize = UDim2.fromScale(1, 1)
-	
-	return scope:New("Frame") {
+
+	return scope:New("Frame")({
 		Name = "ToonPanel",
 		Size = size,
 		Position = position,
@@ -71,57 +71,57 @@ local function ToonPanel(props: ToonPanelProps): Frame
 		AutomaticSize = automaticSize,
 		BackgroundTransparency = 1,
 		Visible = if props.Visible ~= nil then props.Visible else true,
-		
+
 		[Children] = {
 			-- Shadow Layer (bottom, offset down using Scale)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Shadow",
 				Size = subFrameSize,
 				AutomaticSize = if useAutoWidth then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
 				Position = UDim2.fromScale(0, SHADOW_OFFSET_SCALE),
 				BackgroundColor3 = Theme.Colors.Surface.Shadow,
 				ZIndex = 1,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Main Layer (top, with stroke)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Main",
 				Size = subFrameSize,
 				AutomaticSize = if useAutoWidth then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
 				BackgroundColor3 = Theme.Colors.Surface.Main,
 				ZIndex = 2,
-				
+
 				[Children] = {
-					scope:New("UICorner") {
+					scope:New("UICorner")({
 						CornerRadius = Theme.Layout.CornerRadius,
-					},
-					
+					}),
+
 					-- Thick cartoon outline
-					scope:New("UIStroke") {
+					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
-					},
+					}),
 				},
-			},
-			
+			}),
+
 			-- Content Layer (children go here)
-			scope:New("Frame") {
+			scope:New("Frame")({
 				Name = "Content",
 				Size = subFrameSize,
 				AutomaticSize = if useAutoWidth then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
 				BackgroundTransparency = 1,
 				ZIndex = 3,
-				
+
 				[Children] = props[Children],
-			},
+			}),
 		},
-	}
+	})
 end
 
 return ToonPanel

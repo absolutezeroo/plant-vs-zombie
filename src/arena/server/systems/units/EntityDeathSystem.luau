@@ -69,9 +69,11 @@ end
 
 -- 5. LIFECYCLE: INIT
 local function Init(_world)
-	if State.IsInitialized then return end
+	if State.IsInitialized then
+		return
+	end
 	State.IsInitialized = true
-	
+
 	State.Trove = Trove.new()
 end
 
@@ -92,23 +94,23 @@ local function OnStep(world)
 	for id, health in world:query(Components.HealthComponent) do
 		if health.Current <= 0 then
 			-- Entity is dead
-			
+
 			-- Check if it's a plant (need to clear grid)
 			local plant = world:get(id, Components.PlantTypeComponent)
 			if plant then
 				GridService.Clear(plant.Column, plant.Lane)
 			end
-			
+
 			-- Check if it's a zombie (need to drop coins)
 			local zombie = world:get(id, Components.ZombieTypeComponent)
 			if zombie then
 				local coinValue = ProgressionData.ZombieCoinRewards[zombie.ZombieType] or CONFIG.DEFAULT_COIN_VALUE
-				
+
 				local pos = world:get(id, Components.PositionComponent)
 				local posX = if pos then pos.X else 0
 				local posY = if pos then pos.Y else 0
 				local posZ = if pos then pos.Z else 0
-				
+
 				-- Spawn CoinDropEvent for VFX/Audio systems
 				world:spawn(Components.CoinDropEvent({
 					Amount = coinValue,
@@ -117,18 +119,18 @@ local function OnStep(world)
 					PositionZ = posZ,
 					SourceEntityId = id,
 				}))
-				
+
 				-- Award coins to all players
 				local PlayerDataService = getPlayerDataService()
 				local StatsService = getStatsService()
 				for _, player in Players:GetPlayers() do
 					PlayerDataService.AddCoins(player, coinValue)
 					PlayerDataService.IncrementStat(player, "ZombiesKilled", 1)
-					
+
 					-- Update session stats via StatsService
 					StatsService.AddZombieKill(player, 1)
 					StatsService.AddCoinsEarned(player, coinValue)
-					
+
 					Network.CoinGained.Fire(player, {
 						Amount = coinValue,
 						TotalCoins = PlayerDataService.GetCoins(player),
@@ -137,12 +139,12 @@ local function OnStep(world)
 					})
 				end
 			end
-			
+
 			-- Broadcast death to all clients
 			Network.EntityDied.FireAll({
 				EntityId = id,
 			})
-			
+
 			-- Spawn DeathEvent for other systems
 			local deathPos = world:get(id, Components.PositionComponent)
 			local entityType = if plant then "Plant" elseif zombie then "Zombie" else "Unknown"
@@ -153,7 +155,7 @@ local function OnStep(world)
 				PositionY = if deathPos then deathPos.Y else 0,
 				PositionZ = if deathPos then deathPos.Z else 0,
 			}))
-			
+
 			-- Release entity back to pool
 			if EntityPool.IsPooledEntity(id) then
 				EntityPool.Despawn(id)
