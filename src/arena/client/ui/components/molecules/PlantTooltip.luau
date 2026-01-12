@@ -1,12 +1,15 @@
 --!strict
 --[[
-	PlantTooltip.luau - Displays detailed plant information on click
+	PlantTooltip.luau - Displays detailed plant information on click (Responsive)
 	
 	Features:
 	- 3D model preview using ViewportFrame
 	- Plant stats (Health, Damage, Attack Speed, etc.)
 	- Active mutations with effects
 	- Toon Pop styling
+	
+	Uses Fusion 0.3 scope:Method() syntax.
+	Fully responsive with Scale-based sizing.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,48 +22,34 @@ local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local Logger = require(Shared.utils.Logger)
 local Theme = require(Shared.ui.design.Theme)
+local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
 
-local Atoms = script.Parent.Parent.atoms
-local ToonPanel = require(Atoms.ToonPanel)
-
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 local OnEvent = Fusion.OnEvent
-local Out = Fusion.Out
 local peek = Fusion.peek
 local ForValues = Fusion.ForValues
 local Observer = Fusion.Observer
 
--- Types (use any to avoid Fusion generic issues)
-type Scope = any
-type UseFn = any
+-- Types
+type Scope = Fusion.Scope<any>
 
--- Constants
-local TOOLTIP_WIDTH = 320
-local TOOLTIP_HEIGHT = 400
-local VIEWPORT_SIZE = 120
-local STAT_ICON_SIZE = 20
-
--- Colors (from Theme or custom)
+-- Colors
 local Colors = {
-	TextPrimary = Color3.fromRGB(80, 60, 40),     -- Dark brown (readable on beige)
-	TextSecondary = Color3.fromRGB(120, 100, 80), -- Lighter brown
-	TextMuted = Color3.fromRGB(150, 130, 110),    -- Muted brown
-	Sun = Color3.fromRGB(255, 200, 50),           -- Sunny yellow
-	Health = Color3.fromRGB(80, 200, 80),         -- Green
-	Speed = Color3.fromRGB(100, 180, 255),        -- Light blue
-	CloseButton = Color3.fromRGB(200, 180, 150),  -- Light tan
+	TextPrimary = Color3.fromRGB(80, 60, 40),
+	TextSecondary = Color3.fromRGB(120, 100, 80),
+	TextMuted = Color3.fromRGB(150, 130, 110),
+	Sun = Color3.fromRGB(255, 200, 50),
+	Health = Color3.fromRGB(80, 200, 80),
+	Speed = Color3.fromRGB(100, 180, 255),
+	CloseButton = Color3.fromRGB(200, 180, 150),
 }
 
 -- Asset folder for plant models
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local PlantModels = Assets:WaitForChild("Plants")
 
--- Stat icons (emoji fallbacks)
+-- Stat icons
 local STAT_ICONS = {
 	Health = "❤️",
 	Damage = "⚔️",
@@ -71,7 +60,7 @@ local STAT_ICONS = {
 }
 
 export type PlantTooltipProps = {
-	Scope: any,
+	Scope: Scope,
 	PlantType: any,
 	Mutations: any,
 	EntityId: any,
@@ -81,49 +70,71 @@ export type PlantTooltipProps = {
 }
 
 --[[
-	Creates a stat row with icon, label, and value
+	Creates a responsive stat row
 ]]
 local function StatRow(scope: Scope, icon: string, label: string, value: any, color: Color3?): Instance
-	return New(scope, "Frame") {
-		Size = UDim2.new(1, 0, 0, 22),
+	return scope:New("Frame") {
+		Size = UDim2.fromScale(1, 0.16), -- 16% of stats container
 		BackgroundTransparency = 1,
 		
 		[Children] = {
-			-- Icon (absolute positioned left)
-			New(scope, "TextLabel") {
+			-- Icon
+			scope:New("TextLabel") {
 				Name = "Icon",
-				Size = UDim2.fromOffset(22, 22),
-				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.fromScale(0.12, 1),
+				Position = UDim2.fromScale(0, 0),
 				BackgroundTransparency = 1,
 				Text = icon,
-				TextSize = 14,
+				TextScaled = true,
 				Font = Enum.Font.GothamBold,
+				
+				[Children] = {
+					scope:New("UIAspectRatioConstraint") {
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
+					},
+				},
 			},
 			
-			-- Label (absolute positioned after icon)
-			New(scope, "TextLabel") {
+			-- Label
+			scope:New("TextLabel") {
 				Name = "Label",
-				Size = UDim2.new(0, 100, 1, 0),
-				Position = UDim2.new(0, 26, 0, 0),
+				Size = UDim2.fromScale(0.5, 1),
+				Position = UDim2.fromScale(0.14, 0),
 				BackgroundTransparency = 1,
 				Text = label,
 				TextColor3 = Colors.TextSecondary,
-				TextSize = 14,
+				TextScaled = true,
 				Font = Theme.Typography.Fonts.Body,
 				TextXAlignment = Enum.TextXAlignment.Left,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 14,
+						MinTextSize = 9,
+					},
+				},
 			},
 			
-			-- Value (absolute positioned right)
-			New(scope, "TextLabel") {
+			-- Value
+			scope:New("TextLabel") {
 				Name = "Value",
-				Size = UDim2.new(0, 60, 1, 0),
-				Position = UDim2.new(1, -60, 0, 0),
+				Size = UDim2.fromScale(0.3, 1),
+				Position = UDim2.fromScale(1, 0),
+				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
 				Text = value,
 				TextColor3 = color or Colors.TextPrimary,
-				TextSize = 14,
-				Font = Enum.Font.GothamBold, -- More readable for numbers
+				TextScaled = true,
+				Font = Enum.Font.GothamBold,
 				TextXAlignment = Enum.TextXAlignment.Right,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 14,
+						MinTextSize = 9,
+					},
+				},
 			},
 		},
 	}
@@ -135,51 +146,65 @@ end
 local function MutationBadge(scope: Scope, mutationId: string): Instance
 	local mutation = MutationData.Get(mutationId)
 	if not mutation then
-		return New(scope, "Frame") { Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1 }
+		return scope:New("Frame") { Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1 }
 	end
 	
-	return New(scope, "Frame") {
-		Size = UDim2.new(1, 0, 0, 36),
+	return scope:New("Frame") {
+		Size = UDim2.new(1, 0, 0, 40), -- Fixed pixel height for AutomaticCanvasSize
 		BackgroundColor3 = mutation.Color,
 		BackgroundTransparency = 0.8,
 		
 		[Children] = {
-			New(scope, "UICorner") {
+			scope:New("UICorner") {
 				CornerRadius = UDim.new(0, 6),
 			},
-			New(scope, "UIStroke") {
+			scope:New("UIStroke") {
 				Color = mutation.Color,
 				Thickness = 1,
 				Transparency = 0.5,
 			},
-			New(scope, "UIPadding") {
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
+			scope:New("UIPadding") {
+				PaddingLeft = UDim.new(0.03, 0),
+				PaddingRight = UDim.new(0.03, 0),
 			},
 			
 			-- Icon + Name
-			New(scope, "TextLabel") {
-				Size = UDim2.new(1, 0, 0, 18),
-				Position = UDim2.new(0, 0, 0, 2),
+			scope:New("TextLabel") {
+				Size = UDim2.fromScale(1, 0.5),
+				Position = UDim2.fromScale(0, 0.05),
 				BackgroundTransparency = 1,
 				Text = `{mutation.Icon} {mutation.Name}`,
 				TextColor3 = mutation.Color,
-				TextSize = 14,
+				TextScaled = true,
 				Font = Theme.Typography.Fonts.Title,
 				TextXAlignment = Enum.TextXAlignment.Left,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 14,
+						MinTextSize = 10,
+					},
+				},
 			},
 			
 			-- Description
-			New(scope, "TextLabel") {
-				Size = UDim2.new(1, 0, 0, 14),
-				Position = UDim2.new(0, 0, 0, 18),
+			scope:New("TextLabel") {
+				Size = UDim2.fromScale(1, 0.4),
+				Position = UDim2.fromScale(0, 0.55),
 				BackgroundTransparency = 1,
 				Text = mutation.Description,
 				TextColor3 = Colors.TextSecondary,
-				TextSize = 11,
+				TextScaled = true,
 				Font = Theme.Typography.Fonts.Body,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextTruncate = Enum.TextTruncate.AtEnd,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 11,
+						MinTextSize = 8,
+					},
+				},
 			},
 		},
 	}
@@ -201,19 +226,11 @@ local function setupViewport(viewport: ViewportFrame, plantType: string)
 	-- Get plant model
 	local modelTemplate = PlantModels:FindFirstChild(plantType)
 	if not modelTemplate then
-		Logger.Warn("PlantTooltip", `Model not found in PlantModels: {plantType}`)
-		-- List available models for debugging
-		local available = {}
-		for _, child in PlantModels:GetChildren() do
-			table.insert(available, child.Name)
-		end
-		Logger.Debug("PlantTooltip", `Available models: {table.concat(available, ", ")}`)
+		Logger.Warn("PlantTooltip", `Model not found: {plantType}`)
 		return
 	end
 	
-	Logger.Info("PlantTooltip", `Found model template: {modelTemplate.Name}`)
-	
-	-- Create WorldModel to hold the model (required for proper viewport rendering)
+	-- Create WorldModel
 	local worldModel = Instance.new("WorldModel")
 	worldModel.Parent = viewport
 	
@@ -221,12 +238,9 @@ local function setupViewport(viewport: ViewportFrame, plantType: string)
 	local model = modelTemplate:Clone()
 	model.Parent = worldModel
 	
-	-- Reset model position to origin and rotate 180° to face camera
+	-- Reset model position and rotate to face camera
 	if model.PrimaryPart then
 		model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0))
-		Logger.Debug("PlantTooltip", `Model pivoted to origin with 180° rotation`)
-	else
-		Logger.Warn("PlantTooltip", `Model {plantType} has no PrimaryPart!`)
 	end
 	
 	-- Create and position camera
@@ -240,22 +254,19 @@ local function setupViewport(viewport: ViewportFrame, plantType: string)
 	local maxSize = math.max(size.X, size.Y, size.Z)
 	local distance = maxSize * 2.5
 	
-	-- Position camera to look at model from front-right angle
+	-- Position camera
 	local modelCenter = cframe.Position
 	camera.CFrame = CFrame.new(
 		modelCenter + Vector3.new(distance * 0.6, distance * 0.4, distance * 0.8),
 		modelCenter
 	)
-	
-	Logger.Info("PlantTooltip", `Viewport setup complete for {plantType}`)
-	Logger.Debug("PlantTooltip", `  Size: {size}, Center: {modelCenter}, Distance: {distance}`)
-	Logger.Debug("PlantTooltip", `  Camera: {camera.CFrame.Position}, CurrentCamera set: {viewport.CurrentCamera == camera}`)
 end
 
 --[[
-	PlantTooltip Component
+	PlantTooltip Component (Responsive)
 	
 	Displays detailed plant information when a plant is clicked.
+	Uses Scale-based sizing for responsive layout.
 	
 	@param props PlantTooltipProps
 	@return Instance
@@ -264,20 +275,20 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 	local scope = props.Scope
 	
 	-- Get plant stats reactively
-	local plantStats = Computed(scope, function(use: UseFn)
+	local plantStats = scope:Computed(function(use)
 		local plantType = use(props.PlantType)
 		if not plantType then return nil end
 		return PlantData.GetStats(plantType) :: PlantData.PlantStats?
 	end)
 	
 	-- Plant name
-	local plantName = Computed(scope, function(use: UseFn)
+	local plantName = scope:Computed(function(use)
 		local stats = use(plantStats)
 		return stats and stats.Name or "Unknown Plant"
 	end)
 	
 	-- Category with color
-	local categoryInfo = Computed(scope, function(use: UseFn)
+	local categoryInfo = scope:Computed(function(use)
 		local stats = use(plantStats)
 		if not stats then return { text = "", color = Colors.TextSecondary } end
 		
@@ -294,31 +305,31 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 	end)
 	
 	-- Animated scale for pop-in effect
-	local targetScale = Computed(scope, function(use: UseFn)
+	local targetScale = scope:Computed(function(use)
 		return use(props.Visible) and 1 or 0.8
 	end)
-	local animatedScale = Spring(scope, targetScale, 35, 0.7)
+	local animatedScale = scope:Spring(targetScale, 35, 0.7)
 	
 	-- Animated transparency
-	local targetTransparency = Computed(scope, function(use: UseFn)
+	local targetTransparency = scope:Computed(function(use)
 		return use(props.Visible) and 0 or 1
 	end)
-	local animatedTransparency = Spring(scope, targetTransparency, 30, 1)
+	local animatedTransparency = scope:Spring(targetTransparency, 30, 1)
 	
-	-- Create viewport directly for 3D preview
+	-- Create viewport imperatively
 	local viewportFrame = Instance.new("ViewportFrame")
 	viewportFrame.Name = "ModelPreview"
-	viewportFrame.Size = UDim2.fromOffset(VIEWPORT_SIZE, VIEWPORT_SIZE)
-	viewportFrame.Position = UDim2.new(0, 0, 0, 0)
+	viewportFrame.Size = UDim2.fromScale(0.35, 0.9)
+	viewportFrame.Position = UDim2.fromScale(0, 0.05)
 	viewportFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 	viewportFrame.BackgroundTransparency = 0.3
 	viewportFrame.Ambient = Color3.fromRGB(200, 200, 200)
 	viewportFrame.LightColor = Color3.fromRGB(255, 255, 255)
 	viewportFrame.LightDirection = Vector3.new(-1, -1, -1)
 	
-	-- Add corner and stroke to viewport
+	-- Add corner and stroke
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
+	corner.CornerRadius = UDim.new(0.1, 0)
 	corner.Parent = viewportFrame
 	
 	local stroke = Instance.new("UIStroke")
@@ -326,10 +337,16 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 	stroke.Thickness = 2
 	stroke.Parent = viewportFrame
 	
-	-- Cleanup viewport when scope is destroyed
+	-- Keep square aspect
+	local aspect = Instance.new("UIAspectRatioConstraint")
+	aspect.AspectRatio = 1
+	aspect.DominantAxis = Enum.DominantAxis.Height
+	aspect.Parent = viewportFrame
+	
+	-- Cleanup viewport when scope destroyed
 	table.insert(scope, viewportFrame)
 	
-	-- Update viewport when plant type changes (using Observer for side effects)
+	-- Update viewport when plant type changes
 	local observer = Observer(scope, props.PlantType)
 	observer:onBind(function()
 		local plantType = peek(props.PlantType)
@@ -340,106 +357,132 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 		end
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "PlantTooltip",
-		Size = UDim2.fromOffset(TOOLTIP_WIDTH, TOOLTIP_HEIGHT),
+		Size = UDim2.fromScale(0.28, 0.55), -- 28% width, 55% height
 		Position = props.Position,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Visible = Computed(scope, function(use)
+		Visible = scope:Computed(function(use)
 			return use(animatedTransparency) < 0.99
 		end),
 		ZIndex = 100,
 		
 		[Children] = {
+			-- Size constraints
+			scope:New("UISizeConstraint") {
+				MinSize = Vector2.new(280, 360),
+				MaxSize = Vector2.new(400, 500),
+			},
+			
 			-- Scale container
-			New(scope, "UIScale") {
+			scope:New("UIScale") {
 				Scale = animatedScale,
 			},
 			
 			-- Main panel
 			ToonPanel({
 				Scope = scope,
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromScale(1, 1),
 				
 				[Children] = {
 					-- Content container
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Content",
-						Size = UDim2.new(1, -20, 1, -20),
-						Position = UDim2.new(0, 10, 0, 10),
+						Size = UDim2.fromScale(0.92, 0.95),
+						Position = UDim2.fromScale(0.04, 0.025),
 						BackgroundTransparency = 1,
 						
 						[Children] = {
-							New(scope, "UIListLayout") {
+							scope:New("UIListLayout") {
 								SortOrder = Enum.SortOrder.LayoutOrder,
-								Padding = UDim.new(0, 8),
+								Padding = UDim.new(0.02, 0),
 							},
 							
 							-- Header: 3D Preview + Name
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Header",
-								Size = UDim2.new(1, 0, 0, VIEWPORT_SIZE),
+								Size = UDim2.fromScale(1, 0.28),
 								BackgroundTransparency = 1,
 								LayoutOrder = 1,
 								
 								[Children] = {
-									-- ViewportFrame for 3D model (created imperatively)
+									-- ViewportFrame
 									viewportFrame,
 									
 									-- Name and category
-									New(scope, "Frame") {
+									scope:New("Frame") {
 										Name = "NameContainer",
-										Size = UDim2.new(1, -VIEWPORT_SIZE - 10, 0, VIEWPORT_SIZE),
-										Position = UDim2.new(0, VIEWPORT_SIZE + 10, 0, 0),
+										Size = UDim2.fromScale(0.58, 1),
+										Position = UDim2.fromScale(0.4, 0),
 										BackgroundTransparency = 1,
 										
 										[Children] = {
 											-- Plant name
-											New(scope, "TextLabel") {
+											scope:New("TextLabel") {
 												Name = "PlantName",
-												Size = UDim2.new(1, 0, 0, 28),
-												Position = UDim2.new(0, 0, 0, 10),
+												Size = UDim2.fromScale(1, 0.35),
+												Position = UDim2.fromScale(0, 0.1),
 												BackgroundTransparency = 1,
 												Text = plantName,
 												TextColor3 = Colors.TextPrimary,
-												TextSize = 20,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Title,
 												TextXAlignment = Enum.TextXAlignment.Left,
-												TextYAlignment = Enum.TextYAlignment.Top,
+												
+												[Children] = {
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 22,
+														MinTextSize = 14,
+													},
+												},
 											},
 											
 											-- Category badge
-											New(scope, "TextLabel") {
+											scope:New("TextLabel") {
 												Name = "Category",
-												Size = UDim2.new(1, 0, 0, 20),
-												Position = UDim2.new(0, 0, 0, 40),
+												Size = UDim2.fromScale(1, 0.2),
+												Position = UDim2.fromScale(0, 0.45),
 												BackgroundTransparency = 1,
-												Text = Computed(scope, function(use)
+												Text = scope:Computed(function(use)
 													return use(categoryInfo).text
 												end),
-												TextColor3 = Computed(scope, function(use)
+												TextColor3 = scope:Computed(function(use)
 													return use(categoryInfo).color
 												end),
-												TextSize = 14,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Body,
 												TextXAlignment = Enum.TextXAlignment.Left,
+												
+												[Children] = {
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 14,
+														MinTextSize = 10,
+													},
+												},
 											},
 											
 											-- Entity ID (debug)
-											New(scope, "TextLabel") {
+											scope:New("TextLabel") {
 												Name = "EntityId",
-												Size = UDim2.new(1, 0, 0, 16),
-												Position = UDim2.new(0, 0, 0, 65),
+												Size = UDim2.fromScale(1, 0.15),
+												Position = UDim2.fromScale(0, 0.7),
 												BackgroundTransparency = 1,
-												Text = Computed(scope, function(use)
+												Text = scope:Computed(function(use)
 													local id = use(props.EntityId)
 													return id and `Entity #{id}` or ""
 												end),
 												TextColor3 = Colors.TextMuted,
-												TextSize = 11,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Body,
 												TextXAlignment = Enum.TextXAlignment.Left,
+												
+												[Children] = {
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 11,
+														MinTextSize = 8,
+													},
+												},
 											},
 										},
 									},
@@ -447,47 +490,46 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 							},
 							
 							-- Separator
-							New(scope, "Frame") {
-								Size = UDim2.new(1, 0, 0, 1),
+							scope:New("Frame") {
+								Size = UDim2.fromScale(1, 0.003),
 								BackgroundColor3 = Theme.Colors.Surface.Stroke :: Color3,
 								LayoutOrder = 2,
 							},
 							
-							-- Stats section (using ForValues for dynamic list)
-							New(scope, "Frame") {
+							-- Stats section
+							scope:New("Frame") {
 								Name = "Stats",
-								Size = UDim2.new(1, 0, 0, 120),
+								Size = UDim2.fromScale(1, 0.28),
 								BackgroundTransparency = 1,
 								LayoutOrder = 3,
 								
 								[Children] = {
-									New(scope, "UIListLayout") {
+									scope:New("UIListLayout") {
 										SortOrder = Enum.SortOrder.LayoutOrder,
-										Padding = UDim.new(0, 4),
+										Padding = UDim.new(0.02, 0),
 									},
 									
-									-- All stats as separate rows with visibility handling
-									StatRow(scope, STAT_ICONS.Health, "Santé", Computed(scope, function(use)
+									StatRow(scope, STAT_ICONS.Health, "Santé", scope:Computed(function(use)
 										local stats = use(plantStats)
 										return stats and tostring(stats.Health) or "-"
 									end), Colors.Health),
 									
-									StatRow(scope, STAT_ICONS.Damage, "Dégâts", Computed(scope, function(use)
+									StatRow(scope, STAT_ICONS.Damage, "Dégâts", scope:Computed(function(use)
 										local stats = use(plantStats)
 										return stats and stats.Damage > 0 and tostring(stats.Damage) or "-"
 									end), Theme.Colors.Danger.Main),
 									
-									StatRow(scope, STAT_ICONS.AttackSpeed, "Vitesse", Computed(scope, function(use)
+									StatRow(scope, STAT_ICONS.AttackSpeed, "Vitesse", scope:Computed(function(use)
 										local stats = use(plantStats)
 										return stats and stats.AttackSpeed > 0 and `{stats.AttackSpeed}/s` or "-"
 									end), Colors.Speed),
 									
-									StatRow(scope, STAT_ICONS.Cost, "Coût", Computed(scope, function(use)
+									StatRow(scope, STAT_ICONS.Cost, "Coût", scope:Computed(function(use)
 										local stats = use(plantStats)
 										return stats and tostring(stats.Cost) or "-"
 									end), Colors.Sun),
 									
-									StatRow(scope, STAT_ICONS.Cooldown, "Recharge", Computed(scope, function(use)
+									StatRow(scope, STAT_ICONS.Cooldown, "Recharge", scope:Computed(function(use)
 										local stats = use(plantStats)
 										return stats and `{stats.Cooldown}s` or "-"
 									end), nil),
@@ -495,56 +537,62 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 							},
 							
 							-- Separator
-							New(scope, "Frame") {
-								Size = UDim2.new(1, 0, 0, 1),
+							scope:New("Frame") {
+								Size = UDim2.fromScale(1, 0.003),
 								BackgroundColor3 = Theme.Colors.Surface.Stroke :: Color3,
 								LayoutOrder = 4,
 							},
 							
 							-- Mutations section
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Mutations",
-								Size = UDim2.new(1, 0, 0, 90),
+								Size = UDim2.fromScale(1, 0.22),
 								BackgroundTransparency = 1,
 								LayoutOrder = 5,
 								
 								[Children] = {
-									New(scope, "UIListLayout") {
+									scope:New("UIListLayout") {
 										SortOrder = Enum.SortOrder.LayoutOrder,
-										Padding = UDim.new(0, 4),
+										Padding = UDim.new(0.02, 0),
 									},
 									
-									-- Mutations header (styled like stat row)
-									New(scope, "Frame") {
-										Size = UDim2.new(1, 0, 0, 22),
+									-- Mutations header
+									scope:New("Frame") {
+										Size = UDim2.fromScale(1, 0.25),
 										BackgroundTransparency = 1,
 										LayoutOrder = 1,
 										
 										[Children] = {
-											New(scope, "TextLabel") {
-												Size = UDim2.fromOffset(22, 22),
-												Position = UDim2.new(0, 0, 0, 0),
+											scope:New("TextLabel") {
+												Size = UDim2.fromScale(0.12, 1),
 												BackgroundTransparency = 1,
 												Text = "🧬",
-												TextSize = 14,
+												TextScaled = true,
 												Font = Enum.Font.GothamBold,
 											},
-											New(scope, "TextLabel") {
-												Size = UDim2.new(1, -26, 1, 0),
-												Position = UDim2.new(0, 26, 0, 0),
+											scope:New("TextLabel") {
+												Size = UDim2.fromScale(0.85, 1),
+												Position = UDim2.fromScale(0.14, 0),
 												BackgroundTransparency = 1,
 												Text = "Mutations",
 												TextColor3 = Colors.TextPrimary,
-												TextSize = 14,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Title,
 												TextXAlignment = Enum.TextXAlignment.Left,
+												
+												[Children] = {
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 14,
+														MinTextSize = 10,
+													},
+												},
 											},
 										},
 									},
 									
-									-- Mutation badges container (vertical scroll only)
-									New(scope, "ScrollingFrame") {
-										Size = UDim2.new(1, 0, 1, -26),
+									-- Mutation badges container
+									scope:New("ScrollingFrame") {
+										Size = UDim2.fromScale(1, 0.7),
 										BackgroundTransparency = 1,
 										ScrollBarThickness = 4,
 										CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -553,28 +601,41 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 										LayoutOrder = 2,
 										
 										[Children] = {
-											New(scope, "UIListLayout") {
+											scope:New("UIPadding") {
+												PaddingTop = UDim.new(0, 4),
+												PaddingBottom = UDim.new(0, 8),
+												PaddingLeft = UDim.new(0, 4),
+												PaddingRight = UDim.new(0, 4),
+											},
+											scope:New("UIListLayout") {
 												SortOrder = Enum.SortOrder.LayoutOrder,
 												Padding = UDim.new(0, 4),
 											},
 											
 											-- No mutations placeholder
-											New(scope, "TextLabel") {
-												Size = UDim2.new(1, 0, 0, 20),
+											scope:New("TextLabel") {
+												Size = UDim2.new(1, 0, 0, 24),
 												BackgroundTransparency = 1,
 												Text = "Aucune mutation",
 												TextColor3 = Colors.TextMuted,
-												TextSize = 12,
+												TextScaled = true,
 												Font = Theme.Typography.Fonts.Body,
 												TextXAlignment = Enum.TextXAlignment.Center,
-												Visible = Computed(scope, function(use)
+												Visible = scope:Computed(function(use)
 													local mutations = use(props.Mutations) or {}
 													return #mutations == 0
 												end),
+												
+												[Children] = {
+													scope:New("UITextSizeConstraint") {
+														MaxTextSize = 12,
+														MinTextSize = 9,
+													},
+												},
 											},
 											
-											-- Dynamic mutation badges using ForValues
-											ForValues(scope, Computed(scope, function(use)
+											-- Dynamic mutation badges
+											ForValues(scope, scope:Computed(function(use)
 												return use(props.Mutations) or {}
 											end), function(use, innerScope, mutationId)
 												return MutationBadge(innerScope, mutationId)
@@ -585,25 +646,33 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 							},
 							
 							-- Close button
-							New(scope, "TextButton") {
+							scope:New("TextButton") {
 								Name = "CloseButton",
-								Size = UDim2.new(1, 0, 0, 32),
+								Size = UDim2.fromScale(1, 0.08),
 								BackgroundColor3 = Colors.CloseButton,
 								Text = "Fermer",
 								TextColor3 = Colors.TextPrimary,
-								TextSize = 14,
+								TextScaled = true,
 								Font = Theme.Typography.Fonts.Title,
 								LayoutOrder = 10,
 								
 								[OnEvent("Activated")] = props.OnClose,
 								
 								[Children] = {
-									New(scope, "UICorner") {
-										CornerRadius = UDim.new(0, 6),
+									scope:New("UISizeConstraint") {
+										MinSize = Vector2.new(100, 28),
+										MaxSize = Vector2.new(300, 40),
 									},
-									New(scope, "UIStroke") {
+									scope:New("UICorner") {
+										CornerRadius = UDim.new(0.2, 0),
+									},
+									scope:New("UIStroke") {
 										Color = Theme.Colors.Surface.Stroke :: Color3,
 										Thickness = 1,
+									},
+									scope:New("UITextSizeConstraint") {
+										MaxTextSize = 14,
+										MinTextSize = 10,
 									},
 								},
 							},

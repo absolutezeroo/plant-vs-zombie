@@ -1,11 +1,14 @@
 --!strict
 --[[
-	CoinCounter.luau - Displays player's coin balance with "Toon Pop" style
+	CoinCounter.luau - Displays player's coin balance with "Toon Pop" style (Responsive)
 	
 	Molecule component that shows the player's permanent currency (coins).
 	Connects to PlayerDataClient for reactive coin updates.
 	
 	Visual: Compact rounded container with coin icon + text
+	
+	Fully responsive using Scale-based sizing.
+	Uses Fusion 0.3 scope:Method() syntax.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,16 +24,8 @@ local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
 local PlayerDataClient = require(Modules.PlayerDataClient)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-
--- Constants
-local ICON_SIZE = 24
-local CONTAINER_WIDTH = 90  -- Fixed width to match SunCounter
-local CONTAINER_HEIGHT = 40
-local CONTAINER_PADDING = 6
 
 -- Colors
 local Colors = {
@@ -48,7 +43,7 @@ export type CoinCounterProps = {
 }
 
 --[[
-	CoinCounter Component
+	CoinCounter Component (Responsive)
 	
 	Displays the player's coin balance in a compact container.
 	Automatically subscribes to PlayerDataClient coins.
@@ -63,7 +58,7 @@ local function CoinCounter(props: CoinCounterProps): Frame
 	local coinsValue = PlayerDataClient.GetCoinsValue()
 	
 	-- Computed coin text with formatting
-	local coinText = Computed(scope, function(use): string
+	local coinText = scope:Computed(function(use): string
 		local coins = use(coinsValue)
 		
 		-- Format large numbers
@@ -77,52 +72,79 @@ local function CoinCounter(props: CoinCounterProps): Frame
 		return tostring(coins)
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "CoinCounter",
-		Position = props.Position or UDim2.new(0, 0, 0, 0),
+		Position = props.Position or UDim2.fromScale(0, 0),
 		AnchorPoint = props.AnchorPoint or Vector2.new(0, 0),
-		Size = UDim2.fromOffset(CONTAINER_WIDTH, CONTAINER_HEIGHT),
+		Size = UDim2.fromScale(0.08, 1), -- 8% width of screen, full height of parent
 		BackgroundColor3 = Colors.Background,
 		LayoutOrder = props.LayoutOrder or 0,
 		
 		[Children] = {
+			-- Size constraints
+			scope:New("UISizeConstraint") {
+				MinSize = Vector2.new(70, 32),
+				MaxSize = Vector2.new(120, 50),
+			},
+			
 			-- Rounded corners
-			New(scope, "UICorner") {
-				CornerRadius = UDim.new(0, 10),
+			scope:New("UICorner") {
+				CornerRadius = UDim.new(0.3, 0),
 			},
 			
 			-- Stroke
-			New(scope, "UIStroke") {
+			scope:New("UIStroke") {
 				Color = Colors.Stroke,
 				Thickness = 2,
 			},
 			
+			-- Padding
+			scope:New("UIPadding") {
+				PaddingLeft = UDim.new(0.08, 0),
+				PaddingRight = UDim.new(0.08, 0),
+			},
+			
 			-- Coin icon (left)
-			New(scope, "TextLabel") {
+			scope:New("TextLabel") {
 				Name = "CoinIcon",
-				Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
-				Position = UDim2.new(0, CONTAINER_PADDING, 0.5, 0),
+				Size = UDim2.fromScale(0.35, 0.8),
+				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
 				Text = "👛",
-				TextSize = 18,
+				TextScaled = true,
 				Font = Enum.Font.GothamBold,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 20,
+						MinTextSize = 10,
+					},
+				},
 			},
 			
 			-- Coin amount text
-			New(scope, "TextLabel") {
+			scope:New("TextLabel") {
 				Name = "CoinAmount",
-				Size = UDim2.new(1, -ICON_SIZE - CONTAINER_PADDING * 2, 1, 0),
-				Position = UDim2.new(0, ICON_SIZE + CONTAINER_PADDING, 0, 0),
+				Size = UDim2.fromScale(0.55, 0.8),
+				Position = UDim2.fromScale(0.4, 0.5),
+				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
 				Text = coinText,
 				TextColor3 = Colors.Text,
 				TextStrokeColor3 = Colors.Stroke,
 				TextStrokeTransparency = 0.5,
 				Font = Theme.Typography.Fonts.Title,
-				TextSize = 16,
+				TextScaled = true,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextTruncate = Enum.TextTruncate.AtEnd,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 18,
+						MinTextSize = 10,
+					},
+				},
 			},
 		},
 	}

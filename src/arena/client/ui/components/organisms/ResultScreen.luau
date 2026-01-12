@@ -1,6 +1,6 @@
 --!strict
 --[[
-	ResultScreen.luau - Victory/Defeat results screen
+	ResultScreen.luau - Victory/Defeat results screen (Responsive)
 	
 	Organism component displaying end-game summary.
 	Features:
@@ -11,6 +11,9 @@
 	- Return to lobby button
 	
 	Uses Atomic Design with ToonPanel, RewardRow, StarRating, ResultBanner.
+	
+	Uses Fusion 0.3 scope:Method() syntax.
+	Fully responsive with Scale-based sizing.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,26 +23,16 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
-local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
-
-local Atoms = script.Parent.Parent.atoms
-local ToonPanel = require(Atoms.ToonPanel)
-local ToonButton = require(Atoms.ToonButton)
-local RewardRow = require(Atoms.RewardRow)
+local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
+local ToonButton = require(Shared.ui.components.atoms.ToonButton)
+local RewardRow = require(Shared.ui.components.atoms.RewardRow)
 
 local Molecules = script.Parent.Parent.molecules
 local ResultBanner = require(Molecules.ResultBanner)
 local StarRating = require(Molecules.StarRating)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Spring = Fusion.Spring
-
--- Constants
-local PANEL_WIDTH = 380
-local PANEL_HEIGHT = 420
 
 -- Reward colors
 local RewardColors = {
@@ -64,9 +57,10 @@ export type ResultScreenProps = {
 }
 
 --[[
-	ResultScreen Component
+	ResultScreen Component (Responsive)
 	
 	Displays the end-game results with animations.
+	Uses Scale-based sizing for responsive layout.
 	
 	@param props ResultScreenProps
 	@return Frame
@@ -74,22 +68,20 @@ export type ResultScreenProps = {
 local function ResultScreen(props: ResultScreenProps): Frame
 	local scope = props.Scope
 	
-	-- Animated scale for panel entrance (combined with responsive scaling)
-	local targetScale = Computed(scope, function(use)
-		local responsiveScale = use(ResponsiveUtils.GetScale())
-		local visibleScale = if use(props.Visible) then 1.0 else 0.8
-		return responsiveScale * visibleScale
+	-- Animated scale for panel entrance
+	local targetScale = scope:Computed(function(use)
+		return if use(props.Visible) then 1.0 else 0.8
 	end)
-	local animatedScale = Spring(scope, targetScale, 25, 0.6)
+	local animatedScale = scope:Spring(targetScale, 25, 0.6)
 	
 	-- Animated transparency for overlay
-	local overlayTransparency = Computed(scope, function(use)
+	local overlayTransparency = scope:Computed(function(use)
 		return if use(props.Visible) then 0.4 else 1
 	end)
-	local animatedOverlay = Spring(scope, overlayTransparency, 20, 1)
+	local animatedOverlay = scope:Spring(overlayTransparency, 20, 1)
 	
 	-- Countdown text
-	local countdownText = Computed(scope, function(use)
+	local countdownText = scope:Computed(function(use)
 		local seconds = use(props.TeleportCountdown)
 		if seconds > 0 then
 			return `Retour au lobby dans {seconds}s...`
@@ -98,22 +90,22 @@ local function ResultScreen(props: ResultScreenProps): Frame
 	end)
 	
 	-- Show gems row only if > 0
-	local showGems = Computed(scope, function(use)
+	local showGems = scope:Computed(function(use)
 		return use(props.GemsEarned) > 0
 	end)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "ResultScreenContainer",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		Visible = Computed(scope, function(use)
+		Visible = scope:Computed(function(use)
 			return use(props.Visible)
 		end),
 		ZIndex = 100,
 		
 		[Children] = {
 			-- Dark overlay
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Overlay",
 				Size = UDim2.fromScale(1, 1),
 				BackgroundColor3 = Color3.new(0, 0, 0),
@@ -121,17 +113,23 @@ local function ResultScreen(props: ResultScreenProps): Frame
 				ZIndex = 1,
 			},
 			
-			-- Main panel (centered)
-			New(scope, "Frame") {
+			-- Main panel (centered, responsive)
+			scope:New("Frame") {
 				Name = "PanelContainer",
-				Size = UDim2.fromOffset(PANEL_WIDTH, PANEL_HEIGHT),
+				Size = UDim2.fromScale(0.35, 0.6), -- 35% width, 60% height
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				ZIndex = 10,
 				
 				[Children] = {
-					New(scope, "UIScale") {
+					-- Size constraints
+					scope:New("UISizeConstraint") {
+						MinSize = Vector2.new(320, 380),
+						MaxSize = Vector2.new(450, 520),
+					},
+					
+					scope:New("UIScale") {
 						Scale = animatedScale,
 					},
 					
@@ -140,18 +138,18 @@ local function ResultScreen(props: ResultScreenProps): Frame
 						Size = UDim2.fromScale(1, 1),
 						
 						[Children] = {
-							-- Content padding
-							New(scope, "UIPadding") {
-								PaddingLeft = UDim.new(0, 16),
-								PaddingRight = UDim.new(0, 16),
-								PaddingTop = UDim.new(0, 16),
-								PaddingBottom = UDim.new(0, 16),
+							-- Content padding (relative)
+							scope:New("UIPadding") {
+								PaddingLeft = UDim.new(0.04, 0),
+								PaddingRight = UDim.new(0.04, 0),
+								PaddingTop = UDim.new(0.04, 0),
+								PaddingBottom = UDim.new(0.04, 0),
 							},
 							
 							-- Vertical layout
-							New(scope, "UIListLayout") {
+							scope:New("UIListLayout") {
 								SortOrder = Enum.SortOrder.LayoutOrder,
-								Padding = UDim.new(0, 12),
+								Padding = UDim.new(0.025, 0), -- 2.5% padding
 							},
 							
 							-- 1. Result Banner
@@ -171,24 +169,24 @@ local function ResultScreen(props: ResultScreenProps): Frame
 							}),
 							
 							-- 3. Separator
-							New(scope, "Frame") {
-								Size = UDim2.new(1, 0, 0, 2),
+							scope:New("Frame") {
+								Size = UDim2.fromScale(1, 0.005),
 								BackgroundColor3 = Theme.Colors.Surface.Stroke,
 								BackgroundTransparency = 0.5,
 								LayoutOrder = 3,
 							},
 							
 							-- 4. Rewards section
-							New(scope, "Frame") {
+							scope:New("Frame") {
 								Name = "Rewards",
-								Size = UDim2.new(1, 0, 0, 140),
+								Size = UDim2.fromScale(1, 0.35), -- 35% of panel
 								BackgroundTransparency = 1,
 								LayoutOrder = 4,
 								
 								[Children] = {
-									New(scope, "UIListLayout") {
+									scope:New("UIListLayout") {
 										SortOrder = Enum.SortOrder.LayoutOrder,
-										Padding = UDim.new(0, 6),
+										Padding = UDim.new(0.04, 0),
 									},
 									
 									-- Zombies killed
@@ -224,7 +222,7 @@ local function ResultScreen(props: ResultScreenProps): Frame
 										LayoutOrder = 3,
 									}),
 									
-									-- Gems (always created, visibility controlled internally)
+									-- Gems (visibility controlled internally)
 									RewardRow({
 										Scope = scope,
 										Icon = "💎",
@@ -238,24 +236,31 @@ local function ResultScreen(props: ResultScreenProps): Frame
 								},
 							},
 							
-							-- 5. Countdown text
-							New(scope, "TextLabel") {
+							-- 5. Countdown text (responsive)
+							scope:New("TextLabel") {
 								Name = "Countdown",
-								Size = UDim2.new(1, 0, 0, 24),
+								Size = UDim2.fromScale(1, 0.06),
 								BackgroundTransparency = 1,
 								Text = countdownText,
 								TextColor3 = Theme.Colors.Surface.Stroke,
-								TextSize = 14,
+								TextScaled = true,
 								Font = Theme.Typography.Fonts.Body,
 								TextXAlignment = Enum.TextXAlignment.Center,
 								LayoutOrder = 5,
+								
+								[Children] = {
+									scope:New("UITextSizeConstraint") {
+										MaxTextSize = 14,
+										MinTextSize = 10,
+									},
+								},
 							},
 							
-							-- 6. Return button
+							-- 6. Return button (responsive)
 							ToonButton({
 								Scope = scope,
 								Text = "Retour au Lobby",
-								Size = UDim2.new(1, 0, 0, 48),
+								Size = UDim2.fromScale(1, 0.12),
 								Color = "Action",
 								OnClick = props.OnReturnToLobby or function() end,
 								LayoutOrder = 6,

@@ -117,7 +117,7 @@ local function FilterPill(props: FilterPillProps): Frame
 					
 					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
-						Thickness = 2,
+						Thickness = 0.25,
 					},
 				},
 			},

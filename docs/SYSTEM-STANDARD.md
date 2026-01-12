@@ -1,15 +1,20 @@
 # 📐 Standard Architecture: ECS System V2.0
 
-**Version:** 2.0
-**Scope:** All scripts in `src/arena/server/systems/`
+**Version:** 2.0 (Post-Refactoring Complete)
+**Date:** 2026-01-12
+**Scope:** All scripts in `src/arena/server/systems/` and `src/arena/client/systems/`
 **Goal:** Enforce structural uniformity, isolate state, and enable Hot-Reloading.
+**Status:** ✅ All systems refactored to V2 pattern.
 
 ---
 
 ## 1. The 3 Core Rules
-1.  **No Public API:** A System **NEVER** returns functions. It returns a table `{ priority, Init, Dispose, system }`.
+
+1.  **No Public API:** A System **NEVER** returns functions for external consumption. It returns ONLY the lifecycle table `{ priority, Init, Dispose, system }`. If you need shared state, create a **Service** instead.
 2.  **Encapsulated State:** No loose `local` variables for state. Everything mutable must be inside a `local State = {}` table.
-3.  **Frozen Config:** No magic numbers ("Zombie", 100, 0.5) inside the logic. Everything must be in `local CONFIG = table.freeze({})`.
+3.  **Frozen Config:** No magic numbers ("Zombie", 100, 0.5) inside the logic. Everything must be in `local CONFIG = table.freeze({})` or imported from `GameConstants`.
+
+> ⚠️ **CRITICAL:** Systems that return public APIs will break hot-reloading and violate Matter best practices. Use Services for shared state/APIs.
 
 ---
 
@@ -111,13 +116,15 @@ SystemManager.Register(system, moduleScript.Name)
 **Current Services:**
 | Service | Purpose |
 |---------|---------|
-| `WaveService` | Game state, wave management |
+| `ArenaService` | Arena session management, battle start/end |
+| `WaveService` | Game state, wave management, world/difficulty config |
 | `SunService` | Player sun economy |
 | `MutationService` | Player mutation cache |
-| `PlantFoodService` | Plant Food charges |
-| `StatsService` | Session statistics |
-| `GridService` | Grid occupancy |
-| `PlayerDataService` | Player profiles/persistence |
+| `PlantFoodService` | Plant Food charges, glowing zombie tracking |
+| `StatsService` | Session statistics (zombies killed, coins, plants) |
+| `GridService` | Grid occupancy, cell validation |
+| `PlayerDataService` | Player profiles/persistence (ProfileStore) |
+| `MapLoader` | Map loading/unloading |
 
 ---
 
@@ -168,3 +175,29 @@ end
 ```
 
 **Note:** `MapConfig.Initialize()` is called in server bootstrap (`init.server.luau`) before the Matter loop. Functions like `MapConfig.GridToWorld()` are safe to call in OnStep after bootstrap, but caching is still preferred for consistency.
+
+---
+
+## 6. Linting (MANDATORY)
+
+**Tool:** Selene (Luau linter)
+
+**Rule:** Run `selene src/` before every commit and fix ALL warnings/errors.
+
+```bash
+# Run selene on entire codebase
+selene src/
+
+# Run selene on specific system
+selene src/arena/server/systems/combat/CombatSystem.luau
+```
+
+**What selene catches:**
+- Unused variables and imports
+- Variable shadowing
+- Type annotation issues
+- `wait()` usage (must use `task.wait()`)
+- Global variable leaks
+- Missing `--!strict` pragma
+
+**Integration:** CI/CD pipeline fails on selene errors. Fix locally before pushing.

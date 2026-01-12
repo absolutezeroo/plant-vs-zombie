@@ -53,7 +53,7 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 	
 	-- Reactive: Is shovel mode active?
 	local isShovelActive = scope:Computed(function(use)
-		return use(SelectionState.IsShovelMode)
+		return use(SelectionState.ShovelMode)
 	end)
 	
 	-- Border color based on active state
@@ -96,12 +96,7 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 	
 	-- Toggle shovel mode
 	local function toggleShovel()
-		local currentMode = peek(SelectionState.IsShovelMode)
-		SelectionState.IsShovelMode:set(not currentMode)
-		-- Clear plant selection when entering shovel mode
-		if not currentMode then
-			SelectionState.SelectedPlant:set(nil)
-		end
+		SelectionState.ToggleShovel()
 	end
 	
 	return scope:New("Frame") {

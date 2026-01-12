@@ -96,13 +96,13 @@ local function DeckSlot(scope: any, props: {
 	if hasPlant then
 		plantViewport = PlantViewport.CreateWithScope(scope, {
 			PlantType = props.PlantType :: string,
-			Size = UDim2.fromScale(0.85, 0.55),
-			Position = UDim2.fromScale(0.5, 0.35),
+			Size = UDim2.fromScale(0.9, 0.5),
+			Position = UDim2.fromScale(0.5, 0.38),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			ZIndex = 3,
-			CameraFOV = 38,
-			CameraDistance = 1.5,
-			CameraHeight = 0.15,
+			CameraFOV = 35,
+			CameraDistance = 1.4,
+			CameraHeight = 0.12,
 		})
 	end
 	
@@ -820,10 +820,10 @@ local function DeckBuilderScreen(props: DeckBuilderScreenProps): Frame
 									},
 									
 									scope:New("UIPadding") {
-										PaddingTop = UDim.new(0.02, 0),
-										PaddingBottom = UDim.new(0.03, 0),
-										PaddingLeft = UDim.new(0.02, 0),
-										PaddingRight = UDim.new(0.02, 0),
+										PaddingTop = UDim.new(0, 12),
+										PaddingBottom = UDim.new(0, 20),
+										PaddingLeft = UDim.new(0, 12),
+										PaddingRight = UDim.new(0, 12),
 									},
 									
 									scope:New("UIGridLayout") {

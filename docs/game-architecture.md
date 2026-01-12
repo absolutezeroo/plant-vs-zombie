@@ -1,13 +1,14 @@
 ---
 title: 'Game Architecture'
 project: 'plant-vs-zombie'
-date: '2026-01-06'
+date: '2026-01-12'
 author: 'Clayton'
-version: '1.0'
+version: '2.0'
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-status: 'complete'
+status: 'Production (Content & VFX)'
 engine: 'Roblox'
 platform: 'PC, Mobile-First, Console'
+refactoring: 'Complete - Matter V2 Architecture (Isolated State, Frozen Config, Services)'
 
 # Source Documents
 gdd: '_bmad-output/planning-artifacts/gdd.md'
@@ -127,13 +128,14 @@ The project combines tower defense strategy with active gameplay mechanics, targ
 
 | System | Complexity | Critical Constraints | Architecture Priority |
 |--------|-----------|---------------------|---------------------|
-| **Matter ECS Core** | High | 60 ticks/sec, 200 entity cap, no Humanoids | Critical - System interaction diagrams |
+| **Matter ECS Core** | High | 60 ticks/sec, 200 entity cap, server-pure ECS | Critical - System interaction diagrams |
 | **Zap Networking** | High | <50 KB/s bandwidth, Vector3 quantization, client prediction | Critical - Packet schema definitions |
 | **Grid & Placement** | Medium | 9×5 fixed (SACRED), 6-stud cells, Ghost Unit preview | High - Validation logic patterns |
 | **Wave Generator** | High | Budget formula 50×1.6^Wave, 100-120 zombie cap, queue system | Critical - Entity spawning architecture |
 | **Resource Management** | Medium | Sun economy, server authority, optimistic UI updates | High - State synchronization patterns |
 | **Combat Resolution** | High | Projectile pooling, server-authoritative hits, 25 projectile cap | Critical - Damage calculation flow |
 | **VFX/Audio Systems** | Medium | Dynamic LOD (50+ entities trigger), 16-channel audio priority | Medium - Performance scaling strategies |
+| **Animation (Client)** | Medium | AnimationController preferred, optimized Humanoid allowed | Medium - Hybrid animation strategy |
 | **Fusion UI** | Medium | Mobile-First (64px targets), reactive state, deck builder | High - Component composition patterns |
 | **ProfileStore Data** | Medium | Session locking, Account/Mastery/Progress schemas | High - Data schema definitions |
 | **Input Abstraction** | Low | ContextActionService unified Touch/Mouse/Gamepad | Medium - Binding strategy patterns |
@@ -212,20 +214,28 @@ MEMORY_LIMIT = 600     -- MB, emergency protocols at thresholds
 
 **1. The Swarm Engine (100+ Synchronized Entities)**
 
-**Challenge:** Render and synchronize 100-120 zombies + 45 plants + 25 projectiles at 60 FPS on mobile without Roblox Humanoids.
+**Challenge:** Render and synchronize 100-120 zombies + 45 plants + 25 projectiles at 60 FPS on mobile.
 
 **Technical Implications:**
-- **Custom MovementSystem:** No Humanoid components (5-10ms per entity cost). Must design lightweight PositionComponent + VelocityComponent pattern.
+- **Server Logic:** Uses `GridPositionComponent` + `MovementComponent` for entity logic (no Humanoid on server).
+- **Client Animation Strategy (Hybrid):**
+  - **Preferred:** `AnimationController` for animations (~0.1ms per entity, no physics overhead)
+  - **Allowed:** Optimized `Humanoid` with `PlatformStand = true` and physics disabled (~0.3ms per entity) for complex animation rigs
 - **Instanced Rendering:** All zombie models of same type share single draw call (Roblox automatic instancing).
-- **Spatial Partitioning:** Targeting queries only check lane + range (no global entity search).
+- **Spatial Partitioning:** `SpatialHashingSystem` (Priority 100) rebuilds `LaneCache` every frame for O(1) targeting.
 - **Component Array Optimization:** Flat arrays, no nested tables (cache-friendly, 10× faster than OOP).
 
+**Animation Guidelines:**
+- At 150+ entities, prefer `AnimationController` to maintain 60 FPS
+- `AnimationController` has ~0.1ms overhead vs `Humanoid` ~0.3ms overhead per entity
+- Complex rigs (clothing, accessories) may require optimized `Humanoid`
+
 **Architecture Requirements:**
-- System interaction diagram: WaveGeneratorSystem → SpawningSystem → MovementSystem → TargetingSystem flow
-- Component schemas: Position, Velocity, Target, Health, Damage definitions
+- System interaction diagram: WaveManagerSystem → ZombieMovementSystem → SpatialHashingSystem → TargetingSystem flow
+- Component schemas: GridPosition, Movement, Target, Health, Damage definitions
 - Performance monitoring: Entity count tracking, FPS sampling, memory profiling
 
-**Risk:** Unproven at this scale on mobile. Mitigation: Stress test Epic 1 (100 entities), Epic 3 (200 entities).
+**Risk:** Unproven at this scale on mobile. **Validated:** Stress tested 200 entities at 60 FPS.
 
 ---
 
@@ -318,16 +328,16 @@ MEMORY_LIMIT = 600     -- MB, emergency protocols at thresholds
 
 ---
 
-**🚨 Risk 2: Roblox Physics Stability**
+**🚨 Risk 2: Roblox Physics Stability** ✅ RESOLVED
 
-**Description:** Assume Roblox physics engine remains stable with 200 MeshParts in motion using custom movement (no Humanoids).
+**Description:** Physics engine stability with 200 MeshParts in motion using custom movement.
 
-**Mitigation:**
-- **Epic 1 Validation:** Stress test 100 entities at 60 FPS (Weeks 1-2)
-- **Epic 3 Validation:** Full 200-entity test during Swarm Engine (Weeks 5-7)
-- **Fallback:** Reduce entity cap to 150 if physics breaks (still meets "The Swarm" pillar)
+**Resolution:**
+- Server logic uses pure ECS components (no Humanoid physics)
+- Client rendering uses hybrid approach: `AnimationController` preferred, optimized `Humanoid` allowed
+- 200-entity stress tests passed at 60 FPS
 
-**Architecture Impact:** High - If physics fails, must redesign movement system (estimate +2 weeks).
+**Architecture Impact:** Minimal - Hybrid approach works well.
 
 ---
 
@@ -1065,6 +1075,7 @@ plant-vs-zombie/
 | | FullStateSyncSystem | | Full state replication for late joins |
 | | PerformanceMonitorSystem | | FPS/memory monitoring, emergency protocols |
 | | SafetySystem | | Entity cap enforcement |
+| | SpatialHashingSystem | | Lane-based spatial cache rebuild (Priority 100) |
 | **Economy** | SunCollectionSystem | `arena/server/systems/economy/` | Sun pickup validation |
 | | SunflowerProductionSystem | | Sun production from Sunflowers |
 | | SunSpawnSystem | | Natural sun drops |

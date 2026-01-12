@@ -1,9 +1,10 @@
 ---
 title: 'API Reference'
 project: 'plant-vs-zombie'
-date: '2026-01-10'
-version: '1.1'
+date: '2026-01-12'
+version: '2.0'
 purpose: 'Document all service APIs to prevent call mismatches'
+status: 'Post-Refactoring V2 - All services use isolated state pattern'
 ---
 
 # API Reference: Services & Managers
@@ -141,29 +142,50 @@ This document lists all public functions for each service module to prevent call
 
 **Location:** `src/arena/server/services/WaveService.luau`
 
-Manages game state and wave progression. Extracted from WaveManagerSystem.
+Manages game state and wave progression. Decoupled from WaveManagerSystem (service owns state, system runs ECS loop).
 
 ### Game State
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `GetGameState()` | - | `GameState` | Get current game state (`"Idle"`, `"Playing"`, `"Victory"`, `"Defeat"`) |
-| `SetGameState(state)` | `string` | `void` | Set game state |
-| `IsPlaying()` | - | `boolean` | Check if game is active |
-| `IsDay()` | - | `boolean` | Check if current world is daytime |
+| `GetGameState()` | - | `GameState` | Get current game state (`"Idle"`, `"Preparation"`, `"Playing"`, `"Victory"`, `"Defeat"`) |
+| `SetGameState(state)` | `GameState` | `void` | Set game state (triggers `handleGameEnd` on Victory/Defeat) |
+| `IsPlaying()` | - | `boolean` | Check if game is in Playing state |
+| `IsGameOver()` | - | `boolean` | Check if game ended (Victory or Defeat) |
+| `CanStartGame()` | - | `boolean` | Check if game can be started |
+| `IsDay()` | - | `boolean` | Check if current world is daytime (from WorldConfig.Mechanics) |
 
 ### Wave Management
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `GetCurrentWave()` | - | `number` | Get current wave number |
 | `GetTotalWaves()` | - | `number` | Get total waves in level |
-| `StartGame(worldId, difficulty)` | `string, string` | `void` | Start a new game |
-| `EndGame(victory)` | `boolean` | `void` | End the game |
+| `StartGame(worldId?, difficulty?)` | `string?, string?` | `boolean` | Start a new game with world/difficulty config |
+| `StartWaves()` | - | `boolean` | Transition from Preparation to Playing state |
+| `ResetGameState()` | - | `void` | Reset all wave state for new game |
+| `OnZombieDied()` | - | `void` | Hook called by EntityDeathSystem |
+
+### Auto-Start
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `SetAutoStart(enabled)` | `boolean` | `void` | Enable/disable auto-start waves |
+| `GetAutoStartEnabled()` | - | `boolean` | Check if auto-start is enabled |
 
 ### Configuration
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
+| `GetCurrentWorldId()` | - | `string` | Get current world ID |
+| `GetCurrentDifficulty()` | - | `string` | Get current difficulty ID |
 | `GetCurrentWorldConfig()` | - | `WorldConfig?` | Get current world configuration |
 | `GetCurrentDifficultyConfig()` | - | `DifficultyConfig?` | Get current difficulty configuration |
+
+### Internal (WaveManagerSystem)
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetState()` | - | `State` | Get internal state table (for WaveManagerSystem) |
+| `GetSpawner()` | - | `WaveSpawner?` | Get spawner manager instance |
+| `GetBroadcaster()` | - | `WaveBroadcaster?` | Get broadcaster manager instance |
+| `GetPlantFoodService()` | - | `PlantFoodService` | Get PlantFoodService (lazy loaded) |
+| `IsStudioDebug()` | - | `boolean` | Check if running in Studio |
 
 ---
 
@@ -171,17 +193,19 @@ Manages game state and wave progression. Extracted from WaveManagerSystem.
 
 **Location:** `src/arena/server/services/SunService.luau`
 
-Manages player sun economy. Extracted from PlacementSystem.
+Manages player sun economy. Auto-initializes on first API call.
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `Initialize()` | - | `void` | Initialize service |
-| `GetSun(player)` | `Player` | `number` | Get player's current sun |
-| `AddSun(player, amount)` | `Player, number` | `number` | Add sun, returns new total |
+| `GetSun(player)` | `Player` | `number` | Get player's current sun (0 if not tracked) |
+| `AddSun(player, amount)` | `Player, number` | `void` | Add sun to player (can be negative) |
 | `SpendSun(player, amount)` | `Player, number` | `boolean` | Spend sun (returns false if insufficient) |
-| `SetSun(player, amount)` | `Player, number` | `void` | Set sun to specific amount |
-| `BroadcastSunUpdate(player)` | `Player` | `void` | Sync sun to client |
-| `Dispose()` | - | `void` | Clean up |
+| `SetSun(player, amount)` | `Player, number` | `void` | Set sun to specific amount (min 0) |
+| `ResetPlayer(player)` | `Player` | `void` | Reset player to starting sun (50) |
+| `BroadcastSunUpdate(player, sunEntityId?)` | `Player, number?` | `void` | Sync sun to client via network |
+| `Dispose()` | - | `void` | Clean up and reset state |
+
+**Starting Sun:** 50 (configured in service)
 
 ---
 
@@ -189,13 +213,14 @@ Manages player sun economy. Extracted from PlacementSystem.
 
 **Location:** `src/arena/server/services/MutationService.luau`
 
-Manages player mutation cache for combat bonuses.
+Manages player mutation cache for combat bonuses. Stateful singleton.
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `LoadPlayerMutations(userId, mutations)` | `number, {[string]: {string}}` | `void` | Load mutations from teleport data |
+| `LoadMutationsFromProfile(player, profileData)` | `Player, any` | `void` | Load mutations from profile (Studio debug mode) |
 | `ClearPlayerMutations(userId)` | `number` | `void` | Clear cache on leave |
-| `GetPlayerMutations(userId)` | `number` | `{[string]: {string}}` | Get all mutations for player |
+| `GetPlayerMutations(userId)` | `number` | `{[string]: {string}}` | Get all mutations for player (PlantType -> {MutationIds}) |
 | `GetPlantMutations(userId, plantType)` | `number, string` | `{string}` | Get mutations for specific plant |
 | `Dispose()` | - | `void` | Clear all caches |
 
@@ -205,16 +230,18 @@ Manages player mutation cache for combat bonuses.
 
 **Location:** `src/arena/server/services/PlantFoodService.luau`
 
-Manages Plant Food charges and glowing zombie spawning.
+Manages Plant Food charges and glowing zombie spawning. Auto-initializes on first API call.
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `GetCharges(player)` | `Player` | `number` | Get current Plant Food charges |
-| `AddCharge(player, amount)` | `Player, number?` | `number` | Add charge(s), returns new total |
-| `UseCharge(player)` | `Player` | `boolean` | Use one charge (returns false if none) |
-| `ShouldZombieBeGlowing()` | - | `boolean` | Check if next zombie should be glowing |
-| `ResetWaveTracking()` | - | `void` | Reset glowing spawn tracker |
-| `Dispose()` | - | `void` | Clean up |
+| `GetCharges(player)` | `Player` | `number` | Get current Plant Food charges (0-3) |
+| `AddCharge(player, amount?)` | `Player, number?` | `number` | Add charge(s) capped at MAX_CHARGES, returns new total |
+| `UseCharge(player)` | `Player` | `boolean` | Use one charge (returns false if none available) |
+| `ShouldZombieBeGlowing()` | - | `boolean` | Check if next zombie should be glowing (guaranteed first per wave, then random) |
+| `ResetWaveTracking()` | - | `void` | Reset glowing spawn tracker for new wave |
+| `Dispose()` | - | `void` | Clean up and reset state |
+
+**Config:** Uses `GameConstants.PlantFood` for MAX_CHARGES, GUARANTEED_PER_WAVE, GLOWING_ZOMBIE_CHANCE
 
 ---
 
@@ -222,18 +249,27 @@ Manages Plant Food charges and glowing zombie spawning.
 
 **Location:** `src/arena/server/services/StatsService.luau`
 
-Manages session statistics (reset each game).
+Manages session statistics (reset each game). Requires explicit `Initialize()` call.
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `Initialize()` | - | `void` | Initialize service |
-| `GetSessionStats(player)` | `Player` | `SessionStats` | Get session stats (`ZombiesKilled`, `CoinsEarned`, `PlantsPlaced`) |
-| `AddZombieKill(player, count)` | `Player, number?` | `void` | Increment zombie kill count |
+| `Initialize()` | - | `void` | Initialize service (call once at arena start) |
+| `GetSessionStats(player)` | `Player` | `SessionStats` | Get session stats (creates default if not exists) |
+| `AddZombieKill(player, count?)` | `Player, number?` | `void` | Increment zombie kill count (default 1) |
 | `AddCoinsEarned(player, amount)` | `Player, number` | `void` | Add coins earned this session |
-| `AddPlantPlaced(player, count)` | `Player, number?` | `void` | Increment plants placed |
-| `ResetSessionStats(player)` | `Player` | `void` | Reset stats for one player |
-| `ResetAllSessionStats()` | - | `void` | Reset stats for all players |
-| `Dispose()` | - | `void` | Clean up |
+| `AddPlantPlaced(player, count?)` | `Player, number?` | `void` | Increment plants placed (default 1) |
+| `ResetSessionStats(player)` | `Player` | `void` | Reset stats for one player to zeros |
+| `ResetAllSessionStats()` | - | `void` | Reset stats for all tracked players |
+| `Dispose()` | - | `void` | Clean up trove and reset state |
+
+### SessionStats Type
+```lua
+type SessionStats = {
+    ZombiesKilled: number,
+    CoinsEarned: number,
+    PlantsPlaced: number,
+}
+```
 
 ---
 
@@ -586,6 +622,7 @@ model:PivotTo(cframe)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0 | 2026-01-12 | Post-Refactoring V2 sync: Updated all service APIs to match isolated state pattern. WaveService now includes Preparation state, auto-start, and internal accessors. SunService includes ResetPlayer. MutationService includes LoadMutationsFromProfile. |
 | 1.2 | 2026-01-10 | Added ECS Services (WaveService, SunService, MutationService, PlantFoodService, StatsService) |
 | 1.1 | 2026-01-10 | Added ChanceUtils, ECSUtils, VFXUtils documentation |
 | 1.0 | 2026-01-07 | Initial documentation after API audit |

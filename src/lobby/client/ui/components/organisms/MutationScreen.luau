@@ -816,10 +816,10 @@ local function MutationScreen(props: MutationScreenProps): Frame
 									},
 									
 									scope:New("UIPadding") {
-										PaddingTop = UDim.new(0.08, 0),
-										PaddingBottom = UDim.new(0.08, 0),
-										PaddingLeft = UDim.new(0.01, 0),
-										PaddingRight = UDim.new(0.01, 0),
+										PaddingTop = UDim.new(0, 8),
+										PaddingBottom = UDim.new(0, 8),
+										PaddingLeft = UDim.new(0, 8),
+										PaddingRight = UDim.new(0, 8),
 									},
 									
 									scope:New("UIListLayout") {
@@ -917,17 +917,18 @@ local function MutationScreen(props: MutationScreenProps): Frame
 											},
 											
 											scope:New("UIPadding") {
-												PaddingTop = UDim.new(0.02, 0),
-												PaddingBottom = UDim.new(0.03, 0),
-												PaddingLeft = UDim.new(0.02, 0),
-												PaddingRight = UDim.new(0.02, 0),
+												PaddingTop = UDim.new(0, 12),
+												PaddingBottom = UDim.new(0, 20),
+												PaddingLeft = UDim.new(0, 12),
+												PaddingRight = UDim.new(0, 12),
 											},
 											
 											scope:New("UIGridLayout") {
-												CellSize = UDim2.fromScale(0.22, 0.28),
-												CellPadding = UDim2.fromScale(0.02, 0.02),
-												HorizontalAlignment = Enum.HorizontalAlignment.Left,
+												CellSize = UDim2.fromScale(0.115, 0.20),
+												CellPadding = UDim2.fromScale(0.008, 0.01),
+												HorizontalAlignment = Enum.HorizontalAlignment.Center,
 												SortOrder = Enum.SortOrder.LayoutOrder,
+												FillDirection = Enum.FillDirection.Horizontal,
 											},
 											
 											-- Mutation cards

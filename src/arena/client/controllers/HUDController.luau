@@ -1,15 +1,18 @@
 --!strict
 --[[
-	HUDController.luau - Main client UI entry point
+	HUDController.luau - Main client UI entry point (Responsive)
 	
 	Initializes and mounts the GameHUD ScreenGui.
 	Assembles atomic UI components into the game HUD layout.
 	
 	LAYOUT:
-	- Top-Left: SunCounter (sun currency display)
-	- Top-Center: SeedBank (plant selection deck)
+	- Top-Center: SunCounter + SeedBank + CoinCounter (horizontal bar)
 	- Bottom-Center: ReadyButton (start wave, visible during preparation)
 	- Bottom-Right: WaveProgressBar (wave progress indicator)
+	- Bottom-Left: BaseHealthBar
+	
+	Fully responsive using Scale-based sizing.
+	Uses Fusion 0.3 scope:Method() syntax.
 ]]
 
 local Players = game:GetService("Players")
@@ -24,6 +27,7 @@ local Logger = require(Shared.utils.Logger)
 local Network = require(Shared.network.generated.client)
 local Theme = require(Shared.ui.design.Theme)
 local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
+local ToonButton = require(Shared.ui.components.atoms.ToonButton)
 
 -- Client references (controllers is inside client)
 local Client = script.Parent.Parent
@@ -40,13 +44,9 @@ local CoinCounter = require(Components.molecules.CoinCounter)
 local SeedBank = require(Components.organisms.SeedBank)
 local WaveProgressBar = require(Components.molecules.WaveProgressBar)
 local BaseHealthBar = require(Components.molecules.BaseHealthBar)
-local ToonButton = require(Components.atoms.ToonButton)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
 local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
 
@@ -124,7 +124,7 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 	Logger.Debug("HUDController", `Building HUD with reactive deck and mutations`)
 	
 	-- Ready button text with countdown
-	local readyButtonText = Computed(scope, function(use)
+	local readyButtonText = scope:Computed(function(use)
 		local timeLeft = math.floor(use(preparationTime))
 		if timeLeft > 0 then
 			return `🌻 READY! ({timeLeft}s)`
@@ -133,13 +133,13 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 	end)
 	
 	-- Intermission indicator text
-	local intermissionText = Computed(scope, function(use)
+	local intermissionText = scope:Computed(function(use)
 		local timeLeft = math.floor(use(intermissionTime))
 		return `🎉 WAVE COMPLETE! Next in {timeLeft}s`
 	end)
 	
 	-- Create ScreenGui
-	local screenGui = New(scope, "ScreenGui") {
+	local screenGui = scope:New("ScreenGui") {
 		Name = "GameHUD",
 		Parent = playerGui,
 		IgnoreGuiInset = true,
@@ -150,21 +150,26 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 			-- Responsive scaling for all HUD elements
 			ResponsiveUtils.CreateUIScale(scope),
 			
-			-- Top-Center: SunCounter + SeedBank in horizontal layout
-			New(scope, "Frame") {
+			-- Top-Center: SunCounter + SeedBank + CoinCounter in horizontal layout
+			scope:New("Frame") {
 				Name = "TopBar",
-				Size = UDim2.new(0, 0, 0, 90), -- Height for seedbank
-				Position = UDim2.new(0.5, 0, 0, 10),
+				Size = UDim2.fromScale(1, 0.12), -- Width 100%, height 12%
+				Position = UDim2.fromScale(0.5, 0.01),
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
-				AutomaticSize = Enum.AutomaticSize.X,
 				
 				[Children] = {
-					New(scope, "UIListLayout") {
+					-- Constrain height for consistency
+					scope:New("UISizeConstraint") {
+						MinSize = Vector2.new(0, 80),
+						MaxSize = Vector2.new(9999, 120),
+					},
+					
+					scope:New("UIListLayout") {
 						FillDirection = Enum.FillDirection.Horizontal,
 						HorizontalAlignment = Enum.HorizontalAlignment.Center,
 						VerticalAlignment = Enum.VerticalAlignment.Center,
-						Padding = UDim.new(0, 10),
+						Padding = UDim.new(0.01, 0),
 						SortOrder = Enum.SortOrder.LayoutOrder,
 					},
 					
@@ -196,48 +201,59 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 			ToonButton({
 				Scope = scope,
 				Text = readyButtonText,
-				Size = UDim2.fromOffset(240, 56),
-				Position = UDim2.new(0.5, 0, 1, -100),
+				Size = UDim2.fromScale(0.15, 0.06), -- 15% width, 6% height
+				Position = UDim2.fromScale(0.5, 0.88),
 				AnchorPoint = Vector2.new(0.5, 1),
 				Color = "Action", -- Orange/Green action color
 				OnClick = function()
 					onReadyClick(preparationPhase)
 				end,
-				Visible = Computed(scope, function(use)
+				Visible = scope:Computed(function(use)
 					return use(_gameStarted) and use(preparationPhase)
 				end),
 				ZIndex = 10,
 			}),
 			
 			-- Intermission Indicator (visible between waves)
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "IntermissionIndicator",
-				Size = UDim2.fromOffset(320, 60),
-				Position = UDim2.new(0.5, 0, 0.35, 0),
+				Size = UDim2.fromScale(0.25, 0.06), -- 25% width, 6% height
+				Position = UDim2.fromScale(0.5, 0.35),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Theme.Colors.Info.Main,
-				Visible = Computed(scope, function(use)
+				Visible = scope:Computed(function(use)
 					return use(intermissionTime) > 0 and not use(preparationPhase)
 				end),
 				ZIndex = 15,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UISizeConstraint") {
+						MinSize = Vector2.new(200, 40),
+						MaxSize = Vector2.new(400, 80),
+					},
+					scope:New("UICorner") {
 						CornerRadius = Theme.Layout.CornerRadius,
 					},
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
 					},
-					New(scope, "TextLabel") {
-						Size = UDim2.new(1, 0, 1, 0),
+					scope:New("TextLabel") {
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						Text = intermissionText,
 						TextColor3 = Color3.new(1, 1, 1),
 						Font = Theme.Typography.Fonts.Title,
-						TextSize = 22,
+						TextScaled = true,
 						TextStrokeTransparency = 0,
 						TextStrokeColor3 = Theme.Colors.Surface.Stroke :: Color3,
+						
+						[Children] = {
+							scope:New("UITextSizeConstraint") {
+								MaxTextSize = 24,
+								MinTextSize = 14,
+							},
+						},
 					},
 				},
 			},
@@ -245,7 +261,7 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 			-- Bottom-Right: Wave Progress Bar
 			WaveProgressBar({
 				Scope = scope,
-				Position = UDim2.new(1, -20, 1, -60),
+				Position = UDim2.fromScale(0.98, 0.94),
 				AnchorPoint = Vector2.new(1, 1),
 				ZIndex = 5,
 			}),
@@ -253,7 +269,7 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 			-- Bottom-Left: Base Health Bar
 			BaseHealthBar({
 				Scope = scope,
-				Position = UDim2.new(0, 20, 1, -60),
+				Position = UDim2.fromScale(0.02, 0.94),
 				AnchorPoint = Vector2.new(0, 1),
 				ZIndex = 5,
 			}),
@@ -274,15 +290,15 @@ end
 function HUDController.new()
 	local self = setmetatable({}, HUDController)
 	
-	-- Create Fusion scope
-	_scope = Fusion.scoped({})
+	-- Create Fusion 0.3 scope with methods
+	_scope = Fusion.scoped(Fusion)
 	
 	-- Initialize reactive state
-	_waveNumber = Value(_scope, 0)
-	_preparationPhase = Value(_scope, true)
-	_preparationTime = Value(_scope, 0)
-	_intermissionTime = Value(_scope, 0)
-	_gameStarted = Value(_scope, false) -- Will be set true when GameStarted event received
+	_waveNumber = _scope:Value(0)
+	_preparationPhase = _scope:Value(true)
+	_preparationTime = _scope:Value(0)
+	_intermissionTime = _scope:Value(0)
+	_gameStarted = _scope:Value(false) -- Will be set true when GameStarted event received
 	
 	-- Expose for countdown loop in init.client.luau
 	self._waveNumber = _waveNumber
@@ -371,14 +387,14 @@ function HUDController.Initialize()
 		return
 	end
 	
-	-- Create Fusion scope
-	_scope = Fusion.scoped({})
+	-- Create Fusion 0.3 scope with methods
+	_scope = Fusion.scoped(Fusion)
 	
 	-- Initialize reactive state
-	_waveNumber = Value(_scope, 0)
-	_preparationPhase = Value(_scope, true)
-	_preparationTime = Value(_scope, 0)
-	_intermissionTime = Value(_scope, 0)
+	_waveNumber = _scope:Value(0)
+	_preparationPhase = _scope:Value(true)
+	_preparationTime = _scope:Value(0)
+	_intermissionTime = _scope:Value(0)
 	
 	-- Build and mount HUD
 	_screenGui = buildHUD(_scope)

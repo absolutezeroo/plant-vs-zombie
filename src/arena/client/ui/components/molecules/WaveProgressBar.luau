@@ -1,11 +1,14 @@
 --!strict
 --[[
-	WaveProgressBar.luau - Visual wave progress indicator with "Toon Pop" style
+	WaveProgressBar.luau - Visual wave progress indicator with "Toon Pop" style (Responsive)
 	
 	Molecule component showing current wave progress.
 	Features animated fill bar, zombie head indicator, and flag at end.
 	
 	Subscribes to GameSignals.OnWaveChanged for reactive updates.
+	
+	Fully responsive using Scale-based sizing.
+	Uses Fusion 0.3 scope:Method() syntax.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,31 +20,14 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameSignals = require(Shared.signals.GameSignals)
 local Theme = require(Shared.ui.design.Theme)
+local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
 
-local Atoms = script.Parent.Parent.atoms
-local ToonPanel = require(Atoms.ToonPanel)
-
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
 local peek = Fusion.peek
-
--- Constants
-local BAR_HEIGHT = 24
-local BAR_WIDTH = 250
-local ICON_SIZE = 32
-local FILL_CORNER_RADIUS = UDim.new(0, 8)
-
--- Asset IDs (placeholders - replace with actual assets)
-local ZOMBIE_HEAD_ICON = "rbxassetid://6764432293" -- TODO: Replace with zombie head
-local FLAG_ICON = "rbxassetid://6764432293" -- TODO: Replace with finish flag
 
 -- Colors
 local FILL_COLOR = Theme.Colors.Action.Main -- Green
-local FILL_SHADOW_COLOR = Theme.Colors.Action.Shadow -- DarkGreen
 local TRACK_COLOR = Color3.fromRGB(80, 60, 50) -- Dark brown track
 
 export type WaveProgressBarProps = {
@@ -53,7 +39,7 @@ export type WaveProgressBarProps = {
 }
 
 --[[
-	WaveProgressBar Component
+	WaveProgressBar Component (Responsive)
 	
 	A horizontal progress bar showing wave advancement.
 	Zombie head moves along the bar, flag marks the end.
@@ -64,17 +50,17 @@ export type WaveProgressBarProps = {
 local function WaveProgressBar(props: WaveProgressBarProps): Frame
 	local scope = props.Scope
 	
-	local position = props.Position or UDim2.new(0, 0, 0, 0)
+	local position = props.Position or UDim2.fromScale(0, 0)
 	local anchorPoint = props.AnchorPoint or Vector2.new(0, 0)
 	local layoutOrder = props.LayoutOrder or 0
 	local zIndex = props.ZIndex or 1
 	
 	-- Internal state
-	local currentWave = Value(scope, 0)
-	local maxWaves = Value(scope, 10) -- Default to 10 waves
+	local currentWave = scope:Value(0)
+	local maxWaves = scope:Value(10) -- Default to 10 waves
 	
 	-- Progress ratio (0 to 1)
-	local progressRatio = Computed(scope, function(use)
+	local progressRatio = scope:Computed(function(use)
 		local current = use(currentWave)
 		local max = use(maxWaves)
 		if max <= 0 then return 0 end
@@ -82,23 +68,16 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 	end)
 	
 	-- Animated progress with spring
-	local animatedProgress = Spring(scope, progressRatio, 20, 0.8)
+	local animatedProgress = scope:Spring(progressRatio, 20, 0.8)
 	
 	-- Fill bar width
-	local fillWidth = Computed(scope, function(use)
+	local fillWidth = scope:Computed(function(use)
 		local progress = use(animatedProgress)
-		return UDim2.new(progress, 0, 1, 0)
-	end)
-	
-	-- Zombie head position (moves along the bar)
-	local headPosition = Computed(scope, function(use)
-		local progress = use(animatedProgress)
-		-- Position from left edge to right edge, accounting for icon size
-		return UDim2.new(progress, -ICON_SIZE / 2, 0.5, 0)
+		return UDim2.fromScale(progress, 1)
 	end)
 	
 	-- Wave text
-	local waveText = Computed(scope, function(use)
+	local waveText = scope:Computed(function(use)
 		local current = use(currentWave)
 		local max = use(maxWaves)
 		return `{current}/{max}`
@@ -117,12 +96,9 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 		end
 	end)
 	
-	-- Total width including icons
-	local totalWidth = BAR_WIDTH + ICON_SIZE * 2
-	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "WaveProgressBar",
-		Size = UDim2.fromOffset(totalWidth, ICON_SIZE + 8),
+		Size = UDim2.fromScale(0.18, 0.045), -- 18% width, 4.5% height
 		Position = position,
 		AnchorPoint = anchorPoint,
 		LayoutOrder = layoutOrder,
@@ -130,46 +106,58 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 		BackgroundTransparency = 1,
 		
 		[Children] = {
+			-- Size constraints
+			scope:New("UISizeConstraint") {
+				MinSize = Vector2.new(180, 35),
+				MaxSize = Vector2.new(350, 55),
+			},
+			
 			-- Track container (the bar itself)
 			ToonPanel({
 				Scope = scope,
-				Size = UDim2.fromOffset(BAR_WIDTH, BAR_HEIGHT),
-				Position = UDim2.new(0, ICON_SIZE / 2, 0.5, 0),
+				Size = UDim2.fromScale(0.75, 0.7),
+				Position = UDim2.fromScale(0.12, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				ZIndex = 1,
 				
 				[Children] = {
 					-- Dark track background
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Track",
-						Size = UDim2.new(1, -4, 1, -4),
-						Position = UDim2.new(0, 2, 0, 2),
+						Size = UDim2.fromScale(0.98, 0.85),
+						Position = UDim2.fromScale(0.5, 0.5),
+						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundColor3 = TRACK_COLOR,
 						ZIndex = 1,
 						
 						[Children] = {
-							New(scope, "UICorner") {
-								CornerRadius = FILL_CORNER_RADIUS,
+							scope:New("UICorner") {
+								CornerRadius = UDim.new(0.4, 0),
 							},
 						},
 					},
 					
 					-- Fill bar (animated)
-					New(scope, "Frame") {
+					scope:New("Frame") {
 						Name = "Fill",
 						Size = fillWidth,
-						Position = UDim2.new(0, 2, 0, 2),
+						Position = UDim2.fromScale(0.01, 0.5),
+						AnchorPoint = Vector2.new(0, 0.5),
 						BackgroundColor3 = FILL_COLOR,
 						ClipsDescendants = true,
 						ZIndex = 2,
 						
 						[Children] = {
-							New(scope, "UICorner") {
-								CornerRadius = FILL_CORNER_RADIUS,
+							scope:New("UISizeConstraint") {
+								MaxSize = Vector2.new(9999, 30),
+							},
+							
+							scope:New("UICorner") {
+								CornerRadius = UDim.new(0.4, 0),
 							},
 							
 							-- Gradient for 3D effect
-							New(scope, "UIGradient") {
+							scope:New("UIGradient") {
 								Color = ColorSequence.new({
 									ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
 									ColorSequenceKeypoint.new(0.5, Color3.new(0.95, 0.95, 0.95)),
@@ -177,29 +165,26 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 								}),
 								Rotation = 90,
 							},
-							
-							-- Inner frame for proper sizing
-							New(scope, "Frame") {
-								Size = UDim2.new(0, BAR_WIDTH - 4, 1, -4),
-								Position = UDim2.new(0, 0, 0, 0),
-								BackgroundTransparency = 1,
-							},
 						},
 					},
 					
 					-- Wave text (centered)
-					New(scope, "TextLabel") {
+					scope:New("TextLabel") {
 						Name = "WaveText",
-						Size = UDim2.new(1, 0, 1, 0),
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						Text = waveText,
 						TextColor3 = Color3.new(1, 1, 1),
 						Font = Theme.Typography.Fonts.Body,
-						TextSize = 14,
+						TextScaled = true,
 						ZIndex = 5,
 						
 						[Children] = {
-							New(scope, "UIStroke") {
+							scope:New("UITextSizeConstraint") {
+								MaxTextSize = 16,
+								MinTextSize = 10,
+							},
+							scope:New("UIStroke") {
 								Color = Color3.new(0, 0, 0),
 								Thickness = 1,
 								Transparency = 0.3,
@@ -209,14 +194,15 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				},
 			}),
 			
-			-- Zombie emoji (moves along bar) - temporary for testing
-			New(scope, "TextLabel") {
+			-- Zombie emoji (moves along bar)
+			scope:New("TextLabel") {
 				Name = "ZombieHead",
-				Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
-				Position = Computed(scope, function(use)
+				Size = UDim2.fromScale(0.12, 0.9),
+				Position = scope:Computed(function(use)
 					local progress = use(animatedProgress)
-					local xOffset = ICON_SIZE / 2 + (progress * BAR_WIDTH)
-					return UDim2.new(0, xOffset, 0.5, 0)
+					-- Move from 12% to 87% of the container
+					local xPos = 0.12 + (progress * 0.75)
+					return UDim2.fromScale(xPos, 0.5)
 				end),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Color3.fromRGB(100, 180, 100), -- Zombie green
@@ -226,21 +212,25 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				ZIndex = 10,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UIAspectRatioConstraint") {
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
+					},
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
 					},
 				},
 			},
 			
-			-- Flag emoji (end of bar) - temporary for testing
-			New(scope, "TextLabel") {
+			-- Flag emoji (end of bar)
+			scope:New("TextLabel") {
 				Name = "FlagIcon",
-				Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
-				Position = UDim2.new(0, ICON_SIZE / 2 + BAR_WIDTH, 0.5, 0),
+				Size = UDim2.fromScale(0.12, 0.9),
+				Position = UDim2.fromScale(0.92, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Theme.Colors.Danger.Main,
 				Text = "🚩",
@@ -249,10 +239,14 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				ZIndex = 5,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UIAspectRatioConstraint") {
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
+					},
+					scope:New("UICorner") {
 						CornerRadius = UDim.new(0.5, 0),
 					},
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = 2,
 					},

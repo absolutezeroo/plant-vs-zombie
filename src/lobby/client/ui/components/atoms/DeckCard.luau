@@ -24,10 +24,7 @@ local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
 
 -- Constants
-local CARD_WIDTH = 100
-local CARD_HEIGHT = 130
-local SHADOW_OFFSET = 4
-local VIEWPORT_HEIGHT = 60
+local SHADOW_OFFSET_SCALE = 0.03
 local MUTATION_ICON_SIZE = 20
 
 -- Colors
@@ -60,8 +57,8 @@ local function DeckCard(props: DeckCardProps): Frame
 	if not isLocked then
 		plantViewport = PlantViewport.CreateWithScope(scope, {
 			PlantType = plantType,
-			Size = UDim2.new(1, -8, 0, VIEWPORT_HEIGHT),
-			Position = UDim2.new(0.5, 0, 0, 8),
+			Size = UDim2.new(1, -8, 0.45, 0),
+			Position = UDim2.new(0.5, 0, 0.05, 0),
 			AnchorPoint = Vector2.new(0.5, 0),
 			ZIndex = 3,
 			CameraFOV = 35,
@@ -84,7 +81,7 @@ local function DeckCard(props: DeckCardProps): Frame
 	local hoverScale = scope:Spring(targetScale, 35, 0.7)
 	
 	local targetOffset = scope:Computed(function(use)
-		return if use(isPressed) then SHADOW_OFFSET else 0
+		return if use(isPressed) then SHADOW_OFFSET_SCALE else 0
 	end)
 	local pressOffset = scope:Spring(targetOffset, 40, 0.7)
 	
@@ -135,14 +132,14 @@ local function DeckCard(props: DeckCardProps): Frame
 	
 	return scope:New("Frame") {
 		Name = plantType,
-		Size = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT + SHADOW_OFFSET),
+		Size = UDim2.fromScale(1, 1), -- Fill grid cell
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
 		
 		[Children] = {
 			-- Scale container
 			scope:New("Frame") {
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromScale(1, 1),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -153,8 +150,8 @@ local function DeckCard(props: DeckCardProps): Frame
 					-- Shadow
 					scope:New("Frame") {
 						Name = "Shadow",
-						Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
-						Position = UDim2.fromOffset(0, SHADOW_OFFSET),
+						Size = UDim2.fromScale(1, 0.97),
+						Position = UDim2.fromScale(0, 0.03),
 						BackgroundColor3 = Theme.Colors.Surface.Shadow,
 						ZIndex = 1,
 						
@@ -170,10 +167,10 @@ local function DeckCard(props: DeckCardProps): Frame
 						Name = "Main",
 						Size = scope:Computed(function(use)
 							local offset = use(pressOffset)
-							return UDim2.new(1, 0, 1, -SHADOW_OFFSET - offset)
+							return UDim2.fromScale(1, 0.97 - offset)
 						end),
 						Position = scope:Computed(function(use)
-							return UDim2.fromOffset(0, use(pressOffset))
+							return UDim2.fromScale(0, use(pressOffset))
 						end),
 						BackgroundColor3 = bgColor,
 						ZIndex = 2,
@@ -242,22 +239,29 @@ local function DeckCard(props: DeckCardProps): Frame
 							-- Plant name
 							scope:New("TextLabel") {
 								Name = "PlantName",
-								Size = UDim2.new(1, -8, 0, 18),
-								Position = UDim2.new(0, 4, 0, VIEWPORT_HEIGHT + 10),
+								Size = UDim2.new(1, -8, 0.12, 0),
+								Position = UDim2.fromScale(0.02, 0.52),
 								BackgroundTransparency = 1,
 								Text = plantType,
 								TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-								TextSize = 12,
+								TextScaled = true,
 								Font = Theme.Typography.Fonts.Title,
 								TextTruncate = Enum.TextTruncate.AtEnd,
 								ZIndex = 3,
+								
+								[Children] = {
+									scope:New("UITextSizeConstraint") {
+										MaxTextSize = 14,
+										MinTextSize = 8,
+									},
+								},
 							},
 							
 							-- Sun cost pill
 							scope:New("Frame") {
 								Name = "SunCost",
-								Size = UDim2.fromOffset(50, 18),
-								Position = UDim2.new(0.5, 0, 0, VIEWPORT_HEIGHT + 30),
+								Size = UDim2.fromScale(0.5, 0.12),
+								Position = UDim2.fromScale(0.5, 0.66),
 								AnchorPoint = Vector2.new(0.5, 0),
 								BackgroundColor3 = Theme.Colors.Warning.Main,
 								ZIndex = 4,

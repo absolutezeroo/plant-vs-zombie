@@ -1,15 +1,18 @@
 ---
 project_name: 'plant-vs-zombie'
 user_name: 'Clayton'
-date: '2026-01-06'
+date: '2026-01-12'
 game_engine: 'Roblox'
 architecture_doc: '_bmad-output/game-architecture.md'
+status: 'Production (Content & VFX)'
 sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'performance_rules', 'organization_rules', 'critical_rules']
 ---
 
 # Project Context: Roblox PvZ Ultimate Warfare (ECS)
 
 **Purpose:** Critical implementation rules for AI agents working on this Roblox tower defense game. This file captures unobvious patterns, performance constraints, and anti-patterns that prevent implementation mistakes.
+
+**Status:** Production (Content & VFX) — Architecture refactoring complete. Matter V2 patterns (Isolated State, Frozen Config, Services) are fully implemented.
 
 ---
 
@@ -33,8 +36,14 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 - **Rojo** v7.4.0+ — Filesystem-to-Studio sync
 - **Wally** v0.3.2+ — Package manager
 - **Rokit** v0.1.0+ — Toolchain manager
+- **Selene** — Luau linter (MANDATORY)
 
-**Critical Version Constraints:**
+**Linting Rule (MANDATORY):**
+- Run `selene src/` before every commit
+- Fix ALL warnings and errors before testing or committing
+- Do not ignore selene diagnostics — they catch syntax errors, unused variables, and shadowing
+
+**Critical Version Constraints:
 - Matter 0.8.0+ required for archetype storage performance
 - Zap 0.5.0+ required for Vector3 quantization support
 - All libraries MUST support Luau `--!strict` mode
@@ -72,12 +81,23 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 - Use `world:contains(id)` before accessing potentially dead entities
 - NEVER store World references in components — pass World through system functions only
 
-### ❌ NO-HUMANOID HARD CONSTRAINT (NON-NEGOTIABLE)
+### 🎭 ANIMATION STRATEGY (HYBRID APPROACH)
 
-- ABSOLUTELY NO usage of `Humanoid` or `HumanoidRootPart` for Plants or Zombies
-- Use `GridPositionComponent` + `MovementSystem` for entity logic
-- Use separate visual Models/MeshParts in workspace for rendering only
-- Humanoids break "The Swarm" performance pillar (200 entities impossible with Humanoid overhead)
+**Server Logic (STRICT):**
+- Server systems MUST NOT use `Humanoid` — logic is driven purely by `GridPositionComponent` + ECS components
+- Server authority relies on component data only (HealthComponent, MovementComponent, etc.)
+
+**Client Rendering (FLEXIBLE):**
+- **Preferred:** Use `AnimationController` for animations (no physics overhead, no Humanoid state machine)
+- **Allowed:** Optimized `Humanoid` with `PlatformStand = true` and physics disabled for complex animation rigs
+- **Rule:** Client rendering systems can use either approach based on animation complexity
+
+**Performance Guidelines:**
+- `AnimationController` has ~0.1ms overhead per entity (preferred for 200+ entities)
+- Optimized `Humanoid` (PlatformStand, no physics) has ~0.3ms overhead per entity
+- At 150+ entities, prefer `AnimationController` to maintain 60 FPS
+
+**Why Hybrid:** Full animation support (Roblox animations require Humanoid or AnimationController) while maintaining server authority and performance targets.
 
 ### Logic vs. Visuals Separation (Server Authority)
 

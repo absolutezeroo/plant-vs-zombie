@@ -1,6 +1,6 @@
 --!strict
 --[[
-	ToonPanel.luau - Generic container with "Toon Pop" style
+	ToonPanel.luau - Generic container with "Toon Pop" style (Responsive)
 	
 	Atomic component providing a 3D cartoon panel effect.
 	Features thick borders and offset shadow layer.
@@ -8,6 +8,7 @@
 	Used as background for menus, inventory bars, dialogs, etc.
 	
 	SHARED component - used by both Arena and Lobby.
+	Uses Fusion 0.3 scope:Method() syntax.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,12 +19,11 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
 
--- Constants
-local SHADOW_OFFSET_Y = 4
+-- Constants (shadow uses Scale for responsiveness)
+local SHADOW_OFFSET_SCALE = 0.08 -- 8% of component height
 
 export type ToonPanelProps = {
 	Scope: Fusion.Scope<any>,
@@ -38,10 +38,11 @@ export type ToonPanelProps = {
 }
 
 --[[
-	ToonPanel Component
+	ToonPanel Component (Responsive)
 	
 	A stylized container with 3D shadow effect for "Toon Pop" aesthetic.
 	Pass children via [Children] prop to render content inside.
+	Shadow offset uses Scale for responsive sizing.
 	
 	@param props ToonPanelProps
 	@return Frame
@@ -49,14 +50,18 @@ export type ToonPanelProps = {
 local function ToonPanel(props: ToonPanelProps): Frame
 	local scope = props.Scope
 	
-	local size = props.Size or UDim2.new(0, 200, 0, 100)
+	local size = props.Size or UDim2.fromScale(0.2, 0.1)
 	local position = props.Position or UDim2.new(0, 0, 0, 0)
 	local anchorPoint = props.AnchorPoint or Vector2.new(0, 0)
 	local layoutOrder = props.LayoutOrder or 0
 	local zIndex = props.ZIndex or 1
 	local automaticSize = props.AutomaticSize or Enum.AutomaticSize.None
 	
-	return New(scope, "Frame") {
+	-- For AutomaticSize to work, sub-frames need proper sizing
+	local useAutoWidth = automaticSize == Enum.AutomaticSize.X or automaticSize == Enum.AutomaticSize.XY
+	local subFrameSize = UDim2.fromScale(1, 1)
+	
+	return scope:New("Frame") {
 		Name = "ToonPanel",
 		Size = size,
 		Position = position,
@@ -68,35 +73,37 @@ local function ToonPanel(props: ToonPanelProps): Frame
 		Visible = if props.Visible ~= nil then props.Visible else true,
 		
 		[Children] = {
-			-- Shadow Layer (bottom, offset down)
-			New(scope, "Frame") {
+			-- Shadow Layer (bottom, offset down using Scale)
+			scope:New("Frame") {
 				Name = "Shadow",
-				Size = UDim2.new(1, 0, 1, 0),
-				Position = UDim2.fromOffset(0, SHADOW_OFFSET_Y),
+				Size = subFrameSize,
+				AutomaticSize = if useAutoWidth then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
+				Position = UDim2.fromScale(0, SHADOW_OFFSET_SCALE),
 				BackgroundColor3 = Theme.Colors.Surface.Shadow,
 				ZIndex = 1,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = Theme.Layout.CornerRadius,
 					},
 				},
 			},
 			
 			-- Main Layer (top, with stroke)
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Main",
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = subFrameSize,
+				AutomaticSize = if useAutoWidth then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
 				BackgroundColor3 = Theme.Colors.Surface.Main,
 				ZIndex = 2,
 				
 				[Children] = {
-					New(scope, "UICorner") {
+					scope:New("UICorner") {
 						CornerRadius = Theme.Layout.CornerRadius,
 					},
 					
 					-- Thick cartoon outline
-					New(scope, "UIStroke") {
+					scope:New("UIStroke") {
 						Color = Theme.Colors.Surface.Stroke :: Color3,
 						Thickness = Theme.Layout.StrokeThickness,
 					},
@@ -104,9 +111,10 @@ local function ToonPanel(props: ToonPanelProps): Frame
 			},
 			
 			-- Content Layer (children go here)
-			New(scope, "Frame") {
+			scope:New("Frame") {
 				Name = "Content",
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = subFrameSize,
+				AutomaticSize = if useAutoWidth then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
 				BackgroundTransparency = 1,
 				ZIndex = 3,
 				

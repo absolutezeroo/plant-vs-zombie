@@ -161,7 +161,7 @@ local function ShopCard(props: ShopCardProps): Frame
 										scope:New("TextLabel") {
 											Size = UDim2.new(1, 0, 1, 0),
 											BackgroundTransparency = 1,
-											Text = "✓ OWNED",
+											Text = `{Theme.Icons.Check} OWNED`,
 											TextColor3 = Color3.new(1, 1, 1),
 											TextSize = 12,
 											Font = Theme.Typography.Fonts.Body,
@@ -216,7 +216,7 @@ local function ShopCard(props: ShopCardProps): Frame
 									scope:New("TextLabel") {
 										Size = UDim2.new(1, 0, 1, 0),
 										BackgroundTransparency = 1,
-										Text = `☀️ {sunCost}`,
+										Text = `{Theme.Icons.Sun} {sunCost}`,
 										TextColor3 = Color3.fromRGB(80, 50, 20), -- Dark brown for better contrast
 										TextSize = 11,
 										Font = Enum.Font.GothamBold, -- More readable
@@ -242,7 +242,7 @@ local function ShopCard(props: ShopCardProps): Frame
 											scope:New("TextLabel") {
 												Size = UDim2.new(1, 0, 1, 0),
 												BackgroundTransparency = 1,
-												Text = "✓ Collection",
+												Text = `{Theme.Icons.Check} Collection`,
 												TextColor3 = Theme.Colors.Action.Main,
 												TextSize = 12,
 												Font = Theme.Typography.Fonts.Body,
@@ -253,7 +253,6 @@ local function ShopCard(props: ShopCardProps): Frame
 								
 								local canAfford = use(props.CanAfford)
 								local bgColor = if canAfford then Theme.Colors.Gold.Main else Theme.Colors.Surface.Shadow
-								-- Use dark brown text on gold for better contrast
 								local textCol = if canAfford then Color3.fromRGB(80, 50, 20) else Theme.Colors.Surface.Main
 								
 								return scope:New("TextButton") {
@@ -261,7 +260,7 @@ local function ShopCard(props: ShopCardProps): Frame
 									Size = UDim2.new(1, -16, 0, 36),
 									Position = UDim2.new(0, 8, 1, -44),
 									BackgroundColor3 = bgColor,
-									Text = `🪙 {props.Cost}`,
+									Text = `{Theme.Icons.Coin} {props.Cost}`,
 									TextColor3 = textCol,
 									TextSize = 14,
 									Font = Enum.Font.GothamBold, -- More readable than LuckiestGuy on colored bg

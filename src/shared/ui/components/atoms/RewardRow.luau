@@ -1,9 +1,14 @@
 --!strict
 --[[
-	RewardRow.luau - Single reward display row
+	RewardRow.luau - Single reward display row (Responsive)
 	
 	Atom component showing icon + label + animated value.
 	Used in result screens for coins, XP, gems, etc.
+	
+	SHARED component - used by both Arena and Lobby.
+	
+	Uses Fusion 0.3 scope:Method() syntax.
+	Fully responsive with Scale-based sizing.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,10 +19,8 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
 
 export type RewardRowProps = {
 	Scope: Fusion.Scope<any>,
@@ -32,9 +35,10 @@ export type RewardRowProps = {
 }
 
 --[[
-	RewardRow Component
+	RewardRow Component (Responsive)
 	
 	Displays a single reward with icon, label and animated value.
+	Uses Scale-based layout for responsive sizing.
 	
 	@param props RewardRowProps
 	@return Frame
@@ -45,7 +49,7 @@ local function RewardRow(props: RewardRowProps): Frame
 	local prefix = props.Prefix or ""
 	local suffix = props.Suffix or ""
 	
-	local displayText = Computed(scope, function(use)
+	local displayText = scope:Computed(function(use)
 		local value = use(props.Value)
 		return `{prefix}{value}{suffix}`
 	end)
@@ -53,7 +57,7 @@ local function RewardRow(props: RewardRowProps): Frame
 	-- Handle visibility (default true if not provided)
 	local visible = if props.Visible then props.Visible else true
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = `RewardRow_{props.Label}`,
 		Size = UDim2.new(1, 0, 0, 32),
 		BackgroundTransparency = 1,
@@ -61,43 +65,74 @@ local function RewardRow(props: RewardRowProps): Frame
 		Visible = visible,
 		
 		[Children] = {
-			-- Icon
-			New(scope, "TextLabel") {
+			-- Size constraint for min/max
+			scope:New("UISizeConstraint") {
+				MinSize = Vector2.new(150, 24),
+				MaxSize = Vector2.new(400, 40),
+			},
+			
+			-- Icon (left, square aspect)
+			scope:New("TextLabel") {
 				Name = "Icon",
-				Size = UDim2.fromOffset(28, 28),
-				Position = UDim2.new(0, 0, 0.5, 0),
+				Size = UDim2.fromScale(0.12, 0.9),
+				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
 				Text = props.Icon,
-				TextSize = 22,
+				TextScaled = true,
 				Font = Enum.Font.GothamBold,
+				
+				[Children] = {
+					scope:New("UIAspectRatioConstraint") {
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
+					},
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 22,
+						MinTextSize = 14,
+					},
+				},
 			},
 			
-			-- Label
-			New(scope, "TextLabel") {
+			-- Label (center-left)
+			scope:New("TextLabel") {
 				Name = "Label",
-				Size = UDim2.new(0.5, -40, 1, 0),
-				Position = UDim2.new(0, 36, 0, 0),
+				Size = UDim2.fromScale(0.45, 1),
+				Position = UDim2.fromScale(0.14, 0),
 				BackgroundTransparency = 1,
 				Text = props.Label,
 				TextColor3 = Theme.Colors.Surface.Stroke,
-				TextSize = 16,
+				TextScaled = true,
 				Font = Theme.Typography.Fonts.Body,
 				TextXAlignment = Enum.TextXAlignment.Left,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 16,
+						MinTextSize = 10,
+					},
+				},
 			},
 			
-			-- Value
-			New(scope, "TextLabel") {
+			-- Value (right-aligned)
+			scope:New("TextLabel") {
 				Name = "Value",
-				Size = UDim2.new(0.5, 0, 1, 0),
-				Position = UDim2.new(1, 0, 0, 0),
+				Size = UDim2.fromScale(0.38, 1),
+				Position = UDim2.fromScale(1, 0),
 				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
 				Text = displayText,
 				TextColor3 = color,
-				TextSize = 20,
-				Font = Enum.Font.GothamBold, -- More readable than LuckiestGuy for numbers
+				TextScaled = true,
+				Font = Enum.Font.GothamBold,
 				TextXAlignment = Enum.TextXAlignment.Right,
+				
+				[Children] = {
+					scope:New("UITextSizeConstraint") {
+						MaxTextSize = 20,
+						MinTextSize = 12,
+					},
+				},
 			},
 		},
 	}

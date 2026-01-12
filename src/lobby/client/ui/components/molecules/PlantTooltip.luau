@@ -176,12 +176,12 @@ local function MutationBadge(scope: any, mutationId: string): Frame
 	local badgeColor = mutation.Color or Theme.Colors.Purple.Main
 	
 	return scope:New("Frame") {
-		Size = UDim2.fromScale(1, 0.45),
+		Size = UDim2.new(1, 0, 0, 40), -- Fixed pixel height for AutomaticCanvasSize
 		BackgroundColor3 = badgeColor,
 		BackgroundTransparency = 0.8,
 		
 		[Children] = {
-			scope:New("UICorner") { CornerRadius = UDim.new(0.15, 0) },
+			scope:New("UICorner") { CornerRadius = UDim.new(0, 6) },
 			scope:New("UIStroke") {
 				Color = badgeColor,
 				Thickness = 1,
@@ -587,14 +587,20 @@ local function PlantTooltip(props: PlantTooltipProps): Frame
 								ScrollingDirection = Enum.ScrollingDirection.Y,
 								
 								[Children] = {
+									scope:New("UIPadding") {
+										PaddingTop = UDim.new(0, 4),
+										PaddingBottom = UDim.new(0, 8),
+										PaddingLeft = UDim.new(0, 4),
+										PaddingRight = UDim.new(0, 4),
+									},
 									scope:New("UIListLayout") {
 										SortOrder = Enum.SortOrder.LayoutOrder,
-										Padding = UDim.new(0.05, 0),
+										Padding = UDim.new(0, 4),
 									},
 									
 									-- No mutations placeholder
 									scope:New("TextLabel") {
-										Size = UDim2.fromScale(1, 0.4),
+										Size = UDim2.new(1, 0, 0, 24), -- Fixed pixel height
 										BackgroundTransparency = 1,
 										Text = "Aucune mutation",
 										TextColor3 = Theme.Colors.Surface.Shadow,

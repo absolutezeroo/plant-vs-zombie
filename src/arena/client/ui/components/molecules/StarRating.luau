@@ -1,9 +1,12 @@
 --!strict
 --[[
-	StarRating.luau - Animated star rating display
+	StarRating.luau - Animated star rating display (Responsive)
 	
 	Molecule component showing 1-3 stars with reveal animation.
 	Stars appear sequentially with pop effect.
+	
+	Uses Fusion 0.3 scope:Method() syntax.
+	Fully responsive with Scale-based sizing.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,17 +17,8 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
--- Fusion primitives
-local New = Fusion.New
+-- Fusion 0.3 primitives
 local Children = Fusion.Children
-local Computed = Fusion.Computed
-local Value = Fusion.Value
-local Spring = Fusion.Spring
-local peek = Fusion.peek
-
--- Constants
-local STAR_SIZE = 50
-local STAR_SPACING = 10
 
 export type StarRatingProps = {
 	Scope: Fusion.Scope<any>,
@@ -33,10 +27,10 @@ export type StarRatingProps = {
 	LayoutOrder: number?,
 }
 
--- Individual animated star
-local function AnimatedStar(scope: any, index: number, starCount: any): Frame
-	-- State for this star (0=hidden, 1=empty, 2=filled)
-	local starState = Computed(scope, function(use)
+-- Individual animated star (responsive)
+local function AnimatedStar(scope: Fusion.Scope<any>, index: number, starCount: any): Frame
+	-- State for this star (1=empty, 2=filled)
+	local starState = scope:Computed(function(use)
 		local count = use(starCount)
 		if count >= index then
 			return 2 -- Filled
@@ -46,32 +40,38 @@ local function AnimatedStar(scope: any, index: number, starCount: any): Frame
 	end)
 	
 	-- Scale animation
-	local targetScale = Computed(scope, function(use)
+	local targetScale = scope:Computed(function(use)
 		local state = use(starState)
 		return if state == 2 then 1.0 else 0.8
 	end)
-	local animatedScale = Spring(scope, targetScale, 25, 0.5)
+	local animatedScale = scope:Spring(targetScale, 25, 0.5)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = `Star{index}`,
-		Size = UDim2.fromOffset(STAR_SIZE, STAR_SIZE),
+		Size = UDim2.fromScale(0.28, 0.8), -- Responsive within parent
 		BackgroundTransparency = 1,
 		LayoutOrder = index,
 		
 		[Children] = {
-			New(scope, "UIScale") {
+			-- Keep square aspect ratio
+			scope:New("UIAspectRatioConstraint") {
+				AspectRatio = 1,
+				DominantAxis = Enum.DominantAxis.Height,
+			},
+			
+			scope:New("UIScale") {
 				Scale = animatedScale,
 			},
 			
-			New(scope, "TextLabel") {
+			scope:New("TextLabel") {
 				Name = "StarIcon",
 				Size = UDim2.fromScale(1, 1),
 				BackgroundTransparency = 1,
-				Text = Computed(scope, function(use)
+				Text = scope:Computed(function(use)
 					local state = use(starState)
 					return if state == 2 then "⭐" else "☆"
 				end),
-				TextColor3 = Computed(scope, function(use)
+				TextColor3 = scope:Computed(function(use)
 					local state = use(starState)
 					return if state == 2 
 						then Color3.fromRGB(255, 215, 0) 
@@ -85,33 +85,40 @@ local function AnimatedStar(scope: any, index: number, starCount: any): Frame
 end
 
 --[[
-	StarRating Component
+	StarRating Component (Responsive)
 	
 	Displays 3 stars that fill based on rating.
+	Uses Scale-based sizing for responsive layout.
 	
 	@param props StarRatingProps
 	@return Frame
 ]]
 local function StarRating(props: StarRatingProps): Frame
 	local scope = props.Scope
-	local visible = props.Visible or Value(scope, true)
+	local visible = props.Visible or scope:Value(true)
 	
-	return New(scope, "Frame") {
+	return scope:New("Frame") {
 		Name = "StarRating",
-		Size = UDim2.new(1, 0, 0, STAR_SIZE + 10),
+		Size = UDim2.fromScale(1, 0.15), -- 15% of parent height
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
-		Visible = Computed(scope, function(use)
+		Visible = scope:Computed(function(use)
 			return use(visible)
 		end),
 		
 		[Children] = {
-			-- Center layout
-			New(scope, "UIListLayout") {
+			-- Size constraints
+			scope:New("UISizeConstraint") {
+				MinSize = Vector2.new(120, 40),
+				MaxSize = Vector2.new(300, 70),
+			},
+			
+			-- Center layout with responsive padding
+			scope:New("UIListLayout") {
 				FillDirection = Enum.FillDirection.Horizontal,
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, STAR_SPACING),
+				Padding = UDim.new(0.03, 0), -- 3% padding between stars
 			},
 			
 			-- 3 Stars

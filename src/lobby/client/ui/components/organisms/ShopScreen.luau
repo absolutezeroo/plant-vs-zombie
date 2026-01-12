@@ -396,10 +396,10 @@ local function ShopScreen(props: ShopScreenProps)
 									},
 									
 									scope:New("UIPadding") {
-										PaddingTop = UDim.new(0.02, 0),
-										PaddingBottom = UDim.new(0.03, 0),
-										PaddingLeft = UDim.new(0.02, 0),
-										PaddingRight = UDim.new(0.02, 0),
+										PaddingTop = UDim.new(0, 12),
+										PaddingBottom = UDim.new(0, 20),
+										PaddingLeft = UDim.new(0, 12),
+										PaddingRight = UDim.new(0, 12),
 									},
 									
 									scope:New("UIGridLayout") {

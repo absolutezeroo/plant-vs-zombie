@@ -238,52 +238,15 @@ local function SeedCard(props: SeedCardProps): Frame
 							-- 3D Plant Model Preview
 							viewportFrame,
 							
-							-- Cost Badge (bottom-right pill)
-							scope:New("Frame") {
-								Name = "CostBadge",
-								Size = UDim2.fromScale(0.5, 0.3),
-								Position = UDim2.fromScale(0.95, 0.95),
-								AnchorPoint = Vector2.new(1, 1),
-								BackgroundColor3 = Color3.fromHex("#FFD700"),
-								ZIndex = 5,
-								
-								[Children] = {
-									scope:New("UICorner") {
-										CornerRadius = UDim.new(0.5, 0),
-									},
-									scope:New("UIStroke") {
-										Color = Color3.new(0, 0, 0),
-										Thickness = 1,
-										Transparency = 0.5,
-									},
-									scope:New("TextLabel") {
-										Size = UDim2.fromScale(1, 1),
-										BackgroundTransparency = 1,
-										Text = tostring(cost),
-										TextColor3 = Color3.new(0, 0, 0),
-										Font = Theme.Typography.Fonts.Body,
-										TextScaled = true,
-										ZIndex = 6,
-										
-										[Children] = {
-											scope:New("UITextSizeConstraint") {
-												MaxTextSize = 14,
-												MinTextSize = 8,
-											},
-										},
-									},
-								},
-							},
-							
-							-- Mutation Icons (bottom-left row) - reactive frame
+							-- Mutation Icons (bottom-center row) - reactive frame
 							scope:Computed(function(use)
 								local icons = use(mutationIconsComputed)
 								if #icons > 0 then
 									return scope:New("Frame") {
 										Name = "MutationIcons",
 										Size = UDim2.fromScale(0.7, 0.22),
-										Position = UDim2.fromScale(0.05, 0.95),
-										AnchorPoint = Vector2.new(0, 1),
+										Position = UDim2.fromScale(0.55, 0.95),
+										AnchorPoint = Vector2.new(0.5, 1),
 										BackgroundTransparency = 1,
 										ZIndex = 5,
 										
