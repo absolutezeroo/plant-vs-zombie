@@ -35,6 +35,11 @@ local VFXService = require(Modules.VFXService)
 local AudioService = require(Modules.AudioService)
 local Network = require(Shared.network.generated.client)
 
+-- Controllers
+local Controllers = Client:FindFirstChild("controllers")
+assert(Controllers, "VFXAudioSystem: controllers folder not found")
+local FloatingTextController = require(Controllers.FloatingTextController)
+
 -- State
 local _isWaveActive = false
 local _currentWave = 0
@@ -184,6 +189,62 @@ local function Init(_world: any)
 		VFXService.PlaySplashDamage(pos, data.Radius)
 
 		Logger.Debug("VFXAudio", `Splash damage at {pos}, radius {data.Radius}`)
+	end))
+
+	-- XP Gained feedback (floating text near player)
+	_trove:Add(Network.XPGained.On(function(data)
+		-- Show XP popup at screen center (no world position needed)
+		local camera = workspace.CurrentCamera
+		if camera then
+			local screenPos = camera.CFrame.Position + camera.CFrame.LookVector * 5
+			FloatingTextController.ShowXP(screenPos, data.Amount)
+		end
+
+		Logger.Debug("VFXAudio", `XP gained: +{data.Amount}`)
+	end))
+
+	-- Level Up celebration
+	_trove:Add(Network.LevelUp.On(function(data)
+		-- Show level up popup at screen center
+		local camera = workspace.CurrentCamera
+		if camera then
+			local screenPos = camera.CFrame.Position + camera.CFrame.LookVector * 5
+			FloatingTextController.ShowLevelUp(screenPos, data.NewLevel)
+		end
+
+		-- Play level up sound
+		AudioService.PlaySound("LevelUp")
+
+		Logger.Info("VFXAudio", `Level up! New level: {data.NewLevel}`)
+	end))
+
+	-- PlantFood Collected
+	_trove:Add(Network.PlantFoodCollected.On(function(data)
+		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		FloatingTextController.ShowPlantFood(pos, "Collected")
+
+		-- Play pickup sound
+		AudioService.PlaySound("SunCollect", { Position = pos })
+
+		Logger.Debug("VFXAudio", `PlantFood collected at {pos}`)
+	end))
+
+	-- PlantFood Activated (on a plant)
+	_trove:Add(Network.PlantFoodActivated.On(function(data)
+		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		FloatingTextController.ShowPlantFood(pos, "Activated")
+
+		-- Play activation sound
+		AudioService.PlaySound("PlantFood", { Position = pos })
+		VFXService.PlayExplosion(pos, 3) -- Small burst VFX
+
+		Logger.Debug("VFXAudio", `PlantFood activated on entity {data.EntityId}`)
+	end))
+
+	-- PlantFood Charge Update (UI feedback)
+	_trove:Add(Network.PlantFoodChargeUpdate.On(function(data)
+		-- This could update a UI bar, for now just log
+		Logger.Debug("VFXAudio", `PlantFood charge: {data.CurrentCharge}/{data.MaxCharge}`)
 	end))
 
 	Logger.Info("VFXAudioSystem", "Initialized VFX and Audio services")

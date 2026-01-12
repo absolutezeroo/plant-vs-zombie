@@ -184,9 +184,9 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	else
 		-- Normal plant - cell must be empty OR have a platform
 		if existingEntityId then
-			if existingStats and existingStats.IsPlatform and existingStats.AllowsPlantOnTop then
-				-- Can place on platform - this is valid
-			else
+			-- Reject if cell has non-platform entity (or platform that doesn't allow stacking)
+			local canPlaceOnTop = existingStats and existingStats.IsPlatform and existingStats.AllowsPlantOnTop
+			if not canPlaceOnTop then
 				return false, "Cell already occupied"
 			end
 		end

@@ -115,6 +115,18 @@ local function OnStep(world)
 		if newRemaining <= 0 then
 			-- Burn expired, remove component
 			world:remove(entityId, Components.BurningComponent)
+
+			-- Notify clients for VFX cleanup
+			local pos = world:get(entityId, Components.PositionComponent)
+			if pos then
+				Network.StatusRemoved.FireAll({
+					EntityId = entityId,
+					StatusType = "Burn",
+					PositionX = pos.X,
+					PositionY = pos.Y,
+					PositionZ = pos.Z,
+				})
+			end
 		else
 			-- Tick damage every second
 			if elapsed >= CONFIG.TICK_INTERVAL then

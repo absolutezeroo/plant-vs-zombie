@@ -401,6 +401,26 @@ type LobbyReturnData = {
 
 ---
 
+## GridService
+
+**Location:** `src/arena/server/services/GridService.luau`
+
+Server-authoritative grid occupancy tracking singleton. Single source of truth for plant placement.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `IsOccupied(column, lane)` | `number, number` | `boolean` | Check if cell has a plant |
+| `GetEntityAt(column, lane)` | `number, number` | `number?` | Get entity ID at cell |
+| `GetEntity(column, lane)` | `number, number` | `number?` | Alias for GetEntityAt |
+| `Occupy(column, lane, entityId)` | `number, number, number` | `boolean` | Mark cell occupied (fails if already occupied) |
+| `Clear(column, lane)` | `number, number` | `void` | Clear a cell |
+| `ClearByEntity(entityId)` | `number` | `boolean` | Find and clear cell by entity ID |
+| `Reset()` | - | `void` | Reset entire grid (new game) |
+| `GetPlantCount()` | - | `number` | Count of occupied cells |
+| `GetAllOccupied()` | - | `{{Column, Lane, EntityId}}` | Get all occupied cells |
+
+---
+
 ## MapLoader
 
 **Location:** `src/arena/server/services/MapLoader.luau`
@@ -622,6 +642,7 @@ model:PivotTo(cframe)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.1 | 2026-01-12 | Operation Swarm Cleanup: Added complete GridService API documentation. System priority corrections. |
 | 2.0 | 2026-01-12 | Post-Refactoring V2 sync: Updated all service APIs to match isolated state pattern. WaveService now includes Preparation state, auto-start, and internal accessors. SunService includes ResetPlayer. MutationService includes LoadMutationsFromProfile. |
 | 1.2 | 2026-01-10 | Added ECS Services (WaveService, SunService, MutationService, PlantFoodService, StatsService) |
 | 1.1 | 2026-01-10 | Added ChanceUtils, ECSUtils, VFXUtils documentation |

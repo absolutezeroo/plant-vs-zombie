@@ -571,16 +571,10 @@ local function Init(_world)
 	end
 
 	-- Pre-cache MapConfig values to avoid yield in OnStep
-	if MapConfig.IsInitialized() then
-		State.CachedGridOrigin = MapConfig.GetGridOrigin()
-		State.CachedCellWidth = MapConfig.GetCellSize()
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	else
-		-- Fallback: force init (should not happen if bootstrap is correct)
-		State.CachedGridOrigin = MapConfig.GetGridOrigin()
-		State.CachedCellWidth = MapConfig.GetCellSize()
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	end
+	-- Note: MapConfig getters work regardless of init state
+	State.CachedGridOrigin = MapConfig.GetGridOrigin()
+	State.CachedCellWidth = MapConfig.GetCellSize()
+	State.CachedZombieDir = MapConfig.GetZombieDirection()
 
 	State.IsInitialized = true
 end

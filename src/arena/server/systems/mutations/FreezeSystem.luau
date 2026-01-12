@@ -150,6 +150,18 @@ local function OnStep(world)
 		if elapsed >= frozen.RemainingDuration then
 			-- Freeze expired, remove component
 			world:remove(entityId, Components.FrozenComponent)
+
+			-- Notify clients for VFX cleanup
+			local pos = world:get(entityId, Components.PositionComponent)
+			if pos then
+				Network.StatusRemoved.FireAll({
+					EntityId = entityId,
+					StatusType = "Freeze",
+					PositionX = pos.X,
+					PositionY = pos.Y,
+					PositionZ = pos.Z,
+				})
+			end
 		end
 	end
 end

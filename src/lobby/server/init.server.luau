@@ -46,7 +46,7 @@ PlayerDataService.Initialize()
 Logger.Info("Lobby", "PlayerDataService initialized")
 
 -- Initialize ShopHandler EARLY (before client can request data)
--- This sets up RequestPlayerData.SetCallback before any client requests arrive
+-- This sets up PlayerDataRequest.SetCallback before any client requests arrive
 ShopHandler.Initialize()
 Logger.Info("Lobby", "ShopHandler initialized")
 
@@ -76,7 +76,7 @@ _serverTrove:Connect(
 		)
 
 		-- Send results to client for display
-		ZapServer.ShowResults.Fire(player, {
+		ZapServer.BattleResultsSync.Fire(player, {
 			WorldId = returnData.WorldId,
 			Difficulty = returnData.Difficulty,
 			Victory = returnData.Victory,

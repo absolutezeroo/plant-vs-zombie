@@ -101,7 +101,7 @@ local function handlePlayerJoin(player: Player, padModel: Model)
 
 	-- Notify client
 	if ZapServer then
-		ZapServer.JoinedPad.Fire(player, {
+		ZapServer.PadJoined.Fire(player, {
 			PadId = padId,
 			WorldId = config.WorldId,
 			Difficulty = config.Difficulty,
@@ -148,7 +148,7 @@ function handlePlayerLeave(player: Player)
 
 	-- Notify client
 	if ZapServer then
-		ZapServer.LeftPad.Fire(player, {})
+		ZapServer.PadLeft.Fire(player, {})
 	end
 
 	Logger.Info("LobbyService", `{player.Name} left pad {padId}`)

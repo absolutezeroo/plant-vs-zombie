@@ -95,7 +95,7 @@ local loader = ServiceLoader.new({
 
 local function requestPlayerData()
 	Logger.Info("LobbyClient", "Requesting player data from server...")
-	ZapClient.RequestPlayerData.Fire({})
+	ZapClient.PlayerDataRequest.Fire({})
 end
 
 local function purchasePlant(plantType: string)
@@ -215,7 +215,7 @@ local function setupNetworkListeners()
 	end)
 
 	-- Listen for unlocked plants sync
-	ZapClient.SyncUnlockedPlants.On(function(data)
+	ZapClient.UnlockedPlantsSync.On(function(data)
 		Logger.Info("LobbyClient", `Synced {#data.UnlockedPlants} unlocked plants`)
 
 		local current = Fusion.peek(playerData)
@@ -285,7 +285,7 @@ local function setupNetworkListeners()
 	end)
 
 	-- Listen for plant mutations sync (owned + equipped)
-	ZapClient.SyncPlantMutations.On(function(data)
+	ZapClient.PlantMutationsSync.On(function(data)
 		Logger.Info(
 			"LobbyClient",
 			`Synced mutations for {data.PlantType}: {#data.OwnedMutations} owned, {#data.EquippedMutations} equipped`
@@ -319,7 +319,7 @@ local function setupNetworkListeners()
 	end)
 
 	-- Listen for all mutations sync (owned + equipped)
-	ZapClient.SyncAllMutations.On(function(data)
+	ZapClient.AllMutationsSync.On(function(data)
 		Logger.Info("LobbyClient", "Synced all plant mutations")
 
 		-- Convert owned array to dictionary
@@ -349,7 +349,7 @@ local function setupNetworkListeners()
 	end)
 
 	-- Listen for battle results
-	ZapClient.ShowResults.On(function(results)
+	ZapClient.BattleResultsSync.On(function(results)
 		Logger.Info("LobbyClient", "Battle results received", {
 			victory = results.Victory,
 			stars = results.Stars,

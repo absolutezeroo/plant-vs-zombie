@@ -51,7 +51,7 @@ local function syncPlayerData(player: Player)
 		UnlockedPlants = unlockedPlants,
 	})
 
-	-- Sync mutations via dedicated event (SyncAllMutations)
+	-- Sync mutations via dedicated event (AllMutationsSync)
 	local equippedMutationsDict = MutationService.GetPlayerMutations(player.UserId)
 	local ownedMutationsDict = MutationService.GetOwnedMutations and MutationService.GetOwnedMutations(player.UserId)
 		or {}
@@ -74,7 +74,7 @@ local function syncPlayerData(player: Player)
 		})
 	end
 
-	Network.SyncAllMutations.Fire(player, {
+	Network.AllMutationsSync.Fire(player, {
 		OwnedMutations = ownedMutationsArray,
 		EquippedMutations = equippedMutationsArray,
 	})
@@ -151,7 +151,7 @@ local function handleSaveDeck(
 	local success, reason = PlayerDataService.SaveDeck(player, deck)
 
 	-- Send response
-	Network.DeckSaved.Fire(player, {
+	Network.DeckSaveResponse.Fire(player, {
 		Success = success,
 		Error = reason,
 	})

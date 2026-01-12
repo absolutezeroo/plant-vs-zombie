@@ -84,6 +84,8 @@ local SOUNDS: { [string]: SoundEntry } = {
 	WaveStart = "rbxassetid://81385124977604", -- Alert/horn
 	Victory = "rbxassetid://74477612565568", -- Fanfare
 	Defeat = "rbxassetid://", -- Doom
+	LevelUp = "rbxassetid://74477612565568", -- Level up fanfare
+	PlantFood = "rbxassetid://81385124977604", -- PlantFood activation
 
 	-- Mutation sounds
 	FireIgnite = "rbxassetid://", -- Fire burn start
@@ -206,17 +208,30 @@ function AudioService.PlaySound(
 )
 	local opts = options or {}
 
-	-- Get a random sound ID (for variety with arrays)
-	local soundId = AudioService._GetRandomSoundId(soundName)
-	if not soundId then
-		-- Silent fail for empty/missing sounds
-		return
+	-- Check if this is a varied sound (array) or single sound
+	local entry = SOUNDS[soundName]
+	local isVariedSound = type(entry) == "table"
+
+	local playSound: Sound
+	
+	if isVariedSound then
+		-- For varied sounds (arrays), create fresh sound with random ID
+		local soundId = AudioService._GetRandomSoundId(soundName)
+		if not soundId then
+			return -- Silent fail for empty sounds
+		end
+		playSound = Instance.new("Sound")
+		playSound.Name = soundName
+		playSound.SoundId = soundId
+	else
+		-- For single sounds, use cached version (clone for overlapping)
+		local cached = AudioService._PreloadSound(soundName)
+		if not cached then
+			return -- Silent fail for unknown sounds
+		end
+		playSound = cached:Clone()
 	end
 
-	-- Create sound directly (don't use cache for varied sounds)
-	local playSound = Instance.new("Sound")
-	playSound.Name = soundName
-	playSound.SoundId = soundId
 	playSound.Volume = (opts.Volume or 1) * _sfxVolume
 	playSound.PlaybackSpeed = opts.PlaybackSpeed or 1
 
@@ -299,20 +314,6 @@ function AudioService.PlayProjectileImpact(variant: string?, position: Vector3?)
 		soundName = "PeaImpact" -- Fallback
 	end
 	AudioService.PlaySound(soundName, {
-		Position = position,
-		Volume = 0.7,
-	})
-end
-
-function AudioService.PlayPeaShoot(position: Vector3?)
-	AudioService.PlaySound("PeaShoot", {
-		Position = position,
-		PlaybackSpeed = ChanceUtils.RandomPitch(1.0, 0.1), -- Slight variation
-	})
-end
-
-function AudioService.PlayPeaImpact(position: Vector3?)
-	AudioService.PlaySound("PeaImpact", {
 		Position = position,
 		Volume = 0.7,
 	})

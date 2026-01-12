@@ -386,8 +386,8 @@ local function createLeaveButtonUI(): ScreenGui
 	})
 end
 
--- Handle JoinedPad event
-local function onJoinedPad(data: any)
+-- Handle PadJoined event
+local function onPadJoined(data: any)
 	Logger.Info("PadUI", `Joined pad {data.PadId} (World: {data.WorldId}, Difficulty: {data.Difficulty})`)
 	_currentPadId:set(data.PadId)
 	_currentWorldId:set(data.WorldId)
@@ -398,8 +398,8 @@ local function onJoinedPad(data: any)
 	UIStateManager.SetQueueMode(true)
 end
 
--- Handle LeftPad event
-local function onLeftPad(_data: any)
+-- Handle PadLeft event
+local function onPadLeft(_data: any)
 	Logger.Info("PadUI", "Left pad")
 	_isOnPad:set(false)
 	_currentPadId:set("")
@@ -421,8 +421,8 @@ function PadUIController.Initialize()
 	ZapClient.PadStateUpdate.On(updatePadState)
 
 	-- Listen for join/leave pad events
-	ZapClient.JoinedPad.On(onJoinedPad)
-	ZapClient.LeftPad.On(onLeftPad)
+	ZapClient.PadJoined.On(onPadJoined)
+	ZapClient.PadLeft.On(onPadLeft)
 
 	-- Create Leave button UI
 	_leaveButtonUI = createLeaveButtonUI()

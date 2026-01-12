@@ -86,7 +86,7 @@ function MutationHandler.SyncMutationsToPlayer(player: Player)
 	end
 
 	-- Send all mutations at once
-	ZapServer.SyncAllMutations.Fire(player, {
+	ZapServer.AllMutationsSync.Fire(player, {
 		OwnedMutations = ownedArray,
 		EquippedMutations = equippedArray,
 	})
@@ -98,7 +98,7 @@ function MutationHandler.SyncPlantMutations(player: Player, plantType: string)
 	local owned = PlayerDataService.GetOwnedMutations(player, plantType)
 	local equipped = PlayerDataService.GetEquippedMutations(player, plantType)
 
-	ZapServer.SyncPlantMutations.Fire(player, {
+	ZapServer.PlantMutationsSync.Fire(player, {
 		PlantType = plantType,
 		OwnedMutations = owned,
 		EquippedMutations = equipped,

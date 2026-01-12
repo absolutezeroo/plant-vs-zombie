@@ -129,7 +129,7 @@ local function showTooltip(plantModel: Model)
 	_selectedEntityId:set(entityId)
 
 	-- Position tooltip at center of screen (could be improved to follow mouse)
-	_tooltipPosition:set(UDim2.new(0.5, 0, 0.5, 0))
+	_tooltipPosition:set(UDim2.fromScale(0.5, 0.5))
 	_tooltipVisible:set(true)
 end
 
@@ -203,7 +203,7 @@ function PlantTooltipController.Initialize()
 
 	-- Initialize reactive state
 	_tooltipVisible = _scope:Value(false)
-	_tooltipPosition = _scope:Value(UDim2.new(0.5, 0, 0.5, 0))
+	_tooltipPosition = _scope:Value(UDim2.fromScale(0.5, 0.5))
 	_selectedPlantType = _scope:Value(nil :: string?)
 	_selectedMutations = _scope:Value({} :: { string })
 	_selectedEntityId = _scope:Value(nil :: number?)
@@ -221,7 +221,7 @@ function PlantTooltipController.Initialize()
 			-- Click-away background (darkens screen)
 			New(_scope, "TextButton")({
 				Name = "Backdrop",
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromScale(1, 1),
 				BackgroundColor3 = Color3.new(0, 0, 0),
 				BackgroundTransparency = _scope:Computed(function(use)
 					return use(_tooltipVisible) and 0.5 or 1

@@ -130,9 +130,10 @@ local function OnStep(world)
 		local trapId = tonumber(parts[1])
 		local zombieId = tonumber(parts[2])
 
-		if not trapId or not zombieId then
-			State.TrapDamageTimes[key] = nil
-		elseif not world:contains(trapId) or not world:contains(zombieId) then
+		-- Remove if invalid IDs or entities no longer exist
+		local shouldRemove = not trapId or not zombieId
+			or not world:contains(trapId) or not world:contains(zombieId)
+		if shouldRemove then
 			State.TrapDamageTimes[key] = nil
 		end
 	end
@@ -142,9 +143,10 @@ local function OnStep(world)
 		local garlicId = tonumber(parts[1])
 		local zombieId = tonumber(parts[2])
 
-		if not garlicId or not zombieId then
-			State.GarlicBites[key] = nil
-		elseif not world:contains(garlicId) or not world:contains(zombieId) then
+		-- Remove if invalid IDs or entities no longer exist
+		local shouldRemove = not garlicId or not zombieId
+			or not world:contains(garlicId) or not world:contains(zombieId)
+		if shouldRemove then
 			State.GarlicBites[key] = nil
 		end
 	end

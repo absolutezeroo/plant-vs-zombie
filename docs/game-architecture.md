@@ -222,7 +222,7 @@ MEMORY_LIMIT = 600     -- MB, emergency protocols at thresholds
   - **Preferred:** `AnimationController` for animations (~0.1ms per entity, no physics overhead)
   - **Allowed:** Optimized `Humanoid` with `PlatformStand = true` and physics disabled (~0.3ms per entity) for complex animation rigs
 - **Instanced Rendering:** All zombie models of same type share single draw call (Roblox automatic instancing).
-- **Spatial Partitioning:** `SpatialHashingSystem` (Priority 100) rebuilds `LaneCache` every frame for O(1) targeting.
+- **Spatial Partitioning:** `SpatialHashingSystem` (Priority 95) rebuilds `LaneCache` every frame for O(1) targeting.
 - **Component Array Optimization:** Flat arrays, no nested tables (cache-friendly, 10× faster than OOP).
 
 **Animation Guidelines:**
@@ -1075,7 +1075,7 @@ plant-vs-zombie/
 | | FullStateSyncSystem | | Full state replication for late joins |
 | | PerformanceMonitorSystem | | FPS/memory monitoring, emergency protocols |
 | | SafetySystem | | Entity cap enforcement |
-| | SpatialHashingSystem | | Lane-based spatial cache rebuild (Priority 100) |
+| | SpatialHashingSystem | | Lane-based spatial cache rebuild (Priority 95) |
 | **Economy** | SunCollectionSystem | `arena/server/systems/economy/` | Sun pickup validation |
 | | SunflowerProductionSystem | | Sun production from Sunflowers |
 | | SunSpawnSystem | | Natural sun drops |
@@ -1262,7 +1262,7 @@ These patterns ensure consistent, maintainable implementation across all AI agen
 **Components:**
 
 - **LaneCache Module** (`src/server/utils/LaneCache.lua`): Stores array of 5 tables, one per lane
-- **SpatialHashingSystem** (Priority 100): Rebuilds cache at start of Simulation Phase
+- **SpatialHashingSystem** (Priority 95): Rebuilds cache at start of Simulation Phase
 - **TargetingSystem** (Priority 120): Consumes fresh cache for plant targeting logic
 
 **Data Structure:**
@@ -1319,7 +1319,7 @@ function SpatialHashingSystem.system(world)
 end
 
 -- Run FIRST in Simulation Phase
-SpatialHashingSystem.priority = 100
+SpatialHashingSystem.priority = 95
 
 return SpatialHashingSystem
 ```

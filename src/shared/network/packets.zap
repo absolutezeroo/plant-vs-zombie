@@ -136,6 +136,8 @@ event StartWaveRequest = {
     }
 }
 
+-- TODO: Client needs UI button + plant selection mode to fire this event
+-- Server handler exists in PlantFoodSystem.luau, missing client implementation
 -- Client requests to use Plant Food on a plant
 event PlantFoodRequest = {
     from: Client,
@@ -169,17 +171,6 @@ event SaveDeckRequest = {
         Slot4: PlantType?,
         Slot5: PlantType?,
         Slot6: PlantType?,
-    }
-}
-
--- Client requests to start a game (Arena)
-event StartGameRequest = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        WorldId: string.utf8,
-        Difficulty: string.utf8,
     }
 }
 
@@ -228,7 +219,7 @@ event PurchasePlantRequest = {
 }
 
 -- Client requests full player data sync
-event RequestPlayerData = {
+event PlayerDataRequest = {
     from: Client,
     type: Reliable,
     call: SingleAsync,
@@ -265,46 +256,6 @@ event UnequipMutationRequest = {
     data: struct {
         PlantType: PlantType,
         MutationType: MutationType,
-    }
-}
-
--- ==========================
--- DEV COMMANDS (Client -> Server)
--- ==========================
-
--- Dev command types
-type DevCommandType = enum {
-    GiveCoins,
-    GiveGems,
-    SetLevel,
-    UnlockAllPlants,
-    UnlockPlant,
-    AddMutation,
-    ResetData,
-    GiveXP,
-    MaxResources
-}
-
--- Generic dev command request
-event DevCommand = {
-    from: Client,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        Command: DevCommandType,
-        StringArg: string.utf8(..50)?,
-        NumberArg: i32?,
-    }
-}
-
--- Dev command response
-event DevCommandResponse = {
-    from: Server,
-    type: Reliable,
-    call: ManyAsync,
-    data: struct {
-        Success: boolean,
-        Message: string.utf8(..200),
     }
 }
 
@@ -514,16 +465,6 @@ event WaveCompleted = {
     }
 }
 
--- Game phase changed
-event GamePhaseChanged = {
-    from: Server,
-    type: Reliable,
-    call: ManyAsync,
-    data: struct {
-        Phase: GamePhase,
-    }
-}
-
 -- Zombie position update (batched, unreliable for smooth movement)
 event ZombiePositionBatch = {
     from: Server,
@@ -532,18 +473,6 @@ event ZombiePositionBatch = {
     data: struct {
         EntityIds: EntityId[..100],
         PositionsX: f32[..100],
-    }
-}
-
--- Full state sync (on player join or reconnect)
-event FullStateSync = {
-    from: Server,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        SunCount: u16,
-        WaveNumber: u8,
-        Phase: GamePhase,
     }
 }
 
@@ -690,18 +619,6 @@ event SplashDamageVFX = {
     }
 }
 
--- Zombie bite VFX/SFX (when zombie attacks plant)
-event ZombieBiteVFX = {
-    from: Server,
-    type: Unreliable,
-    call: ManyAsync,
-    data: struct {
-        PositionX: f32,
-        PositionY: f32,
-        PositionZ: f32,
-    }
-}
-
 -- Plant Food charge collected
 event PlantFoodCollected = {
     from: Server,
@@ -763,7 +680,7 @@ event LevelUp = {
 }
 
 -- Deck saved confirmation
-event DeckSaved = {
+event DeckSaveResponse = {
     from: Server,
     type: Reliable,
     call: SingleAsync,
@@ -807,21 +724,6 @@ event TeleportCountdown = {
     call: ManyAsync,
     data: struct {
         TimeRemaining: u8,
-    }
-}
-
--- Progression data sync
-event ProgressionSync = {
-    from: Server,
-    type: Reliable,
-    call: SingleAsync,
-    data: struct {
-        Level: u16,
-        TotalXP: u32,
-        Coins: u32,
-        Gems: u32,
-        UnlockedPlants: string.utf8[],
-        OwnedSkins: string.utf8[],
     }
 }
 
@@ -903,21 +805,8 @@ event TeleportToArenaResponse = {
     }
 }
 
--- Sync player data to client (coins, unlocked plants, etc.)
-event SyncPlayerData = {
-    from: Server,
-    type: Reliable,
-    call: ManyAsync,
-    data: struct {
-        Coins: u32,
-        Gems: u32,
-        Level: u8,
-        XP: u32,
-    }
-}
-
 -- Show battle results after returning from Arena
-event ShowResults = {
+event BattleResultsSync = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
@@ -948,7 +837,7 @@ event PadStateUpdate = {
 }
 
 -- Server tells client they joined a pad
-event JoinedPad = {
+event PadJoined = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
@@ -961,7 +850,7 @@ event JoinedPad = {
 }
 
 -- Server tells client they left a pad
-event LeftPad = {
+event PadLeft = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
@@ -992,7 +881,7 @@ event PurchasePlantResponse = {
 }
 
 -- Sync unlocked plants to client
-event SyncUnlockedPlants = {
+event UnlockedPlantsSync = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
@@ -1065,7 +954,7 @@ event UnequipMutationResponse = {
 }
 
 -- Sync plant mutations to client (individual plant)
-event SyncPlantMutations = {
+event PlantMutationsSync = {
     from: Server,
     type: Reliable,
     call: ManyAsync,
@@ -1077,7 +966,7 @@ event SyncPlantMutations = {
 }
 
 -- Sync all mutations for all plants at once
-event SyncAllMutations = {
+event AllMutationsSync = {
     from: Server,
     type: Reliable,
     call: ManyAsync,

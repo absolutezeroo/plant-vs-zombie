@@ -85,6 +85,21 @@ local Styles = {
 		FontSize = 24,
 		IsBig = false,
 	},
+	XP = {
+		Color = Color3.fromRGB(180, 100, 255), -- Purple XP
+		FontSize = 26,
+		IsBig = false,
+	},
+	LevelUp = {
+		Color = Color3.fromRGB(255, 215, 0), -- Gold
+		FontSize = 42,
+		IsBig = true,
+	},
+	PlantFood = {
+		Color = Color3.fromRGB(50, 255, 150), -- Bright green
+		FontSize = 28,
+		IsBig = true,
+	},
 }
 
 local FloatingText = {}

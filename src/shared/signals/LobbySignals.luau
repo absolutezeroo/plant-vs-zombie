@@ -52,13 +52,13 @@ LobbySignals.OnMutationsSync = Signal.new()
     Fired when player joins a teleport pad.
     Payload: { PadId: string, WorldId: string, Difficulty: string }
 ]]
-LobbySignals.OnJoinedPad = Signal.new()
+LobbySignals.OnPadJoined = Signal.new()
 
 --[[
     Fired when player leaves a teleport pad.
     Payload: {}
 ]]
-LobbySignals.OnLeftPad = Signal.new()
+LobbySignals.OnPadLeft = Signal.new()
 
 --[[
     Fired when pad countdown updates.
@@ -86,6 +86,6 @@ LobbySignals.OnPurchaseMutationResponse = Signal.new()
     Fired when arena results should be displayed.
     Payload: { WorldId: string, Difficulty: string, Victory: boolean, Stars: number, CoinsEarned: number, XPEarned: number }
 ]]
-LobbySignals.OnShowResults = Signal.new()
+LobbySignals.OnBattleResultsSync = Signal.new()
 
 return table.freeze(LobbySignals)

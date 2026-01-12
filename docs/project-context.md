@@ -61,11 +61,34 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 
 ### System Priority Rules (MANDATORY)
 
-- **SpatialHashingSystem:** Priority 100 (rebuilds lane cache FIRST)
-- **TargetingSystem:** Priority 120+ (consumes fresh lane cache)
-- **CombatSystem/ProjectileSystem:** Priority 140-150 (after targeting)
-- **VFXSystem/AudioSystem:** Priority 300+ (after game logic)
-- **GarbageCollectionSystem:** Priority 400 (LAST system, cleanup)
+**Input/Safety Phase (0-99):**
+- **SafetySystem:** Priority 1 (performance monitoring, entity cap enforcement)
+- **FullStateSyncSystem:** Priority 50 (network state sync for new players)
+- **SpatialHashingSystem:** Priority 95 (rebuilds LaneCache FIRST)
+
+**Simulation Phase (100-299):**
+- **WaveManagerSystem:** Priority 100 (wave spawning logic)
+- **ZombieMovementSystem:** Priority 150 (entity movement)
+- **MushroomSystem:** Priority 155 (mushroom special behavior)
+- **ProjectileSpawnSystem:** Priority 160 (projectile creation)
+- **ProjectileMovementSystem:** Priority 161 (projectile movement)
+- **TrapSystem/EnhancementSystem:** Priority 165 (trap detection, projectile enhancement)
+- **CombatSystem:** Priority 170 (damage resolution)
+- **SpecialPlantSystem/BossSystem:** Priority 175 (special abilities)
+- **EntityDeathSystem:** Priority 180 (death processing)
+- **PlantFoodSystem:** Priority 185 (plant food abilities)
+- **PlacementSystem:** Priority 200 (plant placement)
+- **MutationApplySystem:** Priority 205 (mutation setup)
+
+**Economy Phase (300-399):**
+- **SunSpawnSystem:** Priority 300 (sun drops)
+- **SunflowerProductionSystem:** Priority 305 (sunflower sun generation)
+- **SunCollectionSystem:** Priority 310 (sun pickup)
+- **Mutation Systems:** Priority 345-375 (splash, burn, freeze, lightning, lifesteal, sun-on-kill)
+
+**Cleanup Phase (400+):**
+- **EventCleanupSystem:** Priority 400 (despawn event entities)
+- **PerformanceMonitorSystem:** Priority 500 (frame time logging)
 
 ### Component Schema Rules
 

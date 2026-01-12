@@ -69,7 +69,7 @@ function ShopHandler.SyncPlayerData(player: Player)
 		Deck = deck,
 	})
 
-	-- Build mutation arrays for SyncAllMutations
+	-- Build mutation arrays for AllMutationsSync
 	local ownedArray = {}
 	for plantType, mutations in pairs(ownedMutations) do
 		table.insert(ownedArray, { PlantType = plantType, Mutations = mutations })
@@ -81,7 +81,7 @@ function ShopHandler.SyncPlayerData(player: Player)
 	end
 
 	-- Sync mutations separately
-	Network.SyncAllMutations.Fire(player, {
+	Network.AllMutationsSync.Fire(player, {
 		OwnedMutations = ownedArray,
 		EquippedMutations = equippedArray,
 	})
@@ -152,7 +152,7 @@ local function onPurchasePlantRequest(player: Player, data: { PlantType: any })
 
 		-- Also sync unlocked plants
 		local unlockedPlants = PlayerDataService.GetUnlockedPlants(player)
-		Network.SyncUnlockedPlants.Fire(player, {
+		Network.UnlockedPlantsSync.Fire(player, {
 			UnlockedPlants = unlockedPlants,
 		})
 
@@ -169,7 +169,7 @@ local function onPurchasePlantRequest(player: Player, data: { PlantType: any })
 end
 
 -- Handle full data request
-local function onRequestPlayerData(player: Player, _data: {})
+local function onPlayerDataRequest(player: Player, _data: {})
 	ShopHandler.SyncPlayerData(player)
 end
 
@@ -180,7 +180,7 @@ function ShopHandler.Initialize()
 	Network.PurchasePlantRequest.SetCallback(onPurchasePlantRequest)
 
 	-- Listen for data sync requests
-	Network.RequestPlayerData.SetCallback(onRequestPlayerData)
+	Network.PlayerDataRequest.SetCallback(onPlayerDataRequest)
 
 	-- Auto-sync player data when profile loads or data changes
 	-- This ensures data is pushed even if client request arrives too early

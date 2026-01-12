@@ -210,7 +210,7 @@ function PlayerDataClient.Initialize()
 		PlayerData.Level:set(data.Level or 1)
 		PlayerData.LevelProgress:set(data.LevelProgress or 0)
 
-		-- Note: Mutations are synced via SyncAllMutations event (separate call)
+		-- Note: Mutations are synced via AllMutationsSync event (separate call)
 
 		-- Update unlocked plants
 		local unlockedList = {}
@@ -223,7 +223,7 @@ function PlayerDataClient.Initialize()
 	end)
 
 	-- Handle mutations sync from server (sent separately after PlayerDataSync)
-	Network.SyncAllMutations.On(function(data)
+	Network.AllMutationsSync.On(function(data)
 		-- Convert EquippedMutations array format from Zap to dictionary
 		local mutationsDict: { [string]: { string } } = {}
 
@@ -301,7 +301,7 @@ function PlayerDataClient.Initialize()
 	end)
 
 	-- Handle deck save response
-	Network.DeckSaved.SetCallback(function(data)
+	Network.DeckSaveResponse.SetCallback(function(data)
 		if data.Success then
 			Logger.Info("PlayerData", "Deck saved successfully")
 		else

@@ -41,12 +41,8 @@ local function Init(_world)
 	end
 
 	-- Pre-cache MapConfig values to avoid yield in OnStep
-	if MapConfig.IsInitialized() then
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	else
-		-- Fallback: force init (should not happen if bootstrap is correct)
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	end
+	-- Note: MapConfig.GetZombieDirection() works regardless of init state
+	State.CachedZombieDir = MapConfig.GetZombieDirection()
 
 	State.IsInitialized = true
 end

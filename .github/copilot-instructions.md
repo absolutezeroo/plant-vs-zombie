@@ -36,6 +36,28 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 6.  **Networking: Zap**
     * **Doc:** https://zap.redblox.dev/usage/generated-api.html
     * **Rule:** Never edit `generated.luau`. Use the generated API strictly for typesafe networking.
+    * **Naming Conventions (MANDATORY):**
+        | Suffix/Pattern | Direction | Usage |
+        |----------------|-----------|-------|
+        | `XXXRequest` | Client → Server | Player requests an action (e.g., `PlantRequest`, `PlayerDataRequest`) |
+        | `XXXResponse` | Server → Client | Direct response to a request (e.g., `PlantResponse`, `DeckSaveResponse`) |
+        | `XXXSync` | Server → Client | Data synchronization/broadcast (e.g., `UnlockedPlantsSync`, `CurrencySync`) |
+        | `XXXUpdate` | Server → Client | Incremental state updates (e.g., `HealthUpdate`, `CooldownUpdate`) |
+        | `XXXVFX` | Either | Visual effect triggers (e.g., `ProjectileVFX`, `DeathVFX`) |
+        | Past Tense | Server → Client | Game events that occurred (e.g., `PlantSpawned`, `ZombieDied`, `SunCollected`) |
+    * **Examples:**
+        ```zap
+        -- ✅ GOOD:
+        event PlantRequest = { from: Client, ... }      -- Client asks to plant
+        event PlantResponse = { from: Server, ... }     -- Server confirms/denies
+        event PlantSpawned = { from: Server, ... }      -- Broadcast: plant was created
+        event CurrencySync = { from: Server, ... }      -- Sync player's currency
+
+        -- ❌ BAD:
+        event RequestPlant = { ... }   -- Prefix instead of suffix
+        event SyncCurrency = { ... }   -- Prefix instead of suffix
+        event PlantingDone = { ... }   -- Unclear naming
+        ```
 
 7.  **Cleanup: Trove**
     * **Doc:** https://sleitnick.github.io/RbxUtil/api/Trove/

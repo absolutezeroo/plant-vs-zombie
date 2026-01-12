@@ -181,6 +181,42 @@ function FloatingTextController.ShowText(position: Vector3, text: string, color:
 end
 
 --[[
+	Show XP gain text
+	
+	@param position Vector3 - World position
+	@param amount number - XP amount gained
+]]
+function FloatingTextController.ShowXP(position: Vector3, amount: number)
+	local text = `+{amount} XP`
+	local ft = FloatingText.Create(position, text, FloatingText.Styles.XP)
+	_activeTexts = Sift.Array.push(_activeTexts, ft)
+end
+
+--[[
+	Show level up celebration
+	
+	@param position Vector3 - World position
+	@param newLevel number - New level reached
+]]
+function FloatingTextController.ShowLevelUp(position: Vector3, newLevel: number)
+	local text = `LEVEL {newLevel}!`
+	local ft = FloatingText.Create(position, text, FloatingText.Styles.LevelUp)
+	_activeTexts = Sift.Array.push(_activeTexts, ft)
+end
+
+--[[
+	Show PlantFood collected/activated
+	
+	@param position Vector3 - World position
+	@param action string - "Collected" or "Activated"
+]]
+function FloatingTextController.ShowPlantFood(position: Vector3, action: string)
+	local text = `🌿 Plant Food {action}!`
+	local ft = FloatingText.Create(position, text, FloatingText.Styles.PlantFood)
+	_activeTexts = Sift.Array.push(_activeTexts, ft)
+end
+
+--[[
 	Dispose the controller
 	Cleans up connections and all active floating texts
 ]]

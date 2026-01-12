@@ -91,7 +91,7 @@ function PadBroadcaster:NotifyPlayerJoined(
 	difficulty: string,
 	position: Vector3
 )
-	ZapServer.JoinedPad.Fire(player, {
+	ZapServer.PadJoined.Fire(player, {
 		PadId = padId,
 		WorldId = worldId,
 		Difficulty = difficulty,
@@ -102,7 +102,7 @@ end
 
 -- Notify a specific player that they left a pad
 function PadBroadcaster:NotifyPlayerLeft(player: Player)
-	ZapServer.LeftPad.Fire(player, {})
+	ZapServer.PadLeft.Fire(player, {})
 	Logger.Debug("PadBroadcaster", `Notified: {player.Name} left pad`)
 end
 
