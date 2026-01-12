@@ -51,42 +51,42 @@ export type ZombieStats = {
 local ZombieData: { [string]: ZombieStats } = {
 	-- Basic zombie - standard enemy
 	Basic = {
-		Health = 100,
-		Speed = 1.5,
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 200, -- Buffed from 100 (takes 10 pea shots)
+		Speed = 2.0, -- Buffed from 1.5
+		Damage = 40, -- Buffed from 20
+		AttackSpeed = 0.8, -- Faster attacks (was 1.0)
 		Category = "Normal",
 		SpawnCost = 10,
 	},
 
 	-- Cone zombie - more health
 	Cone = {
-		Health = 200, -- Cone adds 100 HP
-		Speed = 1.5,
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 400, -- Buffed from 200
+		Speed = 2.0, -- Buffed from 1.5
+		Damage = 40, -- Buffed from 20
+		AttackSpeed = 0.8, -- Faster attacks
 		Category = "Armored",
 		SpawnCost = 20,
-		ArmorHealth = 100, -- Cone HP
+		ArmorHealth = 200, -- Buffed from 100
 	},
 
 	-- Bucket zombie - even more health
 	Bucket = {
-		Health = 400, -- Bucket adds 300 HP
-		Speed = 1.5,
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 800, -- Buffed from 400
+		Speed = 2.0, -- Buffed from 1.5
+		Damage = 50, -- Buffed from 20
+		AttackSpeed = 0.7, -- Faster attacks
 		Category = "Armored",
-		SpawnCost = 30,
-		ArmorHealth = 300, -- Bucket HP
+		SpawnCost = 35,
+		ArmorHealth = 600, -- Buffed from 300
 	},
 
 	-- Pole Vaulter - jumps over first plant
 	Pole = {
-		Health = 150,
-		Speed = 3.0, -- Fast initially
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 300, -- Buffed from 150
+		Speed = 4.0, -- Buffed from 3.0 (very fast)
+		Damage = 40,
+		AttackSpeed = 0.8,
 		Category = "Special",
 		SpawnCost = 25,
 		-- Behavior
@@ -95,74 +95,74 @@ local ZombieData: { [string]: ZombieStats } = {
 
 	-- Newspaper zombie - gets angry when paper destroyed
 	Newspaper = {
-		Health = 150, -- 50 paper + 100 zombie
-		Speed = 1.5,
-		Damage = 20,
-		AttackSpeed = 1.0, -- Normal attack speed
+		Health = 300, -- Buffed from 150
+		Speed = 2.0, -- Buffed from 1.5
+		Damage = 40,
+		AttackSpeed = 0.8,
 		Category = "Special",
-		SpawnCost = 15,
+		SpawnCost = 18,
 		-- Rage behavior
 		HasRage = true,
-		ArmorHealth = 50, -- Newspaper HP
-		RageSpeed = 3.0, -- Speed when enraged
-		RageAttackSpeed = 0.5, -- Attack speed when enraged
+		ArmorHealth = 100, -- Buffed from 50
+		RageSpeed = 5.0, -- Buffed from 3.0
+		RageAttackSpeed = 0.3, -- Faster (was 0.5)
 	},
 
 	-- Football zombie - tanky and fast
 	Football = {
-		Health = 500,
-		Speed = 2.5,
-		Damage = 25,
-		AttackSpeed = 0.8,
+		Health = 1200, -- Buffed from 500
+		Speed = 3.5, -- Buffed from 2.5
+		Damage = 60, -- Buffed from 25
+		AttackSpeed = 0.5, -- Faster attacks (was 0.8)
 		Category = "Armored",
-		SpawnCost = 50,
-		ArmorHealth = 400, -- Helmet HP
+		SpawnCost = 60,
+		ArmorHealth = 800, -- Buffed from 400
 	},
 
 	-- Screen-Door zombie - shield blocks projectiles (pierced by Fume-shroom)
 	ScreenDoor = {
-		Health = 100, -- Base zombie health
-		Speed = 1.5,
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 200, -- Buffed from 100
+		Speed = 2.0, -- Buffed from 1.5
+		Damage = 40,
+		AttackSpeed = 0.8,
 		Category = "Armored",
-		SpawnCost = 35,
+		SpawnCost = 40,
 		-- Shield behavior
 		HasShield = true,
-		ShieldHealth = 400, -- Door absorbs damage until destroyed
+		ShieldHealth = 800, -- Buffed from 400
 	},
 
 	-- Ladder zombie - places ladder over Wall-nuts (shield while carrying)
 	Ladder = {
-		Health = 100,
-		Speed = 1.8,
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 200, -- Buffed from 100
+		Speed = 2.5, -- Buffed from 1.8
+		Damage = 40,
+		AttackSpeed = 0.8,
 		Category = "Special",
-		SpawnCost = 40,
+		SpawnCost = 45,
 		-- Shield while carrying ladder
 		HasShield = true,
-		ShieldHealth = 300, -- Ladder absorbs damage
+		ShieldHealth = 600, -- Buffed from 300
 	},
 
 	-- Imp - small, fast, weak
 	Imp = {
-		Health = 50,
-		Speed = 3.0, -- Very fast
-		Damage = 15,
-		AttackSpeed = 0.8,
+		Health = 100, -- Buffed from 50
+		Speed = 4.5, -- Buffed from 3.0 (very fast)
+		Damage = 30, -- Buffed from 15
+		AttackSpeed = 0.5, -- Very fast attacks
 		Category = "Normal",
-		SpawnCost = 8,
+		SpawnCost = 10,
 	},
 
 	-- Flag zombie - signals large waves
 	Flag = {
-		Health = 100,
-		Speed = 1.8, -- Slightly faster than Basic
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 200, -- Buffed from 100
+		Speed = 2.5, -- Buffed from 1.8
+		Damage = 40,
+		AttackSpeed = 0.8,
 		Category = "Normal",
-		SpawnCost = 10,
+		SpawnCost = 12,
 		-- Behavior
 		IsFlagBearer = true,
 	},
@@ -173,12 +173,12 @@ local ZombieData: { [string]: ZombieStats } = {
 
 	-- Balloon zombie - flies over ground plants, only hit by Cactus/Cattail
 	Balloon = {
-		Health = 75, -- Fragile when popped
-		Speed = 1.2, -- Slower than walking
-		Damage = 20,
-		AttackSpeed = 1.0,
+		Health = 150, -- Buffed from 75
+		Speed = 2.0, -- Buffed from 1.2
+		Damage = 40,
+		AttackSpeed = 0.8,
 		Category = "Special",
-		SpawnCost = 20,
+		SpawnCost = 25,
 		-- Flying behavior
 		IsFlying = true,
 		FlyHeight = 4, -- Studs above ground
@@ -190,26 +190,26 @@ local ZombieData: { [string]: ZombieStats } = {
 
 	-- Gargantuar - massive boss, throws Imp at half health
 	Gargantuar = {
-		Health = 3000, -- Extremely tanky
-		Speed = 0.8, -- Slow but devastating
-		Damage = 100, -- Instant-kills most plants
-		AttackSpeed = 1.5, -- Slow swings
+		Health = 6000, -- Buffed from 3000 (needs serious firepower)
+		Speed = 1.2, -- Buffed from 0.8
+		Damage = 200, -- Buffed from 100 (instant-kills everything)
+		AttackSpeed = 1.0, -- Faster swings (was 1.5)
 		Category = "Boss",
-		SpawnCost = 150, -- Equivalent to 15 basics
+		SpawnCost = 180,
 		-- Boss behavior
 		IsBoss = true,
 		SpawnsOnHalfHealth = "Imp",
-		SpawnCount = 1,
+		SpawnCount = 2, -- Spawns 2 Imps now
 	},
 
 	-- Mini-Gargantuar for easier waves
 	MiniGargantuar = {
-		Health = 1500,
-		Speed = 1.0,
-		Damage = 50,
-		AttackSpeed = 1.2,
+		Health = 3000, -- Buffed from 1500
+		Speed = 1.5, -- Buffed from 1.0
+		Damage = 100, -- Buffed from 50
+		AttackSpeed = 0.8, -- Faster attacks (was 1.2)
 		Category = "Boss",
-		SpawnCost = 80,
+		SpawnCost = 100,
 		IsBoss = true,
 		SpawnsOnHalfHealth = "Imp",
 		SpawnCount = 1,

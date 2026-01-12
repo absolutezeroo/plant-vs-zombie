@@ -60,27 +60,27 @@ export type DifficultyConfig = {
 local Difficulties: { [string]: DifficultyConfig } = {
 
 	-- ============================================
-	-- EASY - For casual play / learning
+	-- EASY - For casual play / learning (solo-friendly)
 	-- ============================================
 	easy = {
 		Id = "easy",
-		Name = "Facile",
-		Description = "Parfait pour découvrir le monde.",
+		Name = "Easy",
+		Description = "Perfect for discovering the world.",
 		Order = 1,
 
 		Icon = "⭐",
 		Color = Color3.fromRGB(100, 200, 100), -- Green
 
-		-- Waves
-		WaveCount = 5,
-		BaseBudget = 30,
-		BudgetPerWave = 10,
-		SpawnInterval = 3.5,
+		-- Waves (solo-friendly)
+		WaveCount = 6,
+		BaseBudget = 40,
+		BudgetPerWave = 15,
+		SpawnInterval = 3.0, -- Slower spawns for solo
 
-		-- Easy zombies
-		ZombieHealthMult = 0.8,
+		-- Slightly weaker zombies for solo
+		ZombieHealthMult = 0.85,
 		ZombieSpeedMult = 0.9,
-		ZombieDamageMult = 0.8,
+		ZombieDamageMult = 0.85,
 
 		-- No boss
 		HasBoss = false,
@@ -90,8 +90,8 @@ local Difficulties: { [string]: DifficultyConfig } = {
 		XPReward = 25,
 		CoinMultiplier = 1.0,
 
-		-- More sun
-		SunDropInterval = 8,
+		-- More sun for economy buildup
+		SunDropInterval = 10,
 	},
 
 	-- ============================================
@@ -100,34 +100,34 @@ local Difficulties: { [string]: DifficultyConfig } = {
 	normal = {
 		Id = "normal",
 		Name = "Normal",
-		Description = "L'expérience classique.",
+		Description = "The classic experience.",
 		Order = 2,
 
 		Icon = "⭐⭐",
 		Color = Color3.fromRGB(100, 150, 255), -- Blue
 
-		-- Waves
-		WaveCount = 8,
-		BaseBudget = 50,
-		BudgetPerWave = 20,
-		SpawnInterval = 2.5,
+		-- Waves (significantly buffed)
+		WaveCount = 12, -- Increased from 8
+		BaseBudget = 80, -- Increased from 50
+		BudgetPerWave = 40, -- Increased from 20
+		SpawnInterval = 1.8, -- Much faster (was 2.5)
 
-		-- Standard zombies
-		ZombieHealthMult = 1.0,
-		ZombieSpeedMult = 1.0,
-		ZombieDamageMult = 1.0,
+		-- Tougher zombies
+		ZombieHealthMult = 1.2, -- Was 1.0
+		ZombieSpeedMult = 1.1, -- Was 1.0
+		ZombieDamageMult = 1.2, -- Was 1.0
 
-		-- Mini-boss on last wave
+		-- Boss on last wave
 		HasBoss = true,
-		BossWave = 8,
+		BossWave = 12,
 
 		-- Normal rewards
 		CoinReward = 100,
 		XPReward = 50,
 		CoinMultiplier = 1.0,
 
-		-- Normal sun
-		SunDropInterval = 10,
+		-- Less sun
+		SunDropInterval = 15, -- Was 10
 	},
 
 	-- ============================================
@@ -135,35 +135,35 @@ local Difficulties: { [string]: DifficultyConfig } = {
 	-- ============================================
 	hard = {
 		Id = "hard",
-		Name = "Difficile",
-		Description = "Les zombies sont plus résistants.",
+		Name = "Hard",
+		Description = "Zombies are tougher.",
 		Order = 3,
 
 		Icon = "⭐⭐⭐",
 		Color = Color3.fromRGB(255, 150, 50), -- Orange
 
-		-- More waves
-		WaveCount = 12,
-		BaseBudget = 80,
-		BudgetPerWave = 35,
-		SpawnInterval = 2.0,
+		-- More waves (buffed)
+		WaveCount = 18, -- Increased from 12
+		BaseBudget = 120, -- Increased from 80
+		BudgetPerWave = 60, -- Increased from 35
+		SpawnInterval = 1.3, -- Much faster (was 2.0)
 
-		-- Tougher zombies
-		ZombieHealthMult = 1.5,
-		ZombieSpeedMult = 1.2,
-		ZombieDamageMult = 1.3,
+		-- Very tough zombies
+		ZombieHealthMult = 1.8, -- Was 1.5
+		ZombieSpeedMult = 1.4, -- Was 1.2
+		ZombieDamageMult = 1.6, -- Was 1.3
 
-		-- Boss mid-game and end
+		-- Boss on last wave
 		HasBoss = true,
-		BossWave = 12,
+		BossWave = 18,
 
 		-- Better rewards
 		CoinReward = 200,
 		XPReward = 100,
 		CoinMultiplier = 1.5,
 
-		-- Less sun
-		SunDropInterval = 12,
+		-- Much less sun
+		SunDropInterval = 20, -- Was 12
 	},
 
 	-- ============================================
@@ -171,35 +171,35 @@ local Difficulties: { [string]: DifficultyConfig } = {
 	-- ============================================
 	nightmare = {
 		Id = "nightmare",
-		Name = "Cauchemar",
-		Description = "Seuls les meilleurs survivent.",
+		Name = "Nightmare",
+		Description = "Only the best survive.",
 		Order = 4,
 
 		Icon = "💀",
 		Color = Color3.fromRGB(150, 50, 200), -- Purple
 
-		-- Many waves
-		WaveCount = 20,
-		BaseBudget = 120,
-		BudgetPerWave = 50,
-		SpawnInterval = 1.5,
+		-- Many waves (buffed significantly)
+		WaveCount = 30, -- Increased from 20
+		BaseBudget = 200, -- Increased from 120
+		BudgetPerWave = 80, -- Increased from 50
+		SpawnInterval = 0.8, -- Ultra fast (was 1.5)
 
-		-- Very tough zombies
-		ZombieHealthMult = 2.0,
-		ZombieSpeedMult = 1.4,
-		ZombieDamageMult = 1.5,
+		-- Extremely tough zombies
+		ZombieHealthMult = 2.5, -- Was 2.0
+		ZombieSpeedMult = 1.6, -- Was 1.4
+		ZombieDamageMult = 2.0, -- Was 1.5
 
 		-- Multiple boss waves
 		HasBoss = true,
-		BossWave = 10, -- First boss at wave 10, another at 20
+		BossWave = 10, -- First boss at wave 10, another at 20, 30
 
 		-- Great rewards
 		CoinReward = 500,
 		XPReward = 250,
 		CoinMultiplier = 2.0,
 
-		-- Minimal sun
-		SunDropInterval = 15,
+		-- Almost no sky sun
+		SunDropInterval = 30, -- Was 15
 	},
 }
 

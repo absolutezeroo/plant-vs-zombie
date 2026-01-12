@@ -19,6 +19,7 @@ export type SunComponent = {
 	IsFalling: boolean, -- True if still falling from sky
 	TargetY: number?, -- Y position to stop at when falling (nil for non-falling)
 	SourceType: string?, -- "Sky" or "Sunflower" (optional for tracking)
+	OwnerId: number?, -- UserId of the player who owns this sun (nil = anyone can collect)
 }
 
 return Matter.component("Sun")

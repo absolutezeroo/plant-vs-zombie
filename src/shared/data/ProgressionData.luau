@@ -36,210 +36,210 @@ local PlantUnlocks: { [string]: PlantUnlockInfo } = {
 	},
 
 	-- ============================================
-	-- TIER 1: Early Game (Levels 1-10, 50-200 coins)
+	-- TIER 1: Early Game (Levels 1-10, 200-750 coins)
 	-- ============================================
 	PotatoMine = {
-		Cost = 50,
+		Cost = 200,
 		StarterPlant = false,
 		Order = 4,
 	},
 	PuffShroom = {
-		Cost = 75,
+		Cost = 350,
 		StarterPlant = false,
 		Order = 5,
 	},
 	SunShroom = {
-		Cost = 100,
+		Cost = 500,
 		StarterPlant = false,
 		Order = 6,
 	},
 	Chomper = {
-		Cost = 150,
+		Cost = 650,
 		StarterPlant = false,
 		Order = 7,
 	},
 	SnowPea = {
-		Cost = 200,
+		Cost = 750,
 		StarterPlant = false,
 		Order = 8,
 	},
 
 	-- ============================================
-	-- TIER 2: Mid-Early Game (Levels 10-20, 250-500 coins)
+	-- TIER 2: Mid-Early Game (Levels 10-20, 1000-2000 coins)
 	-- ============================================
 	Repeater = {
-		Cost = 250,
+		Cost = 1000,
 		StarterPlant = false,
 		Order = 9,
 	},
 	FumeShroom = {
-		Cost = 300,
+		Cost = 1200,
 		StarterPlant = false,
 		Order = 10,
 	},
 	Squash = {
-		Cost = 350,
+		Cost = 1400,
 		StarterPlant = false,
 		Order = 11,
 	},
 	Garlic = {
-		Cost = 400,
+		Cost = 1600,
 		StarterPlant = false,
 		Order = 12,
 	},
 	CherryBomb = {
-		Cost = 450,
+		Cost = 1800,
 		StarterPlant = false,
 		Order = 13,
 	},
 	TallNut = {
-		Cost = 500,
+		Cost = 2000,
 		StarterPlant = false,
 		Order = 14,
 	},
 
 	-- ============================================
-	-- TIER 3: Mid Game (Levels 20-30, 600-1000 coins)
+	-- TIER 3: Mid Game (Levels 20-30, 2500-4000 coins)
 	-- ============================================
 	Threepeater = {
-		Cost = 600,
+		Cost = 2500,
 		StarterPlant = false,
 		Order = 15,
 	},
 	Jalapeno = {
-		Cost = 700,
+		Cost = 2800,
 		StarterPlant = false,
 		Order = 16,
 	},
 	Spikeweed = {
-		Cost = 750,
+		Cost = 3000,
 		StarterPlant = false,
 		Order = 17,
 	},
 	Torchwood = {
-		Cost = 800,
+		Cost = 3200,
 		StarterPlant = false,
 		Order = 18,
 	},
 	CabbagePult = {
-		Cost = 850,
+		Cost = 3400,
 		StarterPlant = false,
 		Order = 19,
 	},
 	Pumpkin = {
-		Cost = 900,
+		Cost = 3600,
 		StarterPlant = false,
 		Order = 20,
 	},
 	ScaredyShroom = {
-		Cost = 950,
+		Cost = 3800,
 		StarterPlant = false,
 		Order = 21,
 	},
 	HypnoShroom = {
-		Cost = 1000,
+		Cost = 4000,
 		StarterPlant = false,
 		Order = 22,
 	},
 
 	-- ============================================
-	-- TIER 4: Mid-Late Game (Levels 30-40, 1200-2000 coins)
+	-- TIER 4: Mid-Late Game (Levels 30-40, 5000-8000 coins)
 	-- ============================================
 	SplitPea = {
-		Cost = 1200,
+		Cost = 5000,
 		StarterPlant = false,
 		Order = 23,
 	},
 	KernelPult = {
-		Cost = 1300,
+		Cost = 5500,
 		StarterPlant = false,
 		Order = 24,
 	},
 	Starfruit = {
-		Cost = 1400,
+		Cost = 6000,
 		StarterPlant = false,
 		Order = 25,
 	},
 	Cactus = {
-		Cost = 1500,
+		Cost = 6500,
 		StarterPlant = false,
 		Order = 26,
 	},
 	Blover = {
-		Cost = 1600,
+		Cost = 7000,
 		StarterPlant = false,
 		Order = 27,
 	},
 	SeaShroom = {
-		Cost = 1700,
+		Cost = 7000,
 		StarterPlant = false,
 		Order = 28,
 	},
 	TwinSunflower = {
-		Cost = 1800,
+		Cost = 7500,
 		StarterPlant = false,
 		Order = 29,
 	},
 	MelonPult = {
-		Cost = 2000,
+		Cost = 8000,
 		StarterPlant = false,
 		Order = 30,
 	},
 
 	-- ============================================
-	-- TIER 5: Late Game (Levels 40-50, 2500-4000 coins)
+	-- TIER 5: Late Game (Levels 40-50, 10000-16000 coins)
 	-- ============================================
 	GatlingPea = {
-		Cost = 2500,
+		Cost = 10000,
 		StarterPlant = false,
 		Order = 31,
 	},
 	GloomShroom = {
-		Cost = 2800,
+		Cost = 11000,
 		StarterPlant = false,
 		Order = 32,
 	},
 	Cattail = {
-		Cost = 3000,
+		Cost = 12000,
 		StarterPlant = false,
 		Order = 33,
 	},
 	WinterMelon = {
-		Cost = 3500,
+		Cost = 14000,
 		StarterPlant = false,
 		Order = 34,
 	},
 	IceShroom = {
-		Cost = 3800,
+		Cost = 15000,
 		StarterPlant = false,
 		Order = 35,
 	},
 	DoomShroom = {
-		Cost = 4000,
+		Cost = 16000,
 		StarterPlant = false,
 		Order = 36,
 	},
 
 	-- ============================================
-	-- TIER 6: End Game (Level 50+, 5000+ coins)
+	-- TIER 6: End Game (Level 50+, 20000+ coins)
 	-- ============================================
 	CobCannon = {
-		Cost = 5000,
+		Cost = 20000,
 		StarterPlant = false,
 		Order = 37,
 	},
 	Marigold = {
-		Cost = 5500,
+		Cost = 22000,
 		StarterPlant = false,
 		Order = 38,
 	},
 	GoldMagnet = {
-		Cost = 6000,
+		Cost = 25000,
 		StarterPlant = false,
 		Order = 39,
 	},
 	Imitater = {
-		Cost = 7500,
+		Cost = 30000,
 		StarterPlant = false,
 		Order = 40,
 	},
@@ -248,42 +248,42 @@ local PlantUnlocks: { [string]: PlantUnlockInfo } = {
 	-- UTILITY PLANTS (Various levels)
 	-- ============================================
 	LilyPad = {
-		Cost = 100,
+		Cost = 400,
 		StarterPlant = false,
 		Order = 41,
 	},
 	FlowerPot = {
-		Cost = 100,
+		Cost = 400,
 		StarterPlant = false,
 		Order = 42,
 	},
 	TangleKelp = {
-		Cost = 300,
+		Cost = 1200,
 		StarterPlant = false,
 		Order = 43,
 	},
 	GraveBuster = {
-		Cost = 200,
+		Cost = 800,
 		StarterPlant = false,
 		Order = 44,
 	},
 	Plantern = {
-		Cost = 400,
+		Cost = 1600,
 		StarterPlant = false,
 		Order = 45,
 	},
 	UmbrellaLeaf = {
-		Cost = 600,
+		Cost = 2400,
 		StarterPlant = false,
 		Order = 46,
 	},
 	CoffeeBean = {
-		Cost = 500,
+		Cost = 2000,
 		StarterPlant = false,
 		Order = 47,
 	},
 	ExplodeONut = {
-		Cost = 2000,
+		Cost = 8000,
 		StarterPlant = false,
 		Order = 48,
 	},

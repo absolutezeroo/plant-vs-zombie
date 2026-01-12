@@ -206,4 +206,64 @@ GameConstants.Performance = table.freeze({
 	MAX_PROJECTILES = 25,
 })
 
+-- ============================================
+-- MULTIPLAYER SCALING
+-- ============================================
+
+--[[
+	TODO: Competitive Mode (Future Feature)
+	- Each player owns specific lanes (e.g., Player 1 = lanes 1-2, Player 2 = lanes 3-4, etc.)
+	- Players can only place/shovel in their own lanes
+	- Separate win/lose conditions per player
+	- Leaderboard with individual scores
+	- Requires: LaneOwnership system, UI indicators, matchmaking changes
+]]
+
+GameConstants.Multiplayer = table.freeze({
+	-- Budget scaling per player count
+	-- Formula: baseBudget * BUDGET_SCALE[playerCount]
+	BUDGET_SCALE = table.freeze({
+		[1] = 1.0, -- Solo: baseline
+		[2] = 1.3, -- Duo: 30% more zombies (was 60%)
+		[3] = 1.7, -- Trio: 70% more zombies
+		[4] = 2.2, -- Squad: 120% more zombies
+	}),
+
+	-- Zombie HP scaling per player count
+	ZOMBIE_HP_SCALE = table.freeze({
+		[1] = 1.0,
+		[2] = 1.15, -- 15% tougher (was 30%)
+		[3] = 1.35, -- 35% tougher
+		[4] = 1.6, -- 60% tougher
+	}),
+
+	-- Zombie speed scaling (slight increase to pressure more)
+	ZOMBIE_SPEED_SCALE = table.freeze({
+		[1] = 1.0,
+		[2] = 1.0, -- No speed increase for duo (was 1.05)
+		[3] = 1.05,
+		[4] = 1.1,
+	}),
+
+	-- Spawn rate scaling (faster spawns with more players)
+	SPAWN_RATE_SCALE = table.freeze({
+		[1] = 1.0,
+		[2] = 0.9, -- 10% faster (was 15%)
+		[3] = 0.75, -- 25% faster
+		[4] = 0.65, -- 35% faster
+	}),
+
+	-- Plant limits per player (0 = no limit for that type)
+	PLANTS_PER_PLAYER = 12, -- Each player can place max 12 plants
+	MAX_TOTAL_PLANTS = 40, -- Hard cap regardless of player count
+
+	-- Sun scaling (less sky sun with more players to balance economy)
+	SUN_DROP_SCALE = table.freeze({
+		[1] = 1.0,
+		[2] = 1.3, -- 30% slower
+		[3] = 1.6, -- 60% slower
+		[4] = 2.0, -- 100% slower
+	}),
+})
+
 return table.freeze(GameConstants)

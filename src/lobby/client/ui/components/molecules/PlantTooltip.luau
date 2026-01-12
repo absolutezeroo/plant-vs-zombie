@@ -278,6 +278,13 @@ local function PlantTooltip(props: PlantTooltipProps): Frame
 		}
 	end)
 
+	-- Plant description
+	local plantDescription = scope:Computed(function(use)
+		local plantType = use(props.PlantType) or ""
+		local data = PlantData[plantType]
+		return if data then data.Description else ""
+	end)
+
 	-- Animated scale for pop-in effect
 	local animatedScale = scope:Spring(
 		scope:Computed(function(use)
@@ -441,8 +448,8 @@ local function PlantTooltip(props: PlantTooltipProps): Frame
 
 									-- Category badge
 									scope:New("TextLabel")({
-										Size = UDim2.fromScale(1, 0.3),
-										Position = UDim2.fromScale(0, 0.5),
+										Size = UDim2.fromScale(1, 0.25),
+										Position = UDim2.fromScale(0, 0.45),
 										BackgroundTransparency = 1,
 										Text = scope:Computed(function(use)
 											local info = use(categoryInfo)
@@ -458,6 +465,23 @@ local function PlantTooltip(props: PlantTooltipProps): Frame
 
 										[Children] = {
 											scope:New("UITextSizeConstraint")({ MaxTextSize = 14, MinTextSize = 10 }),
+										},
+									}),
+
+									-- Plant description
+									scope:New("TextLabel")({
+										Size = UDim2.fromScale(1, 0.25),
+										Position = UDim2.fromScale(0, 0.72),
+										BackgroundTransparency = 1,
+										Text = plantDescription,
+										TextColor3 = Theme.Colors.Surface.Shadow,
+										TextScaled = true,
+										Font = Theme.Typography.Fonts.Body,
+										TextXAlignment = Enum.TextXAlignment.Left,
+										TextWrapped = true,
+
+										[Children] = {
+											scope:New("UITextSizeConstraint")({ MaxTextSize = 11, MinTextSize = 8 }),
 										},
 									}),
 								},

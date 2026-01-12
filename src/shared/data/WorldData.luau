@@ -53,8 +53,8 @@ local Worlds: { [string]: WorldConfig } = {
 	-- ============================================
 	day = {
 		Id = "day",
-		Name = "Jardin de Jour",
-		Description = "Un jardin ensoleillé, parfait pour débuter.",
+		Name = "Day Garden",
+		Description = "A sunny garden, perfect for beginners.",
 		Order = 1,
 
 		MapId = "Map_Day",
@@ -72,7 +72,7 @@ local Worlds: { [string]: WorldConfig } = {
 		BossType = "MiniGargantuar",
 
 		-- Starting sun
-		SunStarting = 50,
+		SunStarting = 100,
 	},
 
 	-- ============================================
@@ -80,8 +80,8 @@ local Worlds: { [string]: WorldConfig } = {
 	-- ============================================
 	night = {
 		Id = "night",
-		Name = "Jardin de Nuit",
-		Description = "Les champignons brillent sous la lune.",
+		Name = "Night Garden",
+		Description = "Mushrooms glow under the moon.",
 		Order = 2,
 
 		MapId = "Map_Night",
@@ -99,7 +99,7 @@ local Worlds: { [string]: WorldConfig } = {
 		BossType = "Gargantuar",
 
 		-- Starting sun (less sun drops from sky at night)
-		SunStarting = 50,
+		SunStarting = 100,
 	},
 
 	-- ============================================
@@ -107,8 +107,8 @@ local Worlds: { [string]: WorldConfig } = {
 	-- ============================================
 	pool = {
 		Id = "pool",
-		Name = "Piscine",
-		Description = "Attention aux zombies aquatiques !",
+		Name = "Pool",
+		Description = "Watch out for aquatic zombies!",
 		Order = 3,
 
 		MapId = "Map_Pool",
@@ -130,7 +130,7 @@ local Worlds: { [string]: WorldConfig } = {
 		BossType = "Gargantuar",
 
 		-- Starting sun
-		SunStarting = 50,
+		SunStarting = 100,
 	},
 
 	-- ============================================
@@ -138,8 +138,8 @@ local Worlds: { [string]: WorldConfig } = {
 	-- ============================================
 	fog = {
 		Id = "fog",
-		Name = "Brouillard",
-		Description = "Visibilité réduite, restez vigilant !",
+		Name = "Fog",
+		Description = "Reduced visibility, stay vigilant!",
 		Order = 4,
 
 		MapId = "Map_Fog",
@@ -161,7 +161,7 @@ local Worlds: { [string]: WorldConfig } = {
 		BossType = "Gargantuar",
 
 		-- Starting sun
-		SunStarting = 50,
+		SunStarting = 100,
 	},
 
 	-- ============================================
@@ -169,8 +169,8 @@ local Worlds: { [string]: WorldConfig } = {
 	-- ============================================
 	roof = {
 		Id = "roof",
-		Name = "Toit",
-		Description = "Les projectiles suivent la pente !",
+		Name = "Roof",
+		Description = "Projectiles follow the slope!",
 		Order = 5,
 
 		MapId = "Map_Roof",
@@ -188,7 +188,7 @@ local Worlds: { [string]: WorldConfig } = {
 		BossType = "Gargantuar",
 
 		-- Starting sun
-		SunStarting = 50,
+		SunStarting = 100,
 	},
 
 	-- ============================================
@@ -197,7 +197,7 @@ local Worlds: { [string]: WorldConfig } = {
 	boss = {
 		Id = "boss",
 		Name = "Boss Rush",
-		Description = "Affrontez tous les boss d'affilée !",
+		Description = "Face all bosses in a row!",
 		Order = 6,
 
 		MapId = "Map_Day", -- Uses day map

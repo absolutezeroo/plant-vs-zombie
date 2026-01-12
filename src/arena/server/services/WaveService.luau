@@ -28,6 +28,7 @@ local WaveSpawner = require(Server.managers.wave.WaveSpawner)
 local RewardCalculator = require(Server.managers.wave.RewardCalculator)
 local WaveBroadcaster = require(Server.managers.wave.WaveBroadcaster)
 local BaseHealth = require(Server.modules.BaseHealth)
+local SunService = require(Server.services.SunService)
 
 -- Types
 type GameState = GameStateManager.GameState
@@ -336,16 +337,34 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 	State.CurrentDifficultyConfig = difficultyConfig
 	State.TotalWaves = difficultyConfig.WaveCount or 10
 
-	-- Build merged config for spawner
+	-- Calculate multiplayer scaling
+	local playerCount = math.max(1, #Players:GetPlayers())
+	local mpConfig = GameConstants.Multiplayer
+
+	-- Get scaling factors (clamp to max 4 players)
+	local scaledPlayerCount = math.min(playerCount, 4)
+	local budgetScale = mpConfig.BUDGET_SCALE[scaledPlayerCount] or 1.0
+	local hpScale = mpConfig.ZOMBIE_HP_SCALE[scaledPlayerCount] or 1.0
+	local speedScale = mpConfig.ZOMBIE_SPEED_SCALE[scaledPlayerCount] or 1.0
+	local spawnRateScale = mpConfig.SPAWN_RATE_SCALE[scaledPlayerCount] or 1.0
+
+	-- Build merged config for spawner with multiplayer scaling applied
 	local spawnerConfig = {
 		Name = worldConfig.Name,
 		MapId = worldConfig.MapId,
 		ZombiePool = worldConfig.ZombiePool,
 		Mechanics = worldConfig.Mechanics,
-		BaseZombieHP = difficultyConfig.ZombieHealthMult or 1.0,
-		BaseBudgetMultiplier = difficultyConfig.ZombieDamageMult or 1.0,
-		SpawnInterval = difficultyConfig.SpawnInterval or 2.5,
+		-- Apply multiplayer HP scaling on top of difficulty scaling
+		BaseZombieHP = (difficultyConfig.ZombieHealthMult or 1.0) * hpScale,
+		-- Apply multiplayer speed scaling
+		ZombieSpeedMult = speedScale,
+		-- Apply multiplayer budget scaling
+		BaseBudgetMultiplier = (difficultyConfig.ZombieDamageMult or 1.0) * budgetScale,
+		-- Apply multiplayer spawn rate scaling (lower = faster)
+		SpawnInterval = (difficultyConfig.SpawnInterval or 2.5) * spawnRateScale,
 		TotalWaves = State.TotalWaves,
+		-- Store player count for dynamic scaling during game
+		PlayerCount = playerCount,
 	}
 
 	spawner:SetWorldConfig(spawnerConfig)
@@ -354,6 +373,13 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 	State.CurrentWave = 0
 	stateManager:SetState("Preparation")
 	State.WaveStartTime = os.clock() + WaveConfig.FIRST_WAVE_DELAY
+
+	-- Initialize all players with starting sun from WorldData
+	local startingSun = worldConfig.SunStarting or 50
+	for _, player in Players:GetPlayers() do
+		SunService.SetSun(player, startingSun)
+		SunService.BroadcastSunUpdate(player)
+	end
 
 	broadcaster:BroadcastGameStarted(worldId, difficulty, worldConfig.Name, difficultyConfig.Name, State.TotalWaves)
 	broadcaster:BroadcastWaveStarted(0, 0)

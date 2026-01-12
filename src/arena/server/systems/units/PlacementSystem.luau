@@ -33,6 +33,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local WorldData = require(Shared.data.WorldData)
@@ -77,6 +78,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	State.PlayerCooldowns[player] = nil
+	GridService.ClearPlayerData(player.UserId)
 end
 
 -- Validate placement request
@@ -207,6 +209,21 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 		end
 	end
 
+	-- Check plant limits (multiplayer balancing)
+	local mpConfig = GameConstants.Multiplayer
+	local playerPlantCount = GridService.GetPlayerPlantCount(player.UserId)
+	local totalPlants = GridService.GetPlantCount()
+
+	-- Per-player limit
+	if playerPlantCount >= mpConfig.PLANTS_PER_PLAYER then
+		return false, `Plant limit reached ({mpConfig.PLANTS_PER_PLAYER} max per player)`
+	end
+
+	-- Global limit
+	if totalPlants >= mpConfig.MAX_TOTAL_PLANTS then
+		return false, `Garden is full ({mpConfig.MAX_TOTAL_PLANTS} plants max)`
+	end
+
 	return true, nil
 end
 
@@ -282,7 +299,7 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 
 	-- Mark cell as occupied (only if not stacking)
 	if not stats.CanStackOnPlant and not existingEntityId then
-		GridService.Occupy(column, lane, entityId)
+		GridService.Occupy(column, lane, entityId, player.UserId)
 	end
 
 	-- Deduct sun via SunService

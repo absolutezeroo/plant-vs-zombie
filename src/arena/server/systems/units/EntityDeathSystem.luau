@@ -44,7 +44,6 @@ local CONFIG = table.freeze({
 local State = {
 	IsInitialized = false,
 	Trove = nil :: any,
-	-- Lazy loaded
 	PlayerDataService = nil :: any,
 	StatsService = nil :: any,
 }
@@ -95,7 +94,7 @@ local function OnStep(world)
 		if health.Current <= 0 then
 			-- Entity is dead
 
-			-- Check if it's a plant (need to clear grid)
+			-- Check if it's a plant (need to clear grid - also auto-decrements owner's plant count)
 			local plant = world:get(id, Components.PlantTypeComponent)
 			if plant then
 				GridService.Clear(plant.Column, plant.Lane)

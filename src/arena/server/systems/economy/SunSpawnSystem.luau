@@ -6,9 +6,12 @@
 	
 	Spawns sun orbs from the sky at regular intervals.
 	Sun falls with simulated gravity until reaching ground level.
+	
+	MULTIPLAYER: Each player gets their own sky suns (not shared).
 ]]
 
 -- 1. IMPORTS
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -82,8 +85,8 @@ local function getRandomGridPosition(): (number, number, number)
 	return cellCenter.X + offsetX, getSpawnHeight(), cellCenter.Z + offsetZ
 end
 
--- Helper: Spawn sky sun
-local function spawnSkySun(world: any): number
+-- Helper: Spawn sky sun for a specific player
+local function spawnSkySunForPlayer(world: any, ownerId: number): number
 	local x, y, z = getRandomGridPosition()
 	local targetY = getGroundY() + CONFIG.GROUND_OFFSET + ChanceUtils.RandomFloat(0, 2)
 
@@ -100,6 +103,7 @@ local function spawnSkySun(world: any): number
 			IsFalling = true,
 			TargetY = targetY,
 			SourceType = "Sky",
+			OwnerId = ownerId, -- Only this player can collect this sun
 		})
 	)
 
@@ -107,6 +111,7 @@ local function spawnSkySun(world: any): number
 		return -1
 	end
 
+	-- Broadcast to all clients (they'll grey out suns they can't collect)
 	Network.SunSpawned.FireAll({
 		EntityId = entityId,
 		PositionX = x,
@@ -114,6 +119,7 @@ local function spawnSkySun(world: any): number
 		PositionZ = z,
 		Value = CONFIG.SUN_VALUE,
 		TargetY = targetY,
+		OwnerId = ownerId,
 	})
 
 	return entityId
@@ -166,11 +172,18 @@ local function OnStep(world)
 		return
 	end
 
+	-- No SUN_DROP_SCALE needed anymore - each player gets their own sun
+	-- The economy is already balanced since suns are individual
+
 	-- Check if it's time to spawn new sun
+	local baseInterval = CONFIG.SPAWN_INTERVAL + ChanceUtils.RandomOffset(CONFIG.SPAWN_INTERVAL_VARIANCE)
 	if currentTime - State.LastSpawnTime >= State.NextSpawnDelay then
-		spawnSkySun(world)
+		-- Spawn one sun for EACH player (individual economy)
+		for _, player in Players:GetPlayers() do
+			spawnSkySunForPlayer(world, player.UserId)
+		end
 		State.LastSpawnTime = currentTime
-		State.NextSpawnDelay = CONFIG.SPAWN_INTERVAL + ChanceUtils.RandomOffset(CONFIG.SPAWN_INTERVAL_VARIANCE)
+		State.NextSpawnDelay = baseInterval
 	end
 
 	-- Process falling sun and despawning

@@ -383,6 +383,7 @@ event SunSpawned = {
         PositionZ: f32,
         Value: u8,
         TargetY: f32,
+        OwnerId: u32?, -- UserId of owner
     }
 }
 

@@ -44,6 +44,7 @@ type SunData = {
 	TargetY: number,
 	Falling: boolean,
 	Value: number,
+	OwnerId: number?,
 }
 local _sunData: { [number]: SunData } = {}
 
@@ -53,15 +54,21 @@ local _trove = Trove.new()
 -- Sun visual config
 local SUN_SIZE = Vector3.new(2.5, 2.5, 2.5)
 local SUN_COLOR = Color3.fromRGB(255, 220, 50)
+local SUN_COLOR_GREYED = Color3.fromRGB(128, 128, 128) -- For other players' suns
 local SUN_MATERIAL = Enum.Material.Neon
 local FALL_SPEED = 4 -- Studs per second (match server)
 
-local function createSunVisual(entityId: number, position: Vector3, targetY: number, value: number): SunData
+local function createSunVisual(
+	entityId: number,
+	position: Vector3,
+	targetY: number,
+	value: number,
+	ownerId: number?
+): SunData
 	local part = Instance.new("Part")
 	part.Name = `Sun_{entityId}`
 	part.Shape = Enum.PartType.Ball
 	part.Size = SUN_SIZE
-	part.Color = SUN_COLOR
 	part.Material = SUN_MATERIAL
 	part.Anchored = true
 	part.CanCollide = false
@@ -70,11 +77,19 @@ local function createSunVisual(entityId: number, position: Vector3, targetY: num
 	part.CastShadow = false
 	part.Position = position
 
+	-- Determine if this sun belongs to the local player
+	local localPlayer = Players.LocalPlayer
+	local isOwnSun = (ownerId == nil) or (localPlayer and ownerId == localPlayer.UserId)
+	local sunColor = if isOwnSun then SUN_COLOR else SUN_COLOR_GREYED
+
+	part.Color = sunColor
+	part.Transparency = if isOwnSun then 0 else 0.3 -- Slightly transparent for others' suns
+
 	-- Add highlight for visibility
 	local highlight = Instance.new("Highlight")
-	highlight.FillColor = SUN_COLOR
-	highlight.FillTransparency = 0.5
-	highlight.OutlineColor = Color3.new(1, 1, 1)
+	highlight.FillColor = sunColor
+	highlight.FillTransparency = if isOwnSun then 0.5 else 0.7
+	highlight.OutlineColor = if isOwnSun then Color3.new(1, 1, 1) else Color3.fromRGB(100, 100, 100)
 	highlight.OutlineTransparency = 0.5
 	highlight.Parent = part
 
@@ -88,10 +103,18 @@ local function createSunVisual(entityId: number, position: Vector3, targetY: num
 		TargetY = targetY,
 		Falling = true,
 		Value = value,
+		OwnerId = ownerId,
 	}
 end
 
 local function collectSun(entityId: number, sunData: SunData)
+	-- Check ownership: cannot collect other players' suns
+	local localPlayer = Players.LocalPlayer
+	if sunData.OwnerId and localPlayer and sunData.OwnerId ~= localPlayer.UserId then
+		Logger.Debug("SunRender", `Cannot collect sun {entityId} - belongs to player {sunData.OwnerId}`)
+		return
+	end
+
 	local part = sunData.Part
 
 	-- Play collection effects
@@ -178,18 +201,19 @@ local function setupListeners()
 	_trove:Add(Network.SunSpawned.On(function(data)
 		local entityId = data.EntityId
 		local position = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
+		local ownerId = data.OwnerId -- May be nil for shared suns
 
 		if _sunData[entityId] then
 			-- Already exists, update position
 			_sunData[entityId].Part.Position = position
 		else
-			-- Create new sun visual
-			_sunData[entityId] = createSunVisual(entityId, position, data.TargetY, data.Value)
+			-- Create new sun visual (with ownership info for greying)
+			_sunData[entityId] = createSunVisual(entityId, position, data.TargetY, data.Value, ownerId)
 			Logger.Debug(
 				"SunRender",
 				`Sun {entityId} spawned at ({math.floor(data.PositionX)}, {math.floor(data.PositionY)}, {math.floor(
 					data.PositionZ
-				)})`
+				)}) owner={ownerId or "shared"}`
 			)
 		end
 	end))

@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
+local PhysicsService = game:GetService("PhysicsService")
 
 -- Wait for packages to be available
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -59,6 +60,15 @@ local StatsService = require(Server.services.StatsService)
 -- Import server systems folder
 -- Note: init.server.luau IS the Server script, so children are direct
 local Systems = script:WaitForChild("systems")
+
+-- ============================================
+-- SETUP PLAYER COLLISION GROUP
+-- Players don't collide with each other (no bumping)
+-- ============================================
+local PLAYER_COLLISION_GROUP = "Players"
+PhysicsService:RegisterCollisionGroup(PLAYER_COLLISION_GROUP)
+PhysicsService:CollisionGroupSetCollidable(PLAYER_COLLISION_GROUP, PLAYER_COLLISION_GROUP, false)
+Logger.Info("Server", "Player collision group created - players won't collide with each other")
 
 -- ============================================
 -- CRITICAL: Initialize TeleportDataHandler FIRST

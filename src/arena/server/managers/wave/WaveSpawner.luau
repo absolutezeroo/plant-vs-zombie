@@ -83,7 +83,8 @@ local DEFAULT_SPAWN_COST = 10
 local _worldConfig: any = nil -- Merged config from WorldData + DifficultyData
 local _waveDefinitions: { WaveDefinition }? = nil -- Precise wave definitions
 local _budgetMultiplier: number = 1.0 -- From difficulty
-local _zombieHPMultiplier: number = 1.0 -- From difficulty
+local _zombieHPMultiplier: number = 1.0 -- From difficulty + multiplayer
+local _zombieSpeedMultiplier: number = 1.0 -- From multiplayer scaling
 local _spawnPools: { Trickle: { string }, Assault: { string }, Flag: { string } } = {
 	Trickle = { "Basic", "Basic", "Basic", "Cone", "Imp" },
 	Assault = { "Basic", "Basic", "Cone", "Cone", "Bucket", "Imp", "Imp" },
@@ -122,10 +123,12 @@ function WaveSpawner:SetWorldConfig(config: any?)
 	if config then
 		_budgetMultiplier = config.BaseBudgetMultiplier or 1.0
 		_zombieHPMultiplier = config.BaseZombieHP or 1.0
-		Logger.Info("WaveSpawner", `Config loaded: Budget x{_budgetMultiplier}, HP x{_zombieHPMultiplier}`)
+		_zombieSpeedMultiplier = config.ZombieSpeedMult or 1.0
+		Logger.Info("WaveSpawner", `Config loaded: Budget x{_budgetMultiplier}, HP x{_zombieHPMultiplier}, Speed x{_zombieSpeedMultiplier}`)
 	else
 		_budgetMultiplier = 1.0
 		_zombieHPMultiplier = 1.0
+		_zombieSpeedMultiplier = 1.0
 	end
 
 	-- Clear wave definitions (use budget-based for new system)
@@ -228,13 +231,13 @@ function WaveSpawner:GetZombieHealth(zombieType: string): number
 	return math.floor(baseHealth * _zombieHPMultiplier)
 end
 
--- Get zombie speed (no multiplier currently)
+-- Get zombie speed with multiplayer scaling
 function WaveSpawner:GetZombieSpeed(zombieType: string): number
 	local stats = ZombieData[zombieType]
 	if not stats then
 		return 1.5
 	end
-	return stats.Speed
+	return stats.Speed * _zombieSpeedMultiplier
 end
 
 -- Calculate wave budget with difficulty multiplier

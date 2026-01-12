@@ -20,6 +20,12 @@ local GridService = {}
 -- 2D array: _occupancy[column][lane] = entityId or nil
 local _occupancy: { { number? } } = {}
 
+-- Track plants per player: _playerPlantCount[PlayerId] = count
+local _playerPlantCount: { [number]: number } = {}
+
+-- Track entity ownership: _entityOwner[entityId] = PlayerId
+local _entityOwner: { [number]: number } = {}
+
 -- Initialize empty grid
 local function initGrid()
 	for column = 1, GridConfig.GRID_COLUMNS do
@@ -71,9 +77,10 @@ end
 	@param column number - Column index (1-9)
 	@param lane number - Lane index (1-5)
 	@param entityId number - Entity ID of the plant
+	@param ownerId number? - Optional owner PlayerId for plant limit tracking
 	@return boolean - True if successful, false if already occupied
 ]]
-function GridService.Occupy(column: number, lane: number, entityId: number): boolean
+function GridService.Occupy(column: number, lane: number, entityId: number, ownerId: number?): boolean
 	if GridService.IsOccupied(column, lane) then
 		return false
 	end
@@ -83,6 +90,13 @@ function GridService.Occupy(column: number, lane: number, entityId: number): boo
 	end
 
 	_occupancy[column][lane] = entityId
+
+	-- Track ownership for plant limits
+	if ownerId then
+		_entityOwner[entityId] = ownerId
+		_playerPlantCount[ownerId] = (_playerPlantCount[ownerId] or 0) + 1
+	end
+
 	return true
 end
 
@@ -94,6 +108,15 @@ end
 ]]
 function GridService.Clear(column: number, lane: number)
 	if _occupancy[column] then
+		local entityId = _occupancy[column][lane]
+		if entityId then
+			-- Decrement owner's plant count
+			local ownerId = _entityOwner[entityId]
+			if ownerId then
+				_playerPlantCount[ownerId] = math.max(0, (_playerPlantCount[ownerId] or 0) - 1)
+				_entityOwner[entityId] = nil
+			end
+		end
 		_occupancy[column][lane] = nil
 	end
 end
@@ -108,6 +131,12 @@ function GridService.ClearByEntity(entityId: number): boolean
 	for column = 1, GridConfig.GRID_COLUMNS do
 		for lane = 1, GridConfig.GRID_LANES do
 			if _occupancy[column] and _occupancy[column][lane] == entityId then
+				-- Decrement owner's plant count
+				local ownerId = _entityOwner[entityId]
+				if ownerId then
+					_playerPlantCount[ownerId] = math.max(0, (_playerPlantCount[ownerId] or 0) - 1)
+					_entityOwner[entityId] = nil
+				end
 				_occupancy[column][lane] = nil
 				return true
 			end
@@ -121,6 +150,29 @@ end
 ]]
 function GridService.Reset()
 	initGrid()
+	-- Clear ownership tracking
+	table.clear(_playerPlantCount)
+	table.clear(_entityOwner)
+end
+
+--[[
+	Get plant count for a specific player
+	
+	@param playerId number - Player's UserId
+	@return number - Number of plants owned by this player
+]]
+function GridService.GetPlayerPlantCount(playerId: number): number
+	return _playerPlantCount[playerId] or 0
+end
+
+--[[
+	Clear a player's tracking data (when they leave)
+	
+	@param playerId number - Player's UserId
+]]
+function GridService.ClearPlayerData(playerId: number)
+	_playerPlantCount[playerId] = nil
+	-- Note: We don't clear _entityOwner here - entities remain until despawned
 end
 
 --[[

@@ -79,6 +79,12 @@ local function processCollection(world: any, player: Player, entityId: number): 
 		return nil
 	end
 
+	-- Check ownership: if sun has an owner, only that player can collect it
+	if sun.OwnerId and sun.OwnerId ~= player.UserId then
+		Logger.Debug("SunCollection", `{player.Name} cannot collect sun {entityId} - belongs to another player`)
+		return nil
+	end
+
 	local value = sun.Value
 
 	-- Release sun back to pool

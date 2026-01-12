@@ -197,15 +197,23 @@ function teleportPadGroup(padId: string, config: PadConfig)
 		return
 	end
 
-	Logger.Info("LobbyService", `Teleporting {#players} players from pad {padId}`)
+	Logger.Info("LobbyService", `Teleporting {#players} players from pad {padId} TOGETHER`)
 
-	-- Set cooldowns and teleport each player using Promise
+	-- Set cooldowns for all players
 	for _, player in ipairs(players) do
 		_touchHandler:SetCooldown(player)
-		_teleportManager:TeleportPlayerAsync(player, config.WorldId, config.Difficulty):catch(function(err)
-			Logger.Warn("LobbyService", `Teleport failed for {player.Name}: {err}`)
-		end)
 	end
+
+	-- Teleport ALL players together to the SAME server
+	_teleportManager:TeleportGroupAsync(players, config.WorldId, config.Difficulty):catch(function(err)
+		Logger.Warn("LobbyService", `Group teleport failed: {err}`)
+		-- Unlock all players on failure
+		for _, player in ipairs(players) do
+			if player.Parent == Players then
+				_playerLockManager:UnlockPlayer(player)
+			end
+		end
+	end)
 
 	-- Clear the queue
 	_queueManager:ClearPad(padId)

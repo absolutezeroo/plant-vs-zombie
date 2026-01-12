@@ -165,6 +165,28 @@ function TeleportDataHandler._handleArenaPlayerJoin(player: Player)
 	local teleportData: TeleportData.ArenaJoinData? = nil
 
 	if rawTeleportData then
+		if rawTeleportData.PlayerDecks and not rawTeleportData.Deck then
+			-- Convert group format to solo format for this player
+			local userId = player.UserId
+			local playerDeck = rawTeleportData.PlayerDecks[userId] or rawTeleportData.PlayerDecks[tostring(userId)]
+			local playerMutations = rawTeleportData.PlayerMutations
+					and (rawTeleportData.PlayerMutations[userId] or rawTeleportData.PlayerMutations[tostring(userId)])
+				or {}
+
+			if playerDeck then
+				rawTeleportData = {
+					WorldId = rawTeleportData.WorldId,
+					Difficulty = rawTeleportData.Difficulty,
+					Deck = playerDeck,
+					EquippedMutations = playerMutations,
+					Timestamp = rawTeleportData.Timestamp,
+				}
+				Logger.Info("TeleportDataHandler", `Converted group teleport data for {player.Name}`)
+			else
+				Logger.Warn("TeleportDataHandler", `No deck found for {player.Name} (UserId={userId}) in group data`)
+			end
+		end
+
 		local isValid, errorMsg = TeleportData.ValidateArenaJoinData(rawTeleportData)
 		if isValid then
 			teleportData = rawTeleportData

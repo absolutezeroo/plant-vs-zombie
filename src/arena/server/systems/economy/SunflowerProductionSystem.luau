@@ -36,10 +36,11 @@ local CONFIG = table.freeze({
 local State = {
 	IsInitialized = false,
 	ProductionTimers = {} :: { [number]: number }, -- entityId -> nextProductionTime
+	PlantSpawnTimes = {} :: { [number]: number }, -- entityId -> spawnTime
 	WaveService = nil :: any, -- Lazy-loaded reference
 }
 
--- Helper: Get WaveService (lazy load to avoid circular dependency)
+-- Helper: Get WaveService
 local function getWaveService()
 	if not State.WaveService then
 		State.WaveService = require(Server.services.WaveService)
@@ -59,6 +60,7 @@ end
 local function Dispose()
 	State.IsInitialized = false
 	table.clear(State.ProductionTimers)
+	table.clear(State.PlantSpawnTimes)
 	State.WaveService = nil
 end
 
@@ -84,7 +86,21 @@ local function OnStep(world)
 		-- Read production values from PlantData (with defaults)
 		local firstDelay = stats.FirstSunDelay or CONFIG.FIRST_PRODUCTION_DELAY
 		local productionInterval = stats.SunProductionInterval or CONFIG.PRODUCTION_INTERVAL
+		local sunCount = stats.SunCount or 1 -- Number of suns to spawn per production
+
+		-- Track when this plant was first seen (for growth mechanics like Sun-shroom)
+		if not State.PlantSpawnTimes[id] then
+			State.PlantSpawnTimes[id] = currentTime
+		end
+
+		-- Calculate sun value (supports growth over time like Sun-shroom)
 		local sunValue = stats.SunValue or CONFIG.SUN_VALUE
+		if stats.SunValueGrown and stats.GrowthTime then
+			local plantAge = currentTime - State.PlantSpawnTimes[id]
+			if plantAge >= stats.GrowthTime then
+				sunValue = stats.SunValueGrown
+			end
+		end
 
 		-- Initialize timer for new sun-producing plants
 		if not State.ProductionTimers[id] then
@@ -93,36 +109,44 @@ local function OnStep(world)
 
 		-- Check if it's time to produce
 		if currentTime >= State.ProductionTimers[id] then
-			-- Spawn sun at plant position (slightly above)
-			local sunId = EntityPool.Spawn(
-				Components.PositionComponent({
-					X = pos.X,
-					Y = pos.Y + CONFIG.SPAWN_OFFSET_Y,
-					Z = pos.Z,
-				}),
-				Components.SunComponent({
-					Value = sunValue,
-					SpawnTime = currentTime,
-					Lifetime = CONFIG.SUN_LIFETIME,
-					IsFalling = false,
-					SourceType = plant.PlantType,
-				})
-			)
+			-- Get plant owner (sun belongs to the player who placed the plant)
+			local owner = world:get(id, Components.OwnerComponent)
+			local ownerId = if owner then owner.PlayerId else nil
 
-			if not sunId then
-				State.ProductionTimers[id] = currentTime + productionInterval
-				continue
+			-- Spawn multiple suns if SunCount > 1 (e.g., Twin Sunflower)
+			for i = 1, sunCount do
+				-- Offset each sun slightly for visual variety
+				local offsetX = if sunCount > 1 then (i - 1) * 1.5 - 0.75 else 0
+
+				local sunId = EntityPool.Spawn(
+					Components.PositionComponent({
+						X = pos.X + offsetX,
+						Y = pos.Y + CONFIG.SPAWN_OFFSET_Y,
+						Z = pos.Z,
+					}),
+					Components.SunComponent({
+						Value = sunValue,
+						SpawnTime = currentTime,
+						Lifetime = CONFIG.SUN_LIFETIME,
+						IsFalling = false,
+						SourceType = plant.PlantType,
+						OwnerId = ownerId,
+					})
+				)
+
+				if sunId then
+					-- Broadcast to clients
+					Network.SunSpawned.FireAll({
+						EntityId = sunId,
+						PositionX = pos.X + offsetX,
+						PositionY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
+						PositionZ = pos.Z,
+						Value = sunValue,
+						TargetY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
+						OwnerId = ownerId,
+					})
+				end
 			end
-
-			-- Broadcast to clients
-			Network.SunSpawned.FireAll({
-				EntityId = sunId,
-				PositionX = pos.X,
-				PositionY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
-				PositionZ = pos.Z,
-				Value = sunValue,
-				TargetY = pos.Y + CONFIG.SPAWN_OFFSET_Y,
-			})
 
 			-- Reset timer for next production
 			State.ProductionTimers[id] = currentTime + productionInterval
@@ -133,6 +157,7 @@ local function OnStep(world)
 	for id in State.ProductionTimers do
 		if not world:contains(id) then
 			State.ProductionTimers[id] = nil
+			State.PlantSpawnTimes[id] = nil
 		end
 	end
 end

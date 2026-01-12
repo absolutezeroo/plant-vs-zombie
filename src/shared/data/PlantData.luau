@@ -98,29 +98,29 @@ local PlantData: { [string]: PlantStats } = {
 
 	Sunflower = {
 		Name = "Sunflower",
-		Cost = 25,
-		Cooldown = 5,
+		Cost = 50, -- Increased from 25
+		Cooldown = 7, -- Increased from 5
 		Health = 100,
 		Damage = 0,
 		AttackSpeed = 0,
 		Range = 0,
-		Description = "Produces sun every 24 seconds",
+		Description = "Produces 25 sun every 30 seconds",
 		Category = "Producer",
 		-- Behavior
 		ProducesSun = true,
-		-- Sun production stats
-		SunProductionInterval = 24,
-		FirstSunDelay = 7,
+		SunProductionInterval = 30, -- Slowed from 24
+		FirstSunDelay = 12, -- Increased from 7
 		SunValue = 25,
+		SunCount = 1, -- Number of suns produced per cycle
 	},
 
 	Peashooter = {
 		Name = "Peashooter",
 		Cost = 100,
-		Cooldown = 5,
+		Cooldown = 7,
 		Health = 100,
 		Damage = 20,
-		AttackSpeed = 1.5,
+		AttackSpeed = 1.0, -- Nerfed from 1.5
 		Range = 0,
 		Description = "Shoots peas at zombies",
 		Category = "Attacker",
@@ -131,8 +131,8 @@ local PlantData: { [string]: PlantStats } = {
 	WallNut = {
 		Name = "Wall-nut",
 		Cost = 50,
-		Cooldown = 20,
-		Health = 400,
+		Cooldown = 30, -- Increased from 20
+		Health = 400, -- 10 zombie attacks to destroy
 		Damage = 0,
 		AttackSpeed = 0,
 		Range = 0,
@@ -147,10 +147,10 @@ local PlantData: { [string]: PlantStats } = {
 	SnowPea = {
 		Name = "Snow Pea",
 		Cost = 175,
-		Cooldown = 5,
+		Cooldown = 7,
 		Health = 100,
 		Damage = 20,
-		AttackSpeed = 1.5,
+		AttackSpeed = 1.0, -- Nerfed from 1.5
 		Range = 0,
 		Description = "Shoots frozen peas that slow zombies",
 		Category = "Attacker",
@@ -160,13 +160,13 @@ local PlantData: { [string]: PlantStats } = {
 		ProjectileVariant = "SnowPea",
 		-- Frozen projectile stats
 		SlowPercent = 0.5,
-		SlowDuration = 3,
+		SlowDuration = 2, -- Reduced from 3
 	},
 
 	CherryBomb = {
 		Name = "Cherry Bomb",
 		Cost = 150,
-		Cooldown = 30,
+		Cooldown = 45, -- Increased from 30
 		Health = 1,
 		Damage = 1800,
 		AttackSpeed = 0,
@@ -183,28 +183,28 @@ local PlantData: { [string]: PlantStats } = {
 	PotatoMine = {
 		Name = "Potato Mine",
 		Cost = 25,
-		Cooldown = 20,
+		Cooldown = 25, -- Increased from 20
 		Health = 100,
 		Damage = 1800,
 		AttackSpeed = 0,
 		Range = 0,
-		Description = "Arms after 15 seconds, explodes on contact",
+		Description = "Arms after 20 seconds, explodes on contact",
 		Category = "Special",
 		-- Behavior
 		IsExplosive = true,
 		NeedsArming = true,
 		-- Armed explosive stats
-		ArmDuration = 15,
+		ArmDuration = 20, -- Increased from 15
 		TriggerRadius = 2,
 	},
 
 	Repeater = {
 		Name = "Repeater",
 		Cost = 200,
-		Cooldown = 5,
+		Cooldown = 7,
 		Health = 100,
 		Damage = 20,
-		AttackSpeed = 1.5,
+		AttackSpeed = 1.0, -- Nerfed from 1.5
 		Range = 0,
 		Description = "Fires two peas at a time",
 		Category = "Attacker",
@@ -485,15 +485,17 @@ local PlantData: { [string]: PlantStats } = {
 		Damage = 0,
 		AttackSpeed = 0,
 		Range = 0,
-		Description = "Produces small sun, grows over time",
+		Description = "Produces small sun (15), grows to normal (25) after 2 minutes",
 		Category = "Producer",
 		IsMushroom = true,
 		SleepsDuringDay = true,
 		ProducesSun = true,
 		SunProductionInterval = 24,
 		FirstSunDelay = 7,
-		SunValue = 15, -- Starts small, grows to 25
-		GrowsOverTime = true,
+		SunValue = 15, -- Starts small
+		SunValueGrown = 25, -- After growth time
+		GrowthTime = 120, -- 2 minutes to grow
+		SunCount = 1,
 	},
 
 	HypnoShroom = {
@@ -683,12 +685,13 @@ local PlantData: { [string]: PlantStats } = {
 		Damage = 0,
 		AttackSpeed = 0,
 		Range = 0,
-		Description = "Produces double sun",
+		Description = "Produces 2 suns at once (50 total)",
 		Category = "Producer",
 		ProducesSun = true,
 		SunProductionInterval = 24,
 		FirstSunDelay = 7,
-		SunValue = 50,
+		SunValue = 25, -- Each sun is worth 25
+		SunCount = 2, -- Produces 2 suns per cycle!
 	},
 
 	Marigold = {
