@@ -31,6 +31,7 @@ local ResourcePill = require(Atoms.ResourcePill)
 -- Fusion primitives
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
+local Out = Fusion.Out
 local peek = Fusion.peek
 
 -- Constants
@@ -156,6 +157,7 @@ local function PlantCard(
 	}
 ): Frame
 	local isPressed = scope:Value(false)
+	local hasEquipped = props.EquippedCount > 0
 
 	local pressOffset = scope:Spring(
 		scope:Computed(function(use)
@@ -186,13 +188,34 @@ local function PlantCard(
 		[Children] = {
 			scope:New("UIAspectRatioConstraint")({ AspectRatio = 0.9 }),
 
+			-- Purple glow for equipped plants
+			hasEquipped and scope:New("Frame")({
+				Name = "EquippedGlow",
+				Size = UDim2.fromScale(1.1, 1.04),
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Theme.Colors.Purple.Main,
+				BackgroundTransparency = 0.6,
+				ZIndex = 0,
+
+				[Children] = {
+					scope:New("UICorner")({ CornerRadius = UDim.new(0, 12) }),
+				},
+			}) or nil,
+
 			-- Shadow
 			scope:New("Frame")({
 				Name = "Shadow",
 				Size = UDim2.fromScale(1, 0.94),
 				Position = UDim2.fromScale(0, 0.06),
 				BackgroundColor3 = scope:Computed(function(use)
-					return if use(props.IsSelected) then Theme.Colors.Action.Shadow else Theme.Colors.Surface.Shadow
+					if use(props.IsSelected) then
+						return Theme.Colors.Action.Shadow
+					elseif hasEquipped then
+						return Theme.Colors.Purple.Shadow
+					else
+						return Theme.Colors.Surface.Shadow
+					end
 				end),
 				ZIndex = 1,
 
@@ -212,7 +235,13 @@ local function PlantCard(
 					return UDim2.fromScale(0, use(pressOffset))
 				end),
 				BackgroundColor3 = scope:Computed(function(use)
-					return if use(props.IsSelected) then Theme.Colors.Action.Main else Theme.Colors.Surface.Main
+					if use(props.IsSelected) then
+						return Theme.Colors.Action.Main
+					elseif hasEquipped then
+						return Color3.fromRGB(60, 45, 80) -- Subtle purple tint
+					else
+						return Theme.Colors.Surface.Main
+					end
 				end),
 				ZIndex = 2,
 
@@ -220,9 +249,23 @@ local function PlantCard(
 					scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
 
 					scope:New("UIStroke")({
-						Color = Theme.Colors.Surface.Stroke :: Color3,
+						Color = scope:Computed(function(use)
+							if use(props.IsSelected) then
+								return Theme.Colors.Action.Stroke or Theme.Colors.Surface.Stroke :: Color3
+							elseif hasEquipped then
+								return Theme.Colors.Purple.Main
+							else
+								return Theme.Colors.Surface.Stroke :: Color3
+							end
+						end),
 						Thickness = scope:Computed(function(use)
-							return if use(props.IsSelected) then 4 else Theme.Layout.StrokeThickness
+							if use(props.IsSelected) then
+								return 4
+							elseif hasEquipped then
+								return 3
+							else
+								return Theme.Layout.StrokeThickness
+							end
 						end),
 					}),
 
@@ -235,7 +278,7 @@ local function PlantCard(
 						AnchorPoint = Vector2.new(0.5, 1),
 						BackgroundTransparency = 1,
 						Text = props.PlantType,
-						TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
+						TextColor3 = if hasEquipped then Theme.Colors.Purple.Main else Theme.Colors.Surface.Stroke :: Color3,
 						TextScaled = true,
 						Font = Enum.Font.GothamBold,
 						TextTruncate = Enum.TextTruncate.AtEnd,
@@ -247,7 +290,7 @@ local function PlantCard(
 					}),
 
 					-- Equipped mutations badge
-					props.EquippedCount > 0
+					hasEquipped
 							and scope:New("Frame")({
 								Size = UDim2.fromScale(0.28, 0.28),
 								Position = UDim2.fromScale(0.95, 0.05),
@@ -519,6 +562,10 @@ local function MutationScreen(props: MutationScreenProps): Frame
 	local selectedPlant = scope:Value(nil :: string?)
 	local selectedMutation = scope:Value(nil :: string?)
 
+	-- Search filter
+	local searchQuery = scope:Value("")
+	local searchBoxRef = scope:Value(nil :: TextBox?)
+
 	-- Close button animation
 	local isClosePressed = scope:Value(false)
 	local closeOffset = scope:Spring(
@@ -539,23 +586,36 @@ local function MutationScreen(props: MutationScreenProps): Frame
 		0.7
 	)
 
-	-- Unlocked plants
+	-- Unlocked plants (filtered by search, equipped first)
 	local unlockedPlants = scope:Computed(function(use)
 		local data = use(props.PlayerData)
 		if not data then
 			return {}
 		end
 
+		local query = string.lower(use(searchQuery) or "")
+		local allEquipped = use(props.EquippedMutations) or {}
 		local unlockedList = data.UnlockedPlants or {}
-		local result: { { Type: string, Stats: any } } = {}
+		local result: { { Type: string, Stats: any, HasEquipped: boolean } } = {}
 
 		for _, plantType in ipairs(unlockedList) do
+			-- Filter by search query
+			if query ~= "" and not string.find(string.lower(plantType), query, 1, true) then
+				continue
+			end
+
 			local stats = PlantData.GetStats(plantType)
 			if stats then
-				table.insert(result, { Type = plantType, Stats = stats })
+				local equipped = allEquipped[plantType] or {}
+				table.insert(result, { Type = plantType, Stats = stats, HasEquipped = #equipped > 0 })
 			end
 		end
+
+		-- Sort: equipped plants first, then alphabetically
 		table.sort(result, function(a, b)
+			if a.HasEquipped ~= b.HasEquipped then
+				return a.HasEquipped
+			end
 			return a.Type < b.Type
 		end)
 
@@ -707,7 +767,7 @@ local function MutationScreen(props: MutationScreenProps): Frame
 		ZIndex = 100,
 
 		[Children] = {
-			-- Main panel (90% centered, transparent like ShopScreen)
+			-- Main panel
 			scope:New("Frame")({
 				Name = "Panel",
 				Size = UDim2.fromScale(0.9, 0.9),
@@ -758,22 +818,110 @@ local function MutationScreen(props: MutationScreenProps): Frame
 										Thickness = Theme.Layout.StrokeThickness,
 									}),
 
-									-- Title (centered)
+									-- Title (left-center)
 									scope:New("TextLabel")({
 										Name = "Title",
-										Size = UDim2.fromScale(0.3, 0.6),
-										Position = UDim2.fromScale(0.5, 0.5),
-										AnchorPoint = Vector2.new(0.5, 0.5),
+										Size = UDim2.fromScale(0.25, 0.6),
+										Position = UDim2.fromScale(0.2, 0.5),
+										AnchorPoint = Vector2.new(0, 0.5),
 										BackgroundTransparency = 1,
 										Text = "🧬 MUTATION LAB",
 										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
 										TextScaled = true,
 										Font = Theme.Typography.Fonts.Title,
+										TextXAlignment = Enum.TextXAlignment.Left,
 
 										[Children] = {
-											scope:New("UITextSizeConstraint")({ MaxTextSize = 32, MinTextSize = 16 }),
+											scope:New("UITextSizeConstraint")({ MaxTextSize = 28, MinTextSize = 14 }),
 										},
 									}),
+
+									-- Search bar (center)
+									scope:New("Frame")({
+										Name = "SearchContainer",
+										Size = UDim2.fromScale(0.25, 0.55),
+										Position = UDim2.fromScale(0.5, 0.5),
+										AnchorPoint = Vector2.new(0.5, 0.5),
+										BackgroundColor3 = Theme.Colors.Surface.Shadow,
+										ZIndex = 3,
+
+										[Children] = {
+											scope:New("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
+											scope:New("UIStroke")({
+												Color = Theme.Colors.Surface.Stroke :: Color3,
+												Thickness = 2,
+											}),
+
+											-- Search icon
+											scope:New("TextLabel")({
+												Size = UDim2.fromScale(0.12, 0.7),
+												Position = UDim2.fromScale(0.04, 0.5),
+												AnchorPoint = Vector2.new(0, 0.5),
+												BackgroundTransparency = 1,
+												Text = "🔍",
+												TextScaled = true,
+												ZIndex = 4,
+
+												[Children] = {
+													scope:New("UITextSizeConstraint")({ MaxTextSize = 16, MinTextSize = 10 }),
+												},
+											}),
+
+											-- Search TextBox
+										searchBoxRef:set(scope:New("TextBox")({
+											Name = "SearchBox",
+											Size = UDim2.fromScale(0.78, 0.8),
+											Position = UDim2.fromScale(0.18, 0.5),
+											AnchorPoint = Vector2.new(0, 0.5),
+											BackgroundTransparency = 1,
+											Text = "",
+											PlaceholderText = "Search plants...",
+											PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
+											TextColor3 = Color3.new(1, 1, 1),
+											TextScaled = true,
+											Font = Theme.Typography.Fonts.Body,
+											TextXAlignment = Enum.TextXAlignment.Left,
+											ClearTextOnFocus = false,
+											ZIndex = 4,
+
+											-- Bind Text property to searchQuery using Out
+											[Out("Text")] = searchQuery,
+
+											[Children] = {
+												scope:New("UITextSizeConstraint")({ MaxTextSize = 14, MinTextSize = 10 }),
+											},
+										})),
+
+										-- Clear button (X)
+										scope:New("TextButton")({
+											Name = "ClearSearch",
+											Size = UDim2.fromScale(0.1, 0.6),
+											Position = UDim2.fromScale(0.94, 0.5),
+											AnchorPoint = Vector2.new(1, 0.5),
+											BackgroundTransparency = 1,
+											Text = scope:Computed(function(use)
+												return if use(searchQuery) ~= "" then "✕" else ""
+											end),
+											TextColor3 = Color3.fromRGB(180, 180, 180),
+											TextScaled = true,
+											Font = Enum.Font.GothamBold,
+											ZIndex = 4,
+
+											[OnEvent("MouseButton1Click")] = function()
+												searchQuery:set("")
+												-- Also clear the TextBox directly
+												local textBox = peek(searchBoxRef)
+												if textBox then
+													textBox.Text = ""
+												end
+											end,
+
+											[Children] = {
+												scope:New("UITextSizeConstraint")({ MaxTextSize = 12, MinTextSize = 8 }),
+											},
+										}),
+									},
+								}),
 
 									-- Coins display (left)
 									scope:New("Frame")({
@@ -927,7 +1075,7 @@ local function MutationScreen(props: MutationScreenProps): Frame
 										FillDirection = Enum.FillDirection.Horizontal,
 										HorizontalAlignment = Enum.HorizontalAlignment.Left,
 										VerticalAlignment = Enum.VerticalAlignment.Center,
-										Padding = UDim.new(0.008, 0),
+										Padding = UDim.new(0, 6),
 									}),
 
 									-- Plant cards
@@ -957,6 +1105,18 @@ local function MutationScreen(props: MutationScreenProps): Frame
 												})
 											)
 										end
+
+										-- Spacer at end to account for right padding in AutomaticCanvasSize
+										table.insert(
+											cards,
+											scope:New("Frame")({
+												Name = "EndSpacer",
+												Size = UDim2.new(0, 8, 1, 0),
+												BackgroundTransparency = 1,
+												LayoutOrder = 9999,
+											})
+										)
+
 										return cards
 									end),
 								},

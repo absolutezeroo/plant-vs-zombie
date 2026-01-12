@@ -150,7 +150,7 @@ local function OnStep(world)
 						EntityId = entityId,
 						NewHealth = targetHealth and targetHealth.Current or 0,
 						DamageAmount = actualDamage,
-						DamageType = "Burn",
+						DamageType = "Fire",
 					})
 				end
 

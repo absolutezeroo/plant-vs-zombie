@@ -61,27 +61,27 @@ type StatusEffectType = enum {
 
 -- Damage types for floating text colors
 type DamageType = enum {
-    Normal,     -- Standard pea damage (white/red)
-    Fire,       -- Fire/burn damage (orange)
-    Ice,        -- Ice/freeze damage (cyan)
-    Lightning,  -- Chain lightning (yellow)
-    Poison,     -- Poison damage (green)
-    Splash      -- Area splash damage (purple)
+    Normal,     -- Standard pea damage
+    Fire,       -- Fire/burn damage
+    Ice,        -- Ice/freeze damage
+    Lightning,  -- Chain lightning
+    Poison,     -- Poison damage
+    Splash      -- Area splash damage
 }
 
 type ProjectileVariant = enum {
     Pea,         -- Standard green pea
-    SnowPea,     -- Blue ice pea (SnowPea)
-    FrozenPea,   -- Frozen pea (ice mutation)
-    FirePea,     -- Flaming pea (Torchwood enhanced)
-    Spore,       -- Mushroom spores (PuffShroom, SeaShroom)
-    Fume,        -- Purple fumes (FumeShroom, GloomShroom)
+    SnowPea,     -- Blue ice pea
+    FrozenPea,   -- Frozen pea
+    FirePea,     -- Flaming pea
+    Spore,       -- Mushroom spores
+    Fume,        -- Purple fumes
     Cabbage,     -- Cabbage lobbed projectile
     Kernel,      -- Corn kernel
-    Butter,      -- Butter (stun)
+    Butter,      -- Butter
     Melon,       -- Melon slice
-    WinterMelon, -- Winter melon (frozen melon)
-    Star,        -- Star projectile (Starfruit)
+    WinterMelon, -- Winter melon
+    Star,        -- Star projectile
     Spike,       -- Cactus spike
     Thorn,       -- Thorn projectile
     Seed         -- Generic seed
