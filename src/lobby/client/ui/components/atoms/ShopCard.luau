@@ -97,7 +97,7 @@ local function ShopCard(props: ShopCardProps): Frame
 		[Children] = {
 			-- Scale container
 			scope:New("Frame")({
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromScale(1, 1),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -165,7 +165,7 @@ local function ShopCard(props: ShopCardProps): Frame
 											BackgroundColor3 = Theme.Colors.Action.Main,
 										}),
 										scope:New("TextLabel")({
-											Size = UDim2.new(1, 0, 1, 0),
+											Size = UDim2.fromScale(1, 1),
 											BackgroundTransparency = 1,
 											Text = `{Theme.Icons.Check} OWNED`,
 											TextColor3 = Color3.new(1, 1, 1),
@@ -183,7 +183,7 @@ local function ShopCard(props: ShopCardProps): Frame
 							scope:New("TextLabel")({
 								Name = "PlantName",
 								Size = UDim2.new(1, -12, 0, 22),
-								Position = UDim2.new(0, 6, 0, 105), -- Below viewport
+								Position = UDim2.fromOffset(6, 105), -- Below viewport
 								BackgroundTransparency = 1,
 								Text = props.PlantType,
 								TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
@@ -222,7 +222,7 @@ local function ShopCard(props: ShopCardProps): Frame
 										CornerRadius = UDim.new(0.5, 0),
 									}),
 									scope:New("TextLabel")({
-										Size = UDim2.new(1, 0, 1, 0),
+										Size = UDim2.fromScale(1, 1),
 										BackgroundTransparency = 1,
 										Text = `{Theme.Icons.Sun} {sunCost}`,
 										TextColor3 = Color3.fromRGB(80, 50, 20), -- Dark brown for better contrast
@@ -248,7 +248,7 @@ local function ShopCard(props: ShopCardProps): Frame
 												CornerRadius = UDim.new(0, 8),
 											}),
 											scope:New("TextLabel")({
-												Size = UDim2.new(1, 0, 1, 0),
+												Size = UDim2.fromScale(1, 1),
 												BackgroundTransparency = 1,
 												Text = `{Theme.Icons.Check} Collection`,
 												TextColor3 = Theme.Colors.Action.Main,

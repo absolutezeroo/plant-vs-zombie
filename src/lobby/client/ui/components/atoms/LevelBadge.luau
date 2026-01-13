@@ -108,7 +108,7 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 					-- Level number
 					scope:New("TextLabel")({
 						Name = "Level",
-						Size = UDim2.new(1, 0, 0.6, 0),
+						Size = UDim2.fromScale(1, 0.6),
 						Position = UDim2.fromScale(0.5, 0.55),
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
@@ -136,7 +136,7 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 									scope:New("Frame")({
 										Name = "Fill",
 										Size = scope:Computed(function(use)
-											return UDim2.new(use(xpProgress), 0, 1, 0)
+											return UDim2.fromScale(use(xpProgress), 1)
 										end),
 										BackgroundColor3 = Theme.Colors.Action.Main,
 

@@ -350,21 +350,13 @@ function ZoneInteractionController.UpdateDeck(deck: { string })
 end
 
 function ZoneInteractionController.UpdateOwnedMutations(mutations: { [string]: { string } })
-	-- Create shallow copy to ensure Fusion detects the change
-	local copy = {}
-	for k, v in mutations do
-		copy[k] = v
-	end
-	_ownedMutations:set(copy)
+	-- Shallow copy to ensure Fusion detects the change
+	_ownedMutations:set(table.clone(mutations))
 end
 
 function ZoneInteractionController.UpdateEquippedMutations(mutations: { [string]: { string } })
-	-- Create shallow copy to ensure Fusion detects the change
-	local copy = {}
-	for k, v in mutations do
-		copy[k] = v
-	end
-	_equippedMutations:set(copy)
+	-- Shallow copy to ensure Fusion detects the change
+	_equippedMutations:set(table.clone(mutations))
 end
 
 -- Callback setters

@@ -133,7 +133,7 @@ local Theme: ThemeType = {
 		CardPadding = 16, -- Internal card padding
 		SectionSpacing = 24, -- Spacing between sections
 		-- Overlay screens (Shop, DeckBuilder, MutationLab, etc.)
-		OverlaySize = UDim2.new(0.92, 0, 0.92, 0),
+		OverlaySize = UDim2.fromScale(0.92, 0.92),
 		OverlayPosition = UDim2.fromScale(0.5, 0.5),
 		OverlayAnchorPoint = Vector2.new(0.5, 0.5),
 	},

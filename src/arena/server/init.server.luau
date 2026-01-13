@@ -49,7 +49,7 @@ local IS_STUDIO = RunService:IsStudio()
 -- Import server services
 local Server = script
 local PlayerDataService = require(Server.services.PlayerDataService)
-local ProgressionHandler = require(Server.handlers.ProgressionHandler)
+local NetworkSyncHandler = require(Server.handlers.NetworkSyncHandler)
 local ArenaService = require(Server.services.ArenaService)
 local MapLoader = require(Server.services.MapLoader)
 
@@ -80,7 +80,7 @@ TeleportDataHandler.InitializeArena({
 	PlayerDataService = PlayerDataService,
 	MutationService = MutationService,
 	ArenaService = ArenaService,
-	ProgressionHandler = ProgressionHandler,
+	NetworkSyncHandler = NetworkSyncHandler,
 })
 Logger.Info("Server", "TeleportDataHandler initialized for Arena (EARLY)")
 
@@ -92,8 +92,8 @@ StatsService.Initialize()
 Logger.Info("Server", "StatsService initialized")
 
 -- Initialize handlers
-ProgressionHandler.Initialize()
-Logger.Info("Server", "ProgressionHandler initialized")
+NetworkSyncHandler.Initialize()
+Logger.Info("Server", "NetworkSyncHandler initialized")
 
 -- CRITICAL: Load map BEFORE MapConfig.Initialize()
 -- MapConfig reads grid bounds from ArenaMap, so map must exist first
@@ -229,11 +229,11 @@ if IS_STUDIO then
 			end
 
 			-- Sync player data
-			if ProgressionHandler.SyncPlayerData then
-				ProgressionHandler.SyncPlayerData(player)
+			if NetworkSyncHandler.SyncPlayerData then
+				NetworkSyncHandler.SyncPlayerData(player)
 			end
-			if ProgressionHandler.SyncDeck then
-				ProgressionHandler.SyncDeck(player)
+			if NetworkSyncHandler.SyncDeck then
+				NetworkSyncHandler.SyncDeck(player)
 			end
 
 			-- Spawn character but DON'T start battle
@@ -257,11 +257,11 @@ else
 
 			-- Sync player data and deck to client BEFORE starting battle
 			-- This ensures the client has the correct deck/mutations
-			if ProgressionHandler.SyncPlayerData then
-				ProgressionHandler.SyncPlayerData(player)
+			if NetworkSyncHandler.SyncPlayerData then
+				NetworkSyncHandler.SyncPlayerData(player)
 			end
-			if ProgressionHandler.SyncDeck then
-				ProgressionHandler.SyncDeck(player)
+			if NetworkSyncHandler.SyncDeck then
+				NetworkSyncHandler.SyncDeck(player)
 			end
 
 			if teleportData then

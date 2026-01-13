@@ -188,10 +188,7 @@ end
 -- Setup network event handlers (Zap generated)
 ZapServer.TeleportToArenaRequest.SetCallback(function(player, data)
 	-- Convert Zap enum array to string array
-	local deckStrings: { string } = {}
-	for i, plantType in data.Deck do
-		deckStrings[i] = plantType
-	end
+	local deckStrings: { string } = table.clone(data.Deck)
 
 	local success, errorCode, message = handleTeleportToArena(player, data.WorldId, data.Difficulty, deckStrings)
 
@@ -210,10 +207,7 @@ end)
 -- Handle SaveDeck request
 ZapServer.SaveDeck.SetCallback(function(player, data)
 	-- Convert Zap enum array to string array
-	local deckStrings: { string } = {}
-	for i, plantType in data.Deck do
-		deckStrings[i] = plantType
-	end
+	local deckStrings: { string } = table.clone(data.Deck)
 
 	-- Save to profile
 	local success = PlayerDataService.SetDeck(player, deckStrings)

@@ -58,7 +58,7 @@ local function DeckCard(props: DeckCardProps): Frame
 		plantViewport = PlantViewport.CreateWithScope(scope, {
 			PlantType = plantType,
 			Size = UDim2.new(1, -8, 0.45, 0),
-			Position = UDim2.new(0.5, 0, 0.05, 0),
+			Position = UDim2.fromScale(0.5, 0.05),
 			AnchorPoint = Vector2.new(0.5, 0),
 			ZIndex = 3,
 			CameraFOV = 35,
@@ -143,7 +143,7 @@ local function DeckCard(props: DeckCardProps): Frame
 						Thickness = 1,
 					}),
 					scope:New("TextLabel")({
-						Size = UDim2.new(1, 0, 1, 0),
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						Text = if mutData then mutData.Icon else "✨",
 						TextSize = 12,
@@ -212,7 +212,7 @@ local function DeckCard(props: DeckCardProps): Frame
 							isLocked
 									and scope:New("Frame")({
 										Name = "LockOverlay",
-										Size = UDim2.new(1, 0, 1, 0),
+										Size = UDim2.fromScale(1, 1),
 										BackgroundColor3 = Color3.new(0, 0, 0),
 										BackgroundTransparency = 0.5,
 										ZIndex = 10,
@@ -222,7 +222,7 @@ local function DeckCard(props: DeckCardProps): Frame
 												CornerRadius = Theme.Layout.CornerRadius,
 											}),
 											scope:New("TextLabel")({
-												Size = UDim2.new(1, 0, 1, 0),
+												Size = UDim2.fromScale(1, 1),
 												BackgroundTransparency = 1,
 												Text = "🔒",
 												TextSize = 32,
@@ -249,7 +249,7 @@ local function DeckCard(props: DeckCardProps): Frame
 											CornerRadius = UDim.new(0.5, 0),
 										}),
 										scope:New("TextLabel")({
-											Size = UDim2.new(1, 0, 1, 0),
+											Size = UDim2.fromScale(1, 1),
 											BackgroundTransparency = 1,
 											Text = "✓",
 											TextColor3 = Color3.new(1, 1, 1),
@@ -298,7 +298,7 @@ local function DeckCard(props: DeckCardProps): Frame
 										CornerRadius = UDim.new(0.5, 0),
 									}),
 									scope:New("TextLabel")({
-										Size = UDim2.new(1, 0, 1, 0),
+										Size = UDim2.fromScale(1, 1),
 										BackgroundTransparency = 1,
 										Text = `☀️ {sunCost}`,
 										TextColor3 = Color3.fromRGB(80, 50, 20),
@@ -333,10 +333,7 @@ local function DeckCard(props: DeckCardProps): Frame
 							-- Click handler
 							scope:New("TextButton")({
 								Name = "ClickHandler",
-								Size = UDim2.new(1, 0, 1, 0),
-								BackgroundTransparency = 1,
-								Text = "",
-								ZIndex = 20,
+										Size = UDim2.fromScale(1, 1),
 
 								[OnEvent("Activated")] = function()
 									if not isLocked then

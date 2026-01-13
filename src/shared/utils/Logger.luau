@@ -42,9 +42,7 @@ local function log(level: LogLevel, category: string, message: string, data: { [
 		output = output .. dataStr
 	end
 
-	if level == "Error" then
-		warn(output)
-	elseif level == "Warn" then
+	if level == "Error" or level == "Warn" then
 		warn(output)
 	else
 		print(output)

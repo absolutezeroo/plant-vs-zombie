@@ -1,13 +1,14 @@
 --!strict
 --[[
-	ProgressionHandler.luau - Server-side progression event handlers
+	NetworkSyncHandler.luau - Server-side network sync handlers
 	
 	Handles:
 	- Player data sync on join
-	- UnlockPlant requests
-	- Deck management
+	- UnlockPlant network requests
+	- Deck sync to client
 	
-	Note: Upgrades replaced by Mutations system (see MutationHandler)
+	Note: Pure progression logic is in shared/handlers/ProgressionLogic.luau
+	      This handler only manages NETWORKING, not game logic.
 ]]
 
 local Players = game:GetService("Players")
@@ -24,7 +25,7 @@ local Server = script.Parent.Parent
 local PlayerDataService = require(Server.services.PlayerDataService)
 local MutationService = require(Server.services.MutationService)
 
-local ProgressionHandler = {}
+local NetworkSyncHandler = {}
 
 -- Send full player data to a client
 local function syncPlayerData(player: Player)
@@ -164,7 +165,7 @@ local function handleSaveDeck(
 end
 
 -- Initialize handlers
-function ProgressionHandler.Initialize()
+function NetworkSyncHandler.Initialize()
 	-- Register data change callback to sync on any change
 	PlayerDataService.OnDataChanged(function(player, _data)
 		syncPlayerData(player)
@@ -182,17 +183,17 @@ function ProgressionHandler.Initialize()
 	Network.UnlockPlantRequest.SetCallback(handleUnlockPlant)
 	Network.SaveDeckRequest.SetCallback(handleSaveDeck)
 
-	Logger.Info("Progression", "ProgressionHandler initialized")
+	Logger.Info("NetworkSync", "NetworkSyncHandler initialized")
 end
 
 -- Expose syncDeck for external use (e.g., after teleport deck save)
-function ProgressionHandler.SyncDeck(player: Player)
+function NetworkSyncHandler.SyncDeck(player: Player)
 	syncDeck(player)
 end
 
 -- Expose syncPlayerData for external use (e.g., after mutations loaded)
-function ProgressionHandler.SyncPlayerData(player: Player)
+function NetworkSyncHandler.SyncPlayerData(player: Player)
 	syncPlayerData(player)
 end
 
-return ProgressionHandler
+return NetworkSyncHandler

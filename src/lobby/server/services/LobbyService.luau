@@ -12,6 +12,7 @@
     - TeleportManager: Handle teleportation
     - PadBroadcaster: Handle network updates
     - PadTouchHandler: Handle touch detection
+    - PadLogicHandler: Pure logic for validation and decisions
 ]]
 
 local Players = game:GetService("Players")
@@ -26,6 +27,9 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local _LobbyConfig = require(Shared.config.LobbyConfig) -- Reserved for future use
+
+-- Shared handlers (pure logic)
+local PadLogicHandler = require(Shared.handlers.lobby.PadLogicHandler)
 
 -- Managers
 local PadManager = require(script.Parent.Parent.modules.PadManager)
@@ -79,13 +83,20 @@ local function handlePlayerJoin(player: Player, padModel: Model)
 		return
 	end
 
-	-- Check if already on a pad
+	-- Validate join via handler
 	local currentPadId = _queueManager:GetPlayerPad(player)
-	if currentPadId then
-		if currentPadId == padId then
-			return -- Already on this pad
+	local playerCount = _queueManager:GetPlayerCount(padId)
+	local validation = PadLogicHandler.ValidateJoin(config :: PadLogicHandler.PadConfig, playerCount, currentPadId)
+	
+	if not validation.CanJoin then
+		if validation.Reason ~= "AlreadyOnPad" then
+			Logger.Warn("LobbyService", `{player.Name} cannot join pad {padId}: {validation.Reason}`)
 		end
-		-- Leave current pad first
+		return
+	end
+
+	-- Leave current pad first if needed
+	if PadLogicHandler.ShouldLeaveCurrentPad(currentPadId, padId) then
 		handlePlayerLeave(player)
 	end
 
@@ -140,7 +151,9 @@ function handlePlayerLeave(player: Player)
 		if character then
 			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 			if humanoidRootPart then
-				humanoidRootPart.CFrame = CFrame.new(leaveRoomPart.Position + Vector3.new(0, 3, 0))
+				-- Use handler to calculate leave CFrame
+				local leaveCFrame = PadLogicHandler.CalculateLeaveCFrame(leaveRoomPart.Position, 3)
+				humanoidRootPart.CFrame = leaveCFrame
 				Logger.Info("LobbyService", `Teleported {player.Name} to LeaveRoomPart`)
 			end
 		end
@@ -165,8 +178,10 @@ function updateCountdown(padId: string, config: PadConfig)
 	local playerCount = _queueManager:GetPlayerCount(padId)
 	local isActive = _countdownManager:IsCountdownActive(padId)
 
-	-- Should start countdown?
-	if playerCount >= config.MinPlayers and not isActive then
+	-- Use handler to decide countdown action
+	local decision = PadLogicHandler.DecideCountdownAction(playerCount, config.MinPlayers, isActive)
+
+	if decision.ShouldStart then
 		_countdownManager:StartCountdown(padId, config.CountdownDuration, {
 			OnTick = function(id, remaining)
 				-- Broadcast every tick
@@ -183,8 +198,7 @@ function updateCountdown(padId: string, config: PadConfig)
 		Logger.Info("LobbyService", `Countdown started for pad {padId} ({config.CountdownDuration}s)`)
 	end
 
-	-- Should cancel countdown?
-	if playerCount < config.MinPlayers and isActive then
+	if decision.ShouldCancel then
 		_countdownManager:CancelCountdown(padId)
 		Logger.Info("LobbyService", `Countdown cancelled for pad {padId}`)
 	end
@@ -193,7 +207,11 @@ end
 -- Teleport all players on a pad
 function teleportPadGroup(padId: string, config: PadConfig)
 	local players = _queueManager:GetPlayersOnPad(padId)
-	if #players == 0 then
+	
+	-- Use handler to validate teleport
+	local canTeleport, reason = PadLogicHandler.CanTeleportGroup(#players, config.MinPlayers)
+	if not canTeleport then
+		Logger.Warn("LobbyService", `Cannot teleport pad {padId}: {reason}`)
 		return
 	end
 

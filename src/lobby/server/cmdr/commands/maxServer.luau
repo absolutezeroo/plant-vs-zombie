@@ -16,16 +16,10 @@ local PlayerDataService = require(Server.services.PlayerDataService)
 return function(context, target: Player?)
 	local player = target or context.Executor
 
-	local profile = PlayerDataService.GetProfile(player)
-	if not profile then
+	local success = PlayerDataService.MaxResources(player)
+	if not success then
 		return `Profile not loaded for {player.Name}`
 	end
-
-	profile.Data.Coins = 999999
-	profile.Data.Gems = 9999
-	profile.Data.Level = 50
-	profile.Data.XP = 0
-	profile.Data.TotalXPForNextLevel = 100 + (50 * 50)
 
 	-- Sync to client
 	PlayerDataService.SyncToClient(player)

@@ -16,29 +16,10 @@ local PlayerDataService = require(Server.services.PlayerDataService)
 return function(context, target: Player?)
 	local player = target or context.Executor
 
-	local profile = PlayerDataService.GetProfile(player)
-	if not profile then
+	local success = PlayerDataService.ResetProfile(player)
+	if not success then
 		return `Profile not loaded for {player.Name}`
 	end
-
-	-- Reset to defaults
-	profile.Data.Coins = 500
-	profile.Data.Gems = 50
-	profile.Data.Level = 1
-	profile.Data.XP = 0
-	profile.Data.TotalXPForNextLevel = 100
-	profile.Data.GamesPlayed = 0
-	profile.Data.GamesWon = 0
-	profile.Data.ZombiesKilled = 0
-	profile.Data.PlantsPlaced = 0
-	profile.Data.UnlockedPlants = {
-		Sunflower = true,
-		Peashooter = true,
-		WallNut = true,
-	}
-	profile.Data.Deck = { "Sunflower", "Peashooter", "WallNut" }
-	profile.Data.PlantOwnedMutations = {}
-	profile.Data.PlantEquippedMutations = {}
 
 	-- Sync to client
 	PlayerDataService.SyncToClient(player)

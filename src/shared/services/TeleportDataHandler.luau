@@ -26,8 +26,8 @@
     
     -- Listen to ready signal
     TeleportDataHandler.OnPlayerReady:Connect(function(player, teleportData)
-        ProgressionHandler.SyncPlayerData(player)
-        ProgressionHandler.SyncDeck(player)
+        NetworkSyncHandler.SyncPlayerData(player)
+        NetworkSyncHandler.SyncDeck(player)
     end)
     ```
     
@@ -82,7 +82,7 @@ local _dependencies: {
 	PlayerDataService: any?,
 	MutationService: any?,
 	ArenaService: any?,
-	ProgressionHandler: any?,
+	NetworkSyncHandler: any?,
 } =
 	{}
 
@@ -111,7 +111,7 @@ export type ArenaDependencies = {
 	PlayerDataService: any,
 	MutationService: any?,
 	ArenaService: any?,
-	ProgressionHandler: any?,
+	NetworkSyncHandler: any?,
 }
 
 --[[
@@ -128,7 +128,7 @@ function TeleportDataHandler.InitializeArena(deps: ArenaDependencies)
 	_dependencies.PlayerDataService = deps.PlayerDataService
 	_dependencies.MutationService = deps.MutationService
 	_dependencies.ArenaService = deps.ArenaService
-	_dependencies.ProgressionHandler = deps.ProgressionHandler
+	_dependencies.NetworkSyncHandler = deps.NetworkSyncHandler
 
 	-- Connect to PlayerAdded (single handler for all teleport logic)
 	-- This MUST be connected BEFORE PlayerDataService.Initialize() is called

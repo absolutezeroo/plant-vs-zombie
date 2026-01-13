@@ -65,8 +65,8 @@ local function PlantViewport(props: PlantViewportProps): (ViewportFrame, () -> (
 	-- Create viewport frame
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Name = "PlantViewport"
-	viewport.Size = props.Size or UDim2.new(1, 0, 1, 0)
-	viewport.Position = props.Position or UDim2.new(0.5, 0, 0.5, 0)
+	viewport.Size = props.Size or UDim2.fromScale(1, 1)
+	viewport.Position = props.Position or UDim2.fromScale(0.5, 0.5)
 	viewport.AnchorPoint = props.AnchorPoint or Vector2.new(0.5, 0.5)
 	viewport.LayoutOrder = props.LayoutOrder or 0
 	viewport.ZIndex = props.ZIndex or 1

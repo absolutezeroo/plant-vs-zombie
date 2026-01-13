@@ -48,10 +48,7 @@ local function saveDeck(deck: { string })
 	Logger.Info("DeckBuilder", "Saving deck", { deckSize = #deck })
 
 	-- Convert to Zap enum array
-	local deckEnums = {}
-	for i, plantType in deck do
-		deckEnums[i] = plantType
-	end
+	local deckEnums = table.clone(deck)
 
 	ZapClient.SaveDeck.Fire({
 		Deck = deckEnums :: any,
@@ -60,10 +57,7 @@ end
 
 -- Listen for deck changes from server
 ZapClient.DeckChanged.On(function(data)
-	local deck = {}
-	for i, plantType in data.Deck do
-		deck[i] = plantType
-	end
+	local deck = table.clone(data.Deck)
 
 	currentDeck:set(deck)
 	Logger.Info("DeckBuilder", "Deck updated from server", { deckSize = #deck })

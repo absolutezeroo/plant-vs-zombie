@@ -95,7 +95,7 @@ local function XPBar(props: XPBarProps): Frame
 					scope:New("Frame")({
 						Name = "Fill",
 						Size = scope:Computed(function(use)
-							return UDim2.new(use(progress), 0, 1, 0)
+							return UDim2.fromScale(use(progress), 1)
 						end),
 						BackgroundColor3 = Theme.Colors.Purple.Main,
 						ZIndex = 1,
@@ -110,7 +110,7 @@ local function XPBar(props: XPBarProps): Frame
 					-- Text overlay
 					scope:New("TextLabel")({
 						Name = "Text",
-						Size = UDim2.new(1, 0, 1, 0),
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						Text = displayText,
 						TextColor3 = Color3.new(1, 1, 1),

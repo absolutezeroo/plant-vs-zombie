@@ -8,6 +8,10 @@
 	
 	This service provides the public API that other systems call.
 	It does NOT run an ECS loop - that's WaveManagerSystem's job.
+	
+	Uses handlers for pure logic:
+	- GameEndHandler: Reward calculations
+	- MultiplayerScalingHandler: Multiplayer scaling
 ]]
 
 local Players = game:GetService("Players")
@@ -20,6 +24,10 @@ local GameConstants = require(Shared.config.GameConstants)
 -- Data modules
 local WorldData = require(Shared.data.WorldData)
 local DifficultyData = require(Shared.data.DifficultyData)
+
+-- Shared handlers (pure logic)
+local GameEndHandler = require(Shared.handlers.game.GameEndHandler)
+local MultiplayerScalingHandler = require(Shared.handlers.game.MultiplayerScalingHandler)
 
 -- Server modules
 local Server = script.Parent.Parent
@@ -169,27 +177,36 @@ local function handleGameEnd(isVictory: boolean)
 	local broadcaster = getBroadcaster()
 
 	local starRating = if isVictory then BaseHealth.GetStarRating() else 0
-	local difficultyConfig = State.CurrentDifficultyConfig
+
+	-- Build game end input for handler
+	local gameEndInput: GameEndHandler.GameEndInput = {
+		IsVictory = isVictory,
+		StarRating = starRating,
+		CurrentWave = State.CurrentWave,
+		TotalWaves = State.TotalWaves,
+		SessionStats = { ZombiesKilled = 0, CoinsEarned = 0, PlantsPlaced = 0 },
+		DifficultyConfig = State.CurrentDifficultyConfig :: GameEndHandler.DifficultyConfig?,
+		WorldConfig = State.CurrentWorldConfig :: GameEndHandler.WorldConfig?,
+	}
 
 	-- Process rewards for each player
 	for _, player in Players:GetPlayers() do
 		local sessionStats = StatsService.GetSessionStats(player)
+		gameEndInput.SessionStats = {
+			ZombiesKilled = sessionStats.ZombiesKilled,
+			CoinsEarned = sessionStats.CoinsEarned,
+			PlantsPlaced = sessionStats.PlantsPlaced or 0,
+		}
 
-		-- Calculate base rewards from difficulty config
-		local baseCoins = if difficultyConfig then difficultyConfig.CoinReward else 100
-		local baseXP = if difficultyConfig then difficultyConfig.XPReward else 50
-		local waveMultiplier = State.CurrentWave / (if State.TotalWaves > 0 then State.TotalWaves else 1)
+		-- Use RewardCalculator for detailed calculation
+		local baseCoins, baseXP = GameEndHandler.GetBaseRewards(gameEndInput.DifficultyConfig)
+		local waveMultiplier = GameEndHandler.CalculateWaveMultiplier(State.CurrentWave, State.TotalWaves)
 
-		-- Calculate rewards
-		local rewards = rewardCalc:CalculateRewards({
+		local rewardCalcResult = rewardCalc:CalculateRewards({
 			IsVictory = isVictory,
 			WaveReached = State.CurrentWave,
-			SessionStats = {
-				ZombiesKilled = sessionStats.ZombiesKilled,
-				CoinsEarned = sessionStats.CoinsEarned,
-				PlantsPlaced = sessionStats.PlantsPlaced or 0,
-			},
-			DifficultyConfig = difficultyConfig,
+			SessionStats = gameEndInput.SessionStats,
+			DifficultyConfig = State.CurrentDifficultyConfig,
 			WorldConfig = State.CurrentWorldConfig,
 			StarRating = starRating,
 			BaseCoins = baseCoins,
@@ -199,15 +216,18 @@ local function handleGameEnd(isVictory: boolean)
 			IsNewBest = false,
 		})
 
-		-- Award rewards
+		-- Calculate final rewards via handler
+		local rewards = GameEndHandler.CalculatePlayerRewards(gameEndInput, rewardCalcResult)
+
+		-- Award rewards via PlayerDataService
 		if isVictory then
-			PlayerDataService.AddCoins(player, rewards.TotalCoins or (baseCoins * waveMultiplier))
+			PlayerDataService.AddCoins(player, rewards.CoinsEarned)
 		end
 
-		local levelsGained = PlayerDataService.AddXP(player, rewards.XPEarned or baseXP)
+		local levelsGained = PlayerDataService.AddXP(player, rewards.XPEarned)
 		local newLevel = PlayerDataService.GetLevel(player)
 
-		if rewards.GemsEarned and rewards.GemsEarned > 0 then
+		if rewards.GemsEarned > 0 then
 			PlayerDataService.AddGems(player, rewards.GemsEarned)
 		end
 
@@ -217,19 +237,9 @@ local function handleGameEnd(isVictory: boolean)
 			PlayerDataService.IncrementStat(player, "GamesWon", 1)
 		end
 
-		-- Broadcast to client
-		broadcaster:BroadcastGameEndRewards(player, {
-			Victory = isVictory,
-			CoinsEarned = rewards.TotalCoins or baseCoins,
-			ZombiesKilled = sessionStats.ZombiesKilled,
-			WavesCompleted = State.CurrentWave,
-			BonusCoins = rewards.BonusCoins or 0,
-			StarRating = starRating,
-			XPEarned = rewards.XPEarned or baseXP,
-			GemsEarned = rewards.GemsEarned or 0,
-			NewLevel = newLevel,
-			LevelsGained = levelsGained,
-		})
+		-- Build and broadcast payload via handler
+		local payload = GameEndHandler.BuildBroadcastPayload(gameEndInput, rewards, newLevel, levelsGained)
+		broadcaster:BroadcastGameEndRewards(player, payload)
 	end
 
 	-- Teleport countdown
@@ -337,35 +347,13 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 	State.CurrentDifficultyConfig = difficultyConfig
 	State.TotalWaves = difficultyConfig.WaveCount or 10
 
-	-- Calculate multiplayer scaling
+	-- Build spawner config via MultiplayerScalingHandler
 	local playerCount = math.max(1, #Players:GetPlayers())
-	local mpConfig = GameConstants.Multiplayer
-
-	-- Get scaling factors (clamp to max 4 players)
-	local scaledPlayerCount = math.min(playerCount, 4)
-	local budgetScale = mpConfig.BUDGET_SCALE[scaledPlayerCount] or 1.0
-	local hpScale = mpConfig.ZOMBIE_HP_SCALE[scaledPlayerCount] or 1.0
-	local speedScale = mpConfig.ZOMBIE_SPEED_SCALE[scaledPlayerCount] or 1.0
-	local spawnRateScale = mpConfig.SPAWN_RATE_SCALE[scaledPlayerCount] or 1.0
-
-	-- Build merged config for spawner with multiplayer scaling applied
-	local spawnerConfig = {
-		Name = worldConfig.Name,
-		MapId = worldConfig.MapId,
-		ZombiePool = worldConfig.ZombiePool,
-		Mechanics = worldConfig.Mechanics,
-		-- Apply multiplayer HP scaling on top of difficulty scaling
-		BaseZombieHP = (difficultyConfig.ZombieHealthMult or 1.0) * hpScale,
-		-- Apply multiplayer speed scaling
-		ZombieSpeedMult = speedScale,
-		-- Apply multiplayer budget scaling
-		BaseBudgetMultiplier = (difficultyConfig.ZombieDamageMult or 1.0) * budgetScale,
-		-- Apply multiplayer spawn rate scaling (lower = faster)
-		SpawnInterval = (difficultyConfig.SpawnInterval or 2.5) * spawnRateScale,
-		TotalWaves = State.TotalWaves,
-		-- Store player count for dynamic scaling during game
-		PlayerCount = playerCount,
-	}
+	local spawnerConfig = MultiplayerScalingHandler.BuildSpawnerConfig(
+		worldConfig :: MultiplayerScalingHandler.WorldConfig,
+		difficultyConfig :: MultiplayerScalingHandler.DifficultyConfig,
+		playerCount
+	)
 
 	spawner:SetWorldConfig(spawnerConfig)
 

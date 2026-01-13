@@ -162,7 +162,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 
 ---
 
-## 🏗️ CODING STANDARDS
+## 🏗️ CODING STANDARDS & ARCHITECTURE RULES
 
 * **Strict Typing:** Every file MUST start with `--!strict`. All functions must have type annotations.
 * **Linting (MANDATORY):**
@@ -174,3 +174,23 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
     * `src/shared/components/` -> All component definitions.
     * `src/arena/server/systems/` -> Server Logic (Authority).
     * `src/arena/client/systems/` -> Visuals (Prediction/Rendering).
+* **Service Architecture (The "Facade" Pattern):**
+    * **Services (`src/.../services/`)** are Entry Points Only. They hold State (Data) but contain NO complex logic.
+    * **Handlers (`src/.../handlers/`)** contain the Game Logic (Maths, Rules). They are stateless functions that modify data passed to them.
+    * **Data Modules (`src/shared/data/`)** contain the Config. No magic numbers in code.
+    * **Rule:** If a Service function has more than 10 lines of logic, move it to a Handler.
+
+## 🏷️ NAMING CONVENTIONS (STRICT)
+
+* **Services (`*Service.luau`):** Singleton. Public API. Holds Server State. **NO Complex Logic.**
+    * *Path:* `src/**/server/services/`
+* **Systems (`*System.luau`):** ECS Loop. Runs every frame. **NO Public API.**
+    * *Path:* `src/arena/server/systems/`
+* **Handlers (`*Handler.luau`):** Pure Logic/Maths. Stateless. Helper for Services.
+    * *Path:* `src/**/server/handlers/`
+* **Managers (`*Manager.luau`):** Lifecycle management of non-ECS objects (Maps, Pads).
+    * *Path:* `src/**/server/managers/`
+* **Controllers (`*Controller.luau`):** Client-side Singleton. User Input & UI State.
+    * *Path:* `src/**/client/controllers/`
+* **Data (`*Data.luau`):** Static Configuration Tables. strictly `table.freeze()`.
+    * *Path:* `src/shared/data/`

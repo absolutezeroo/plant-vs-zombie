@@ -112,7 +112,7 @@ local function WinRateBanner(props: WinRateBannerProps): Frame
 					-- Text
 					scope:New("TextLabel")({
 						Name = "Text",
-						Size = UDim2.new(1, 0, 1, 0),
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						Text = displayText,
 						TextColor3 = Color3.new(1, 1, 1),

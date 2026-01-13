@@ -94,9 +94,7 @@ function UIStateManager.SetQueueMode(inQueue: boolean)
 
 		if inQueue then
 			-- Entering queue: hide non-essential GUIs
-			if shouldBeVisibleInQueue(name) then
-				-- Keep visible
-			else
+			if not shouldBeVisibleInQueue(name) then
 				-- Save current state and hide
 				if gui:IsA("ScreenGui") then
 					guiData.OriginalVisible = gui.Enabled

@@ -64,7 +64,7 @@ local PadUIController = {}
 local function createPadUI(scope, state: PadUIState): BillboardGui
 	return New(scope, "BillboardGui")({
 		Name = "PadUI",
-		Size = UDim2.new(8, 0, 8, 0), -- 8x8 studs like original
+		Size = UDim2.fromScale(8, 8), -- 8x8 studs like original
 		StudsOffset = Vector3.new(0, 0, 0),
 		AlwaysOnTop = false,
 		MaxDistance = math.huge,
@@ -73,7 +73,7 @@ local function createPadUI(scope, state: PadUIState): BillboardGui
 			-- Frame container
 			New(scope, "Frame")({
 				Name = "Frame",
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromScale(1, 1),
 				BackgroundColor3 = Color3.new(0, 0, 0),
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
@@ -90,7 +90,7 @@ local function createPadUI(scope, state: PadUIState): BillboardGui
 					New(scope, "TextLabel")({
 						Name = "players",
 						Position = UDim2.new(0, 0, 0, 0),
-						Size = UDim2.new(1, 0, 0.333, 0),
+						Size = UDim2.fromScale(1, 0.333),
 						BackgroundTransparency = 1,
 						Text = Computed(scope, function(use)
 							return `Players: {use(state.PlayersCount)}/{use(state.MaxPlayers)}`
@@ -106,8 +106,8 @@ local function createPadUI(scope, state: PadUIState): BillboardGui
 					-- Time label
 					New(scope, "TextLabel")({
 						Name = "time",
-						Position = UDim2.new(0, 0, 0.333, 0),
-						Size = UDim2.new(1, 0, 0.333, 0),
+						Position = UDim2.fromScale(0, 0.333),
+						Size = UDim2.fromScale(1, 0.333),
 						BackgroundTransparency = 1,
 						Text = Computed(scope, function(use)
 							local countdown = use(state.CountdownRemaining) or 0
@@ -124,8 +124,8 @@ local function createPadUI(scope, state: PadUIState): BillboardGui
 					-- Status label
 					New(scope, "TextLabel")({
 						Name = "Status",
-						Position = UDim2.new(0, 0, 0.666, 0),
-						Size = UDim2.new(1, 0, 0.333, 0),
+						Position = UDim2.fromScale(0, 0.666),
+						Size = UDim2.fromScale(1, 0.333),
 						BackgroundTransparency = 1,
 						Text = Computed(scope, function(use)
 							local countdown = use(state.CountdownRemaining) or 0
@@ -287,7 +287,7 @@ local function createLeaveButtonUI(): ScreenGui
 			-- Container for Leave UI (centered bottom)
 			New(_scope, "Frame")({
 				Name = "Container",
-				Size = UDim2.new(0, 300, 0, 150),
+				Size = UDim2.fromOffset(300, 150),
 				Position = UDim2.new(0.5, -150, 1, -180),
 				BackgroundColor3 = Color3.fromRGB(139, 90, 43),
 				BorderSizePixel = 0,
@@ -308,7 +308,7 @@ local function createLeaveButtonUI(): ScreenGui
 					-- World + Difficulty name
 					New(_scope, "TextLabel")({
 						Size = UDim2.new(1, -20, 0, 40),
-						Position = UDim2.new(0, 10, 0, 10),
+						Position = UDim2.fromOffset(10, 10),
 						BackgroundTransparency = 1,
 						Text = Computed(_scope, function(use)
 							local world = use(worldConfig)
@@ -328,7 +328,7 @@ local function createLeaveButtonUI(): ScreenGui
 					-- Info text
 					New(_scope, "TextLabel")({
 						Size = UDim2.new(1, -20, 0, 28),
-						Position = UDim2.new(0, 10, 0, 52),
+						Position = UDim2.fromOffset(10, 52),
 						BackgroundTransparency = 1,
 						Text = Computed(_scope, function(use)
 							local countdown = use(_currentCountdown)
@@ -360,7 +360,7 @@ local function createLeaveButtonUI(): ScreenGui
 					-- Leave Button
 					New(_scope, "TextButton")({
 						Name = "LeaveButton",
-						Size = UDim2.new(0, 120, 0, 40),
+						Size = UDim2.fromOffset(120, 40),
 						Position = UDim2.new(0.5, -60, 1, -55),
 						BackgroundColor3 = Color3.fromRGB(200, 60, 60),
 						Text = "Leave",

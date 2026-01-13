@@ -24,6 +24,7 @@ StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 -- Wait for packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
+local Sift = require(Packages:WaitForChild("Sift"))
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -291,19 +292,15 @@ local function setupNetworkListeners()
 			`Synced mutations for {data.PlantType}: {#data.OwnedMutations} owned, {#data.EquippedMutations} equipped`
 		)
 
-		-- Create new tables to trigger Fusion reactivity
-		local newOwned = {}
-		for k, v in Fusion.peek(ownedMutations) do
-			newOwned[k] = v
-		end
-		newOwned[data.PlantType] = data.OwnedMutations
+		-- Merge new data into existing tables to trigger Fusion reactivity
+		local newOwned = Sift.Dictionary.merge(Fusion.peek(ownedMutations), {
+			[data.PlantType] = data.OwnedMutations,
+		})
 		ownedMutations:set(newOwned)
 
-		local newEquipped = {}
-		for k, v in Fusion.peek(equippedMutations) do
-			newEquipped[k] = v
-		end
-		newEquipped[data.PlantType] = data.EquippedMutations
+		local newEquipped = Sift.Dictionary.merge(Fusion.peek(equippedMutations), {
+			[data.PlantType] = data.EquippedMutations,
+		})
 		equippedMutations:set(newEquipped)
 
 		-- Update HUD controller
