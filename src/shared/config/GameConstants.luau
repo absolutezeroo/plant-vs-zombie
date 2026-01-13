@@ -253,9 +253,15 @@ GameConstants.Multiplayer = table.freeze({
 		[4] = 0.65, -- 35% faster
 	}),
 
-	-- Plant limits per player (0 = no limit for that type)
-	PLANTS_PER_PLAYER = 12, -- Each player can place max 12 plants
-	MAX_TOTAL_PLANTS = 40, -- Hard cap regardless of player count
+	-- Plant limits per player (scales with player count)
+	-- Solo = 45 (full grid), more players = less per player
+	PLANTS_PER_PLAYER = table.freeze({
+		[1] = 45, -- Solo: full grid access
+		[2] = 22, -- 2 players: ~half grid each
+		[3] = 15, -- 3 players
+		[4] = 12, -- 4 players
+	}),
+	MAX_TOTAL_PLANTS = 45, -- Hard cap (full grid)
 
 	-- Sun scaling (less sky sun with more players to balance economy)
 	SUN_DROP_SCALE = table.freeze({

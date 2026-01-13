@@ -369,7 +369,7 @@ function WaveService.StartGame(worldId: string?, difficulty: string?): boolean
 		SunService.BroadcastSunUpdate(player)
 	end
 
-	broadcaster:BroadcastGameStarted(worldId, difficulty, worldConfig.Name, difficultyConfig.Name, State.TotalWaves)
+	broadcaster:BroadcastGameStarted(worldId, difficulty, worldConfig.Name, difficultyConfig.Name, State.TotalWaves, playerCount)
 	broadcaster:BroadcastWaveStarted(0, 0)
 
 	return true

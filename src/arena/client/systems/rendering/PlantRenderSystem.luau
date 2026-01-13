@@ -18,6 +18,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
 -- Packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -39,6 +40,7 @@ local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
 local Network = require(Shared.network.generated.client)
 local AudioService = require(Modules.AudioService)
+local SelectionState = require(Modules.SelectionState)
 
 -- Assets folder (optional - fallback to cubes if missing)
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -84,6 +86,7 @@ type PlantVisual = {
 	PlantType: string,
 	Column: number,
 	Lane: number,
+	OwnerId: number, -- Player UserId who owns this plant
 }
 local _plantVisuals: { [number]: PlantVisual } = {}
 
@@ -223,6 +226,7 @@ local function setupNetworkListeners()
 		local plantType = tostring(data.PlantType)
 		local column = data.Column
 		local lane = data.Lane
+		local ownerId = data.OwnerId
 		local mutations = data.Mutations or {}
 
 		if _plantVisuals[entityId] then
@@ -230,7 +234,15 @@ local function setupNetworkListeners()
 			return
 		end
 
-		_plantVisuals[entityId] = createPlantVisual(entityId, plantType, column, lane)
+		local visual = createPlantVisual(entityId, plantType, column, lane)
+		visual.OwnerId = ownerId -- Store owner for decrement on death
+		_plantVisuals[entityId] = visual
+
+		-- Track plant count for HUD (only local player's plants)
+		local localPlayer = Players.LocalPlayer
+		if localPlayer and ownerId == localPlayer.UserId then
+			SelectionState.IncrementPlantCount()
+		end
 
 		-- Store mutations in local cache (cleaner than model attributes)
 		local mutationStrings: { string } = {}
@@ -272,6 +284,12 @@ local function setupNetworkListeners()
 		if visual then
 			local animService = getAnimService()
 			local vfx = getVFXService()
+
+			-- Decrement plant count for HUD (only local player's plants)
+			local localPlayer = Players.LocalPlayer
+			if localPlayer and visual.OwnerId == localPlayer.UserId then
+				SelectionState.DecrementPlantCount()
+			end
 
 			-- Remove from tracking immediately to prevent double-processing
 			_plantVisuals[entityId] = nil

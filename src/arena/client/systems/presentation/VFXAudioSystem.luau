@@ -104,10 +104,18 @@ local function Init(_world: any)
 	-- Explosion VFX event
 	_trove:Add(Network.ExplosionVFX.On(function(data)
 		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
-		VFXService.PlayExplosion(pos, data.Radius)
-		AudioService.PlayExplosion(pos)
-		VFXService.ScreenShake(0.8, 0.3)
-		Logger.Debug("VFXAudio", `Explosion at {pos}`)
+		
+		-- DoomShroom uses crater explosion (darker, heavier)
+		if data.IsCrater then
+			VFXService.PlayCraterExplosion(pos, data.Radius)
+			AudioService.PlayExplosion(pos) -- Heavy explosion sound
+			Logger.Debug("VFXAudio", `Crater explosion at {pos}`)
+		else
+			VFXService.PlayExplosion(pos, data.Radius)
+			AudioService.PlayExplosion(pos)
+			VFXService.ScreenShake(0.8, 0.3)
+			Logger.Debug("VFXAudio", `Explosion at {pos}`)
+		end
 	end))
 
 	-- ========================================

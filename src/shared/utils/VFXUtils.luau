@@ -518,4 +518,300 @@ function VFXUtils.RemoveStatusOverlay(model: Model, effectType: string)
 	end
 end
 
+-- ============================================
+-- Voxel Burst VFX (Procedural)
+-- ============================================
+
+--[[
+	Configuration type for VoxelBurst effect
+]]
+export type VoxelBurstConfig = {
+	-- Particle count
+	Count: number?,              -- Default: 15
+	
+	-- Size (voxel cube size)
+	SizeMin: number?,            -- Default: 0.3
+	SizeMax: number?,            -- Default: 0.6
+	
+	-- Colors (earth tones, explosion, etc.)
+	Colors: { Color3 }?,         -- Default: brown/dirt tones
+	
+	-- Physics
+	SpeedMin: number?,           -- Default: 8
+	SpeedMax: number?,           -- Default: 15
+	SpreadAngle: number?,        -- Default: 45 (degrees)
+	Gravity: number?,            -- Default: -50 (negative Y acceleration)
+	Drag: number?,               -- Default: 2
+	
+	-- Collision
+	Bounce: boolean?,            -- Default: true (SurfaceCollision)
+	
+	-- Timing
+	LifetimeMin: number?,        -- Default: 0.5
+	LifetimeMax: number?,        -- Default: 1.0
+	
+	-- Rotation (tumbling voxels)
+	RotSpeedMin: number?,        -- Default: -180
+	RotSpeedMax: number?,        -- Default: 180
+	
+	-- Direction
+	EmissionDirection: Enum.NormalId?, -- Default: Top
+}
+
+-- Preset configurations
+local VOXEL_PRESETS = {
+	-- Dirt burst when planting
+	Dirt = {
+		Count = 25,
+		SizeMin = 0.25,
+		SizeMax = 0.5,
+		Colors = {
+			Color3.fromRGB(101, 67, 33),   -- Dark brown
+			Color3.fromRGB(139, 90, 43),   -- Saddle brown
+			Color3.fromRGB(160, 120, 60),  -- Light brown
+		},
+		SpeedMin = 8,
+		SpeedMax = 14,
+		SpreadAngle = 50,
+		Gravity = -45,
+		Drag = 3,
+		Bounce = true,
+		LifetimeMin = 0.4,
+		LifetimeMax = 0.8,
+	},
+	
+	-- Crater explosion (DoomShroom)
+	Crater = {
+		Count = 35,
+		SizeMin = 0.4,
+		SizeMax = 0.9,
+		Colors = {
+			Color3.fromRGB(50, 40, 30),    -- Charred dark
+			Color3.fromRGB(80, 60, 40),    -- Burnt brown
+			Color3.fromRGB(60, 50, 35),    -- Ash brown
+			Color3.fromRGB(30, 25, 20),    -- Almost black
+		},
+		SpeedMin = 18,
+		SpeedMax = 30,
+		SpreadAngle = 60,
+		Gravity = -35,
+		Drag = 1.5,
+		Bounce = true,
+		LifetimeMin = 0.8,
+		LifetimeMax = 1.5,
+	},
+	
+	-- Ice shatter
+	Ice = {
+		Count = 20,
+		SizeMin = 0.2,
+		SizeMax = 0.5,
+		Colors = {
+			Color3.fromRGB(200, 230, 255), -- Light ice blue
+			Color3.fromRGB(150, 200, 255), -- Ice blue
+			Color3.fromRGB(255, 255, 255), -- White
+		},
+		SpeedMin = 10,
+		SpeedMax = 18,
+		SpreadAngle = 70,
+		Gravity = -40,
+		Drag = 2,
+		Bounce = true,
+		LifetimeMin = 0.5,
+		LifetimeMax = 1.0,
+	},
+	
+	-- Fire/Explosion debris
+	Explosion = {
+		Count = 25,
+		SizeMin = 0.3,
+		SizeMax = 0.7,
+		Colors = {
+			Color3.fromRGB(255, 100, 0),   -- Orange
+			Color3.fromRGB(255, 50, 0),    -- Red-orange
+			Color3.fromRGB(80, 40, 20),    -- Burnt
+		},
+		SpeedMin = 15,
+		SpeedMax = 25,
+		SpreadAngle = 80,
+		Gravity = -30,
+		Drag = 2,
+		Bounce = false,
+		LifetimeMin = 0.4,
+		LifetimeMax = 0.8,
+	},
+	
+	-- Leaf/Plant debris
+	Plant = {
+		Count = 25,
+		SizeMin = 0.2,
+		SizeMax = 0.4,
+		Colors = {
+			Color3.fromRGB(34, 139, 34),   -- Forest green
+			Color3.fromRGB(50, 180, 50),   -- Lime green
+			Color3.fromRGB(85, 170, 85),   -- Light green
+		},
+		SpeedMin = 6,
+		SpeedMax = 12,
+		SpreadAngle = 60,
+		Gravity = -25,
+		Drag = 4,
+		Bounce = false,
+		LifetimeMin = 0.6,
+		LifetimeMax = 1.2,
+	},
+}
+
+--[[
+	Create a voxel/cube burst effect at a position using real 3D Parts
+	
+	@param position Vector3 - World position for the burst
+	@param config VoxelBurstConfig | string - Config table or preset name ("Dirt", "Crater", "Ice", "Explosion", "Plant")
+]]
+function VFXUtils.VoxelBurst(position: Vector3, config: VoxelBurstConfig | string?)
+	-- Resolve preset or use custom config
+	local cfg: VoxelBurstConfig
+	if type(config) == "string" then
+		cfg = VOXEL_PRESETS[config] or VOXEL_PRESETS.Dirt
+	elseif config then
+		cfg = config
+	else
+		cfg = VOXEL_PRESETS.Dirt
+	end
+	
+	-- Apply defaults
+	local count = cfg.Count or 15
+	local sizeMin = cfg.SizeMin or 0.3
+	local sizeMax = cfg.SizeMax or 0.6
+	local colors = cfg.Colors or { Color3.fromRGB(139, 90, 43) }
+	local speedMin = cfg.SpeedMin or 8
+	local speedMax = cfg.SpeedMax or 15
+	local spreadAngle = math.rad(cfg.SpreadAngle or 45)
+	local lifetimeMin = cfg.LifetimeMin or 0.5
+	local lifetimeMax = cfg.LifetimeMax or 1.0
+	
+	-- Spawn real 3D cubes
+	for _ = 1, count do
+		local cube = Instance.new("Part")
+		cube.Name = "VoxelDebris"
+		
+		-- Random size
+		local size = sizeMin + math.random() * (sizeMax - sizeMin)
+		cube.Size = Vector3.new(size, size, size)
+		
+		-- Random color from palette
+		cube.Color = colors[math.random(1, #colors)]
+		
+		-- Appearance
+		cube.Material = Enum.Material.Plastic
+		cube.TopSurface = Enum.SurfaceType.Smooth
+		cube.BottomSurface = Enum.SurfaceType.Smooth
+		
+		-- Physics
+		cube.Anchored = false
+		cube.CanCollide = true
+		cube.CanQuery = false
+		cube.CanTouch = false
+		
+		-- Position with slight random offset
+		local offsetX = (math.random() - 0.5) * 1
+		local offsetZ = (math.random() - 0.5) * 1
+		cube.Position = position + Vector3.new(offsetX, 0.5, offsetZ)
+		
+		-- Random rotation
+		cube.CFrame = cube.CFrame * CFrame.Angles(
+			math.random() * math.pi * 2,
+			math.random() * math.pi * 2,
+			math.random() * math.pi * 2
+		)
+		
+		cube.Parent = workspace
+		
+		-- Apply upward/outward velocity
+		local speed = speedMin + math.random() * (speedMax - speedMin)
+		local angle = math.random() * math.pi * 2 -- Random horizontal direction
+		local verticalAngle = math.pi / 2 - math.random() * spreadAngle -- Mostly up
+		
+		local velocityX = math.cos(angle) * math.sin(verticalAngle) * speed
+		local velocityY = math.cos(verticalAngle) * speed + speed * 0.5 -- Bias upward
+		local velocityZ = math.sin(angle) * math.sin(verticalAngle) * speed
+		
+		cube.AssemblyLinearVelocity = Vector3.new(velocityX, velocityY, velocityZ)
+		
+		-- Random spin
+		cube.AssemblyAngularVelocity = Vector3.new(
+			(math.random() - 0.5) * 20,
+			(math.random() - 0.5) * 20,
+			(math.random() - 0.5) * 20
+		)
+		
+		-- Fade out and cleanup
+		local lifetime = lifetimeMin + math.random() * (lifetimeMax - lifetimeMin)
+		
+		task.spawn(function()
+			-- Wait for most of lifetime
+			task.wait(lifetime * 0.7)
+			
+			-- Fade out
+			local fadeSteps = 5
+			for i = 1, fadeSteps do
+				if cube and cube.Parent then
+					cube.Transparency = i / fadeSteps
+				end
+				task.wait(lifetime * 0.3 / fadeSteps)
+			end
+			
+			-- Destroy
+			if cube and cube.Parent then
+				cube:Destroy()
+			end
+		end)
+	end
+end
+
+--[[
+	Dirt burst effect for plant placement
+	
+	@param position Vector3 - World position for the burst
+]]
+function VFXUtils.DirtBurst(position: Vector3)
+	VFXUtils.VoxelBurst(position, "Dirt")
+end
+
+--[[
+	Crater explosion effect (DoomShroom, etc.)
+	
+	@param position Vector3 - World position for the burst
+]]
+function VFXUtils.CraterBurst(position: Vector3)
+	VFXUtils.VoxelBurst(position, "Crater")
+end
+
+--[[
+	Ice shatter effect (frozen plants/zombies breaking)
+	
+	@param position Vector3 - World position for the burst
+]]
+function VFXUtils.IceBurst(position: Vector3)
+	VFXUtils.VoxelBurst(position, "Ice")
+end
+
+--[[
+	Explosion debris effect (CherryBomb, Jalapeno, etc.)
+	
+	@param position Vector3 - World position for the burst
+]]
+function VFXUtils.ExplosionBurst(position: Vector3)
+	VFXUtils.VoxelBurst(position, "Explosion")
+end
+
+--[[
+	Plant debris effect (plant destroyed)
+	
+	@param position Vector3 - World position for the burst
+]]
+function VFXUtils.PlantBurst(position: Vector3)
+	VFXUtils.VoxelBurst(position, "Plant")
+end
+
 return VFXUtils

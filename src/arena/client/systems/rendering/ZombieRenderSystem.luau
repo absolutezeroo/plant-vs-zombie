@@ -15,6 +15,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
@@ -135,25 +136,105 @@ local function createZombieVisual(entityId: number, zombieType: string, lane: nu
 	-- Calculate spawn position with feet offset
 	-- FeetOffset = distance from root to feet (so we add it to put feet at ground level)
 	local feetOffset = model:GetAttribute("FeetOffset") or 0
-	local spawnY = groundY + feetOffset
-	local worldPos = Vector3.new(positionX, spawnY, z)
+	local finalY = groundY + feetOffset
+	
+	-- Emerge animation config
+	local EMERGE_DEPTH = 4 -- How far below ground to start (fallback if no animation)
+	local EMERGE_DURATION = 0.8 -- Fallback duration if no animation
 
 	-- Position and rotate to face toward the house
 	local zombieDir = MapConfig.GetZombieDirection()
-	local facingCFrame = CFrame.lookAt(worldPos, worldPos + zombieDir) * CFrame.fromEulerAnglesXYZ(0, math.pi / 2, 0)
-	model:PivotTo(facingCFrame)
-
-	model:SetAttribute("EntityId", entityId)
-	model.Parent = Workspace
-
-	-- Play spawn/idle animations
+	local finalPos = Vector3.new(positionX, finalY, z)
+	local finalCFrame = CFrame.lookAt(finalPos, finalPos + zombieDir) * CFrame.fromEulerAnglesXYZ(0, math.pi / 2, 0)
+	
+	-- Check if we have an Emerge animation
 	local animService = getAnimService()
+	local hasEmergeAnim = false
+	local emergeDuration = 0
+	
 	if animService then
-		animService.PlaySpawn(model)
-		animService.StartIdle(model)
+		-- Try to get emerge animation duration (returns 0 if not available)
+		-- We need to position model first to load animations
+		model:PivotTo(finalCFrame)
+		model:SetAttribute("EntityId", entityId)
+		model:SetAttribute("IsEmerging", true)
+		model.Parent = Workspace
+		
+		emergeDuration = animService.PlayEmerge(model)
+		hasEmergeAnim = emergeDuration > 0
+	end
+	
+	-- Play dirt burst VFX at ground level
+	local groundPos = Vector3.new(positionX, groundY, z)
+	local VFXUtils = require(Shared.utils.VFXUtils)
+	VFXUtils.DirtBurst(groundPos)
+
+	if hasEmergeAnim then
+		-- USE ANIMATION: Model stays in place, animation handles the visual
+		Logger.Debug("ZombieRender", `Zombie {entityId} playing Emerge animation ({emergeDuration}s)`)
+		
+		task.spawn(function()
+			-- Wait for animation to complete
+			task.wait(emergeDuration)
+			
+			if model and model.Parent then
+				model:SetAttribute("IsEmerging", false)
+				-- Start walk after emerge
+				if animService then
+					animService.StartIdle(model)
+				end
+			end
+		end)
+	else
+		-- FALLBACK: Tween-based emerge (no animation available)
+		local startY = finalY - EMERGE_DEPTH
+		local startPos = Vector3.new(positionX, startY, z)
+		local startCFrame = CFrame.lookAt(startPos, startPos + zombieDir) * CFrame.fromEulerAnglesXYZ(0, math.pi / 2, 0)
+		model:PivotTo(startCFrame)
+		
+		task.spawn(function()
+			-- Create a CFrameValue to tween
+			local cframeValue = Instance.new("CFrameValue")
+			cframeValue.Value = startCFrame
+			cframeValue.Parent = model
+			
+			-- Connect to update model position when value changes
+			local connection = cframeValue.Changed:Connect(function()
+				if model and model.Parent then
+					model:PivotTo(cframeValue.Value)
+				end
+			end)
+			
+			-- Create and play tween
+			local tweenInfo = TweenInfo.new(
+				EMERGE_DURATION,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.Out
+			)
+			local tween = TweenService:Create(cframeValue, tweenInfo, { Value = finalCFrame })
+			tween:Play()
+			
+			-- Wait for tween to complete
+			tween.Completed:Wait()
+			
+			-- Cleanup
+			connection:Disconnect()
+			cframeValue:Destroy()
+			
+			-- Ensure final position and clear flag
+			if model and model.Parent then
+				model:PivotTo(finalCFrame)
+				model:SetAttribute("IsEmerging", false)
+				
+				-- Start walk after emerge
+				if animService then
+					animService.StartIdle(model)
+				end
+			end
+		end)
 	end
 
-	Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned at Y={spawnY}`)
+	Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) emerging from ground`)
 
 	return {
 		Model = model,

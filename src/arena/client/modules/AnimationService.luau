@@ -47,6 +47,7 @@ type HumanoidAnimData = {
 	WalkTrack: AnimationTrack?,
 	AttackTrack: AnimationTrack?,
 	DeathTrack: AnimationTrack?,
+	EmergeTrack: AnimationTrack?,
 }
 local _humanoidAnimations: { [Model]: HumanoidAnimData } = {}
 
@@ -106,6 +107,7 @@ local function loadZombieAnimations(model: Model): HumanoidAnimData?
 		WalkTrack = nil,
 		AttackTrack = nil,
 		DeathTrack = nil,
+		EmergeTrack = nil,
 	}
 
 	-- Helper to check if Animation has valid ID
@@ -140,6 +142,15 @@ local function loadZombieAnimations(model: Model): HumanoidAnimData?
 		track.Looped = false
 		track.Priority = Enum.AnimationPriority.Action4
 		data.DeathTrack = track
+	end
+
+	-- Emerge animation (zombie rising from ground)
+	local emergeAnim = animFolder:FindFirstChild("Emerge")
+	if isValidAnimation(emergeAnim) then
+		local track = animator:LoadAnimation(emergeAnim)
+		track.Looped = false
+		track.Priority = Enum.AnimationPriority.Action2
+		data.EmergeTrack = track
 	end
 
 	_humanoidAnimations[model] = data
@@ -401,6 +412,31 @@ function AnimationService.PlayDeath(model: Model): ()
 	if lastTween then
 		lastTween.Completed:Wait()
 	end
+end
+
+--[[
+	🧟 EMERGE ANIMATION - Zombie rising from ground
+	Plays the Emerge animation if available, returns duration
+	@return number - Animation duration (0 if no animation)
+]]
+function AnimationService.PlayEmerge(model: Model): number
+	if not hasHumanoid(model) then
+		return 0
+	end
+	
+	local animData = getZombieAnimData(model)
+	if animData and animData.EmergeTrack then
+		-- Stop walk while emerging
+		if animData.WalkTrack and animData.WalkTrack.IsPlaying then
+			animData.WalkTrack:Stop()
+		end
+		
+		animData.EmergeTrack:Play()
+		Logger.Debug("Animation", `Started emerge animation on {model.Name}`)
+		return animData.EmergeTrack.Length
+	end
+	
+	return 0
 end
 
 --[[

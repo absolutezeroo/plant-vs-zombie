@@ -524,7 +524,7 @@ event GameEndRewards = {
     }
 }
 
--- Explosion VFX event (CherryBomb, PotatoMine)
+-- Explosion VFX event (CherryBomb, PotatoMine, DoomShroom)
 event ExplosionVFX = {
     from: Server,
     type: Reliable,
@@ -534,6 +534,7 @@ event ExplosionVFX = {
         PositionY: f32,
         PositionZ: f32,
         Radius: f32,
+        IsCrater: boolean?,  -- DoomShroom leaves a crater (darker, heavier VFX)
     }
 }
 
@@ -715,6 +716,7 @@ event GameStarted = {
         WorldId: string.utf8,
         Difficulty: string.utf8,
         WaveCount: u8,
+        PlayerCount: u8,  -- Number of players for plant limit scaling
     }
 }
 

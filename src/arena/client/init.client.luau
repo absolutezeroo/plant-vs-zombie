@@ -35,6 +35,7 @@ local Logger = require(Shared.utils.Logger)
 local ErrorHandler = require(Shared.utils.ErrorHandler)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local ServiceLoader = require(Shared.utils.ServiceLoader)
 local SystemManager = require(Shared.utils.SystemManager)
 local GameSignals = require(Shared.signals.GameSignals)
@@ -53,6 +54,7 @@ local _clientTrove = Trove.new()
 -- ============================================
 local Network: any
 local PlayerDataClient: any
+local SelectionState: any
 local HUDController: any
 local FloatingTextController: any
 local PlantTooltipController: any
@@ -133,8 +135,15 @@ end
 local function setupNetworkListeners()
     -- Game started event (receives total wave count)
     Network.GameStarted.On(function(data)
-        Logger.Info("ArenaClient", `Game started: World={data.WorldId}, Difficulty={data.Difficulty}, Waves={data.WaveCount}`)
+        Logger.Info("ArenaClient", `Game started: World={data.WorldId}, Difficulty={data.Difficulty}, Waves={data.WaveCount}, Players={data.PlayerCount}`)
         totalWaves = data.WaveCount or 10
+        
+        -- Set plant limit based on player count (solo=45, duo=22, trio=15, quad=12)
+        local playerCount = math.clamp(data.PlayerCount or 1, 1, 4)
+        local plantLimit = GameConstants.Multiplayer.PLANTS_PER_PLAYER[playerCount] or 12
+        SelectionState.SetPlantLimit(plantLimit)
+        SelectionState.ResetPlantCount() -- Reset for new game
+        Logger.Debug("ArenaClient", `Plant limit set to {plantLimit} for {playerCount} players`)
         
         -- Mark game as started (enables Ready button in HUD)
         hud:SetGameStarted(true)
@@ -327,6 +336,7 @@ loader:AddStep("Modules", function()
     
     local Modules = script:WaitForChild("modules")
     PlayerDataClient = require(Modules:WaitForChild("PlayerDataClient"))
+    SelectionState = require(Modules:WaitForChild("SelectionState"))
     
     local Controllers = script:WaitForChild("controllers")
     HUDController = require(Controllers:WaitForChild("HUDController"))

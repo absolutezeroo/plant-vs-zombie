@@ -187,19 +187,26 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 
 		Logger.Info("SpecialPlant", `{plantType} {entityId} exploded! Killed {killCount} zombies`)
 
-		-- Broadcast explosion VFX
+		-- Broadcast explosion VFX (DoomShroom uses crater VFX)
 		Network.ExplosionVFX.FireAll({
 			PositionX = pos.X,
 			PositionY = 1,
 			PositionZ = pos.Z,
 			Radius = explosionRadius,
+			IsCrater = stats.LeavesCrater or false,
 		})
 	end
 
-	-- Clear grid cell
+	-- Handle grid cell: clear and optionally block (crater)
 	local plant = world:get(entityId, Components.PlantTypeComponent)
 	if plant then
 		GridService.Clear(plant.Column, plant.Lane)
+		
+		-- DoomShroom leaves a crater that blocks planting
+		if stats.LeavesCrater then
+			GridService.BlockCell(plant.Column, plant.Lane)
+			Logger.Info("SpecialPlant", `{plantType} left a crater at ({plant.Column}, {plant.Lane})`)
+		end
 	end
 
 	-- Broadcast entity death

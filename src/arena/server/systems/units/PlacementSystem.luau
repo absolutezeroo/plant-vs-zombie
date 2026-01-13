@@ -213,10 +213,12 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	local mpConfig = GameConstants.Multiplayer
 	local playerPlantCount = GridService.GetPlayerPlantCount(player.UserId)
 	local totalPlants = GridService.GetPlantCount()
+	local playerCount = math.max(1, #Players:GetPlayers())
+	local plantLimit = mpConfig.PLANTS_PER_PLAYER[playerCount] or 12
 
-	-- Per-player limit
-	if playerPlantCount >= mpConfig.PLANTS_PER_PLAYER then
-		return false, `Plant limit reached ({mpConfig.PLANTS_PER_PLAYER} max per player)`
+	-- Per-player limit (scales with player count: solo=45, duo=22, trio=15, quad=12)
+	if playerPlantCount >= plantLimit then
+		return false, `Plant limit reached ({plantLimit} max per player)`
 	end
 
 	-- Global limit

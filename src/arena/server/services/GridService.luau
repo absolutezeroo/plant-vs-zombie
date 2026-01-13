@@ -20,6 +20,9 @@ local GridService = {}
 -- 2D array: _occupancy[column][lane] = entityId or nil
 local _occupancy: { { number? } } = {}
 
+-- 2D array: _blocked[column][lane] = true (for craters, obstacles)
+local _blocked: { { boolean? } } = {}
+
 -- Track plants per player: _playerPlantCount[PlayerId] = count
 local _playerPlantCount: { [number]: number } = {}
 
@@ -30,8 +33,10 @@ local _entityOwner: { [number]: number } = {}
 local function initGrid()
 	for column = 1, GridConfig.GRID_COLUMNS do
 		_occupancy[column] = {}
+		_blocked[column] = {}
 		for lane = 1, GridConfig.GRID_LANES do
 			_occupancy[column][lane] = nil
+			_blocked[column][lane] = nil
 		end
 	end
 end
@@ -39,17 +44,32 @@ end
 initGrid()
 
 --[[
-	Check if a cell is occupied
+	Check if a cell is occupied or blocked
 	
 	@param column number - Column index (1-9)
 	@param lane number - Lane index (1-5)
-	@return boolean - True if cell has a plant
+	@return boolean - True if cell has a plant or is blocked (crater)
 ]]
 function GridService.IsOccupied(column: number, lane: number): boolean
 	if not _occupancy[column] then
 		return false
 	end
-	return _occupancy[column][lane] ~= nil
+	-- Check both occupancy and blocked state
+	return _occupancy[column][lane] ~= nil or _blocked[column][lane] == true
+end
+
+--[[
+	Check if a cell is blocked (crater/obstacle, no entity)
+	
+	@param column number - Column index (1-9)
+	@param lane number - Lane index (1-5)
+	@return boolean - True if cell is blocked
+]]
+function GridService.IsBlocked(column: number, lane: number): boolean
+	if not _blocked[column] then
+		return false
+	end
+	return _blocked[column][lane] == true
 end
 
 --[[
@@ -118,6 +138,31 @@ function GridService.Clear(column: number, lane: number)
 			end
 		end
 		_occupancy[column][lane] = nil
+	end
+end
+
+--[[
+	Block a cell (crater, obstacle) - no entity, just blocks placement
+	
+	@param column number - Column index (1-9)
+	@param lane number - Lane index (1-5)
+]]
+function GridService.BlockCell(column: number, lane: number)
+	if not _blocked[column] then
+		_blocked[column] = {}
+	end
+	_blocked[column][lane] = true
+end
+
+--[[
+	Unblock a cell (crater removed)
+	
+	@param column number - Column index (1-9)
+	@param lane number - Lane index (1-5)
+]]
+function GridService.UnblockCell(column: number, lane: number)
+	if _blocked[column] then
+		_blocked[column][lane] = nil
 	end
 end
 

@@ -129,11 +129,91 @@ local function playVFXFromAsset(position: Vector3, vfxName: string, fallbackColo
 end
 
 --[[
+	Advanced VFX player with support for EmitDelay attribute
+	For complex multi-phase effects (like DoomShroom nuke)
+	Reads EmitDelay attribute from particles to stagger emissions
+]]
+local function playVFXFromAssetWithDelay(position: Vector3, vfxName: string): boolean
+	local vfxAssets = getVFXAssets()
+	local vfxTemplate = vfxAssets and vfxAssets:FindFirstChild(vfxName)
+
+	if not vfxTemplate then
+		Logger.Debug("VFX", `{vfxName} asset not found`)
+		return false
+	end
+
+	local part = createVFXPart(position)
+	local maxLifetime: number = 0
+
+	-- Clone and play all effects with delay support
+	for _, child in vfxTemplate:GetChildren() do
+		if child:IsA("ParticleEmitter") then
+			local delay: number = (child:GetAttribute("EmitDelay") :: number?) or 0
+			local emitCount: number = (child:GetAttribute("EmitCount") :: number?) or 20
+			local lifetime: number = child.Lifetime.Max + delay
+
+			if lifetime > maxLifetime then
+				maxLifetime = lifetime
+			end
+
+			local clone = child:Clone()
+			clone.Enabled = false
+			clone.Parent = part
+
+			if delay > 0 then
+				task.delay(delay, function()
+					if clone.Parent then
+						clone:Emit(emitCount)
+					end
+				end)
+			else
+				clone:Emit(emitCount)
+			end
+
+		elseif child:IsA("PointLight") then
+			local delay: number = (child:GetAttribute("Delay") :: number?) or 0
+			local fadeTime: number = (child:GetAttribute("FadeTime") :: number?) or 0.5
+			local peakBrightness: number = (child:GetAttribute("PeakBrightness") :: number?) or child.Brightness
+
+			if delay > 0 then
+				task.delay(delay, function()
+					if part.Parent then
+						VFXUtils.CloneAndFadeLight(child, part, fadeTime)
+					end
+				end)
+			else
+				-- Flash effect: quick bright then fade
+				local lightClone = child:Clone()
+				lightClone.Parent = part
+				lightClone.Brightness = peakBrightness
+
+				local fadeTween = TweenService:Create(lightClone, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Brightness = 0,
+				})
+				fadeTween:Play()
+			end
+
+			if fadeTime > maxLifetime then
+				maxLifetime = fadeTime
+			end
+		end
+	end
+
+	-- Cleanup after all effects complete
+	Debris:AddItem(part, maxLifetime + 1)
+	Logger.Debug("VFX", `{vfxName} played with delays (lifetime={maxLifetime}s)`)
+	return true
+end
+
+--[[
 	🔥 EXPLOSION EFFECT - CherryBomb/PotatoMine
-	ASSET-BASED: Looks for Assets/VFX/Explosion
+	ASSET-BASED + VOXEL: Debris burst + shockwave ring
 ]]
 function VFXService.PlayExplosion(position: Vector3, radius: number?)
 	local actualRadius = radius or 9
+
+	-- Play voxel explosion burst (debris flying)
+	VFXUtils.ExplosionBurst(position)
 
 	-- Try asset-based VFX
 	local played = playVFXFromAsset(position, "Explosion", Color3.fromRGB(255, 150, 50))
@@ -163,6 +243,86 @@ function VFXService.PlayExplosion(position: Vector3, radius: number?)
 	if not played then
 		Logger.Debug("VFX", `Explosion fallback at {position}`)
 	end
+end
+
+--[[
+	💀 CRATER EXPLOSION - DoomShroom nuclear-style explosion
+	
+	ASSET-FIRST: Uses ReplicatedStorage/Assets/VFX/DoomShroom_Explosion
+	Contains: MushroomStem, MushroomCap, Shockwave, DebrisBurst, ToxicSparks,
+	          NuclearFlash, ToxicGlow, FlashBurst, LingeringCloud
+	
+	Procedural elements (geometric, hard to do in particles):
+	- Neon shockwave ring (expanding cylinder)
+	- Ground crater mark
+]]
+function VFXService.PlayCraterExplosion(position: Vector3, radius: number?)
+	local actualRadius = radius or 12
+
+	-- === ASSET-BASED VFX (primary) ===
+	local played = playVFXFromAssetWithDelay(position, "DoomShroom_Explosion")
+	
+	if not played then
+		-- Fallback: CraterBurst voxels + generic particles
+		VFXUtils.CraterBurst(position)
+		playVFXFromAsset(position, "Explosion", Color3.fromRGB(100, 50, 150))
+	end
+
+	-- === PROCEDURAL: Expanding shockwave ring (geometric) ===
+	local ring = Instance.new("Part")
+	ring.Name = "NukeShockwave"
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanTouch = false
+	ring.CastShadow = false
+	ring.Material = Enum.Material.Neon
+	ring.Color = Color3.fromRGB(150, 80, 200) -- Purple neon
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.5, 2, 2)
+	ring.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Transparency = 0.2
+	ring.Parent = _vfxFolder
+
+	local ringTween = TweenService:Create(ring, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.5, actualRadius * 3, actualRadius * 3),
+		Transparency = 1,
+	})
+	ringTween:Play()
+	Debris:AddItem(ring, 1)
+
+	-- === PROCEDURAL: Ground crater mark ===
+	local crater = Instance.new("Part")
+	crater.Name = "CraterMark"
+	crater.Anchored = true
+	crater.CanCollide = false
+	crater.CanTouch = false
+	crater.CastShadow = false
+	crater.Material = Enum.Material.Slate
+	crater.Color = Color3.fromRGB(20, 15, 25) -- Dark purple-charred
+	crater.Shape = Enum.PartType.Cylinder
+	crater.Size = Vector3.new(0.15, actualRadius * 2, actualRadius * 2)
+	crater.CFrame = CFrame.new(position + Vector3.new(0, 0.05, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	crater.Transparency = 0.4
+	crater.Parent = _vfxFolder
+
+	local craterTween = TweenService:Create(crater, TweenInfo.new(4, Enum.EasingStyle.Linear), {
+		Transparency = 1,
+	})
+	craterTween:Play()
+	Debris:AddItem(crater, 4.5)
+
+	-- Heavy screen shake for nuke
+	VFXService.ScreenShake(2.5, 0.8)
+	
+	Logger.Info("VFX", `DoomShroom nuke at {position} (asset={played})`)
+end
+
+--[[
+	❄️ ICE SHATTER - IceShroom or frozen entity breaking
+]]
+function VFXService.PlayIceShatter(position: Vector3)
+	VFXUtils.IceBurst(position)
+	playVFXFromAsset(position, "Ice_Shatter", Color3.fromRGB(180, 220, 255))
 end
 
 --[[
@@ -232,9 +392,13 @@ end
 
 --[[
 	🌱 PLANT PLACED - When plant is placed
-	ASSET-BASED: Looks for Assets/VFX/Plant_Placed
+	VOXEL-BASED: Dirt burst effect + Asset fallback
 ]]
 function VFXService.PlayPlantPlaced(position: Vector3)
+	-- Play voxel dirt burst (procedural)
+	VFXUtils.DirtBurst(position)
+	
+	-- Also play asset-based VFX if available (layered effect)
 	playVFXFromAsset(position, "Plant_Placed", Color3.fromRGB(120, 100, 60))
 end
 
@@ -395,6 +559,9 @@ function VFXService.PlayPlantDeath(model: Model?, position: Vector3)
 		local centerPos = AttachmentUtils.GetWorldPosition(model, AttachmentUtils.Names.Center, false)
 		position = centerPos
 	end
+
+	-- Play voxel plant burst (procedural debris)
+	VFXUtils.PlantBurst(position)
 
 	-- Try model-specific VFX first
 	if model then

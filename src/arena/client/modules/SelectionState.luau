@@ -28,6 +28,10 @@ SelectionState.Cooldowns = Fusion.Value(scope, {} :: { [string]: number })
 -- Player's sun count (synced from server)
 SelectionState.SunCount = Fusion.Value(scope, 50) -- Start with 50 sun
 
+-- Plant count tracking for HUD (synced locally on PlantSpawned/EntityDied)
+SelectionState.PlantCount = Fusion.Value(scope, 0) -- Current player's plant count
+SelectionState.PlantLimit = Fusion.Value(scope, 45) -- Dynamic limit based on player count
+
 --[[
 	Select a plant card
 	@param plantType string? - Plant type to select, nil to deselect
@@ -153,6 +157,41 @@ end
 ]]
 function SelectionState.SetSun(amount: number)
 	SelectionState.SunCount:set(amount)
+end
+
+--------------------------------------------------------------------------------
+-- PLANT COUNT TRACKING
+--------------------------------------------------------------------------------
+
+--[[
+	Increment plant count (called when local player places a plant)
+]]
+function SelectionState.IncrementPlantCount()
+	local current = Fusion.peek(SelectionState.PlantCount)
+	SelectionState.PlantCount:set(current + 1)
+end
+
+--[[
+	Decrement plant count (called when local player's plant dies/shoveled)
+]]
+function SelectionState.DecrementPlantCount()
+	local current = Fusion.peek(SelectionState.PlantCount)
+	SelectionState.PlantCount:set(math.max(0, current - 1))
+end
+
+--[[
+	Set plant limit based on player count
+	@param limit number - New plant limit (45 solo, 22 duo, etc.)
+]]
+function SelectionState.SetPlantLimit(limit: number)
+	SelectionState.PlantLimit:set(limit)
+end
+
+--[[
+	Reset plant count (for new game)
+]]
+function SelectionState.ResetPlantCount()
+	SelectionState.PlantCount:set(0)
 end
 
 return SelectionState

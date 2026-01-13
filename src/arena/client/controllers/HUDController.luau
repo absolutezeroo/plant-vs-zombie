@@ -40,6 +40,7 @@ local UI = Client:WaitForChild("ui")
 
 local Components = UI:WaitForChild("components")
 local SunCounter = require(Components.molecules.SunCounter)
+local PlantCounter = require(Components.molecules.PlantCounter)
 local CoinCounter = require(Components.molecules.CoinCounter)
 local SeedBank = require(Components.organisms.SeedBank)
 local WaveProgressBar = require(Components.molecules.WaveProgressBar)
@@ -179,6 +180,12 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 						LayoutOrder = 1,
 					}),
 
+					-- Plant Counter (after sun, before seedbank)
+					PlantCounter({
+						Scope = scope,
+						LayoutOrder = 2,
+					}),
+
 					-- Seed Bank (center)
 					SeedBank({
 						Scope = scope,
@@ -186,13 +193,13 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 						EquippedMutations = equippedMutations,
 						OnPlantSelect = onPlantSelect,
 						ZIndex = 5,
-						LayoutOrder = 2,
+						LayoutOrder = 3,
 					}),
 
 					-- Coin Counter (right)
 					CoinCounter({
 						Scope = scope,
-						LayoutOrder = 3,
+						LayoutOrder = 4,
 					}),
 				},
 			}),

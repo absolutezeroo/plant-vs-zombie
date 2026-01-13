@@ -526,6 +526,51 @@ local function OnStep(world: MatterWorld)
 
 						-- Check if zombie is within bite range of plant
 						if absDistance <= CONFIG.ZOMBIE_BITE_RANGE then
+							-- Check if zombie can vault over this plant (Pole Vaulter)
+							if stats.CanJump and not world:get(zombieId, Components.VaultedComponent) then
+								-- Check if plant blocks jumpers (TallNut, etc.)
+								local plantComp = world:get(plantId, Components.PlantTypeComponent)
+								local plantStats = if plantComp then PlantData[plantComp.PlantType] else nil
+								local blocksJumpers = plantStats and plantStats.BlocksJumpers
+								
+								if not blocksJumpers then
+									-- Vault over this plant!
+									-- Mark as vaulted (can only vault once)
+									world:insert(
+										zombieId,
+										Components.VaultedComponent({
+											VaultedAt = currentTime,
+										})
+									)
+									
+									-- Move zombie past the plant (jump distance = 2 cells)
+									local jumpDistance = CONFIG.ZOMBIE_BITE_RANGE * 3
+									local zombieDir = State.CachedZombieDir
+									world:insert(
+										zombieId,
+										Components.PositionComponent({
+											X = zombiePos.X + (zombieDir.X * jumpDistance),
+											Y = zombiePos.Y,
+											Z = zombiePos.Z,
+										})
+									)
+									
+									-- Continue moving (don't stop to eat)
+									world:insert(
+										zombieId,
+										Components.MovementComponent({
+											VelocityX = zombieDir.X * stats.Speed,
+											VelocityY = 0,
+											VelocityZ = zombieDir.Z * stats.Speed,
+										})
+									)
+									
+									-- Skip eating this plant
+									break
+								end
+								-- If blocked by TallNut, fall through to normal eating
+							end
+							
 							-- Start eating!
 							world:insert(
 								zombieId,

@@ -22,7 +22,8 @@ export type WaveBroadcaster = {
 		difficulty: string,
 		worldName: string,
 		difficultyName: string,
-		waveCount: number
+		waveCount: number,
+		playerCount: number
 	) -> (),
 	BroadcastWaveStarted: (self: WaveBroadcaster, waveNumber: number, zombieCount: number) -> (),
 	BroadcastWaveCompleted: (self: WaveBroadcaster, waveNumber: number, survived: boolean) -> (),
@@ -70,15 +71,17 @@ function WaveBroadcaster:BroadcastGameStarted(
 	difficulty: string,
 	worldName: string,
 	difficultyName: string,
-	waveCount: number
+	waveCount: number,
+	playerCount: number
 )
 	local Network = getNetwork()
 	Network.GameStarted.FireAll({
 		WorldId = worldId,
 		Difficulty = difficulty,
 		WaveCount = waveCount,
+		PlayerCount = playerCount,
 	})
-	Logger.Debug("WaveBroadcaster", `Game started: {worldName} | {difficultyName}`)
+	Logger.Debug("WaveBroadcaster", `Game started: {worldName} | {difficultyName} | {playerCount} players`)
 end
 
 -- Broadcast wave started

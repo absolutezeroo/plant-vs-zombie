@@ -53,6 +53,7 @@ return {
 	PlantTypeComponent = require(Units.PlantTypeComponent),
 	ShieldComponent = require(Units.ShieldComponent),
 	SleepingComponent = require(Units.SleepingComponent),
+	VaultedComponent = require(Units.VaultedComponent),
 	ZombieTypeComponent = require(Units.ZombieTypeComponent),
 
 	-- Economy components

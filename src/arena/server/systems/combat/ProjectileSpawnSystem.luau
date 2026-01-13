@@ -341,6 +341,90 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	end
 end
 
+-- Fire in all 8 directions for GloomShroom (ShootsAllDirections)
+-- GloomShroom is short-range (1 cell radius) and pierces shields
+local function fireAllDirections(world: any, plantId: number, lane: number, startX: number, plantType: string)
+	local stats = PlantData[plantType]
+	local damage = (stats and stats.Damage) or CONFIG.DAMAGE
+	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
+	local offsetX = if spawnOffset then spawnOffset.X else 0 -- GloomShroom spawns from center
+	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
+	local piercesShields = (stats and stats.PiercesShields) or false
+	local range = (stats and stats.Range) or 6 -- Default 1 cell radius (6 studs)
+
+	-- Spawn position (plant center)
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local plantZ = laneCenter.Z
+
+	-- 8 directions: N, NE, E, SE, S, SW, W, NW
+	-- dz: -1 = up (lower lane number), +1 = down (higher lane number)
+	-- dx: forward/backward depends on map orientation
+	local directions = {
+		{ dx = 1, dz = 0 }, -- E (forward toward zombies)
+		{ dx = -1, dz = 0 }, -- W (backward toward base)
+		{ dx = 0, dz = -1 }, -- N (up lane)
+		{ dx = 0, dz = 1 }, -- S (down lane)
+		{ dx = 1, dz = -1 }, -- NE
+		{ dx = 1, dz = 1 }, -- SE
+		{ dx = -1, dz = -1 }, -- NW
+		{ dx = -1, dz = 1 }, -- SW
+	}
+
+	for _, dir in directions do
+		-- Normalize direction
+		local mag = math.sqrt(dir.dx * dir.dx + dir.dz * dir.dz)
+		local normDx = dir.dx / mag
+		local normDz = dir.dz / mag
+
+		-- Calculate target lane for this direction
+		local targetLane = lane
+		if dir.dz < 0 and lane > 1 then
+			targetLane = lane - 1
+		elseif dir.dz > 0 and lane < GridConfig.GRID_LANES then
+			targetLane = lane + 1
+		end
+
+		local entityId = EntityPool.Spawn(
+			Components.PositionComponent({
+				X = startX + offsetX * normDx,
+				Y = offsetY,
+				Z = plantZ + offsetX * normDz,
+			}),
+			Components.ProjectileComponent({
+				Damage = damage,
+				Speed = CONFIG.SPEED,
+				SourceEntity = plantId,
+				Lane = targetLane,
+				SpawnX = startX,
+				SpawnZ = plantZ,
+				DirectionX = normDx,
+				DirectionZ = normDz,
+				MaxRange = range, -- Short range projectile
+				PiercesShields = piercesShields, -- Fume-shroom behavior
+			})
+		)
+
+		if not entityId then
+			continue
+		end
+
+		-- Get projectile variant from PlantData
+		local variant: string = (stats and stats.ProjectileVariant) or "Fume"
+
+		Network.ProjectileSpawned.FireAll({
+			EntityId = entityId,
+			Lane = lane :: any,
+			StartX = startX,
+			TargetEntityId = nil,
+			Variant = variant :: any,
+			IsFrozen = false,
+			IsEnhanced = false,
+			DirectionX = normDx,
+			DirectionZ = normDz,
+		})
+	end
+end
+
 --------------------------------------------------------------------------------
 -- [5] ONSTEP (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
@@ -399,8 +483,8 @@ local function OnStep(world)
 
 		-- Check if zombies in lane (or any lane for multi-direction)
 		local hasTargets = false
-		if stats.ShootsMultiDirection then
-			-- Starfruit: will check directions in fireMultiDirection
+		if stats.ShootsMultiDirection or stats.ShootsAllDirections then
+			-- Starfruit/GloomShroom: will check directions in fire function
 			-- Just need at least one zombie anywhere to attempt firing (O(1) check)
 			hasTargets = LaneCache.GetTotalCount() > 0
 		elseif stats.IsThreeLane then
@@ -431,24 +515,52 @@ local function OnStep(world)
 			local hasInRange = false
 			local zombieDir = State.CachedZombieDir
 
-			-- O(1) lane lookup instead of O(N) world:query
-			local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
+			-- For ShootsAllDirections (GloomShroom), check all nearby lanes
+			local lanesToCheck: { number }
+			if stats.ShootsAllDirections then
+				-- Check current lane and adjacent lanes (8-direction range check)
+				lanesToCheck = {}
+				for checkLane = math.max(1, plant.Lane - 1), math.min(GridConfig.GRID_LANES, plant.Lane + 1) do
+					table.insert(lanesToCheck, checkLane)
+				end
+			else
+				lanesToCheck = { plant.Lane }
+			end
 
-			for _, zombieId in zombiesInLane do
-				local zombiePos = LaneCache.GetPosition(zombieId)
-				if not zombiePos then
-					continue
+			for _, checkLane in lanesToCheck do
+				local zombiesInLane = LaneCache.GetEntitiesInLane(checkLane)
+
+				for _, zombieId in zombiesInLane do
+					local zombiePos = LaneCache.GetPosition(zombieId)
+					if not zombiePos then
+						continue
+					end
+
+					-- For ShootsAllDirections, use 2D distance (any direction)
+					-- For normal short-range, use forward distance only
+					local dx = zombiePos.X - pos.X
+					local dz = zombiePos.Z - pos.Z
+					local distance: number
+
+					if stats.ShootsAllDirections then
+						-- 2D distance for 8-direction plants
+						distance = math.sqrt(dx * dx + dz * dz)
+					else
+						-- Dot product with zombie direction (negative = in front of plant)
+						local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
+						distance = -dotProduct -- Distance in the "forward" direction
+						if distance <= 0 then
+							continue -- Skip zombies behind
+						end
+					end
+
+					if distance <= stats.Range then
+						hasInRange = true
+						break
+					end
 				end
 
-				-- Calculate distance in the direction zombies come from
-				local dx = zombiePos.X - pos.X
-				local dz = zombiePos.Z - pos.Z
-				-- Dot product with zombie direction (negative = in front of plant)
-				local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
-				local distance = -dotProduct -- Distance in the "forward" direction
-
-				if distance > 0 and distance <= stats.Range then
-					hasInRange = true
+				if hasInRange then
 					break
 				end
 			end
@@ -460,7 +572,10 @@ local function OnStep(world)
 		State.PlantFireTimes[plantId] = currentTime
 
 		-- Fire based on plant type behavior
-		if stats.ShootsMultiDirection then
+		if stats.ShootsAllDirections then
+			-- GloomShroom: 8 directions (short range, pierces shields)
+			fireAllDirections(world, plantId, plant.Lane, pos.X, plantType)
+		elseif stats.ShootsMultiDirection then
 			-- Starfruit: 5 directions
 			fireMultiDirection(world, plantId, plant.Lane, pos.X, plantType)
 		elseif stats.IsThreeLane then
