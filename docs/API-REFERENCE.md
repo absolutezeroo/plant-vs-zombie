@@ -1,8 +1,8 @@
 ---
 title: 'API Reference'
 project: 'plant-vs-zombie'
-date: '2026-01-12'
-version: '2.0'
+date: '2026-01-18'
+version: '2.2'
 purpose: 'Document all service APIs to prevent call mismatches'
 status: 'Post-Refactoring V2 - All services use isolated state pattern'
 ---
@@ -280,6 +280,45 @@ type SessionStats = {
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `Initialize(zapServer)` | `ZapServer` | `void` | Initialize with Zap |
+
+---
+
+## LightingService
+
+**Location:** `src/arena/server/services/LightingService.luau`
+
+Manages lighting presets per world theme with smooth transitions.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Initialize()` | - | `void` | Initialize service |
+| `ApplyPreset(presetName)` | `string` | `void` | Apply lighting preset ("Day", "Night", "Pool", "Fog", "Roof") |
+| `TransitionTo(presetName, duration?)` | `string, number?` | `void` | Smooth transition to preset (default 1s) |
+| `GetCurrentPreset()` | - | `string` | Get current lighting preset name |
+| `ResetToDefault()` | - | `void` | Reset to Day lighting |
+
+### Preset Types
+- `"Day"` - Bright outdoor lighting
+- `"Night"` - Dark with ambient lighting
+- `"Pool"` - Daylight with water reflections
+- `"Fog"` - Reduced visibility, atmospheric
+- `"Roof"` - Evening/sunset lighting
+
+---
+
+## MapService
+
+**Location:** `src/arena/server/services/MapService.luau`
+
+Handles dynamic map loading from ReplicatedStorage.Maps.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Initialize()` | - | `void` | Initialize service |
+| `LoadMap(mapId)` | `string` | `Model?` | Load and parent map to workspace |
+| `UnloadCurrentMap()` | - | `void` | Remove current map from workspace |
+| `GetCurrentMap()` | - | `Model?` | Get currently loaded map model |
+| `GetMapList()` | - | `{string}` | Get available map IDs |
 
 ---
 
@@ -641,8 +680,7 @@ model:PivotTo(cframe)
 ## Version History
 
 | Version | Date | Changes |
-|---------|------|---------|
-| 2.1 | 2026-01-12 | Operation Swarm Cleanup: Added complete GridService API documentation. System priority corrections. |
+|---------|------|---------|| 2.2 | 2026-01-18 | Added LightingService and MapService documentation. Updated to Argon toolchain. || 2.1 | 2026-01-12 | Operation Swarm Cleanup: Added complete GridService API documentation. System priority corrections. |
 | 2.0 | 2026-01-12 | Post-Refactoring V2 sync: Updated all service APIs to match isolated state pattern. WaveService now includes Preparation state, auto-start, and internal accessors. SunService includes ResetPlayer. MutationService includes LoadMutationsFromProfile. |
 | 1.2 | 2026-01-10 | Added ECS Services (WaveService, SunService, MutationService, PlantFoodService, StatsService) |
 | 1.1 | 2026-01-10 | Added ChanceUtils, ECSUtils, VFXUtils documentation |

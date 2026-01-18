@@ -1,9 +1,9 @@
 ---
 title: 'Game Architecture'
 project: 'plant-vs-zombie'
-date: '2026-01-12'
+date: '2026-01-18'
 author: 'Clayton'
-version: '2.0'
+version: '2.1'
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 status: 'Production (Content & VFX)'
 engine: 'Roblox'
@@ -20,7 +20,7 @@ brief: '_bmad-output/planning-artifacts/game-brief-plant-vs-zombie-2026-01-05.md
 
 ## Executive Summary
 
-**Roblox PvZ: Ultimate Warfare (ECS)** architecture is designed for Roblox targeting PC, Mobile-First, and Console platforms. The architecture delivers 100+ entities at 60 FPS through a pure Entity Component System powered by Matter 0.8.0+, with Zap 0.5.0+ networking, Fusion 0.3.0+ reactive UI, ProfileStore 1.0.0+ persistence, Promise 4.0.0+ async handling, Trove 1.8.0+ cleanup management, and Sift 0.0.11+ immutable table utilities.
+**Roblox PvZ: Ultimate Warfare (ECS)** architecture is designed for Roblox targeting PC, Mobile-First, and Console platforms. The architecture delivers 100+ entities at 60 FPS through a pure Entity Component System powered by Matter 0.8.5, with Zap 0.6.28 networking, Fusion 0.3.0 reactive UI, ProfileStore 1.0.3 persistence, Promise 4.0.0 async handling, Trove 1.8.0 cleanup management, and Sift 0.0.11 immutable table utilities.
 
 **Key Architectural Decisions:**
 
@@ -479,7 +479,7 @@ The project uses the "Pro Standard" Roblox stack—modern libraries that enable 
 #### Matter (ECS Framework)
 
 **Repository:** [matter-ecs/matter](https://github.com/matter-ecs/matter)  
-**Version:** 0.8.0+ (latest stable via Wally)  
+**Version:** 0.8.5 (via Wally)  
 **License:** MIT
 
 **Purpose:** Entity Component System architecture for gameplay simulation.
@@ -515,7 +515,7 @@ The project uses the "Pro Standard" Roblox stack—modern libraries that enable 
 #### Zap (Type-Safe Networking)
 
 **Repository:** [red-blox/zap](https://github.com/red-blox/zap)  
-**Version:** 0.5.0+ (latest stable via Wally)  
+**Version:** 0.6.28 (via Rokit)  
 **License:** MIT
 
 **Purpose:** IDL-based networking library for type-safe, efficient client-server communication.
@@ -693,16 +693,17 @@ return {
 
 **Argon (Filesystem Sync)**
 
-**Repository:** [rojo-rbx/rojo](https://github.com/rojo-rbx/rojo)  
-**Version:** 7.3.0+ (latest stable)  
+**Repository:** [argon-rbx/argon](https://github.com/argon-rbx/argon)  
+**Version:** Latest (via VS Code extension or standalone)  
 **License:** MPL-2.0
 
 **Purpose:** Sync local filesystem to Roblox Studio (enables VS Code workflow).
 
 **What Argon Provides:**
-- `default.project.json` configuration (maps folders to Roblox services)
-- Live sync (file changes reflect in Studio <2 seconds)
+- `*.project.json` configuration (maps folders to Roblox services)
+- Live two-way sync (file changes reflect in Studio instantly)
 - CLI build command (`argon build` outputs `.rbxl` file for CI/CD)
+- Multiple project support (arena.project.json, lobby.project.json)
 
 **Project Structure Mapping:**
 ```json
@@ -749,10 +750,14 @@ registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
 [dependencies]
-matter = "evaera/matter@0.8.0"
-zap = "red-blox/zap@0.5.0"
-fusion = "Elttob/fusion@0.2.0"
-profilestore = "MadStudioRoblox/ProfileStore@1.0.0"
+matter = "matter-ecs/matter@0.8.5"
+fusion = "elttob/fusion@0.3.0"
+profilestore = "vyon/profilestore@1.0.3"
+promise = "evaera/promise@4.0.0"
+trove = "sleitnick/trove@1.8.0"
+sift = "csqrl/sift@0.0.11"
+signal = "sleitnick/signal@2.0.3"
+cmdr = "evaera/cmdr@1.12.0"
 ```
 
 ---

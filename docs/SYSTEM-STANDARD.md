@@ -1,7 +1,7 @@
 # 📐 Standard Architecture: ECS System V2.0
 
-**Version:** 2.0 (Post-Refactoring Complete)
-**Date:** 2026-01-12
+**Version:** 2.1 (Documentation Update)
+**Date:** 2026-01-18
 **Scope:** All scripts in `src/arena/server/systems/` and `src/arena/client/systems/`
 **Goal:** Enforce structural uniformity, isolate state, and enable Hot-Reloading.
 **Status:** ✅ All systems refactored to V2 pattern.
@@ -124,7 +124,8 @@ SystemManager.Register(system, moduleScript.Name)
 | `StatsService` | Session statistics (zombies killed, coins, plants) |
 | `GridService` | Grid occupancy, cell validation |
 | `PlayerDataService` | Player profiles/persistence (ProfileStore) |
-| `MapLoader` | Map loading/unloading |
+| `MapService` | Dynamic map loading from ReplicatedStorage.Maps |
+| `LightingService` | Lighting presets per world theme, smooth transitions |
 
 ---
 

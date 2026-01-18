@@ -1,6 +1,25 @@
-# 🌻 ROADMAP - Garden Swarm - État d'Implémentation des Plantes
+# 🌻 ROADMAP - Garden Swarm - État d'Implémentation
 
-> Roadmap basée sur l'analyse complète de `PlantData.luau` (49 plantes) et des Systems existants
+> **Dernière mise à jour automatisée:** 18 Janvier 2026  
+> Basé sur l'analyse complète du codebase (`PlantData.luau`, Systems ECS, Services, UI)
+
+---
+
+## 🎯 ÉTAT GLOBAL DU PROJET
+
+### Vue d'Ensemble
+
+| Métrique | Valeur | Status |
+|----------|--------|--------|
+| **Phase Actuelle** | Phase 3 (Epic 6 - Polish) | 🟢 En cours |
+| **Architecture ECS** | Matter V2 Pattern | ✅ Complète |
+| **Systèmes Serveur Arena** | 27/27 | ✅ 100% |
+| **Systèmes Client Arena** | 7/7 | ✅ 100% |
+| **Services Arena** | 10/10 | ✅ 100% |
+| **Lobby Serveur** | 11/11 | ✅ 100% |
+| **Lobby Client** | 6/6 | ✅ 100% |
+| **Composants ECS** | 45 fichiers | ✅ 100% |
+| **Modules Partagés** | 92 fichiers | ✅ 99% |
 
 ---
 
@@ -200,28 +219,81 @@
 
 **Sprint 2 complété!**
 
-### 🚀 Sprint 3 : Features Avancées
+### 🚀 Sprint 3 : Features Avancées ❌ EN ATTENTE
 
-| Priorité | Feature                   | Complexité                        | Effort |
-|----------|---------------------------|-----------------------------------|--------|
-| P3       | **Cattail Homing**        | HomingProjectileSystem            | 6h     |
-| P3       | **CobCannon Manual Fire** | UI click + targeting              | 8h     |
-| P3       | **HypnoShroom**           | Retourner zombie = faction change | 6h     |
-| P3       | **Fog System**            | Visibilité + Plantern + Blover    | 8h     |
-| P3       | **Flying Zombies**        | CanHitFlying validation           | 6h     |
+| Priorité | Feature                   | Complexité                        | Effort | Status |
+|----------|---------------------------|-----------------------------------|--------|--------|
+| P3       | **Cattail Homing**        | HomingProjectileSystem            | 6h     | ❌ Non commencé |
+| P3       | **CobCannon Manual Fire** | UI click + targeting              | 8h     | ❌ Non commencé |
+| P3       | **HypnoShroom**           | Retourner zombie = faction change | 6h     | ❌ Non commencé |
+| P3       | **Fog System**            | Visibilité + Plantern + Blover    | 8h     | ✅ **Implémenté** (FogSystem.luau + FogController.luau) |
+| P3       | **Flying Zombies**        | CanHitFlying validation           | 6h     | ⚠️ Flag existe, zombies manquants |
 
-**Effort total Sprint 3:** ~34h
+**Effort restant Sprint 3:** ~20h (Fog fait, reste homing + cobcannon + hypno)
 
-### 🏆 Sprint 4 : Cosmétiques & Polish
+### 🏆 Sprint 4 : Cosmétiques & Polish ❌ EN ATTENTE
 
-| Priorité | Feature                     | Type                       | Effort |
-|----------|-----------------------------|----------------------------|--------|
-| P4       | **Imitater Clone**          | UI + spawn duplicate       | 6h     |
-| P4       | **GraveBuster + Graves**    | Night level mechanics      | 8h     |
-| P4       | **UmbrellaLeaf Deflect**    | Catapult zombie protection | 4h     |
-| P4       | **GoldMagnet Auto-collect** | Coin attraction range      | 3h     |
+| Priorité | Feature                     | Type                       | Effort | Status |
+|----------|-----------------------------|----------------------------|--------|--------|
+| P4       | **Imitater Clone**          | UI + spawn duplicate       | 6h     | ❌ Non commencé |
+| P4       | **GraveBuster + Graves**    | Night level mechanics      | 8h     | ❌ Non commencé |
+| P4       | **UmbrellaLeaf Deflect**    | Catapult zombie protection | 4h     | ❌ Non commencé |
+| P4       | **GoldMagnet Auto-collect** | Coin attraction range      | 3h     | ❌ Non commencé |
 
 **Effort total Sprint 4:** ~21h
+
+---
+
+## 🏗️ ARCHITECTURE SYSTÈME (COMPLÈTE)
+
+### Systèmes Serveur Arena (27 fichiers - V2 Pattern)
+
+| Catégorie | Systèmes | Status |
+|-----------|----------|--------|
+| **Combat** (8) | BossSystem, CombatSystem, EnhancementSystem, PlantFoodSystem, ProjectileMovementSystem, ProjectileSpawnSystem, SpecialPlantSystem, TrapSystem | ✅ 100% |
+| **Core** (5) | EventCleanupSystem, FullSyncSystem, PerformanceSystem, SafeEntityCapSystem, LaneCacheSystem | ✅ 100% |
+| **Economy** (4) | CoinProductionSystem, SunCollectionSystem, SunflowerProductionSystem, SunSpawnSystem | ✅ 100% |
+| **Environment** (1) | FogSystem | ✅ 100% |
+| **Mutations** (8) | BurnDamageSystem, ChainLightningSystem, FreezeSystem, LifestealSystem, MutationApplySystem, PoisonCloudSystem, SplashDamageSystem, SolarKillSystem | ✅ 100% |
+| **Units** (4) | EntityDeathSystem, MushroomSystem, PlacementSystem, ZombieMovementSystem | ✅ 100% |
+| **Wave** (1) | WaveLoopSystem | ✅ 100% |
+
+### Services Arena (10 fichiers)
+
+| Service | Rôle | Status |
+|---------|------|--------|
+| ArenaService | Lifecycle battle, config monde/difficulté | ✅ |
+| GridService | Occupancy tracking, plant limits | ✅ |
+| LightingService | Presets éclairage par monde | ✅ |
+| MapService | Chargement dynamique maps | ✅ |
+| MutationService | Cache mutations joueur | ✅ |
+| PlantFoodService | Charges Plant Food (0-3) | ✅ |
+| PlayerDataService | Persistence ProfileStore | ✅ |
+| StatsService | Statistiques session | ✅ |
+| SunService | Économie soleil joueur | ✅ |
+| WaveService | État vagues, orchestration | ✅ |
+
+### Systèmes Client Arena (7 fichiers)
+
+| Système | Priorité | Status |
+|---------|----------|--------|
+| PlacementPreviewSystem | 50 | ✅ Ghost preview, validation visuelle |
+| EffectsSystem | 350 | ✅ VFX/Audio, music dynamique |
+| GridRenderingSystem | 350 | ✅ Debug grid |
+| SunRenderingSystem | 400 | ✅ Collection optimiste |
+| PlantRenderingSystem | 405 | ✅ Modèles, animations |
+| ZombieRenderingSystem | 410 | ✅ Interpolation, fog visibility |
+| ProjectileRenderingSystem | 420 | ✅ Trails, impacts |
+
+### Lobby Implémentation
+
+| Catégorie | Fichiers | Status |
+|-----------|----------|--------|
+| **Services Serveur** | LobbyService, PlayerDataService | ✅ 100% |
+| **Managers Serveur** | 6 managers (Countdown, Broadcaster, Queue, Touch, Lock, Teleport) | ✅ 100% |
+| **Handlers Serveur** | MutationHandler, PadConfigReader, ShopHandler | ✅ 100% |
+| **Controllers Client** | 6 controllers (HUD, Pad, Zone, Tooltip, Visibility, DeckBuilder) | ✅ 100% |
+| **UI Organisms** | 7 écrans (Lobby, Profile, Shop, Deck, Mutation, Unlocks, SeedBank) | ✅ 100% |
 
 ---
 
@@ -239,13 +311,79 @@
 
 ## 🎯 PROCHAINES ÉTAPES RECOMMANDÉES
 
-1. **Valider les plantes MVP** - Tester Sunflower, Peashooter, WallNut, PotatoMine, CherryBomb, Repeater, SnowPea
-2. **Compléter Sprint 1** - Quick wins pour passer de 50% à 65% d'implémentation
-3. **Ajouter ZombieData** - Balancer les plantes en fonction des zombies
-4. **PlantFood polish** - Tester toutes les abilities dans PlantFoodData.luau
-5. **VFX par plante** - Particules, sons, animations client
+### 🔴 Haute Priorité (Sprint 3)
+
+1. **Cattail Homing Projectiles** (~6h)
+   - Créer `HomingProjectileComponent` (existe déjà!)
+   - Implémenter logique homing dans `ProjectileMovementSystem`
+   - Target: zombie le plus proche cross-lane
+
+2. **CobCannon Manual Fire** (~8h)
+   - UI: Click-to-fire targeting overlay
+   - Network: `CobCannonFireRequest` event (déjà dans packets.zap!)
+   - Server: Spawn projectile at target position
+
+3. **HypnoShroom** (~6h)
+   - `HypnotizedComponent` (existe!)
+   - Toggle faction dans `ZombieMovementSystem`
+   - VFX: Swirl eyes indicator
+
+### 🟡 Moyenne Priorité (Sprint 4)
+
+4. **Flying Zombies** (~6h)
+   - `CanHitFlying` flag déjà dans ProjectileComponent
+   - Créer `FlyingZombie` dans ZombieData
+   - Modifier CombatSystem pour hit detection aérienne
+
+5. **Imitater Clone** (~6h)
+   - UI selection du plant à imiter
+   - Spawn duplicate avec visuals différents
+   - Cooldown séparé
+
+### 🟢 Basse Priorité (Polish)
+
+6. **GraveBuster + Graves** - Night levels
+7. **UmbrellaLeaf Deflect** - Catapult protection
+8. **GoldMagnet Auto-collect** - Coin attraction
 
 ---
 
-> **Dernière mise à jour:** Janvier 2026
-> **Source:** Analyse de `src/shared/data/PlantData.luau` + Systems ECS
+## 📈 EPICS & MILESTONES (Timeline 20 Semaines)
+
+| Phase | Epic | Semaines | Status |
+|-------|------|----------|--------|
+| **Phase 1** | Epic 1: ECS Skeleton | 1-2 | ✅ Complète |
+| **Phase 1** | Epic 2: Grid & Deployment | 3-4 | ✅ Complète |
+| **Phase 2** | Epic 3: Swarm Engine | 5-7 | ✅ Complète |
+| **Phase 2** | Epic 4: The Arsenal | 8-10 | ✅ Complète |
+| **Phase 3** | Epic 5: Progression Loop | 11-13 | ✅ Complète |
+| **Phase 3** | Epic 6: "Juice" Injection | 14-16 | 🟡 En cours (VFX/Audio polish) |
+| **Phase 4** | Epic 7: Monetization & Analytics | 17-18 | ❌ Non commencé |
+| **Phase 4** | Epic 8: QA & Optimization | 19-20 | ❌ Non commencé |
+
+### Post-Launch Roadmap
+
+| Version | Contenu | Status |
+|---------|---------|--------|
+| V1.5 | Hard/Nightmare, Daily Challenges, Plant Mastery | ❌ Planifié |
+| V2.0 | Worlds 2-4, Endless Mode, +20 zombies, +12 plants | ❌ Planifié |
+| V2.5 | PvP Arena, Coop Mode (2-4 players) | ❌ Planifié |
+| V3.0 | Roguelite Mode, Trading, Housing | ❌ Planifié |
+
+---
+
+## 📊 MÉTRIQUES TECHNIQUES
+
+| Métrique | Cible | Actuel |
+|----------|-------|--------|
+| Entity Cap | 200 | ✅ SafeEntityCapSystem |
+| FPS Target | 60 | ✅ 60 ticks/sec ECS |
+| Bandwidth | <50 KB/s | ✅ Zap optimisé |
+| LaneCache | O(1) | ✅ Implémenté |
+| Strict Typing | 100% | ✅ `--!strict` partout |
+
+---
+
+> **Dernière mise à jour:** 18 Janvier 2026  
+> **Source:** Analyse automatisée du codebase complet  
+> **Prochaine review:** Fin Sprint 3

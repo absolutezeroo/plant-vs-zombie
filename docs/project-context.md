@@ -1,7 +1,7 @@
 ---
 project_name: 'plant-vs-zombie'
 user_name: 'Clayton'
-date: '2026-01-12'
+date: '2026-01-18'
 game_engine: 'Roblox'
 architecture_doc: '_bmad-output/game-architecture.md'
 status: 'Production (Content & VFX)'
@@ -22,30 +22,34 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 - Roblox (Luau with `--!strict` type checking REQUIRED on all files)
 
 **Core Framework Stack:**
-- **Matter** v0.8.0+ — ECS framework (archetype-based component storage)
-- **Zap** v0.5.0+ — Type-safe networking with IDL schema
-- **Fusion** v0.3.0+ — Reactive UI framework (Value, Computed, Scope pattern)
-- **ProfileStore** v1.0.0+ — Session-locked DataStore wrapper
-- **Promise** v4.0.0+ — Async/await for Luau (data loading, teleports)
-- **Trove** v1.8.0+ — Connection/instance cleanup manager
-- **Sift** v0.0.11+ — Immutable table utilities (required by Matter)
-- **Signal** v2.0.3+ — Custom event emitter (UI/Manager communication)
-- **Cmdr** v1.12.0+ — Developer console & command framework (replaces custom debug console)
+- **Matter** v0.8.5 — ECS framework (archetype-based component storage)
+- **Zap** v0.6.28 — Type-safe networking with IDL schema
+- **Fusion** v0.3.0 — Reactive UI framework (Value, Computed, Scope pattern)
+- **ProfileStore** v1.0.3 — Session-locked DataStore wrapper
+- **Promise** v4.0.0 — Async/await for Luau (data loading, teleports)
+- **Trove** v1.8.0 — Connection/instance cleanup manager
+- **Sift** v0.0.11 — Immutable table utilities (required by Matter)
+- **Signal** v2.0.3 — Custom event emitter (UI/Manager communication)
+- **Cmdr** v1.12.0 — Developer console & command framework (replaces custom debug console)
 
 **Development Toolchain:**
-- **Rojo** v7.4.0+ — Filesystem-to-Studio sync
-- **Wally** v0.3.2+ — Package manager
-- **Rokit** v0.1.0+ — Toolchain manager
-- **Selene** — Luau linter (MANDATORY)
+- **Argon** — Filesystem-to-Studio sync (replaces Rojo)
+- **Wally** v0.3.2 — Package manager
+- **Rokit** — Toolchain manager
+- **Selene** v0.29.0 — Luau linter (MANDATORY)
+- **StyLua** v2.3.1 — Code formatter
+- **darklua** v0.17.3 — Code transformation
+- **luau-lsp** v1.60.1 — Language server
 
 **Linting Rule (MANDATORY):**
 - Run `selene src/` before every commit
 - Fix ALL warnings and errors before testing or committing
 - Do not ignore selene diagnostics — they catch syntax errors, unused variables, and shadowing
 
-**Critical Version Constraints:
-- Matter 0.8.0+ required for archetype storage performance
-- Zap 0.5.0+ required for Vector3 quantization support
+**Critical Version Constraints:**
+- Matter 0.8.5 required for archetype storage performance
+- Zap 0.6.x required for Vector3 quantization support and latest features
+- Fusion 0.3.x required (NOT 0.2 - different API)
 - All libraries MUST support Luau `--!strict` mode
 
 ---
@@ -482,17 +486,20 @@ src/
 
 ### File Location Rules (Non-Negotiable)
 
-- **Server-Only Code:** `src/server/` — authority validation, ProfileStore operations, wave generation
-- **Client-Only Code:** `src/client/` — input handling, VFX/Audio, UI rendering, prediction
-- **Shared Code:** `src/shared/` — ONLY components (pure data), config modules, utilities, type definitions
+- **Arena Server:** `src/arena/server/` — gameplay authority, ECS systems, wave generation
+- **Arena Client:** `src/arena/client/` — rendering, VFX/Audio, input handling, prediction
+- **Lobby Server:** `src/lobby/server/` — teleport pads, player data, shop
+- **Lobby Client:** `src/lobby/client/` — lobby UI, deck builder, profile
+- **Shared Code:** `src/shared/` — components (pure data), config, data, utils, network
 - **Argon Mapping:** Server → ServerScriptService, Client → StarterPlayerScripts, Shared → ReplicatedStorage
 
 ### System Location Rules
 
-- All server systems: `src/server/systems/SystemName.lua`
-- All client systems: `src/client/systems/SystemName.lua`
-- Singleton services: `src/server/services/ServiceName.lua`
-- UI controllers: `src/client/controllers/ControllerName.lua`
+- Arena server systems: `src/arena/server/systems/{domain}/SystemName.luau`
+- Arena client systems: `src/arena/client/systems/{domain}/SystemName.luau`
+- Arena services: `src/arena/server/services/ServiceName.luau`
+- Lobby services: `src/lobby/server/services/ServiceName.luau`
+- UI controllers: `src/{arena|lobby}/client/controllers/ControllerName.luau`
 
 ### File Naming Conventions (Strict)
 

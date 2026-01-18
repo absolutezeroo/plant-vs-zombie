@@ -6,6 +6,10 @@
 	Contains position and value data for rendering.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Matter = require(Packages:WaitForChild("Matter"))
+
 export type CoinComponent = {
 	Value: number, -- Coin value
 	SpawnTime: number, -- When coin was spawned
@@ -15,4 +19,4 @@ export type CoinComponent = {
 	TargetPlayerId: number, -- Player who killed the zombie (gets the coins)
 }
 
-return "CoinComponent"
+return Matter.component("Coin")
