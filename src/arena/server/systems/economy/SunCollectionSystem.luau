@@ -88,11 +88,7 @@ local function processCollection(world: any, player: Player, entityId: number): 
 	local value = sun.Value
 
 	-- Release sun back to pool
-	if EntityPool.IsPooledEntity(entityId) then
-		EntityPool.Despawn(entityId)
-	else
-		world:despawn(entityId)
-	end
+	EntityPool.SafeDespawn(entityId, world)
 
 	Logger.Debug("SunCollection", `{player.Name} collected sun {entityId} worth {value}`)
 

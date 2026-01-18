@@ -56,11 +56,128 @@ local function Dispose()
 	table.clear(State.GarlicBites)
 end
 
+-- Helper: Divert zombie to adjacent lane
+local function divertZombie(world, zombieId: number, zombie: any, zombiePos: any)
+	local currentLane = zombie.Lane
+	
+	-- Choose direction: prefer away from center (more dramatic), fallback to random
+	local newLane: number
+	if currentLane <= 2 then
+		newLane = currentLane + 1 -- Move down
+	elseif currentLane >= 4 then
+		newLane = currentLane - 1 -- Move up
+	else
+		-- Center lane: random direction
+		newLane = if ChanceUtils.Roll(0.5) then currentLane + 1 else currentLane - 1
+	end
+	
+	-- Clamp to valid lanes (1-5)
+	newLane = math.clamp(newLane, 1, GridConfig.GRID_LANES)
+	
+	-- Calculate new Z position for the new lane
+	local laneOffset = (newLane - currentLane) * GridConfig.CELL_SIZE
+	local newZ = zombiePos.Z + laneOffset
+	
+	-- Update zombie lane and position
+	world:insert(zombieId, Components.ZombieTypeComponent({
+		ZombieType = zombie.ZombieType,
+		Lane = newLane,
+	}))
+	
+	world:insert(zombieId, Components.PositionComponent({
+		X = zombiePos.X,
+		Y = zombiePos.Y,
+		Z = newZ,
+	}))
+	
+	-- Remove target so zombie resumes moving
+	if world:get(zombieId, Components.TargetComponent) then
+		world:remove(zombieId, Components.TargetComponent)
+	end
+	
+	-- Resume movement
+	local stats = ZombieData[zombie.ZombieType]
+	if stats then
+		local direction = MapConfig.GetZombieDirection()
+		world:insert(zombieId, Components.MovementComponent({
+			VelocityX = direction.X * stats.Speed,
+			VelocityY = 0,
+			VelocityZ = direction.Z * stats.Speed,
+		}))
+	end
+	
+	-- Broadcast lane change to clients
+	Network.ZombieDiverted.FireAll({
+		EntityId = zombieId,
+		NewLane = newLane,
+		NewZ = newZ,
+	})
+end
+
 -- 6. MAIN LOOP
 local function OnStep(world)
 	local currentTime = os.clock()
+	
+	-- ==============================================
+	-- Process Garlic diversion
+	-- ==============================================
+	-- Check zombies that are currently eating a Garlic
+	for zombieId, target in world:query(Components.TargetComponent) do
+		if not world:contains(target.TargetEntity) then
+			continue
+		end
+		
+		local plant = world:get(target.TargetEntity, Components.PlantTypeComponent)
+		if not plant then
+			continue
+		end
+		
+		local plantStats = PlantData[plant.PlantType]
+		if not plantStats or not plantStats.DivertsZombies then
+			continue
+		end
+		
+		local zombie = world:get(zombieId, Components.ZombieTypeComponent)
+		local zombiePos = world:get(zombieId, Components.PositionComponent)
+		if not zombie or not zombiePos then
+			continue
+		end
+		
+		-- Key for tracking bites on this specific garlic
+		local key = `{target.TargetEntity}_{zombieId}`
+		
+		-- Initialize bite count on first encounter
+		if not State.GarlicBites[key] then
+			State.GarlicBites[key] = 0
+		end
+		
+		-- Check if zombie just bit the garlic (using attack timer from this frame)
+		-- We increment on each frame the zombie is eating (CombatSystem handles actual damage)
+		-- But we only want to count ACTUAL bites, not frames
+		-- So we track last check time
+		local lastBiteCheck = State.TrapDamageTimes[`garlic_{key}`] or 0
+		local zombieStats = ZombieData[zombie.ZombieType]
+		local attackSpeed = if zombieStats then zombieStats.AttackSpeed else 1.0
+		
+		if currentTime - lastBiteCheck >= attackSpeed then
+			State.GarlicBites[key] = State.GarlicBites[key] + 1
+			State.TrapDamageTimes[`garlic_{key}`] = currentTime
+			
+			-- Check if threshold reached
+			if State.GarlicBites[key] >= CONFIG.GARLIC_BITE_THRESHOLD then
+				-- Divert zombie to adjacent lane!
+				divertZombie(world, zombieId, zombie, zombiePos)
+				
+				-- Clear bite counter (zombie is gone)
+				State.GarlicBites[key] = nil
+				State.TrapDamageTimes[`garlic_{key}`] = nil
+			end
+		end
+	end
 
+	-- ==============================================
 	-- Process traps (Spikeweed)
+	-- ==============================================
 	for trapId, trapPos, trap in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		local stats = PlantData[trap.PlantType]
 		if not stats or not stats.IsTrap or not stats.DamagesOnWalk then
@@ -151,10 +268,6 @@ local function OnStep(world)
 		end
 	end
 end
-
--- TODO: Garlic diversion - implement via ChewingComponent query when zombie bites Garlic
--- Should detect when zombie with ChewingComponent.TargetId == garlicId finishes eating
--- Then divert zombie to adjacent lane after GARLIC_BITE_THRESHOLD bites
 
 -- 7. EXPORT
 return {

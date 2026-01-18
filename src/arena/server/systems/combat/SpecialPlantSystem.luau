@@ -32,11 +32,13 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local EntityPool = require(Shared.utils.EntityPool)
 local ECSUtils = require(Shared.utils.ECSUtils)
+local NetworkUtils = require(Shared.utils.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -69,6 +71,10 @@ local CONFIG = table.freeze({
 
 	-- Freeze defaults
 	FREEZE_DURATION = 4,
+
+	-- CobCannon defaults
+	COB_COOLDOWN = 30, -- Seconds between shots
+	COB_FLIGHT_TIME = 1.5, -- Time for corn cob to reach target
 })
 
 -- ============================================================
@@ -79,6 +85,10 @@ local State = {
 	FusePlants = {} :: { [number]: { explodeTime: number, plantType: string } },
 	-- Track Squash jumping state
 	SquashJumps = {} :: { [number]: { targetX: number, targetZ: number, startTime: number, startX: number, startZ: number } },
+	-- Track CobCannon cooldowns
+	CobCooldowns = {} :: { [number]: number }, -- entityId -> nextFireTime
+	-- Track pending CobCannon explosions
+	PendingCobExplosions = {} :: { [number]: { impactTime: number, targetX: number, targetZ: number, damage: number, splashRadius: number } },
 }
 
 -- ============================================================
@@ -210,16 +220,54 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	end
 
 	-- Broadcast entity death
-	Network.EntityDied.FireAll({
-		EntityId = entityId,
-	})
+	NetworkUtils.BroadcastEntityDied(entityId)
 
 	-- Release plant back to pool
-	if EntityPool.IsPooledEntity(entityId) then
-		EntityPool.Despawn(entityId)
-	else
-		world:despawn(entityId)
+	EntityPool.SafeDespawn(entityId, world)
+end
+
+-- Handle CobCannon explosion at target location
+local function handleCobExplosion(world: any, explosionId: number, targetX: number, targetZ: number, damage: number, splashRadius: number)
+	local killCount = 0
+
+	-- Find zombies in splash radius across nearby lanes
+	local targetLane = math.floor((targetZ / GridConfig.CELL_SIZE) + 0.5) -- Approximate lane
+	targetLane = math.clamp(targetLane, 1, GridConfig.GRID_LANES)
+	local laneRadius = math.ceil(splashRadius / GridConfig.CELL_SIZE)
+
+	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(targetLane, laneRadius)
+
+	for _, zombieId in zombiesInRange do
+		local zombiePos = LaneCache.GetPosition(zombieId)
+		if not zombiePos then
+			continue
+		end
+
+		local dx = zombiePos.X - targetX
+		local dz = zombiePos.Z - targetZ
+		local distance = math.sqrt(dx * dx + dz * dz)
+
+		if distance <= splashRadius then
+			-- CobCannon deals massive damage but might not instant-kill
+			local _, isDead = ECSUtils.DamageEntity(world, zombieId, damage, Components)
+			if isDead then
+				killCount += 1
+			end
+		end
 	end
+
+	Logger.Info("SpecialPlant", `CobCannon explosion at ({targetX}, {targetZ}) killed {killCount} zombies`)
+
+	-- Broadcast explosion VFX
+	Network.ExplosionVFX.FireAll({
+		PositionX = targetX,
+		PositionY = 1,
+		PositionZ = targetZ,
+		Radius = splashRadius,
+	})
+
+	-- Clean up pending explosion
+	State.PendingCobExplosions[explosionId] = nil
 end
 
 -- Explode PotatoMine: kill the triggering zombie
@@ -244,16 +292,10 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 	})
 
 	-- Broadcast entity death
-	Network.EntityDied.FireAll({
-		EntityId = mineId,
-	})
+	NetworkUtils.BroadcastEntityDied(mineId)
 
 	-- Release mine back to pool
-	if EntityPool.IsPooledEntity(mineId) then
-		EntityPool.Despawn(mineId)
-	else
-		world:despawn(mineId)
-	end
+	EntityPool.SafeDespawn(mineId, world)
 end
 
 -- Find nearest zombie in range for Chomper/Squash
@@ -291,6 +333,27 @@ end
 local function OnStep(world)
 	local currentTime = os.clock()
 
+	-- Process pending CobCannon explosions
+	for explosionId, explosion in State.PendingCobExplosions do
+		if currentTime >= explosion.impactTime then
+			handleCobExplosion(
+				world,
+				explosionId,
+				explosion.targetX,
+				explosion.targetZ,
+				explosion.damage,
+				explosion.splashRadius
+			)
+		end
+	end
+
+	-- Clean up CobCannon cooldowns for despawned entities
+	for entityId in State.CobCooldowns do
+		if not world:contains(entityId) then
+			State.CobCooldowns[entityId] = nil
+		end
+	end
+
 	-- React to SpawnEvent for new special plants
 	for _, event in world:query(Components.SpawnEvent) do
 		if event.EntityType ~= "Plant" then
@@ -320,6 +383,36 @@ local function OnStep(world)
 				plantType = plant.PlantType,
 			}
 			Logger.Debug("SpecialPlant", `{plant.PlantType} {entityId} fuse started ({fuseTime}s)`)
+		elseif stats.IsInstant and stats.RemovesFlying then
+			-- Blover: Instantly kill all flying zombies
+			local killCount = 0
+			local allZombies = LaneCache.GetAllZombies()
+			local ZombieData = require(Shared.data.ZombieData)
+			
+			for _, zombieId in allZombies do
+				if not world:contains(zombieId) then
+					continue
+				end
+				
+				local zombie = world:get(zombieId, Components.ZombieTypeComponent)
+				if not zombie then
+					continue
+				end
+				
+				local zombieStats = ZombieData[zombie.ZombieType]
+				if zombieStats and zombieStats.IsFlying then
+					if ECSUtils.KillEntity(world, zombieId, Components) then
+						killCount += 1
+					end
+				end
+			end
+			
+			Logger.Info("SpecialPlant", `Blover {entityId} blew away {killCount} flying zombies!`)
+			
+			-- Blover disappears after use
+			GridService.Clear(plant.Column, plant.Lane)
+			NetworkUtils.BroadcastEntityDied(entityId)
+			EntityPool.SafeDespawn(entityId, world)
 		elseif stats.NeedsArming then
 			local armDuration = stats.ArmDuration or CONFIG.ARM_DURATION
 			world:insert(
@@ -439,9 +532,7 @@ local function OnStep(world)
 
 			Logger.Info("SpecialPlant", `Chomper {plantId} ate zombie {zombieId}, chewing for {chewDuration}s`)
 
-			Network.EntityDied.FireAll({
-				EntityId = zombieId,
-			})
+			NetworkUtils.BroadcastEntityDied(zombieId)
 		end
 	end
 
@@ -475,20 +566,16 @@ local function OnStep(world)
 					if dx < 3 and dz < 3 then
 						if ECSUtils.KillEntity(world, zombieId, Components) then
 							Logger.Info("SpecialPlant", `Squash {plantId} squashed zombie {zombieId}`)
-							Network.EntityDied.FireAll({ EntityId = zombieId })
-						end
+							NetworkUtils.BroadcastEntityDied(zombieId)
+							end
 						break
 					end
 				end
 
 				-- Squash dies after landing
 				GridService.Clear(plant.Column, plant.Lane)
-				Network.EntityDied.FireAll({ EntityId = plantId })
-				if EntityPool.IsPooledEntity(plantId) then
-					EntityPool.Despawn(plantId)
-				else
-					world:despawn(plantId)
-				end
+				NetworkUtils.BroadcastEntityDied(plantId)
+				EntityPool.SafeDespawn(plantId, world)
 			end
 			State.SquashJumps[plantId] = nil
 		else
@@ -546,13 +633,84 @@ end
 -- ============================================================
 -- SECTION 6: INIT / DISPOSE
 -- ============================================================
-local function Init(_world)
+
+-- Store world reference for network handlers
+local _world: any = nil
+
+local function Init(world)
+	_world = world
+	
+	-- Listen for CobCannon fire requests
+	Network.CobCannonFireRequest.SetCallback(function(player: Player, data)
+		local plantId = data.PlantEntityId
+		local targetLane = data.TargetLane
+		local targetColumn = data.TargetColumn
+
+		-- Validate plant exists and is a CobCannon
+		if not _world:contains(plantId) then
+			Logger.Warn("SpecialPlant", `CobCannon fire failed: plant {plantId} not found`)
+			return
+		end
+
+		local plant = _world:get(plantId, Components.PlantTypeComponent)
+		if not plant or plant.PlantType ~= "CobCannon" then
+			Logger.Warn("SpecialPlant", `CobCannon fire failed: entity {plantId} is not a CobCannon`)
+			return
+		end
+
+		-- Check cooldown
+		local currentTime = os.clock()
+		local nextFireTime = State.CobCooldowns[plantId] or 0
+		if currentTime < nextFireTime then
+			Logger.Debug("SpecialPlant", `CobCannon {plantId} on cooldown, {nextFireTime - currentTime}s remaining`)
+			return
+		end
+
+		-- Get target world position
+		local targetPos = MapConfig.GridToWorld(targetColumn, targetLane)
+		local targetX = targetPos.X
+		local targetZ = targetPos.Z
+
+		-- Get stats
+		local stats = PlantData.CobCannon
+		local damage = stats.Damage or 1800
+		local splashRadius = stats.SplashRadius or 9
+		local cooldown = stats.Cooldown or CONFIG.COB_COOLDOWN
+		local flightTime = CONFIG.COB_FLIGHT_TIME
+
+		-- Set cooldown
+		State.CobCooldowns[plantId] = currentTime + cooldown
+
+		-- Schedule explosion
+		local explosionId = plantId * 1000 + currentTime -- Unique ID
+		State.PendingCobExplosions[explosionId] = {
+			impactTime = currentTime + flightTime,
+			targetX = targetX,
+			targetZ = targetZ,
+			damage = damage,
+			splashRadius = splashRadius,
+		}
+
+		-- Broadcast to clients for VFX
+		Network.CobCannonFired.FireAll({
+			PlantEntityId = plantId,
+			TargetX = targetX,
+			TargetZ = targetZ,
+			ImpactTime = flightTime,
+		})
+
+		Logger.Info("SpecialPlant", `Player {player.Name} fired CobCannon {plantId} at ({targetColumn}, {targetLane})`)
+	end)
+	
 	Logger.Debug("SpecialPlantSystem", "Initialized")
 end
 
 local function Dispose()
 	table.clear(State.FusePlants)
 	table.clear(State.SquashJumps)
+	table.clear(State.CobCooldowns)
+	table.clear(State.PendingCobExplosions)
+	_world = nil
 	Logger.Debug("SpecialPlantSystem", "Disposed")
 end
 

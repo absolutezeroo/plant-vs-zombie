@@ -120,6 +120,32 @@ function EntityPool.IsPooledEntity(entityId: number): boolean
 end
 
 --[[
+	Safe despawn - works for both pooled and non-pooled entities
+	
+	Consolidates the common pattern:
+	  if EntityPool.IsPooledEntity(id) then EntityPool.Despawn(id) else world:despawn(id) end
+	
+	@param entityId - Entity to despawn
+	@param world - Optional world instance (uses cached world if not provided)
+]]
+function EntityPool.SafeDespawn(entityId: number, world: any?)
+	if not entityId then
+		return
+	end
+	
+	if _trackedEntities[entityId] then
+		-- Pooled entity
+		EntityPool.Despawn(entityId)
+	else
+		-- Non-pooled entity
+		local w = world or _world
+		if w and w:contains(entityId) then
+			w:despawn(entityId)
+		end
+	end
+end
+
+--[[
 	Legacy: Acquire (prefer Spawn)
 ]]
 function EntityPool.Acquire(): number?

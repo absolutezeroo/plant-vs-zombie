@@ -28,6 +28,13 @@
       }
     },
 
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "CharacterAutoLoads": true
+      }
+    },
+
     "Workspace": {
       "$properties": {
         "FilteringEnabled": true

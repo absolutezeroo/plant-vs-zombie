@@ -367,6 +367,58 @@ function ECSUtils.Exists(world: any, entityId: number): boolean
 end
 
 -- ============================================
+-- Safe Component Access
+-- ============================================
+
+--[[
+	Safely get a component from an entity
+	
+	Consolidates the common pattern:
+	  if world:contains(id) then return world:get(id, Component) end
+	
+	@param world any - Matter World instance
+	@param entityId number - Entity ID
+	@param component any - Component type to get
+	@return any? - Component data or nil if entity doesn't exist
+]]
+function ECSUtils.SafeGet(world: any, entityId: number, component: any): any?
+	if not entityId or not world:contains(entityId) then
+		return nil
+	end
+	return world:get(entityId, component)
+end
+
+--[[
+	Safely get multiple components from an entity
+	
+	@param world any - Matter World instance
+	@param entityId number - Entity ID
+	@param ... any - Component types to get
+	@return ...any? - Component data or nil values
+]]
+function ECSUtils.SafeGetMultiple(world: any, entityId: number, ...: any): ...any
+	if not entityId or not world:contains(entityId) then
+		return nil
+	end
+	return world:get(entityId, ...)
+end
+
+--[[
+	Check if entity has a component
+	
+	@param world any - Matter World instance
+	@param entityId number - Entity ID
+	@param component any - Component type to check
+	@return boolean - True if entity exists and has the component
+]]
+function ECSUtils.HasComponent(world: any, entityId: number, component: any): boolean
+	if not entityId or not world:contains(entityId) then
+		return false
+	end
+	return world:get(entityId, component) ~= nil
+end
+
+-- ============================================
 -- Status Effect Application
 -- ============================================
 

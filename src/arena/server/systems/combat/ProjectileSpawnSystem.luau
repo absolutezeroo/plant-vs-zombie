@@ -71,7 +71,7 @@ local State = {
 --------------------------------------------------------------------------------
 -- [4] PRIVATE HELPERS
 --------------------------------------------------------------------------------
--- Check if there are zombies in the lane within shoot range
+-- Check if there are enemy zombies (non-hypnotized) in the lane within shoot range
 -- Uses LaneCache for O(1) lane lookup + O(lane_size) direction check
 local function hasZombiesInLane(
 	_world: any,
@@ -83,7 +83,8 @@ local function hasZombiesInLane(
 ): boolean
 	local zombieDir = State.CachedZombieDir
 	local shootRange = customRange or CONFIG.SHOOT_RANGE
-	return LaneCache.HasZombiesInDirection(
+	-- Use HasEnemiesInDirection to skip hypnotized zombies (allies)
+	return LaneCache.HasEnemiesInDirection(
 		lane,
 		plantX,
 		plantZ,
@@ -428,8 +429,125 @@ end
 --------------------------------------------------------------------------------
 -- [5] ONSTEP (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
+
+-- Fire homing projectile (Cattail) - targets closest zombie in ANY lane
+local function fireHomingProjectile(world: any, plantId: number, lane: number, startX: number, plantType: string)
+	local stats = PlantData[plantType]
+	local damage = (stats and stats.Damage) or CONFIG.DAMAGE
+	local spawnOffset = (stats and stats.ProjectileSpawnOffset) or nil
+	local offsetX = if spawnOffset then spawnOffset.X else CONFIG.SPAWN_OFFSET_X
+	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
+	local canHitFlying = (stats and stats.CanHitFlying) or true -- Cattail can hit flying by default
+
+	-- Spawn position
+	local laneCenter = MapConfig.GridToWorld(1, lane)
+	local plantZ = laneCenter.Z
+
+	-- Find closest zombie across ALL lanes
+	local allZombies = LaneCache.GetAllZombies()
+	if #allZombies == 0 then
+		return nil
+	end
+
+	local closestZombie: number? = nil
+	local closestDist = math.huge
+
+	for _, zombieId in allZombies do
+		-- Skip hypnotized zombies (allies)
+		if LaneCache.IsHypnotized(zombieId) then
+			continue
+		end
+		
+		local zombiePos = LaneCache.GetPosition(zombieId)
+		if not zombiePos then
+			continue
+		end
+
+		local dx = zombiePos.X - startX
+		local dz = zombiePos.Z - plantZ
+		local dist = dx * dx + dz * dz -- No sqrt for comparison
+
+		if dist < closestDist then
+			closestDist = dist
+			closestZombie = zombieId
+		end
+	end
+
+	if not closestZombie then
+		return nil
+	end
+
+	-- Get target position for initial direction
+	local targetPos = LaneCache.GetPosition(closestZombie)
+	if not targetPos then
+		return nil
+	end
+
+	-- Calculate initial direction toward target
+	local dx = targetPos.X - startX
+	local dz = targetPos.Z - plantZ
+	local dist = math.sqrt(dx * dx + dz * dz)
+	local normDx = if dist > 0 then dx / dist else 1
+	local normDz = if dist > 0 then dz / dist else 0
+
+	-- Target lane (for collision detection later)
+	local targetLane = LaneCache.GetLane(closestZombie) or lane
+
+	local entityId = EntityPool.Spawn(
+		Components.PositionComponent({
+			X = startX + (offsetX * normDx),
+			Y = offsetY,
+			Z = plantZ + (offsetX * normDz),
+		}),
+		Components.ProjectileComponent({
+			Damage = damage,
+			Speed = CONFIG.SPEED * 1.2, -- Homing projectiles are slightly faster
+			SourceEntity = plantId,
+			Lane = targetLane,
+			SpawnX = startX,
+			SpawnZ = plantZ,
+			DirectionX = normDx,
+			DirectionZ = normDz,
+			MaxRange = CONFIG.MAX_RANGE * 2, -- Homing can travel further
+			CanHitFlying = canHitFlying,
+		}),
+		Components.HomingComponent({
+			TargetEntity = closestZombie,
+			TurnSpeed = 5, -- Radians per second
+			MaxLifetime = 5, -- Max 5 seconds alive
+			SpawnTime = os.clock(),
+		})
+	)
+
+	if not entityId then
+		return nil
+	end
+
+	-- Get projectile variant from PlantData
+	local variant: string = (stats and stats.ProjectileVariant) or "Thorn"
+
+	Network.ProjectileSpawned.FireAll({
+		EntityId = entityId,
+		Lane = lane :: any,
+		StartX = startX,
+		TargetEntityId = closestZombie, -- Send target for client-side homing VFX
+		Variant = variant :: any,
+		IsFrozen = false,
+		IsEnhanced = false,
+		DirectionX = normDx,
+		DirectionZ = normDz,
+	})
+
+	return entityId
+end
+
 local function OnStep(world)
 	local currentTime = os.clock()
+
+	-- Refresh cached MapConfig values (may change after loadmap)
+	if MapConfig.IsInitialized() then
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
 
 	-- EVENT-DRIVEN CLEANUP: Clean up state for dead plants before main logic
 	-- This runs BEFORE shooting logic to prevent errors from stale state
@@ -481,12 +599,12 @@ local function OnStep(world)
 			continue
 		end
 
-		-- Check if zombies in lane (or any lane for multi-direction)
+		-- Check if zombies in lane (or any lane for multi-direction/homing)
 		local hasTargets = false
-		if stats.ShootsMultiDirection or stats.ShootsAllDirections then
-			-- Starfruit/GloomShroom: will check directions in fire function
-			-- Just need at least one zombie anywhere to attempt firing (O(1) check)
-			hasTargets = LaneCache.GetTotalCount() > 0
+		if stats.IsHoming or stats.ShootsMultiDirection or stats.ShootsAllDirections then
+			-- Cattail/Starfruit/GloomShroom: target any enemy zombie anywhere
+			-- Use GetEnemyCount to skip hypnotized zombies (allies)
+			hasTargets = LaneCache.GetEnemyCount() > 0
 		elseif stats.IsThreeLane then
 			-- Threepeater checks 3 lanes (O(1) per lane with GridDetection)
 			local minLane = math.max(1, plant.Lane - 1)
@@ -572,7 +690,10 @@ local function OnStep(world)
 		State.PlantFireTimes[plantId] = currentTime
 
 		-- Fire based on plant type behavior
-		if stats.ShootsAllDirections then
+		if stats.IsHoming then
+			-- Cattail: Homing projectiles target any lane
+			fireHomingProjectile(world, plantId, plant.Lane, pos.X, plantType)
+		elseif stats.ShootsAllDirections then
 			-- GloomShroom: 8 directions (short range, pierces shields)
 			fireAllDirections(world, plantId, plant.Lane, pos.X, plantType)
 		elseif stats.ShootsMultiDirection then

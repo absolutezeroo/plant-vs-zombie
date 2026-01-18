@@ -22,6 +22,7 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local EntityPool = require(Shared.utils.EntityPool)
+local NetworkUtils = require(Shared.utils.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -110,7 +111,13 @@ local function OnStep(world)
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, CONFIG.MIN_DT, CONFIG.MAX_DT)
 
-	-- Get base position and zombie direction from cache (set in Init)
+	-- Refresh cached MapConfig values (may change after loadmap)
+	if MapConfig.IsInitialized() then
+		State.CachedBasePos = MapConfig.GetBasePosition()
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
+
+	-- Get base position and zombie direction from cache
 	local basePos = State.CachedBasePos
 	local zombieDir = State.CachedZombieDir
 
@@ -147,6 +154,32 @@ local function OnStep(world)
 		local newY = pos.Y + (movement.VelocityY * dt * speedMultiplier)
 		local newZ = pos.Z + (movement.VelocityZ * dt * speedMultiplier)
 
+		-- Check if hypnotized zombie reached zombie spawn (they walk backwards)
+		local hypnotized = world:get(id, Components.HypnotizedComponent)
+		if hypnotized then
+			-- Hypnotized zombies despawn when reaching the zombie spawn area (opposite side)
+			local gridPos = world:get(id, Components.GridPositionComponent)
+			local lane = gridPos and gridPos.Row or 3 -- Default to middle lane
+			local spawnPos = MapConfig.GetZombieSpawn(lane)
+
+			-- Check if zombie reached spawn area (reverse direction check)
+			local reachedSpawn = false
+			if zombieDir.X > 0 then
+				-- Normal zombies go positive X, hypnotized go negative
+				reachedSpawn = newX <= spawnPos.X
+			elseif zombieDir.X < 0 then
+				-- Normal zombies go negative X, hypnotized go positive
+				reachedSpawn = newX >= spawnPos.X
+			end
+
+			if reachedSpawn then
+				-- Despawn without dealing damage to base
+				EntityPool.SafeDespawn(id, world)
+				NetworkUtils.BroadcastEntityDied(id)
+				continue
+			end
+		end
+
 		-- Check if zombie reached the base (direction-aware)
 		local reachedBase = false
 		if zombieDir.X > 0 then
@@ -163,16 +196,10 @@ local function OnStep(world)
 				BaseHealth.OnZombieReachedHouse()
 
 				-- Release zombie back to pool
-				if EntityPool.IsPooledEntity(id) then
-					EntityPool.Despawn(id)
-				else
-					world:despawn(id)
-				end
+				EntityPool.SafeDespawn(id, world)
 
 				-- Broadcast zombie death
-				Network.EntityDied.FireAll({
-					EntityId = id,
-				})
+				NetworkUtils.BroadcastEntityDied(id)
 			end
 			continue
 		end

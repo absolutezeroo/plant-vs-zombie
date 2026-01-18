@@ -195,19 +195,11 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 			local dist = math.sqrt(dx * dx + dz * dz)
 
 			if dist <= radius then
-				if EntityPool.IsPooledEntity(zombieId) then
-					EntityPool.Despawn(zombieId)
-				else
-					world:despawn(zombieId)
-				end
+				EntityPool.SafeDespawn(zombieId, world)
 			end
 		end
 
-		if EntityPool.IsPooledEntity(plantId) then
-			EntityPool.Despawn(plantId)
-		else
-			world:despawn(plantId)
-		end
+		EntityPool.SafeDespawn(plantId, world)
 		Logger.Info("PlantFood", `{plantType} exploded with radius {radius}`)
 	end
 end

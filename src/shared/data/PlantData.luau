@@ -59,6 +59,7 @@ export type PlantStats = {
 	StunDuration: number?, -- Stun duration in seconds
 	StunProjectileVariant: string?, -- Variant when stun procs ("Butter" for KernelPult)
 	CanHitFlying: boolean?, -- Can hit flying zombies (Cactus, Cattail)
+	IsHoming: boolean?, -- Fires homing projectiles that track targets (Cattail)
 	ShotsPerBurst: number?, -- Number of shots per attack (Repeater=2, GatlingPea=4)
 	ShootsMultiDirection: boolean?, -- Shoots in multiple directions (Starfruit)
 	IsThreeLane: boolean?, -- Shoots in 3 lanes (Threepeater)
@@ -83,12 +84,22 @@ export type PlantStats = {
 	GrowsOverTime: boolean?, -- Grows larger over time (Sun-shroom)
 	HidesWhenNear: boolean?, -- Hides when zombies are near (Scaredy-shroom)
 	HideRadius: number?, -- Distance at which to hide (default 6 studs)
+	HypnotizesOnDeath: boolean?, -- Hypnotizes the zombie that kills it (Hypno-shroom)
 
 	-- Stacking behavior (for plants that can be placed on top of others)
 	CanStackOnPlant: boolean?, -- Can be placed on top of Pumpkin/shell plants
 	CanStackOnMushroom: boolean?, -- Can be placed on sleeping mushrooms (CoffeeBean)
 	WakesMushrooms: boolean?, -- Wakes sleeping mushrooms when stacked
 	IsShell: boolean?, -- Is a protective shell plant (Pumpkin)
+
+	-- Manual fire plants (CobCannon)
+	IsManualFire: boolean?, -- Requires player click to fire (CobCannon)
+	RequiresTwoKernelPults: boolean?, -- Must be placed on two adjacent KernelPults (CobCannon)
+
+	-- Fog interaction (Plantern, Blover)
+	RemovesFog: boolean?, -- Removes or illuminates fog (Plantern, Blover)
+	FogRadius: number?, -- Radius of fog illumination in studs (Plantern)
+	RemovesFlying: boolean?, -- Removes flying zombies (Blover)
 }
 
 local PlantData: { [string]: PlantStats } = {
@@ -310,6 +321,7 @@ local PlantData: { [string]: PlantStats } = {
 		Category = "Attacker",
 		CanShoot = true,
 		IsHoming = true,
+		CanHitFlying = true,
 		ProjectileVariant = "Thorn",
 		RequiresLilyPad = true,
 	},

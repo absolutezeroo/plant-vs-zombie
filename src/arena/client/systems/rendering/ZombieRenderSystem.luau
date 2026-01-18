@@ -36,9 +36,11 @@ local ChanceUtils = require(Shared.utils.ChanceUtils)
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
 local Modules = Client:FindFirstChild("modules")
+local Controllers = Client:FindFirstChild("controllers")
 local Network = require(Shared.network.generated.client)
 local VFXService = require(Modules.VFXService)
 local AudioService = require(Modules.AudioService)
+local FogController = require(Controllers.FogController)
 
 -- Assets folder (optional - fallback to cubes if missing)
 local Assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -72,6 +74,9 @@ type ZombieVisual = {
 	FeetOffset: number, -- Distance from root to feet for ground alignment
 	IsVaulting: boolean?, -- True while playing vault animation
 	IsGlowing: boolean?, -- True for Plant Food zombies
+	IsHypnotized: boolean?, -- True for hypnotized zombies (walk backwards)
+	CachedParts: { BasePart }?, -- Cached BaseParts for fog visibility
+	LastFogVisible: boolean?, -- Last fog visibility state (to avoid redundant updates)
 }
 local _zombieVisuals: { [number]: ZombieVisual } = {}
 
@@ -355,6 +360,17 @@ local function setupNetworkListeners()
 		end
 	end))
 
+	-- Clear all visuals when map is unloading
+	_trove:Add(Network.MapUnloading.On(function(data)
+		Logger.Info("ZombieRender", `Map unloading: {data.MapId}, clearing {#_zombieVisuals} zombie visuals`)
+		for entityId, visual in _zombieVisuals do
+			if visual.Model then
+				visual.Model:Destroy()
+			end
+		end
+		table.clear(_zombieVisuals)
+	end))
+
 	-- Show floating damage numbers
 	_trove:Add(Network.EntityDamaged.On(function(data)
 		local visual = _zombieVisuals[data.EntityId]
@@ -474,6 +490,45 @@ local function setupNetworkListeners()
 
 		Logger.Debug("ZombieRender", `Zombie {entityId} vaulting from {startPos} to {endPos}`)
 	end))
+
+	-- Zombie was hypnotized (turn around and walk backwards)
+	_trove:Add(Network.ZombieHypnotized.On(function(data)
+		local entityId = data.ZombieId
+		local visual = _zombieVisuals[entityId]
+		if not visual or not visual.Model.Parent then
+			Logger.Warn("ZombieRender", `Hypnotized zombie {entityId} not found`)
+			return
+		end
+
+		-- Get current model position
+		local currentCFrame = visual.Model:GetPivot()
+		local currentPos = currentCFrame.Position
+
+		-- Rotate 180 degrees (zombie now faces opposite direction)
+		local zombieDir = MapConfig.GetZombieDirection()
+		local reversedDir = -zombieDir
+		local newCFrame = CFrame.lookAt(currentPos, currentPos + reversedDir) * CFrame.Angles(0, math.pi / 2, 0)
+
+		-- Tween the rotation for smooth turn
+		local turnTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		-- Find root part to tween
+		local rootPart = visual.Model.PrimaryPart or visual.Model:FindFirstChildWhichIsA("BasePart")
+		if rootPart then
+			local tween = TweenService:Create(rootPart, turnTweenInfo, {
+				CFrame = newCFrame,
+			})
+			tween:Play()
+		else
+			-- No tween possible, snap rotation
+			visual.Model:PivotTo(newCFrame)
+		end
+
+		-- Mark as hypnotized for interpolation (reverses direction)
+		visual.IsHypnotized = true
+
+		Logger.Info("ZombieRender", `Zombie {entityId} hypnotized, turning around`)
+	end))
 end
 
 --[[
@@ -527,9 +582,41 @@ local function ZombieRenderSystem(_world)
 		local spawnY = groundY + visual.FeetOffset -- Add feet offset for ground alignment
 		local newPos = Vector3.new(newX, spawnY, z)
 
-		-- Update position with 90° rotation
-		local facingCFrame = CFrame.lookAt(newPos, newPos + zombieDir) * CFrame.Angles(0, math.pi / 2, 0)
+		-- Update position with 90° rotation (reversed for hypnotized zombies)
+		local facingDir = if visual.IsHypnotized then -zombieDir else zombieDir
+		local facingCFrame = CFrame.lookAt(newPos, newPos + facingDir) * CFrame.Angles(0, math.pi / 2, 0)
 		visual.Model:PivotTo(facingCFrame)
+		
+		-- FOG VISIBILITY: Hide zombies in fog zone unless illuminated
+		local isVisible = true
+		if FogController.IsFogActive() then
+			local column, lane = MapConfig.WorldToGrid(newPos)
+			if column and lane then
+				isVisible = FogController.IsCellVisible(column, lane)
+			end
+		end
+		
+		-- Only update if visibility changed (optimization)
+		if visual.LastFogVisible ~= isVisible then
+			visual.LastFogVisible = isVisible
+			
+			-- Build part cache if not exists
+			local cachedParts: { BasePart } = visual.CachedParts or {}
+			if #cachedParts == 0 then
+				for _, part in visual.Model:GetDescendants() do
+					if part:IsA("BasePart") then
+						table.insert(cachedParts, part)
+					end
+				end
+				visual.CachedParts = cachedParts
+			end
+			
+			-- Apply visibility using cached parts
+			local modifier = if isVisible then 0 else 1
+			for _, part in cachedParts do
+				part.LocalTransparencyModifier = modifier
+			end
+		end
 	end
 
 	-- Random zombie groans for immersion
@@ -548,8 +635,10 @@ local function ZombieRenderSystem(_world)
 
 		if #zombieList > 0 and ChanceUtils.Roll(GROAN_CONFIG.CHANCE_PER_ZOMBIE) then
 			local randomZombie = ChanceUtils.PickRandom(zombieList)
-			local pos = randomZombie.Model:GetPivot().Position
-			AudioService.PlayZombieGroan(pos)
+			if randomZombie then
+				local pos = randomZombie.Model:GetPivot().Position
+				AudioService.PlayZombieGroan(pos)
+			end
 		end
 	end
 end

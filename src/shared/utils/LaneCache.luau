@@ -39,9 +39,13 @@ local _gridMaxX: number = 0
 local _zombiesOnGrid: { { number } } = {}
 local _zombiePositionsOnGrid: { [number]: number } = {} -- entityId -> X position (only for zombies on grid)
 
+-- Hypnotized zombie tracking (allies - should not be targeted by plants)
+local _hypnotizedZombies: { [number]: boolean } = {} -- entityId -> true if hypnotized
+
 -- O(1) total count cache
 local _totalCount: number = 0
 local _totalOnGridCount: number = 0
+local _hypnotizedCount: number = 0
 
 -- Initialize empty lanes (5 lanes for 9×5 grid)
 for i = 1, GridConfig.GRID_LANES do
@@ -67,8 +71,9 @@ end
 	@param PositionComponent - Position component type (has X, Z)
 	@param ZombieTypeComponent - Zombie type component (has Lane)
 	@param mapConfig - Optional map config with grid bounds
+	@param HypnotizedComponent - Optional hypnotized component for ally tracking
 ]]
-function LaneCache.Rebuild(world: any, PositionComponent: any, ZombieTypeComponent: any, mapConfig: any?)
+function LaneCache.Rebuild(world: any, PositionComponent: any, ZombieTypeComponent: any, mapConfig: any?, HypnotizedComponent: any?)
 	-- Clear all lanes (fast table recycle)
 	for i = 1, GridConfig.GRID_LANES do
 		table.clear(_lanes[i])
@@ -76,8 +81,10 @@ function LaneCache.Rebuild(world: any, PositionComponent: any, ZombieTypeCompone
 	end
 	table.clear(_positions)
 	table.clear(_zombiePositionsOnGrid)
+	table.clear(_hypnotizedZombies)
 	_totalCount = 0
 	_totalOnGridCount = 0
+	_hypnotizedCount = 0
 
 	-- Update grid bounds if provided
 	if mapConfig then
@@ -94,6 +101,15 @@ function LaneCache.Rebuild(world: any, PositionComponent: any, ZombieTypeCompone
 			table.insert(_lanes[lane], entityId)
 			_positions[entityId] = { X = pos.X, Z = pos.Z }
 			_totalCount = _totalCount + 1
+
+			-- Track hypnotized status if component provided
+			if HypnotizedComponent then
+				local hypnotized = world:get(entityId, HypnotizedComponent)
+				if hypnotized then
+					_hypnotizedZombies[entityId] = true
+					_hypnotizedCount = _hypnotizedCount + 1
+				end
+			end
 
 			-- Also cache if zombie is on the grid (O(1) lookup later)
 			if pos.X >= _gridMinX and pos.X <= _gridMaxX then
@@ -380,6 +396,102 @@ function LaneCache.GetAllZombies(): { number }
 		end
 	end
 	return all
+end
+
+--[[
+	Check if a zombie is hypnotized (ally)
+	
+	@param entityId - Entity ID to check
+	@return true if zombie is hypnotized
+]]
+function LaneCache.IsHypnotized(entityId: number): boolean
+	return _hypnotizedZombies[entityId] == true
+end
+
+--[[
+	Get count of enemy zombies (non-hypnotized) in all lanes
+	
+	@return Number of enemy zombies
+]]
+function LaneCache.GetEnemyCount(): number
+	return _totalCount - _hypnotizedCount
+end
+
+--[[
+	Get count of enemy zombies in a specific lane (non-hypnotized)
+	
+	@param laneIndex - Lane number (1-5)
+	@return Number of enemy zombies in lane
+]]
+function LaneCache.GetEnemyCountInLane(laneIndex: number): number
+	if laneIndex < 1 or laneIndex > GridConfig.GRID_LANES then
+		return 0
+	end
+	
+	local count = 0
+	for _, entityId in _lanes[laneIndex] do
+		if not _hypnotizedZombies[entityId] then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+--[[
+	Check if there are enemy zombies (non-hypnotized) in a lane in the specified direction
+	
+	@param laneIndex - Lane number (1-5)
+	@param plantX - Plant's X position
+	@param plantZ - Plant's Z position  
+	@param zombieDir - Zombie direction vector
+	@param checkBehind - If true, check behind plant
+	@param maxRange - Maximum distance to check
+	@return true if enemy zombies exist in the specified direction
+]]
+function LaneCache.HasEnemiesInDirection(
+	laneIndex: number,
+	plantX: number,
+	plantZ: number,
+	zombieDir: { X: number, Z: number },
+	checkBehind: boolean?,
+	maxRange: number?
+): boolean
+	local entities = LaneCache.GetEntitiesInLane(laneIndex)
+	local rangeLimit = maxRange or 0
+
+	for _, entityId in entities do
+		-- Skip hypnotized zombies (they're allies)
+		if _hypnotizedZombies[entityId] then
+			continue
+		end
+		
+		local pos = _positions[entityId]
+		if pos then
+			local dx = pos.X - plantX
+			local dz = pos.Z - plantZ
+			local dotProduct = dx * zombieDir.X + dz * zombieDir.Z
+
+			local isInCorrectDirection = false
+			if checkBehind then
+				isInCorrectDirection = dotProduct > 0
+			else
+				isInCorrectDirection = dotProduct < 0
+			end
+
+			if not isInCorrectDirection then
+				continue
+			end
+
+			local distance = math.abs(dotProduct)
+			if rangeLimit > 0 and distance > rangeLimit then
+				continue
+			end
+
+			return true
+		end
+	end
+
+	return false
 end
 
 return LaneCache

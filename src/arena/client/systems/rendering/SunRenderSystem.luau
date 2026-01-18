@@ -253,6 +253,17 @@ local function setupListeners()
 			SelectionState.SetSun(data.NewTotal)
 		end
 	end))
+
+	-- Clear all sun visuals when map is unloading
+	_trove:Add(Network.MapUnloading.On(function(_data)
+		for entityId, sunData in _sunData do
+			if sunData.Part then
+				sunData.Part:Destroy()
+			end
+		end
+		table.clear(_sunData)
+		Logger.Debug("SunRender", "Cleared all sun visuals for map unload")
+	end))
 end
 
 --[[

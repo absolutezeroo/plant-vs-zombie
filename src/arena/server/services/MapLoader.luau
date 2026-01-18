@@ -35,6 +35,9 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
+-- Services
+local LightingService = require(script.Parent.LightingService)
+
 -- Network (from shared module)
 local _network: any = nil
 local function getNetwork()
@@ -85,6 +88,9 @@ function MapLoader.Initialize()
 		newFolder.Parent = ReplicatedStorage
 		_mapsFolder = newFolder
 	end
+
+	-- Initialize lighting service
+	LightingService.Initialize()
 
 	Logger.Info("MapLoader", "Initialized")
 end
@@ -203,6 +209,18 @@ function MapLoader.LoadMap(mapId: string): boolean
 	local MapConfig = require(Shared.config.MapConfig)
 	MapConfig.LoadFromMap(mapClone)
 
+	-- Apply lighting preset based on map theme
+	-- Extract world ID from mapId (e.g., "Map_Night" -> "night")
+	local worldId = string.lower(string.gsub(mapId, "Map_", "") :: string)
+	LightingService.ApplyFromWorld(worldId, true) -- Instant on map load
+
+	-- Enable fog if map has FogBounds defined
+	if MapConfig.HasFogBounds() then
+		local FogSystem = require(script.Parent.Parent.systems.environment.FogSystem)
+		FogSystem.EnableFogFromBounds()
+		Logger.Info("MapLoader", "Fog enabled from FogBounds")
+	end
+
 	-- Send map config to all clients (authoritative sync)
 	MapLoader._SyncConfigToClients(mapId)
 
@@ -262,8 +280,23 @@ end
 
 --[[
     Unload the current map (ArenaMap + World)
+    Notifies clients to clear their visual caches
 ]]
 function MapLoader.UnloadMap()
+	if not _currentMapId and not _currentMapModel then
+		return
+	end
+	
+	local network = getNetwork()
+	
+	-- Notify clients FIRST so they can cleanup before map disappears
+	if network and _currentMapId then
+		network.MapUnloading.FireAll({
+			MapId = _currentMapId,
+		})
+		Logger.Info("MapLoader", `Notified clients of map unload: {_currentMapId}`)
+	end
+	
 	if _currentMapModel then
 		Logger.Info("MapLoader", `Unloading map: {_currentMapId}`)
 		_currentMapModel:Destroy()

@@ -39,6 +39,7 @@ local PlantData = require(Shared.data.PlantData)
 local WorldData = require(Shared.data.WorldData)
 local Logger = require(Shared.utils.Logger)
 local EntityPool = require(Shared.utils.EntityPool)
+local NetworkUtils = require(Shared.utils.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -299,6 +300,23 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 		return nil :: any
 	end
 
+	-- Handle Pumpkin shell protection (CanStackOnPlant)
+	if stats.CanStackOnPlant and stats.IsShell and existingEntityId then
+		-- Link Pumpkin to the plant it protects
+		world:insert(entityId, Components.ShellComponent({
+			ProtectsPlant = existingEntityId,
+			ProtectedByShell = nil,
+		}))
+		
+		-- Mark the inner plant as protected by this Pumpkin
+		world:insert(existingEntityId, Components.ShellComponent({
+			ProtectsPlant = nil,
+			ProtectedByShell = entityId,
+		}))
+		
+		Logger.Info("PlacementSystem", `Pumpkin {entityId} now protects plant {existingEntityId}`)
+	end
+
 	-- Mark cell as occupied (only if not stacking)
 	if not stats.CanStackOnPlant and not existingEntityId then
 		GridService.Occupy(column, lane, entityId, player.UserId)
@@ -410,11 +428,7 @@ local function handleShovelRequest(player: Player, plantEntityId: number): (bool
 	GridService.ClearByEntity(plantEntityId)
 
 	-- Release plant back to pool
-	if EntityPool.IsPooledEntity(plantEntityId) then
-		EntityPool.Despawn(plantEntityId)
-	else
-		world:despawn(plantEntityId)
-	end
+	EntityPool.SafeDespawn(plantEntityId, world)
 
 	-- Refund sun to player via SunService
 	SunService.AddSun(player, refundAmount)
@@ -422,9 +436,7 @@ local function handleShovelRequest(player: Player, plantEntityId: number): (bool
 	Logger.Info("PlacementSystem", `{player.Name} shoveled {plantType.PlantType} - refunded {refundAmount} sun`)
 
 	-- Broadcast removal to all clients (use EntityDied event)
-	Network.EntityDied.FireAll({
-		EntityId = plantEntityId,
-	})
+	NetworkUtils.BroadcastEntityDied(plantEntityId)
 
 	return true, nil
 end

@@ -28,6 +28,7 @@ local Mutations = Components.mutations
 
 return {
 	-- Core components
+	FogZoneComponent = require(Core.FogZoneComponent),
 	GridPositionComponent = require(Core.GridPositionComponent),
 	HealthComponent = require(Core.HealthComponent),
 	MovementComponent = require(Core.MovementComponent),
@@ -40,6 +41,7 @@ return {
 	ChewingComponent = require(Combat.ChewingComponent),
 	EnhancedProjectileComponent = require(Combat.EnhancedProjectileComponent),
 	HidingComponent = require(Combat.HidingComponent),
+	HomingComponent = require(Combat.HomingComponent),
 	PlantFoodComponent = require(Combat.PlantFoodComponent),
 	ProjectileComponent = require(Combat.ProjectileComponent),
 	SlowComponent = require(Combat.SlowComponent),
@@ -49,8 +51,10 @@ return {
 
 	-- Unit type components
 	GhostComponent = require(Units.GhostComponent),
+	HypnotizedComponent = require(Units.HypnotizedComponent),
 	JumpingComponent = require(Units.JumpingComponent),
 	PlantTypeComponent = require(Units.PlantTypeComponent),
+	ShellComponent = require(Units.ShellComponent),
 	ShieldComponent = require(Units.ShieldComponent),
 	SleepingComponent = require(Units.SleepingComponent),
 	VaultedComponent = require(Units.VaultedComponent),

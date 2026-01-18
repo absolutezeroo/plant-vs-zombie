@@ -54,8 +54,8 @@
 |-----------------|---------|-----|------------------------------|------------------|-----------------------------------------|
 | **WallNut**     | 50      | 400 | Défense de base              | ✅ MVP            | Bloqueur simple                         |
 | **TallNut**     | 125     | 800 | `BlocksJumpers`              | ✅ Implémenté     | Pole Vaulter ne peut pas sauter         |
-| **Pumpkin**     | 125     | 400 | `IsShell`, `CanStackOnPlant` | ❌ Non implémenté | Système stacking manquant               |
-| **Garlic**      | 50      | 200 | `DivertsZombies`             | ⚠️ Partiel       | TODO dans TrapSystem (lane switch)      |
+| **Pumpkin**     | 125     | 400 | `IsShell`, `CanStackOnPlant` | ✅ Implémenté    | ShellComponent + damage routing         |
+| **Garlic**      | 50      | 200 | `DivertsZombies`             | ✅ Implémenté    | TrapSystem complet (lane switch)        |
 | **ExplodeONut** | 50      | 400 | `ExplodesOnDeath`            | ⚠️ Partiel       | Logique dans SpecialPlantSystem         |
 
 ### 🌻 6. PRODUCTEURS (4 plantes)
@@ -65,7 +65,7 @@
 | **Sunflower**     | 50      | 25☀️/30s   | `ProducesSun`, `SunCount=1` | ✅ MVP            | SunflowerProductionSystem     |
 | **TwinSunflower** | 150     | 50☀️/24s   | `SunCount=2`                | ✅ Implémenté     | Double production             |
 | **SunShroom**     | 25      | 15→25☀️    | `GrowthTime=120`            | ⚠️ Partiel       | Croissance à implémenter      |
-| **Marigold**      | 50      | Coins      | `ProducesCoins`             | ❌ Non implémenté | CoinProductionSystem manquant |
+| **Marigold**    | 50      | Coins      | `ProducesCoins`             | ✅ Implémenté    | CoinProductionSystem ajouté   |
 
 ### 🍄 7. CHAMPIGNONS (7 plantes)
 
@@ -111,12 +111,12 @@
 | Catapultes   | 5      | 4            | 0            | 1                |
 | Explosives   | 7      | 5            | 2            | 0                |
 | Instant-Kill | 1      | 1            | 0            | 0                |
-| Défensives   | 5      | 1            | 3            | 1                |
-| Producteurs  | 4      | 2            | 1            | 1                |
+| Défensives   | 5      | 3            | 1            | 1                |
+| Producteurs  | 4      | 3            | 1            | 0                |
 | Champignons  | 7      | 3            | 2            | 2                |
 | Support      | 9      | 1            | 3            | 5                |
 | Pièges       | 1      | 1            | 0            | 0                |
-| **TOTAL**    | **48** | **25 (52%)** | **12 (25%)** | **11 (23%)**     |
+| **TOTAL**    | **48** | **28 (58%)** | **11 (23%)** | **9 (19%)**      |
 
 ---
 
@@ -129,7 +129,7 @@
 - ✅ `SpecialPlantSystem.luau` - Explosions, Squash, Chomper, PotatoMine
 - ✅ `EnhancementSystem.luau` - Torchwood fire enhancement
 - ✅ `PlantFoodSystem.luau` - Capacités ultimes
-- ✅ `TrapSystem.luau` - Spikeweed + PopsTires fonctionnent, Garlic TODO
+- ✅ `TrapSystem.luau` - Spikeweed + PopsTires + Garlic DivertsZombies
 - ⚠️ `BossSystem.luau` - Pour zombies boss
 
 ### Unit Systems (`src/arena/server/systems/units/`)
@@ -142,6 +142,7 @@
 - ✅ `SunflowerProductionSystem.luau` - Production soleil
 - ✅ `SunSpawnSystem.luau` - Spawn soleil du ciel
 - ✅ `SunCollectionSystem.luau` - Collecte soleil
+- ✅ `CoinProductionSystem.luau` - Marigold produit coins
 
 ### Mutation Systems (`src/arena/server/systems/mutations/`)
 - ✅ `FreezeSystem.luau` - Effets gel
@@ -168,6 +169,7 @@
 ### Unit Components
 - ✅ `SleepingComponent` - Mushroom day sleep
 - ✅ `PlantTypeComponent` - Plant type + lane
+- ✅ `ShellComponent` - Pumpkin protection (stacking)
 - ✅ `ShieldComponent` - Zombie shields
 - ✅ `JumpingComponent` - Pole vaulter state
 
@@ -187,16 +189,16 @@
 
 **Sprint 1 complété!**
 
-### 🌱 Sprint 2 : Systèmes Manquants Simples
+### 🌱 Sprint 2 : Systèmes Manquants Simples ✅ TERMINÉ
 
-| Priorité | Feature                     | Système à créer                       | Effort |
+| Priorité | Feature                     | Système à créer                       | État   |
 |----------|-----------------------------|---------------------------------------|--------|
-| P2       | **Garlic DivertsZombies**   | Compléter TODO dans TrapSystem        | 3h     |
-| P2       | **Pumpkin Stacking**        | CanStackOnPlant validation            | 4h     |
-| P2       | **Marigold CoinProduction** | Nouveau CoinProductionSystem          | 3h     |
-| P2       | **Water Lane Validation**   | RequiresWater, RequiresLilyPad        | 3h     |
+| P2       | **Garlic DivertsZombies**   | TrapSystem complet                    | ✅ Implémenté |
+| P2       | **Pumpkin Stacking**        | ShellComponent + CombatSystem         | ✅ Implémenté |
+| P2       | **Marigold CoinProduction** | CoinProductionSystem créé             | ✅ Implémenté |
+| P2       | **Water Lane Validation**   | PlacementSystem (déjà fait)           | ✅ Implémenté |
 
-**Effort total Sprint 2:** ~13h
+**Sprint 2 complété!**
 
 ### 🚀 Sprint 3 : Features Avancées
 

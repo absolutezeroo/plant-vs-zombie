@@ -100,6 +100,11 @@ end
 
 -- 6. MAIN LOOP
 local function OnStep(world)
+	-- Refresh cached MapConfig values (may change after loadmap)
+	if MapConfig.IsInitialized() then
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
+	
 	-- Check all zombies for boss behavior
 	for zombieId, health, zombie, pos in
 		world:query(Components.HealthComponent, Components.ZombieTypeComponent, Components.PositionComponent)

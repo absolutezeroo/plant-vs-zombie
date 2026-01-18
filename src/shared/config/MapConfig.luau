@@ -59,6 +59,11 @@ local _config = {
 	-- Direction zombies walk (normalized)
 	ZombieDirection = Vector3.new(-1, 0, 0), -- Default: left
 
+	-- Fog bounds (world positions) - defines fog zone
+	FogBoundsA = nil :: Vector3?, -- Min corner of fog zone
+	FogBoundsB = nil :: Vector3?, -- Max corner of fog zone
+	HasFogBounds = false, -- Whether this map has fog bounds defined
+
 	-- Are we using visual config or defaults?
 	UsingVisualConfig = false,
 }
@@ -118,6 +123,9 @@ function MapConfig.Initialize()
 
 	-- Read base position
 	MapConfig._ReadBasePosition(arenaMap)
+
+	-- Read fog bounds (optional)
+	MapConfig._ReadFogBounds(arenaMap)
 
 	-- Calculate zombie direction
 	MapConfig._CalculateZombieDirection()
@@ -350,6 +358,68 @@ function MapConfig._CalculateZombieDirection()
 	end
 end
 
+--[[
+	Read fog bounds from FogBounds Part with CornerA/CornerB Attachments
+	
+	Expected structure in ArenaMap:
+	📍 FogBounds (Part - invisible, CanCollide=false)
+	├── 🔗 CornerA (Attachment) - Start corner of fog zone
+	└── 🔗 CornerB (Attachment) - End corner of fog zone
+	
+	The fog zone is the rectangular area between these two corners.
+]]
+function MapConfig._ReadFogBounds(arenaMap: Instance)
+	local fogBounds = arenaMap:FindFirstChild("FogBounds")
+	
+	if not fogBounds then
+		Logger.Debug("MapConfig", "FogBounds not found - fog disabled for this map")
+		_config.FogBoundsA = nil
+		_config.FogBoundsB = nil
+		_config.HasFogBounds = false
+		return
+	end
+	
+	if not fogBounds:IsA("BasePart") then
+		Logger.Warn("MapConfig", `FogBounds found but is {fogBounds.ClassName}, expected BasePart`)
+		_config.HasFogBounds = false
+		return
+	end
+	
+	local cornerA = fogBounds:FindFirstChild("CornerA")
+	local cornerB = fogBounds:FindFirstChild("CornerB")
+	
+	if not cornerA or not cornerA:IsA("Attachment") then
+		Logger.Warn("MapConfig", "FogBounds CornerA Attachment not found")
+		_config.HasFogBounds = false
+		return
+	end
+	
+	if not cornerB or not cornerB:IsA("Attachment") then
+		Logger.Warn("MapConfig", "FogBounds CornerB Attachment not found")
+		_config.HasFogBounds = false
+		return
+	end
+	
+	-- Get world positions
+	local posA = cornerA.WorldPosition
+	local posB = cornerB.WorldPosition
+	
+	-- Normalize to min/max corners
+	_config.FogBoundsA = Vector3.new(
+		math.min(posA.X, posB.X),
+		math.min(posA.Y, posB.Y),
+		math.min(posA.Z, posB.Z)
+	)
+	_config.FogBoundsB = Vector3.new(
+		math.max(posA.X, posB.X),
+		math.max(posA.Y, posB.Y),
+		math.max(posA.Z, posB.Z)
+	)
+	_config.HasFogBounds = true
+	
+	Logger.Info("MapConfig", `FogBounds loaded: {_config.FogBoundsA} to {_config.FogBoundsB}`)
+end
+
 -- Use GridConfig defaults when no visual config found
 function MapConfig._UseDefaults()
 	_config.GridCornerA = Vector3.new(GridConfig.GRID_ORIGIN_X, GridConfig.GRID_ORIGIN_Y, GridConfig.GRID_ORIGIN_Z)
@@ -370,6 +440,11 @@ function MapConfig._UseDefaults()
 		GridConfig.GRID_ORIGIN_Y,
 		GridConfig.GRID_ORIGIN_Z + GridConfig.GRID_HEIGHT / 2
 	)
+
+	-- Clear fog bounds
+	_config.FogBoundsA = nil
+	_config.FogBoundsB = nil
+	_config.HasFogBounds = false
 
 	MapConfig._GenerateDefaultSpawns()
 	_config.UsingVisualConfig = false
@@ -492,6 +567,42 @@ function MapConfig.IsUsingVisualConfig(): boolean
 	return _config.UsingVisualConfig
 end
 
+--[[
+	Check if this map has fog bounds defined
+	@return boolean
+]]
+function MapConfig.HasFogBounds(): boolean
+	return _config.HasFogBounds
+end
+
+--[[
+	Get fog bounds (if defined)
+	@return FogBoundsA, FogBoundsB (both nil if not defined)
+]]
+function MapConfig.GetFogBounds(): (Vector3?, Vector3?)
+	if not _config.HasFogBounds then
+		return nil, nil
+	end
+	return _config.FogBoundsA, _config.FogBoundsB
+end
+
+--[[
+	Check if a world position is inside the fog zone
+	@param position - World position to check
+	@return boolean - True if inside fog zone
+]]
+function MapConfig.IsInFogZone(position: Vector3): boolean
+	if not _config.HasFogBounds or not _config.FogBoundsA or not _config.FogBoundsB then
+		return false
+	end
+	
+	local minP = _config.FogBoundsA
+	local maxP = _config.FogBoundsB
+	
+	return position.X >= minP.X and position.X <= maxP.X
+		and position.Z >= minP.Z and position.Z <= maxP.Z
+end
+
 -- Force re-read (for hot-reload during development)
 function MapConfig.Reload()
 	_isInitialized = false
@@ -523,6 +634,9 @@ function MapConfig.LoadFromMap(mapModel: Instance)
 
 	-- Read base position
 	MapConfig._ReadBasePosition(mapModel)
+
+	-- Read fog bounds (optional)
+	MapConfig._ReadFogBounds(mapModel)
 
 	-- Calculate zombie direction
 	MapConfig._CalculateZombieDirection()
@@ -557,6 +671,14 @@ export type ServerMapConfig = {
 	BasePositionZ: number,
 	ZombieDirectionX: number,
 	ZombieDirectionZ: number,
+	-- Fog bounds (optional)
+	HasFogBounds: boolean,
+	FogBoundsAX: number?,
+	FogBoundsAY: number?,
+	FogBoundsAZ: number?,
+	FogBoundsBX: number?,
+	FogBoundsBY: number?,
+	FogBoundsBZ: number?,
 }
 
 function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
@@ -575,6 +697,24 @@ function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
 	_config.ZombieDirection = Vector3.new(serverConfig.ZombieDirectionX, 0, serverConfig.ZombieDirectionZ).Unit
 	_config.UsingVisualConfig = true
 
+	-- Apply fog bounds
+	_config.HasFogBounds = serverConfig.HasFogBounds
+	if serverConfig.HasFogBounds and serverConfig.FogBoundsAX then
+		_config.FogBoundsA = Vector3.new(
+			serverConfig.FogBoundsAX :: number,
+			serverConfig.FogBoundsAY :: number,
+			serverConfig.FogBoundsAZ :: number
+		)
+		_config.FogBoundsB = Vector3.new(
+			serverConfig.FogBoundsBX :: number,
+			serverConfig.FogBoundsBY :: number,
+			serverConfig.FogBoundsBZ :: number
+		)
+	else
+		_config.FogBoundsA = nil
+		_config.FogBoundsB = nil
+	end
+
 	-- Generate zombie spawns from grid (client doesn't need exact positions)
 	MapConfig._GenerateDefaultSpawns()
 
@@ -584,6 +724,9 @@ function MapConfig.ApplyFromServer(serverConfig: ServerMapConfig)
 	Logger.Info("MapConfig", `  GridY: {_config.GridY}`)
 	Logger.Info("MapConfig", `  Grid: {_config.GridCornerA} to {_config.GridCornerB}`)
 	Logger.Info("MapConfig", `  Cell size: {_config.CellWidth}x{_config.CellDepth}`)
+	if _config.HasFogBounds then
+		Logger.Info("MapConfig", `  FogBounds: {_config.FogBoundsA} to {_config.FogBoundsB}`)
+	end
 end
 
 --[[
@@ -606,6 +749,14 @@ function MapConfig.GetServerSyncData(mapId: string): ServerMapConfig
 		BasePositionZ = _config.BasePosition.Z,
 		ZombieDirectionX = _config.ZombieDirection.X,
 		ZombieDirectionZ = _config.ZombieDirection.Z,
+		-- Fog bounds
+		HasFogBounds = _config.HasFogBounds,
+		FogBoundsAX = _config.FogBoundsA and _config.FogBoundsA.X or nil,
+		FogBoundsAY = _config.FogBoundsA and _config.FogBoundsA.Y or nil,
+		FogBoundsAZ = _config.FogBoundsA and _config.FogBoundsA.Z or nil,
+		FogBoundsBX = _config.FogBoundsB and _config.FogBoundsB.X or nil,
+		FogBoundsBY = _config.FogBoundsB and _config.FogBoundsB.Y or nil,
+		FogBoundsBZ = _config.FogBoundsB and _config.FogBoundsB.Z or nil,
 	}
 end
 

@@ -270,6 +270,15 @@ local function getColumnFromX(x: number): number
 	return math.floor(localX / cellW) + 1
 end
 
+-- Get grid lane from world Z position (uses cached values from Init)
+local function getLaneFromZ(z: number): number
+	local origin = State.CachedGridOrigin
+	local cellW = State.CachedCellWidth
+	local localZ = z - origin.Z
+	local lane = math.floor(localZ / cellW) + 1
+	return math.clamp(lane, 1, GridConfig.GRID_LANES)
+end
+
 --------------------------------------------------------------------------------
 -- [5] ONSTEP (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
@@ -278,6 +287,13 @@ local function OnStep(world: MatterWorld)
 
 	-- Reset frame stats at start of combat processing
 	resetFrameStats()
+	
+	-- Refresh cached MapConfig values (may change after loadmap)
+	if MapConfig.IsInitialized() then
+		State.CachedGridOrigin = MapConfig.GetGridOrigin()
+		State.CachedCellWidth = MapConfig.GetCellSize()
+		State.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
 
 	-- Process stun effect expiration
 	for zombieId, stun in world:query(Components.StunComponent) do
@@ -311,6 +327,11 @@ local function OnStep(world: MatterWorld)
 		for _, zombieId in zombiesToCheck do
 			-- Check if entity still exists (could have been killed by another projectile)
 			if not world:contains(zombieId) then
+				continue
+			end
+
+			-- Skip hypnotized zombies (allies) - projectiles pass through them
+			if LaneCache.IsHypnotized(zombieId) then
 				continue
 			end
 
@@ -424,11 +445,7 @@ local function OnStep(world: MatterWorld)
 			})
 
 			-- Release projectile back to pool
-			if EntityPool.IsPooledEntity(projId) then
-				EntityPool.Despawn(projId)
-			else
-				world:despawn(projId)
-			end
+			EntityPool.SafeDespawn(projId, world)
 		end
 	end
 
@@ -441,7 +458,7 @@ local function OnStep(world: MatterWorld)
 	end
 
 	-- Skip stunned zombies from attacking
-	-- Process zombie eating plants
+	-- Process zombie eating plants (or hypnotized zombies attacking other zombies)
 	for zombieId, zombiePos, zombie, zombieHealth in
 		world:query(Components.PositionComponent, Components.ZombieTypeComponent, Components.HealthComponent)
 	do
@@ -454,6 +471,101 @@ local function OnStep(world: MatterWorld)
 		local stats = ZombieData[zombie.ZombieType]
 		if not stats then
 			continue
+		end
+		
+		-- Check if this zombie is hypnotized
+		local hypnotized = world:get(zombieId, Components.HypnotizedComponent)
+		
+		-- Hypnotized zombies attack other zombies instead of plants
+		if hypnotized then
+			-- Check for other zombies in bite range
+			local target = world:get(zombieId, Components.TargetComponent)
+			
+			if target then
+				-- Already attacking - check if target still exists
+				if not world:contains(target.TargetEntity) then
+					-- Target destroyed, resume moving (backward toward zombie spawns)
+					local direction = State.CachedZombieDir
+					world:remove(zombieId, Components.TargetComponent)
+					world:insert(
+						zombieId,
+						Components.MovementComponent({
+							VelocityX = -direction.X * stats.Speed,
+							VelocityY = 0,
+							VelocityZ = -direction.Z * stats.Speed,
+						})
+					)
+					State.ZombieAttackTimes[zombieId] = nil
+					continue
+				end
+				
+				-- Attack the enemy zombie
+				local lastAttack = State.ZombieAttackTimes[zombieId] or 0
+				if currentTime - lastAttack >= stats.AttackSpeed then
+					local killed = applyDamage(world, target.TargetEntity, stats.Damage)
+					State.ZombieAttackTimes[zombieId] = currentTime
+					State.FrameStats.zombieBites += 1
+					
+					if killed then
+						-- Resume moving backward
+						local direction = State.CachedZombieDir
+						world:remove(zombieId, Components.TargetComponent)
+						world:insert(
+							zombieId,
+							Components.MovementComponent({
+								VelocityX = -direction.X * stats.Speed,
+								VelocityY = 0,
+								VelocityZ = -direction.Z * stats.Speed,
+							})
+						)
+						State.ZombieAttackTimes[zombieId] = nil
+					end
+				end
+			else
+				-- Find enemy zombie to attack (non-hypnotized zombies)
+				local lane = getLaneFromZ(zombiePos.Z)
+				local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
+				
+				for _, otherZombieId in zombiesInLane do
+					if otherZombieId == zombieId then
+						continue
+					end
+					
+					-- Skip other hypnotized zombies (allies)
+					local otherHypnotized = world:get(otherZombieId, Components.HypnotizedComponent)
+					if otherHypnotized then
+						continue
+					end
+					
+					local otherPos = LaneCache.GetPosition(otherZombieId)
+					if not otherPos then
+						continue
+					end
+					
+					-- Check if in bite range
+					local dx = otherPos.X - zombiePos.X
+					local dz = otherPos.Z - zombiePos.Z
+					local dist = math.sqrt(dx * dx + dz * dz)
+					
+					if dist <= CONFIG.ZOMBIE_BITE_RANGE then
+						-- Start attacking this zombie
+						world:insert(zombieId, Components.TargetComponent({
+							TargetEntity = otherZombieId,
+							TargetType = "Zombie",
+						}))
+						world:insert(
+							zombieId,
+							Components.MovementComponent({
+								VelocityX = 0,
+								VelocityY = 0,
+								VelocityZ = 0,
+							})
+						)
+						break
+					end
+				end
+			end
+			continue -- Skip normal plant-eating logic for hypnotized zombies
 		end
 
 		-- Check if zombie has a target
@@ -480,13 +592,80 @@ local function OnStep(world: MatterWorld)
 			-- Check attack timer
 			local lastAttack = State.ZombieAttackTimes[zombieId] or 0
 			if currentTime - lastAttack >= stats.AttackSpeed then
-				-- Bite!
-				local killed = applyDamage(world, target.TargetEntity, stats.Damage)
+				-- Determine actual target (may be redirected to Pumpkin shell)
+				local actualTarget = target.TargetEntity
+				local shell = world:get(target.TargetEntity, Components.ShellComponent)
+				
+				-- If plant is protected by a shell (Pumpkin), damage the shell instead
+				if shell and shell.ProtectedByShell then
+					local pumpkinId = shell.ProtectedByShell
+					if world:contains(pumpkinId) then
+						actualTarget = pumpkinId
+					end
+				end
+				
+				-- Bite the actual target!
+				local killed = applyDamage(world, actualTarget, stats.Damage)
 				State.ZombieAttackTimes[zombieId] = currentTime
 				State.FrameStats.zombieBites += 1
 
 				if killed then
-					-- Plant destroyed, resume moving
+					-- Check if we killed a HypnoShroom (before Pumpkin check, as HypnoShroom may be protected)
+					local killedPlant = world:get(actualTarget, Components.PlantTypeComponent)
+					if killedPlant then
+						local plantStats = PlantData[killedPlant.PlantType]
+						if plantStats and plantStats.HypnotizesOnDeath then
+							-- Hypnotize this zombie!
+							local direction = State.CachedZombieDir
+							
+							-- Add HypnotizedComponent
+							world:insert(zombieId, Components.HypnotizedComponent({
+								HypnotizedAt = currentTime,
+								OriginalSpeed = stats.Speed,
+							}))
+							
+							-- Reverse movement direction (zombie now walks toward zombie spawns)
+							world:remove(zombieId, Components.TargetComponent)
+							world:insert(
+								zombieId,
+								Components.MovementComponent({
+									VelocityX = -direction.X * stats.Speed,
+									VelocityY = 0,
+									VelocityZ = -direction.Z * stats.Speed,
+								})
+							)
+							
+							-- Broadcast hypnotization event
+							Network.ZombieHypnotized.FireAll({
+								ZombieId = zombieId,
+							})
+							
+							State.ZombieAttackTimes[zombieId] = nil
+							State.FrameStats.plantsDestroyed += 1
+							continue
+						end
+					end
+					
+					-- Check if we killed a Pumpkin protecting a plant
+					local killedShell = world:get(actualTarget, Components.ShellComponent)
+					if killedShell and killedShell.ProtectsPlant then
+						-- Pumpkin destroyed - inner plant is now exposed
+						local innerPlantId = killedShell.ProtectsPlant
+						if world:contains(innerPlantId) then
+							-- Remove protection from inner plant
+							world:remove(innerPlantId, Components.ShellComponent)
+							-- Zombie continues eating the inner plant (don't resume moving)
+							world:insert(zombieId, Components.TargetComponent({
+								TargetEntity = innerPlantId,
+								TargetType = "Plant",
+							}))
+							State.FrameStats.plantsDestroyed += 1
+							-- Don't resume moving - continue eating inner plant
+							continue
+						end
+					end
+					
+					-- Plant/Shell destroyed, resume moving
 					local direction = State.CachedZombieDir
 					world:remove(zombieId, Components.TargetComponent)
 					world:insert(
@@ -505,6 +684,12 @@ local function OnStep(world: MatterWorld)
 			-- No target - check if there's a plant in our path
 			local column = getColumnFromX(zombiePos.X)
 			local zombieDir = State.CachedZombieDir
+			
+			-- Flying zombies skip ground plants entirely (they fly over)
+			if stats.IsFlying then
+				-- Flying zombies don't eat plants, they fly past them
+				continue
+			end
 
 			-- Check current column and columns ahead of zombie (in its movement direction)
 			-- If zombie moves -X, check column and column-1; if +X, check column and column+1
@@ -608,6 +793,60 @@ local function OnStep(world: MatterWorld)
 							State.ZombieAttackTimes[zombieId] = currentTime
 							break
 						end
+					end
+				end
+			end
+			
+			-- If no plant target yet, check for hypnotized zombies to attack
+			local currentTarget = world:get(zombieId, Components.TargetComponent)
+			if not currentTarget then
+				local lane = zombie.Lane
+				local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
+				
+				for _, otherZombieId in zombiesInLane do
+					if otherZombieId == zombieId then
+						continue
+					end
+					
+					-- Only attack hypnotized zombies (they're now allies of the player)
+					local otherHypnotized = world:get(otherZombieId, Components.HypnotizedComponent)
+					if not otherHypnotized then
+						continue
+					end
+					
+					local otherPos = LaneCache.GetPosition(otherZombieId)
+					if not otherPos then
+						continue
+					end
+					
+					-- Check if hypnotized zombie is ahead of us (in our movement direction)
+					local zombieDir = State.CachedZombieDir
+					local isAhead = if zombieDir.X < 0 then otherPos.X < zombiePos.X else otherPos.X > zombiePos.X
+					if not isAhead then
+						continue
+					end
+					
+					-- Check if in bite range
+					local dx = otherPos.X - zombiePos.X
+					local dz = otherPos.Z - zombiePos.Z
+					local dist = math.sqrt(dx * dx + dz * dz)
+					
+					if dist <= CONFIG.ZOMBIE_BITE_RANGE then
+						-- Start attacking this hypnotized zombie
+						world:insert(zombieId, Components.TargetComponent({
+							TargetEntity = otherZombieId,
+							TargetType = "Zombie",
+						}))
+						world:insert(
+							zombieId,
+							Components.MovementComponent({
+								VelocityX = 0,
+								VelocityY = 0,
+								VelocityZ = 0,
+							})
+						)
+						State.ZombieAttackTimes[zombieId] = currentTime
+						break
 					end
 				end
 			end

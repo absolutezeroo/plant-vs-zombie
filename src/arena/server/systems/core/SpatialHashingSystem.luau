@@ -50,8 +50,15 @@ end
 -- 6. MAIN LOOP
 local function OnStep(world)
 	-- Rebuild the cache from scratch every frame
+	-- Pass HypnotizedComponent so LaneCache can track ally zombies
 	local mapConfig = MapConfig.IsInitialized() and MapConfig.GetConfig() or nil
-	LaneCache.Rebuild(world, Components.PositionComponent, Components.ZombieTypeComponent, mapConfig)
+	LaneCache.Rebuild(
+		world,
+		Components.PositionComponent,
+		Components.ZombieTypeComponent,
+		mapConfig,
+		Components.HypnotizedComponent
+	)
 	LaneCache.RebuildPlants(world, Components.PlantTypeComponent)
 end
 

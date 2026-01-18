@@ -345,6 +345,10 @@ loader:AddStep("Modules", function()
     FloatingTextController = require(Controllers:WaitForChild("FloatingTextController"))
     PlayerController = require(Controllers:WaitForChild("PlayerController"))
     
+    -- Initialize FogController early (listens to fog events)
+    local FogController = require(Controllers:WaitForChild("FogController"))
+    FogController.Initialize()
+    
     Logger.Info("ArenaClient", "Modules loaded")
 end, 1)
 

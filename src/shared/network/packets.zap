@@ -148,6 +148,32 @@ event PlantFoodRequest = {
     }
 }
 
+-- Client requests to fire CobCannon at a target location
+event CobCannonFireRequest = {
+    from: Client,
+    type: Reliable,
+    call: SingleAsync,
+    data: struct {
+        RequestId: RequestId,
+        PlantEntityId: EntityId,
+        TargetLane: Lane,
+        TargetColumn: Column,
+    }
+}
+
+-- Server confirms CobCannon fired
+event CobCannonFired = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        PlantEntityId: EntityId,
+        TargetX: f32,
+        TargetZ: f32,
+        ImpactTime: f32,
+    }
+}
+
 -- Client requests to unlock a plant
 event UnlockPlantRequest = {
     from: Client,
@@ -328,6 +354,16 @@ event EntityDied = {
     }
 }
 
+-- Zombie was hypnotized by Hypno-shroom
+event ZombieHypnotized = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        ZombieId: EntityId,
+    }
+}
+
 -- Projectile spawned (Unreliable: visual-only, client can handle missing spawns)
 event ProjectileSpawned = {
     from: Server,
@@ -467,6 +503,42 @@ event WaveCompleted = {
     }
 }
 
+-- Fog enabled on map (for night/pool levels)
+-- Can use either column-based fog or bounds-based fog
+event FogEnabled = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        FoggyColumns: u8[..15],
+        UseFogBounds: boolean?,
+        FogBoundsAX: f32?,
+        FogBoundsAY: f32?,
+        FogBoundsAZ: f32?,
+        FogBoundsBX: f32?,
+        FogBoundsBY: f32?,
+        FogBoundsBZ: f32?,
+    }
+}
+
+-- Fog cleared (by Blover or level end)
+event FogCleared = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {}
+}
+
+-- Fog illumination updated (Plantern placed/destroyed)
+event FogIlluminationUpdate = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        IlluminatedCells: string.utf8[..100],
+    }
+}
+
 -- Zombie position update (batched, unreliable for smooth movement)
 event ZombiePositionBatch = {
     from: Server,
@@ -538,6 +610,18 @@ event ZombieVaulted = {
         EndX: f32,
         EndY: f32,
         EndZ: f32,
+    }
+}
+
+-- Zombie diverted to adjacent lane (Garlic)
+event ZombieDiverted = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        NewLane: Lane,
+        NewZ: f32,
     }
 }
 
@@ -772,6 +856,13 @@ event MapConfigSync = {
         BasePositionZ: f32,
         ZombieDirectionX: f32,
         ZombieDirectionZ: f32,
+        HasFogBounds: boolean,
+        FogBoundsAX: f32?,
+        FogBoundsAY: f32?,
+        FogBoundsAZ: f32?,
+        FogBoundsBX: f32?,
+        FogBoundsBY: f32?,
+        FogBoundsBZ: f32?,
     }
 }
 
@@ -806,6 +897,16 @@ event MapLoadingComplete = {
     data: struct {
         MapId: string.utf8,
         Success: boolean,
+    }
+}
+
+-- Map unloading - clients should clear all entity visuals
+event MapUnloading = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        MapId: string.utf8,
     }
 }
 

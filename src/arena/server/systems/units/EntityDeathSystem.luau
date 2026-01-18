@@ -28,6 +28,7 @@ local Components = require(Shared.components)
 local ProgressionData = require(Shared.data.ProgressionData)
 local EntityPool = require(Shared.utils.EntityPool)
 local Logger = require(Shared.utils.Logger)
+local NetworkUtils = require(Shared.utils.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -100,6 +101,29 @@ local function OnStep(world)
 			local plant = world:get(id, Components.PlantTypeComponent)
 			if plant then
 				GridService.Clear(plant.Column, plant.Lane)
+				
+				-- Check if this plant was protected by a Pumpkin shell
+				local shell = world:get(id, Components.ShellComponent)
+				if shell then
+					-- If this is a Pumpkin that was protecting another plant
+					if shell.ProtectsPlant and world:contains(shell.ProtectsPlant) then
+						-- Remove the protection from the inner plant
+						world:remove(shell.ProtectsPlant, Components.ShellComponent)
+					end
+					
+					-- If this plant was protected by a Pumpkin, destroy the Pumpkin too
+					-- (inner plant died first somehow - e.g., explosive zombie)
+					if shell.ProtectedByShell and world:contains(shell.ProtectedByShell) then
+						-- Mark Pumpkin for death by zeroing health
+						local pumpkinHealth = world:get(shell.ProtectedByShell, Components.HealthComponent)
+						if pumpkinHealth and pumpkinHealth.Current > 0 then
+							world:insert(shell.ProtectedByShell, Components.HealthComponent({
+								Current = 0,
+								Max = pumpkinHealth.Max,
+							}))
+						end
+					end
+				end
 			end
 
 			-- Check if it's a zombie (need to drop coins)
@@ -160,9 +184,7 @@ local function OnStep(world)
 			end
 
 			-- Broadcast death to all clients
-			Network.EntityDied.FireAll({
-				EntityId = id,
-			})
+			NetworkUtils.BroadcastEntityDied(id)
 
 			-- Spawn DeathEvent for other systems
 			local deathPos = world:get(id, Components.PositionComponent)
@@ -176,11 +198,7 @@ local function OnStep(world)
 			}))
 
 			-- Release entity back to pool
-			if EntityPool.IsPooledEntity(id) then
-				EntityPool.Despawn(id)
-			else
-				world:despawn(id)
-			end
+			EntityPool.SafeDespawn(id, world)
 		end
 	end
 end

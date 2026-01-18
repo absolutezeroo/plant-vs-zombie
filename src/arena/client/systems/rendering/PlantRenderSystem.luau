@@ -108,6 +108,48 @@ local FALLBACK_COLORS = {
 	Repeater = Color3.fromRGB(60, 180, 60),
 }
 
+-- Plantern light configuration
+local PLANTERN_LIGHT_CONFIG = table.freeze({
+	Color = Color3.fromRGB(255, 240, 200), -- Warm yellow glow
+	Brightness = 2,
+	Range = 40, -- Match fog radius roughly
+	Shadows = true,
+})
+
+--[[
+	Add a PointLight to Plantern for fog illumination visual effect
+]]
+local function addPlanternLight(model: Model)
+	local primaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+	if not primaryPart then
+		return
+	end
+	
+	-- Check if light already exists
+	if primaryPart:FindFirstChild("PlanternLight") then
+		return
+	end
+	
+	local light = Instance.new("PointLight")
+	light.Name = "PlanternLight"
+	light.Color = PLANTERN_LIGHT_CONFIG.Color
+	light.Brightness = PLANTERN_LIGHT_CONFIG.Brightness
+	light.Range = PLANTERN_LIGHT_CONFIG.Range
+	light.Shadows = PLANTERN_LIGHT_CONFIG.Shadows
+	light.Parent = primaryPart
+	
+	-- Subtle glow animation (pulse)
+	task.spawn(function()
+		while light.Parent do
+			for i = 0, 1, 0.02 do
+				if not light.Parent then break end
+				light.Brightness = PLANTERN_LIGHT_CONFIG.Brightness + math.sin(i * math.pi * 2) * 0.3
+				task.wait(0.05)
+			end
+		end
+	end)
+end
+
 --[[
 	Create plant visual from real model or fallback to cube
 ]]
@@ -153,6 +195,12 @@ local function createPlantVisual(entityId: number, plantType: string, column: nu
 		local vfx = getVFXService()
 		if vfx then
 			vfx.AttachIdleVFX(model)
+		end
+		
+		-- Add Plantern light effect for fog illumination
+		local stats = PlantData[plantType]
+		if stats and stats.RemovesFog and not stats.IsInstant then
+			addPlanternLight(model)
 		end
 
 		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) using real model`)
@@ -275,6 +323,20 @@ local function setupNetworkListeners()
 		end
 
 		Logger.Debug("PlantRender", `Plant {entityId} ({plantType}) spawned at ({column}, {lane})`)
+	end))
+
+	-- Clear all visuals when map is unloading
+	_trove:Add(Network.MapUnloading.On(function(data)
+		Logger.Info("PlantRender", `Map unloading: {data.MapId}, clearing {#_plantVisuals} plant visuals`)
+		for entityId, visual in _plantVisuals do
+			if visual.Model then
+				visual.Model:Destroy()
+			elseif visual.Part then
+				visual.Part:Destroy()
+			end
+		end
+		table.clear(_plantVisuals)
+		table.clear(_plantMutations)
 	end))
 
 	_trove:Add(Network.EntityDied.On(function(data)

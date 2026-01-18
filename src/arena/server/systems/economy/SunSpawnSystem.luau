@@ -191,11 +191,7 @@ local function OnStep(world)
 		-- Despawn check
 		local age = currentTime - sun.SpawnTime
 		if age >= sun.Lifetime then
-			if EntityPool.IsPooledEntity(id) then
-				EntityPool.Despawn(id)
-			else
-				world:despawn(id)
-			end
+			EntityPool.SafeDespawn(id, world)
 
 			Network.SunDespawned.FireAll({
 				EntityId = id,
