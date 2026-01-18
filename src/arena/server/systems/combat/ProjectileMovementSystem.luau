@@ -20,20 +20,21 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+local GameConstants = require(Shared.config.GameConstants)
 local EntityPool = require(Shared.utils.EntityPool)
 local LaneCache = require(Shared.utils.LaneCache)
 
 local Network = require(Shared.network.generated.server)
 
 --------------------------------------------------------------------------------
--- [2] CONFIG (frozen constants)
+-- [2] CONFIG (frozen constants - referencing GameConstants)
 --------------------------------------------------------------------------------
 local CONFIG = table.freeze({
 	-- Movement limits
 	MIN_DT = 1 / 120,
 	MAX_DT = 1 / 15,
-	-- Default max range
-	MAX_RANGE = 100,
+	-- Default max range (from GameConstants.Projectile)
+	MAX_RANGE = GameConstants.Projectile.MAX_RANGE,
 })
 
 --------------------------------------------------------------------------------

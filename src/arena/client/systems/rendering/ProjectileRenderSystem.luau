@@ -438,6 +438,69 @@ local function setupNetworkListeners()
 	_trove:Add(Network.ProjectileDespawned.On(function(data)
 		destroyProjectileVisual(data.EntityId)
 	end))
+
+	-- Projectile enhanced by Torchwood (pea -> fire pea)
+	_trove:Add(Network.ProjectileEnhanced.On(function(data)
+		local entityId = data.EntityId
+		local visual = _projectileVisuals[entityId]
+		if not visual then
+			return
+		end
+
+		local enhancementType = data.EnhancementType
+
+		if enhancementType == "fire" then
+			-- Update visual state
+			visual.IsEnhanced = true
+			visual.Variant = "FirePea"
+
+			-- Change visual appearance
+			local part = getVisualPart(visual)
+			if part then
+				local pos = part.Position
+
+				-- Get FirePea config
+				local fireConfig = FALLBACK_CONFIGS.FirePea or DEFAULT_FALLBACK
+
+				-- Apply fire appearance to fallback part
+				if visual.Part then
+					visual.Part.Color = fireConfig.Color
+					visual.Part.Material = fireConfig.Material
+					visual.Part.Size = fireConfig.Size
+				end
+
+				-- If using model, swap to FirePea model
+				if visual.Model then
+					local fireTemplate = ProjectileAssets and ProjectileAssets:FindFirstChild("FirePea")
+					if fireTemplate and fireTemplate:IsA("Model") then
+						-- Destroy old model
+						local oldModel = visual.Model
+						local oldCFrame = oldModel:GetPivot()
+
+						-- Create new fire model
+						local newModel = fireTemplate:Clone()
+						newModel.Name = `Projectile_{entityId}_FirePea`
+						newModel:PivotTo(oldCFrame)
+						newModel:SetAttribute("EntityId", entityId)
+						newModel.Parent = Workspace
+
+						visual.Model = newModel
+						oldModel:Destroy()
+					end
+				end
+
+				-- Play fire ignition VFX at projectile position
+				local vfxAssets = ReplicatedStorage:FindFirstChild("Assets")
+				local vfxFolder = vfxAssets and vfxAssets:FindFirstChild("VFX")
+				local fireVFX = vfxFolder and vfxFolder:FindFirstChild("FireIgnite")
+				if fireVFX and fireVFX:IsA("ParticleEmitter") then
+					VFXUtils.CloneAndEmit(fireVFX, pos)
+				end
+
+				Logger.Debug("ProjectileRender", `Projectile {entityId} enhanced to FirePea at {pos}`)
+			end
+		end
+	end))
 end
 
 --[[

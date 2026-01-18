@@ -23,13 +23,13 @@ local Network = require(Shared.network.generated.server)
 -- Server modules (lazy-loaded)
 local Server = script.Parent.Parent.Parent
 
--- 2. CONFIGURATION
+-- 2. CONFIGURATION (referencing GameConstants.Coin)
 local CONFIG = table.freeze({
-	DEFAULT_PRODUCTION_INTERVAL = 24, -- Seconds between coin production
-	DEFAULT_FIRST_PRODUCTION_DELAY = 7, -- Seconds before first coin
-	DEFAULT_COIN_VALUE = 5, -- Coins per production (silver coin)
-	GOLD_COIN_VALUE = 10, -- Gold coin value (rare drop)
-	GOLD_COIN_CHANCE = 0.15, -- 15% chance for gold coin
+	DEFAULT_PRODUCTION_INTERVAL = GameConstants.Coin.PRODUCTION_INTERVAL,
+	DEFAULT_FIRST_PRODUCTION_DELAY = GameConstants.Coin.FIRST_PRODUCTION_DELAY,
+	DEFAULT_COIN_VALUE = GameConstants.Coin.SILVER_VALUE,
+	GOLD_COIN_VALUE = GameConstants.Coin.GOLD_VALUE,
+	GOLD_COIN_CHANCE = GameConstants.Coin.GOLD_CHANCE,
 })
 
 -- 3. STATE

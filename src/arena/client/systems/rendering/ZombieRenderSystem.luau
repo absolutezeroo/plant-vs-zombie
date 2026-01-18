@@ -529,6 +529,60 @@ local function setupNetworkListeners()
 
 		Logger.Info("ZombieRender", `Zombie {entityId} hypnotized, turning around`)
 	end))
+
+	-- Zombie diverted to adjacent lane by Garlic
+	_trove:Add(Network.ZombieDiverted.On(function(data)
+		local entityId = data.EntityId
+		local visual = _zombieVisuals[entityId]
+		if not visual or not visual.Model.Parent then
+			Logger.Warn("ZombieRender", `Diverted zombie {entityId} not found`)
+			return
+		end
+
+		local newLane = data.NewLane
+		local newZ = data.NewZ
+
+		-- Update lane tracking
+		local oldLane = visual.Lane
+		visual.Lane = newLane
+
+		-- Get current position
+		local currentCFrame = visual.Model:GetPivot()
+		local currentPos = currentCFrame.Position
+		local targetPos = Vector3.new(currentPos.X, currentPos.Y, newZ)
+
+		-- Smooth lane transition (tween Z position)
+		local laneChangeTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		-- Use CFrameValue for smooth model pivot tween
+		task.spawn(function()
+			local cframeValue = Instance.new("CFrameValue")
+			cframeValue.Value = currentCFrame
+			cframeValue.Parent = visual.Model
+
+			local connection = cframeValue.Changed:Connect(function()
+				if visual.Model and visual.Model.Parent then
+					visual.Model:PivotTo(cframeValue.Value)
+				end
+			end)
+
+			local zombieDir = MapConfig.GetZombieDirection()
+			local targetCFrame = CFrame.lookAt(targetPos, targetPos + zombieDir) * CFrame.Angles(0, math.pi / 2, 0)
+
+			local tween = TweenService:Create(cframeValue, laneChangeTweenInfo, { Value = targetCFrame })
+			tween:Play()
+			tween.Completed:Wait()
+
+			connection:Disconnect()
+			cframeValue:Destroy()
+		end)
+
+		-- Play divert VFX (dust puff)
+		local VFXUtils = require(Shared.utils.VFXUtils)
+		VFXUtils.DirtBurst(currentPos)
+
+		Logger.Debug("ZombieRender", `Zombie {entityId} diverted from lane {oldLane} to lane {newLane}`)
+	end))
 end
 
 --[[

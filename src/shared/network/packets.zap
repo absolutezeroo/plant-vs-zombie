@@ -408,6 +408,17 @@ event ProjectileDespawned = {
     }
 }
 
+-- Projectile was enhanced by Torchwood (pea -> fire pea)
+event ProjectileEnhanced = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        EnhancementType: string.utf8(..20),  -- "fire", "ice", etc.
+    }
+}
+
 -- Sun spawned (from Sunflower or sky)
 event SunSpawned = {
     from: Server,

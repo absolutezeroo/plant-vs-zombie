@@ -110,15 +110,8 @@ local function handlePlayerJoin(player: Player, padModel: Model)
 	local spawnPos = config.SpawnPosition
 	_playerLockManager:LockPlayer(player, spawnPos)
 
-	-- Notify client
-	if ZapServer then
-		ZapServer.PadJoined.Fire(player, {
-			PadId = padId,
-			WorldId = config.WorldId,
-			Difficulty = config.Difficulty,
-			Position = spawnPos,
-		})
-	end
+	-- Notify client via broadcaster (single responsibility)
+	_broadcaster:NotifyPlayerJoined(player, padId, config.WorldId, config.Difficulty, spawnPos)
 
 	Logger.Info("LobbyService", `{player.Name} joined pad {padId}`)
 
@@ -159,10 +152,8 @@ function handlePlayerLeave(player: Player)
 		end
 	end
 
-	-- Notify client
-	if ZapServer then
-		ZapServer.PadLeft.Fire(player, {})
-	end
+	-- Notify client via broadcaster (single responsibility)
+	_broadcaster:NotifyPlayerLeft(player)
 
 	Logger.Info("LobbyService", `{player.Name} left pad {padId}`)
 

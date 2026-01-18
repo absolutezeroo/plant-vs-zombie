@@ -134,6 +134,51 @@ GameConstants.ChomperDefaults = table.freeze({
 })
 
 -- ============================================
+-- PROJECTILES
+-- ============================================
+
+GameConstants.Projectile = table.freeze({
+	-- Movement
+	DEFAULT_SPEED = 15, -- Studs/second
+	CATAPULT_SPEED = 10, -- Slower arc projectiles
+	MAX_RANGE = 100, -- Studs (full grid + margin)
+	HOMING_SPEED = 20, -- For Cattail
+
+	-- Timing
+	DEFAULT_FIRE_INTERVAL = 0.67, -- Seconds between shots
+
+	-- Spawn offsets (from plant center)
+	SPAWN_OFFSET_X = 2, -- Forward
+	SPAWN_OFFSET_Y = 2.5, -- Height
+
+	-- Defaults
+	DEFAULT_DAMAGE = 20,
+})
+
+-- ============================================
+-- COINS
+-- ============================================
+
+GameConstants.Coin = table.freeze({
+	-- Marigold production
+	PRODUCTION_INTERVAL = 24, -- Seconds
+	FIRST_PRODUCTION_DELAY = 7, -- Seconds
+
+	-- Values
+	SILVER_VALUE = 5,
+	GOLD_VALUE = 10,
+	GOLD_CHANCE = 0.15, -- 15% chance for gold coin
+
+	-- Zombie drops
+	DEFAULT_ZOMBIE_DROP = 5,
+	BOSS_ZOMBIE_DROP = 50,
+
+	-- Lifetime
+	COIN_LIFETIME = 15, -- Seconds before auto-collect
+	COLLECT_DELAY = 0.5, -- VFX delay before collection
+})
+
+-- ============================================
 -- ZOMBIES
 -- ============================================
 

@@ -32,21 +32,21 @@ local GridDetection = require(Shared.utils.GridDetection)
 local Network = require(Shared.network.generated.server)
 
 --------------------------------------------------------------------------------
--- [2] CONFIG (frozen constants)
+-- [2] CONFIG (frozen constants - referencing GameConstants)
 --------------------------------------------------------------------------------
 local CONFIG = table.freeze({
-	-- Projectile defaults
-	SPEED = 15,
-	FIRE_INTERVAL = 0.67,
-	MAX_RANGE = 100,
-	DAMAGE = 20,
+	-- Projectile defaults (from GameConstants.Projectile)
+	SPEED = GameConstants.Projectile.DEFAULT_SPEED,
+	FIRE_INTERVAL = GameConstants.Projectile.DEFAULT_FIRE_INTERVAL,
+	MAX_RANGE = GameConstants.Projectile.MAX_RANGE,
+	DAMAGE = GameConstants.Projectile.DEFAULT_DAMAGE,
 	SLOW_PERCENT = GameConstants.Combat.DEFAULT_SLOW_PERCENT,
 	SLOW_DURATION = GameConstants.Combat.DEFAULT_SLOW_DURATION,
-	SHOT_DELAY = 0.1,
-	CATAPULT_SPEED = 10,
-	SPAWN_OFFSET_X = 2,
-	SPAWN_OFFSET_Y = 2.5,
-	SHOOT_RANGE = 54,
+	SHOT_DELAY = 0.1, -- Multi-shot delay (system-specific)
+	CATAPULT_SPEED = GameConstants.Projectile.CATAPULT_SPEED,
+	SPAWN_OFFSET_X = GameConstants.Projectile.SPAWN_OFFSET_X,
+	SPAWN_OFFSET_Y = GameConstants.Projectile.SPAWN_OFFSET_Y,
+	SHOOT_RANGE = GameConstants.Grid.LANE_WIDTH * (MapConfig.GRID_SIZE_X - 1), -- Dynamic based on grid
 })
 
 --------------------------------------------------------------------------------

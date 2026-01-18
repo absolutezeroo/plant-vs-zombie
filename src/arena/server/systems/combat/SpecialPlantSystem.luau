@@ -33,6 +33,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
+local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
@@ -48,24 +49,24 @@ local Server = script.Parent.Parent.Parent
 local GridService = require(Server.services.GridService)
 
 -- ============================================================
--- SECTION 2: CONFIG (immutable settings)
+-- SECTION 2: CONFIG (immutable settings - referencing GameConstants)
 -- ============================================================
 local CONFIG = table.freeze({
 	PRIORITY = 175,
 
-	-- Explosion defaults
-	FUSE_TIME = 0.5,
-	EXPLOSION_RADIUS = 9,
+	-- Explosion defaults (from GameConstants.ExplosiveDefaults)
+	FUSE_TIME = GameConstants.ExplosiveDefaults.FUSE_TIME,
+	EXPLOSION_RADIUS = GameConstants.ExplosiveDefaults.DEFAULT_EXPLOSION_RADIUS,
 
-	-- Armed plant defaults
-	ARM_DURATION = 15,
-	TRIGGER_RADIUS = 2,
+	-- Armed plant defaults (from GameConstants.ExplosiveDefaults)
+	ARM_DURATION = GameConstants.ExplosiveDefaults.ARM_DURATION,
+	TRIGGER_RADIUS = GameConstants.ExplosiveDefaults.TRIGGER_RADIUS,
 
-	-- Chomper defaults
-	CHEW_DURATION = 42,
-	CHOMP_RANGE = 6,
+	-- Chomper defaults (from GameConstants.ChomperDefaults)
+	CHEW_DURATION = GameConstants.ChomperDefaults.CHEW_DURATION,
+	CHOMP_RANGE = GameConstants.ChomperDefaults.CHOMP_RANGE,
 
-	-- Squash defaults
+	-- Squash defaults (system-specific, no global constant)
 	JUMP_DURATION = 0.5,
 	SQUASH_RANGE = 6,
 

@@ -245,6 +245,39 @@ local function Init(_world: any)
 		Logger.Debug("VFXAudio", `PlantFood activated on plant {data.PlantEntityId} ({data.PlantType})`)
 	end))
 
+	-- ========================================
+	-- PROJECTILE & ZOMBIE VFX EVENTS
+	-- ========================================
+
+	-- Projectile enhanced by Torchwood (pea -> fire pea)
+	_trove:Add(Network.ProjectileEnhanced.On(function(data)
+		-- VFX will be handled by ProjectileRenderSystem which updates the visual
+		-- Here we just play the ignition sound
+		if data.EnhancementType == "fire" then
+			AudioService.PlaySound("FireIgnite")
+		end
+
+		Logger.Debug("VFXAudio", `Projectile {data.EntityId} enhanced: {data.EnhancementType}`)
+	end))
+
+	-- Cob Cannon fired (corn cob launched)
+	_trove:Add(Network.CobCannonFired.On(function(data)
+		local targetPos = Vector3.new(data.TargetX, 0, data.TargetZ)
+
+		-- Play launch sound (cannon fire)
+		AudioService.PlaySound("Explosion") -- Reuse explosion for now, TODO: add CobCannonLaunch
+
+		-- Schedule impact VFX after ImpactTime
+		task.delay(data.ImpactTime, function()
+			VFXService.PlayExplosion(targetPos, 9)
+			AudioService.PlayExplosion(targetPos)
+			VFXService.ScreenShake(1.0, 0.4)
+			Logger.Debug("VFXAudio", `Cob Cannon impact at {targetPos}`)
+		end)
+
+		Logger.Debug("VFXAudio", `Cob Cannon fired to {targetPos}, impact in {data.ImpactTime}s`)
+	end))
+
 	-- PlantFood Charge Update (UI feedback)
 	_trove:Add(Network.PlantFoodChargeUpdate.SetCallback(function(data)
 		SelectionState.SetPlantFoodCharges(data.ChargeCount)
