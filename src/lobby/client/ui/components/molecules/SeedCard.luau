@@ -20,7 +20,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local Theme = require(Shared.ui.design.Theme)
-local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
 
 -- Fusion 0.3 primitives
 local Children = Fusion.Children

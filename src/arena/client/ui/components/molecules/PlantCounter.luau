@@ -20,6 +20,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 -- Path: client/ui/components/molecules/PlantCounter.luau
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
@@ -132,20 +133,35 @@ local function PlantCounter(props: PlantCounterProps): Frame
 			}),
 
 			-- Plant icon (left)
-			scope:New("TextLabel")({
+			scope:New("Frame")({
 				Name = "PlantIcon",
 				Size = UDim2.fromScale(0.35, 0.8),
 				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
-				Text = "🌱",
-				TextScaled = true,
-				Font = Enum.Font.GothamBold,
 
 				[Children] = {
-					scope:New("UITextSizeConstraint")({
-						MaxTextSize = 22,
-						MinTextSize = 12,
+					scope:New("ImageLabel")({
+						Size = UDim2.fromScale(1, 1),
+						BackgroundTransparency = 1,
+						Image = IconAssets.Get("Plant"),
+						ScaleType = Enum.ScaleType.Fit,
+						Visible = IconAssets.HasImage("Plant"),
+					}),
+					scope:New("TextLabel")({
+						Size = UDim2.fromScale(1, 1),
+						BackgroundTransparency = 1,
+						Text = IconAssets.GetEmoji("Plant"),
+						TextScaled = true,
+						Font = Enum.Font.GothamBold,
+						Visible = not IconAssets.HasImage("Plant"),
+
+						[Children] = {
+							scope:New("UITextSizeConstraint")({
+								MaxTextSize = 22,
+								MinTextSize = 12,
+							}),
+						},
 					}),
 				},
 			}),

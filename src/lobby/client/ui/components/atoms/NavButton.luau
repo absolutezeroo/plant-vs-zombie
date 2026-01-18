@@ -15,6 +15,8 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion primitives
 local Children = Fusion.Children
@@ -25,7 +27,8 @@ local SHADOW_OFFSET_SCALE = 0.08 -- 8% of button height
 
 export type NavButtonProps = {
 	Scope: any,
-	Icon: string,
+	Icon: string?, -- Legacy emoji (fallback)
+	IconName: IconAssets.IconName?, -- Use IconAssets system
 	Label: string?,
 	OnClick: () -> (),
 	Color: string?, -- Theme color key
@@ -132,12 +135,10 @@ local function NavButton(props: NavButtonProps): Frame
 							}),
 
 							-- Icon
-							scope:New("TextLabel")({
-								Name = "Icon",
+							scope:New("Frame")({
+								Name = "IconContainer",
 								Size = UDim2.fromScale(1, 1),
 								BackgroundTransparency = 1,
-								Text = props.Icon,
-								TextScaled = true,
 
 								[Children] = {
 									scope:New("UIPadding")({
@@ -146,10 +147,26 @@ local function NavButton(props: NavButtonProps): Frame
 										PaddingLeft = UDim.new(0.15, 0),
 										PaddingRight = UDim.new(0.15, 0),
 									}),
-									scope:New("UITextSizeConstraint")({
-										MaxTextSize = 32,
-										MinTextSize = 14,
-									}),
+									if props.IconName then
+										Icon(scope, {
+											Name = props.IconName,
+											Size = UDim2.fromScale(1, 1),
+										})
+									else
+										scope:New("TextLabel")({
+											Name = "Emoji",
+											Size = UDim2.fromScale(1, 1),
+											BackgroundTransparency = 1,
+											Text = props.Icon or "?",
+											TextScaled = true,
+
+											[Children] = {
+												scope:New("UITextSizeConstraint")({
+													MaxTextSize = 32,
+													MinTextSize = 14,
+												}),
+											},
+										}),
 								},
 							}),
 						},

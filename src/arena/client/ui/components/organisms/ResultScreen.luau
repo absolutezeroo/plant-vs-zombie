@@ -23,9 +23,9 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
-local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
-local ToonButton = require(Shared.ui.components.atoms.ToonButton)
-local RewardRow = require(Shared.ui.components.atoms.RewardRow)
+local ToonPanel = require(Shared.ui.components.base.ToonPanel)
+local ToonButton = require(Shared.ui.components.base.ToonButton)
+local RewardRow = require(Shared.ui.components.base.RewardRow)
 
 local Molecules = script.Parent.Parent.molecules
 local ResultBanner = require(Molecules.ResultBanner)
@@ -192,7 +192,7 @@ local function ResultScreen(props: ResultScreenProps): Frame
 									-- Zombies killed
 									RewardRow({
 										Scope = scope,
-										Icon = "💀",
+										IconName = "Skull",
 										Label = "Zombies tués",
 										Value = props.ZombiesKilled,
 										Color = RewardColors.Zombies,
@@ -202,7 +202,7 @@ local function ResultScreen(props: ResultScreenProps): Frame
 									-- Coins earned
 									RewardRow({
 										Scope = scope,
-										Icon = "🪙",
+										IconName = "Coin",
 										Label = "Pièces gagnées",
 										Value = props.CoinsEarned,
 										Color = RewardColors.Coins,
@@ -213,7 +213,7 @@ local function ResultScreen(props: ResultScreenProps): Frame
 									-- XP earned
 									RewardRow({
 										Scope = scope,
-										Icon = "⭐",
+										IconName = "Star",
 										Label = "Expérience",
 										Value = props.XPEarned,
 										Color = RewardColors.XP,
@@ -225,7 +225,7 @@ local function ResultScreen(props: ResultScreenProps): Frame
 									-- Gems (visibility controlled internally)
 									RewardRow({
 										Scope = scope,
-										Icon = "💎",
+										IconName = "Gem",
 										Label = "Gemmes",
 										Value = props.GemsEarned,
 										Color = RewardColors.Gems,

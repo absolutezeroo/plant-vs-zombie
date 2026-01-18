@@ -16,13 +16,19 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
+local Icon = require(Shared.ui.components.base.Icon)
+
+-- Shared UI components
+local LevelBadge = require(Shared.ui.components.indicators.LevelBadge)
+local ResourcePill = require(Shared.ui.components.indicators.ResourcePill)
+local StatCard = require(Shared.ui.components.cards.StatCard)
+local XPBar = require(Shared.ui.components.indicators.XPBar)
+
+-- Local atoms (lobby-specific)
 local Atoms = script.Parent.Parent.atoms
 local AvatarFrame = require(Atoms.AvatarFrame)
-local LevelBadge = require(Atoms.LevelBadge)
-local ResourcePill = require(Atoms.ResourcePill)
-local StatCard = require(Atoms.StatCard)
-local XPBar = require(Atoms.XPBar)
 local WinRateBanner = require(Atoms.WinRateBanner)
 
 -- Fusion 0.3 scope-based primitives
@@ -32,19 +38,19 @@ local OnEvent = Fusion.OnEvent
 -- Get dynamic title based on level
 local function getTitleForLevel(level: number): string
 	if level >= 50 then
-		return "🌟 Legendary Guardian"
+		return "Legendary Guardian"
 	elseif level >= 40 then
-		return "👑 Master Gardener"
+		return "Master Gardener"
 	elseif level >= 30 then
-		return "⚔️ Zombie Slayer"
+		return "Zombie Slayer"
 	elseif level >= 20 then
-		return "🛡️ Plant Defender"
+		return "Plant Defender"
 	elseif level >= 10 then
-		return "🌿 Garden Keeper"
+		return "Garden Keeper"
 	elseif level >= 5 then
-		return "🌱 Sprout Tender"
+		return "Sprout Tender"
 	else
-		return "🌰 Novice Gardener"
+		return "Novice Gardener"
 	end
 end
 
@@ -257,7 +263,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 
 											ResourcePill({
 												Scope = scope,
-												Icon = Theme.Icons.Coin,
+												IconName = "Coin",
 												Value = props.Coins,
 												Color = "Gold",
 												Width = 90,
@@ -266,7 +272,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 
 											ResourcePill({
 												Scope = scope,
-												Icon = Theme.Icons.Gem,
+												IconName = "Gem",
 												Value = props.Gems,
 												Color = "Purple",
 												Width = 90,
@@ -317,10 +323,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 												end),
 												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Main,
-												Text = Theme.Icons.Close,
-												TextColor3 = Color3.new(1, 1, 1),
-												TextScaled = true,
-												Font = Theme.Typography.Fonts.Title,
+												Text = "",
 												AutoButtonColor = false,
 												ZIndex = 2,
 
@@ -345,9 +348,11 @@ local function ProfileScreen(props: ProfileScreenProps)
 														Color = Theme.Colors.Surface.Stroke :: Color3,
 														Thickness = 2,
 													}),
-													scope:New("UITextSizeConstraint")({
-														MaxTextSize = 22,
-														MinTextSize = 12,
+													Icon(scope, {
+														Name = "Close",
+														Size = UDim2.fromScale(0.6, 0.6),
+														Position = UDim2.fromScale(0.5, 0.5),
+														AnchorPoint = Vector2.new(0.5, 0.5),
 													}),
 												},
 											}),
@@ -482,7 +487,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 
 							StatCard({
 								Scope = scope,
-								Icon = "🎮",
+								IconName = "Play",
 								Label = "Games",
 								Value = props.GamesPlayed,
 								Color = "Info",
@@ -491,7 +496,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 
 							StatCard({
 								Scope = scope,
-								Icon = "🏆",
+								IconName = "Trophy",
 								Label = "Wins",
 								Value = props.GamesWon,
 								Color = "Gold",
@@ -500,7 +505,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 
 							StatCard({
 								Scope = scope,
-								Icon = "💀",
+								IconName = "Skull",
 								Label = "Kills",
 								Value = props.ZombiesKilled,
 								Color = "Danger",
@@ -509,7 +514,7 @@ local function ProfileScreen(props: ProfileScreenProps)
 
 							StatCard({
 								Scope = scope,
-								Icon = "🌱",
+								IconName = "Plant",
 								Label = "Plants",
 								Value = props.PlantsPlaced,
 								Color = "Action",

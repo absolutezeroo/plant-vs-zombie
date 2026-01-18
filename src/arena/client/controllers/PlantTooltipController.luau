@@ -156,11 +156,12 @@ local function onInputBegan(input: InputObject, gameProcessed: boolean)
 		return
 	end
 
-	-- Don't show tooltip if in placement or shovel mode
+	-- Don't show tooltip if in placement, shovel, or Plant Food mode
 	local selectedPlant = peek(SelectionState.SelectedPlant)
 	local shovelMode = peek(SelectionState.ShovelMode)
+	local plantFoodMode = SelectionState.IsPlantFoodActive()
 
-	if selectedPlant or shovelMode then
+	if selectedPlant or shovelMode or plantFoodMode then
 		return
 	end
 

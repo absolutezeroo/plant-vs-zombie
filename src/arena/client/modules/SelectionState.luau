@@ -32,6 +32,10 @@ SelectionState.SunCount = Fusion.Value(scope, 50) -- Start with 50 sun
 SelectionState.PlantCount = Fusion.Value(scope, 0) -- Current player's plant count
 SelectionState.PlantLimit = Fusion.Value(scope, 45) -- Dynamic limit based on player count
 
+-- Plant Food charges (synced from server)
+SelectionState.PlantFoodCharges = Fusion.Value(scope, 0) -- Current charges (0-3)
+SelectionState.PlantFoodMode = Fusion.Value(scope, false) -- True when selecting plant to feed
+
 --[[
 	Select a plant card
 	@param plantType string? - Plant type to select, nil to deselect
@@ -192,6 +196,72 @@ end
 ]]
 function SelectionState.ResetPlantCount()
 	SelectionState.PlantCount:set(0)
+end
+
+--------------------------------------------------------------------------------
+-- PLANT FOOD SYSTEM
+--------------------------------------------------------------------------------
+
+--[[
+	Set Plant Food charges (from server sync)
+	@param charges number - New charge count (0-3)
+]]
+function SelectionState.SetPlantFoodCharges(charges: number)
+	SelectionState.PlantFoodCharges:set(math.clamp(charges, 0, 3))
+end
+
+--[[
+	Toggle Plant Food mode (activate to select plant to feed)
+]]
+function SelectionState.TogglePlantFoodMode()
+	local current = Fusion.peek(SelectionState.PlantFoodMode)
+	if current then
+		SelectionState.PlantFoodMode:set(false)
+	else
+		-- Check if we have charges
+		if Fusion.peek(SelectionState.PlantFoodCharges) > 0 then
+			-- Deselect plant and shovel, activate Plant Food mode
+			SelectionState.SelectedPlant:set(nil)
+			SelectionState.ShovelMode:set(false)
+			SelectionState.PlantFoodMode:set(true)
+		end
+	end
+end
+
+--[[
+	Check if Plant Food mode is active
+	@return boolean
+]]
+function SelectionState.IsPlantFoodActive(): boolean
+	return Fusion.peek(SelectionState.PlantFoodMode)
+end
+
+--[[
+	Deactivate Plant Food mode
+]]
+function SelectionState.DeactivatePlantFood()
+	SelectionState.PlantFoodMode:set(false)
+end
+
+--[[
+	Check if player has Plant Food charges
+	@return boolean
+]]
+function SelectionState.HasPlantFoodCharges(): boolean
+	return Fusion.peek(SelectionState.PlantFoodCharges) > 0
+end
+
+--[[
+	Use one Plant Food charge (optimistic update)
+	@return boolean - success (true if had charges)
+]]
+function SelectionState.UsePlantFoodCharge(): boolean
+	local current = Fusion.peek(SelectionState.PlantFoodCharges)
+	if current <= 0 then
+		return false
+	end
+	SelectionState.PlantFoodCharges:set(current - 1)
+	return true
 end
 
 return SelectionState

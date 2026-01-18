@@ -13,6 +13,8 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion primitives
 local Children = Fusion.Children
@@ -95,14 +97,19 @@ local function LevelBadge(props: LevelBadgeProps): Frame
 					}),
 
 					-- Star icon (top)
-					scope:New("TextLabel")({
+					scope:New("Frame")({
 						Name = "Star",
 						Size = UDim2.fromOffset(20, 20),
 						Position = UDim2.new(0.5, 0, 0, 2),
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						Text = "⭐",
-						TextSize = 14,
+
+						[Children] = {
+							Icon(scope, {
+								Name = "Star",
+								Size = UDim2.fromScale(1, 1),
+							}),
+						},
 					}),
 
 					-- Level number

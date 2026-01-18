@@ -17,7 +17,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
+local ToonPanel = require(Shared.ui.components.base.ToonPanel)
 
 -- Path: client/ui/components/organisms/SeedBank.luau
 local Client = script.Parent.Parent.Parent.Parent

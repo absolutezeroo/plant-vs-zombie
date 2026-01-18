@@ -7,6 +7,8 @@
 	
 	SHARED component - used by both Arena and Lobby.
 	
+	Supports both emoji (legacy) and image assets via IconName prop.
+	
 	Uses Fusion 0.3 scope:Method() syntax.
 	Fully responsive with Scale-based sizing.
 ]]
@@ -18,13 +20,16 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion 0.3 primitives
 local Children = Fusion.Children
 
 export type RewardRowProps = {
 	Scope: Fusion.Scope<any>,
-	Icon: string,
+	Icon: string?, -- Legacy: emoji string (fallback if IconName not provided)
+	IconName: IconAssets.IconName?, -- New: use IconAssets system
 	Label: string,
 	Value: any, -- Fusion.Value<number> or Fusion.Computed<number>
 	Color: Color3?,
@@ -71,26 +76,41 @@ local function RewardRow(props: RewardRowProps): Frame
 				MaxSize = Vector2.new(400, 40),
 			}),
 
-			-- Icon (left, square aspect)
-			scope:New("TextLabel")({
-				Name = "Icon",
+			-- Icon (left, square aspect) - Image or emoji fallback
+			scope:New("Frame")({
+				Name = "IconContainer",
 				Size = UDim2.fromScale(0.12, 0.9),
 				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
-				Text = props.Icon,
-				TextScaled = true,
-				Font = Enum.Font.GothamBold,
 
 				[Children] = {
 					scope:New("UIAspectRatioConstraint")({
 						AspectRatio = 1,
 						DominantAxis = Enum.DominantAxis.Height,
 					}),
-					scope:New("UITextSizeConstraint")({
-						MaxTextSize = 22,
-						MinTextSize = 14,
-					}),
+					-- Use Icon component when IconName provided, otherwise emoji fallback
+					if props.IconName then
+						Icon(scope, {
+							Name = props.IconName,
+							Size = UDim2.fromScale(1, 1),
+						})
+					else
+						scope:New("TextLabel")({
+							Name = "Emoji",
+							Size = UDim2.fromScale(1, 1),
+							BackgroundTransparency = 1,
+							Text = props.Icon or "?",
+							TextScaled = true,
+							Font = Enum.Font.GothamBold,
+
+							[Children] = {
+								scope:New("UITextSizeConstraint")({
+									MaxTextSize = 22,
+									MinTextSize = 14,
+								}),
+							},
+						}),
 				},
 			}),
 

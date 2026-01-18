@@ -174,8 +174,8 @@ ENTITY_CAP = 200     -- Maximum entities
 
 | Command | Description |
 |---------|-------------|
-| `rojo serve` | Start file sync server |
-| `rojo build -o game.rbxl` | Build place file |
+| `argon serve` | Start file sync server |
+| `argon build -o game.rbxl` | Build place file |
 | `wally install` | Install/update packages |
 | `zap src/shared/network/packets.zap` | Generate network code |
 

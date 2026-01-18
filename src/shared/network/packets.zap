@@ -300,6 +300,7 @@ event ZombieSpawned = {
         ZombieType: ZombieType,
         Lane: Lane,
         PositionX: f32,
+        IsGlowing: boolean?,  -- Plant Food carrier (green glow)
     }
 }
 
@@ -521,6 +522,22 @@ event GameEndRewards = {
         GemsEarned: u8,
         NewLevel: u8,
         LevelsGained: u8,
+    }
+}
+
+-- Zombie vaulted over a plant (Pole Vaulter)
+event ZombieVaulted = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        StartX: f32,
+        StartY: f32,
+        StartZ: f32,
+        EndX: f32,
+        EndY: f32,
+        EndZ: f32,
     }
 }
 

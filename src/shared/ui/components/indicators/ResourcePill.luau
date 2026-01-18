@@ -1,8 +1,8 @@
 --!strict
 --[[
-	StatCard.luau - Statistics display card
+	ResourcePill.luau - Currency display pill (coins, gems, etc.)
 	
-	Atomic component showing icon + label + value in a card.
+	Atomic component showing icon + value in a rounded pill shape.
 	"Toon Pop" style with shadow effect.
 ]]
 
@@ -13,26 +13,27 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion primitives
 local Children = Fusion.Children
 
 -- Constants
-local SHADOW_OFFSET = 4
-local CARD_HEIGHT = 90
+local PILL_HEIGHT = 36
+local SHADOW_OFFSET = 3
 
-export type StatCardProps = {
+export type ResourcePillProps = {
 	Scope: Fusion.Scope<any>,
-	Icon: string,
-	Label: string,
+	IconName: IconAssets.IconName, -- Changed from Icon: string
 	Value: any, -- Fusion.Value<number> or Fusion.Computed<number>
-	Color: string?, -- Theme color key: "Gold", "Action", "Danger", etc.
-	Size: UDim2?,
+	Color: string?, -- Theme color key: "Gold", "Purple", "Action", etc.
+	Width: number?,
 	LayoutOrder: number?,
 }
 
 --[[
-	Format large numbers for display (1000 → 1.0K)
+	Format large numbers (1000 → 1.0K, 10000 → 10K)
 ]]
 local function formatNumber(value: number): string
 	if value >= 1000000 then
@@ -45,10 +46,10 @@ local function formatNumber(value: number): string
 	return tostring(value)
 end
 
-local function StatCard(props: StatCardProps): Frame
+local function ResourcePill(props: ResourcePillProps): Frame
 	local scope = props.Scope
 	local colorKey = props.Color or "Gold"
-	local size = props.Size or UDim2.new(0.5, -8, 0, CARD_HEIGHT)
+	local width = props.Width or 90
 
 	local colorSet = (Theme.Colors :: any)[colorKey] or Theme.Colors.Gold
 
@@ -58,8 +59,8 @@ local function StatCard(props: StatCardProps): Frame
 	end)
 
 	return scope:New("Frame")({
-		Name = "StatCard",
-		Size = size,
+		Name = "ResourcePill",
+		Size = UDim2.fromOffset(width, PILL_HEIGHT + SHADOW_OFFSET),
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 0,
 
@@ -67,69 +68,53 @@ local function StatCard(props: StatCardProps): Frame
 			-- Shadow
 			scope:New("Frame")({
 				Name = "Shadow",
-				Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
+				Size = UDim2.fromOffset(width, PILL_HEIGHT),
 				Position = UDim2.fromOffset(0, SHADOW_OFFSET),
-				BackgroundColor3 = Theme.Colors.Surface.Shadow,
+				BackgroundColor3 = colorSet.Shadow :: Color3,
 				ZIndex = 1,
 
 				[Children] = {
 					scope:New("UICorner")({
-						CornerRadius = Theme.Layout.CornerRadius,
+						CornerRadius = UDim.new(0.5, 0),
 					}),
 				},
 			}),
 
-			-- Main card
+			-- Main pill
 			scope:New("Frame")({
 				Name = "Main",
-				Size = UDim2.new(1, 0, 1, -SHADOW_OFFSET),
-				BackgroundColor3 = Theme.Colors.Surface.Main,
+				Size = UDim2.fromOffset(width, PILL_HEIGHT),
+				BackgroundColor3 = colorSet.Main :: Color3,
 				ZIndex = 2,
 
 				[Children] = {
 					scope:New("UICorner")({
-						CornerRadius = Theme.Layout.CornerRadius,
+						CornerRadius = UDim.new(0.5, 0),
 					}),
 
 					scope:New("UIStroke")({
 						Color = Theme.Colors.Surface.Stroke :: Color3,
-						Thickness = Theme.Layout.StrokeThickness,
+						Thickness = 2,
 					}),
 
-					-- Icon (top-left)
-					scope:New("TextLabel")({
-						Name = "Icon",
-						Size = UDim2.fromOffset(40, 40),
-						Position = UDim2.fromOffset(12, 10),
-						BackgroundTransparency = 1,
-						Text = props.Icon,
-						TextSize = 28,
+					-- Icon
+					Icon(scope, {
+						Name = props.IconName,
+						Size = UDim2.fromOffset(24, 24),
+						Position = UDim2.fromOffset(6, 6),
 					}),
 
-					-- Label (next to icon)
-					scope:New("TextLabel")({
-						Name = "Label",
-						Size = UDim2.new(1, -60, 0, 24),
-						Position = UDim2.fromOffset(50, 18),
-						BackgroundTransparency = 1,
-						Text = props.Label,
-						TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-						TextSize = 14,
-						Font = Theme.Typography.Fonts.Body,
-						TextXAlignment = Enum.TextXAlignment.Left,
-					}),
-
-					-- Value (big number, bottom)
+					-- Value
 					scope:New("TextLabel")({
 						Name = "Value",
-						Size = UDim2.new(1, -20, 0, 32),
-						Position = UDim2.new(0, 12, 1, -38),
+						Size = UDim2.new(1, -40, 1, 0),
+						Position = UDim2.fromOffset(32, 0),
 						BackgroundTransparency = 1,
 						Text = displayText,
-						TextColor3 = colorSet.Main :: Color3,
-						TextSize = 26,
-						Font = Theme.Typography.Fonts.Title,
-						TextXAlignment = Enum.TextXAlignment.Left,
+						TextColor3 = Color3.fromRGB(80, 50, 20),
+						TextSize = 16,
+						Font = Enum.Font.GothamBold,
+						TextXAlignment = Enum.TextXAlignment.Center,
 					}),
 				},
 			}),
@@ -137,4 +122,4 @@ local function StatCard(props: StatCardProps): Frame
 	})
 end
 
-return StatCard
+return ResourcePill

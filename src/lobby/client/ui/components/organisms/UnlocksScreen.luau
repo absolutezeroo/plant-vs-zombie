@@ -17,8 +17,10 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 local ProgressionData = require(Shared.data.ProgressionData)
-local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion 0.3 scope-based primitives
 local Children = Fusion.Children
@@ -283,23 +285,41 @@ local function LevelRow(
 												},
 											}),
 
-											-- Plant name
-											scope:New("TextLabel")({
+											-- Plant name with icon
+											scope:New("Frame")({
 												Size = UDim2.fromScale(0.55, 1),
 												Position = UDim2.fromScale(0.42, 0.5),
 												AnchorPoint = Vector2.new(0, 0.5),
 												BackgroundTransparency = 1,
-												Text = `🌱 {props.PlantType}`,
-												TextColor3 = Color3.new(1, 1, 1),
-												TextScaled = true,
-												Font = Theme.Typography.Fonts.Body,
-												TextXAlignment = Enum.TextXAlignment.Left,
-												TextTruncate = Enum.TextTruncate.AtEnd,
 
 												[Children] = {
-													scope:New("UITextSizeConstraint")({
-														MaxTextSize = 14,
-														MinTextSize = 8,
+													scope:New("UIListLayout")({
+														FillDirection = Enum.FillDirection.Horizontal,
+														VerticalAlignment = Enum.VerticalAlignment.Center,
+														Padding = UDim.new(0.03, 0),
+													}),
+													Icon(scope, {
+														Name = "Plant",
+														Size = UDim2.fromScale(0.15, 0.8),
+														LayoutOrder = 1,
+													}),
+													scope:New("TextLabel")({
+														Size = UDim2.fromScale(0.8, 1),
+														BackgroundTransparency = 1,
+														Text = props.PlantType,
+														TextColor3 = Color3.new(1, 1, 1),
+														TextScaled = true,
+														Font = Theme.Typography.Fonts.Body,
+														TextXAlignment = Enum.TextXAlignment.Left,
+														TextTruncate = Enum.TextTruncate.AtEnd,
+														LayoutOrder = 2,
+
+														[Children] = {
+															scope:New("UITextSizeConstraint")({
+																MaxTextSize = 14,
+																MinTextSize = 8,
+															}),
+														},
 													}),
 												},
 											}),
@@ -322,19 +342,10 @@ local function LevelRow(
 								AspectRatio = 1,
 								DominantAxis = Enum.DominantAxis.Height,
 							}),
-							scope:New("TextLabel")({
-								Name = "Status",
+							-- Status icon (automatic image/emoji fallback)
+							Icon(scope, {
+								Name = if props.IsCurrent then "Pointer" elseif props.IsUnlocked then "Check" else "Lock",
 								Size = UDim2.fromScale(1, 1),
-								BackgroundTransparency = 1,
-								Text = if props.IsCurrent then "👉" elseif props.IsUnlocked then "✅" else "🔒",
-								TextScaled = true,
-
-								[Children] = {
-									scope:New("UITextSizeConstraint")({
-										MaxTextSize = 28,
-										MinTextSize = 16,
-									}),
-								},
 							}),
 						},
 					}),
@@ -462,7 +473,7 @@ local function UnlocksScreen(props: UnlocksScreenProps)
 										Position = UDim2.fromScale(0.5, 0.5),
 										AnchorPoint = Vector2.new(0.5, 0.5),
 										BackgroundTransparency = 1,
-										Text = "🏆 LEVEL REWARDS",
+										Text = "LEVEL REWARDS",
 										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
 										TextScaled = true,
 										Font = Theme.Typography.Fonts.Title,
@@ -551,10 +562,7 @@ local function UnlocksScreen(props: UnlocksScreenProps)
 												end),
 												AnchorPoint = Vector2.new(0.5, 0),
 												BackgroundColor3 = Theme.Colors.Danger.Main,
-												Text = Theme.Icons.Close,
-												TextColor3 = Color3.new(1, 1, 1),
-												TextScaled = true,
-												Font = Theme.Typography.Fonts.Title,
+												Text = "",
 												AutoButtonColor = false,
 												ZIndex = 2,
 
@@ -579,9 +587,11 @@ local function UnlocksScreen(props: UnlocksScreenProps)
 														Color = Theme.Colors.Surface.Stroke :: Color3,
 														Thickness = 2,
 													}),
-													scope:New("UITextSizeConstraint")({
-														MaxTextSize = 24,
-														MinTextSize = 14,
+													Icon(scope, {
+														Name = "Close",
+														Size = UDim2.fromScale(0.6, 0.6),
+														Position = UDim2.fromScale(0.5, 0.5),
+														AnchorPoint = Vector2.new(0.5, 0.5),
 													}),
 												},
 											}),

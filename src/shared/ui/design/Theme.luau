@@ -5,6 +5,9 @@
 	
 	Central source of truth for all UI styling constants.
 	SHARED between Arena and Lobby.
+	
+	NOTE: For icon images, use IconAssets.luau instead.
+	The Icons table below contains emoji fallbacks for legacy compatibility.
 ]]
 
 export type ColorSet = {
@@ -42,6 +45,7 @@ export type LayoutType = {
 	OverlayAnchorPoint: Vector2,
 }
 
+-- Legacy emoji icons (prefer using IconAssets + Icon component)
 export type IconsType = {
 	Coin: string,
 	Gem: string,
@@ -128,7 +132,7 @@ local Theme: ThemeType = {
 
 	Layout = {
 		CornerRadius = UDim.new(0, 12), -- Rounded cartoon corners
-		StrokeThickness = 3, -- Thick cartoon outlines
+		StrokeThickness = 1, -- Thick cartoon outlines
 		ButtonHeight = 50, -- Touch-friendly button size
 		CardPadding = 16, -- Internal card padding
 		SectionSpacing = 24, -- Spacing between sections

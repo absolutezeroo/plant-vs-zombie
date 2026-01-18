@@ -21,6 +21,7 @@ local Sift = require(Packages:WaitForChild("Sift"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
 local Atoms = script.Parent.Parent.ui.components.atoms
 local FloatingText = require(Atoms.FloatingText)
@@ -211,7 +212,7 @@ end
 	@param action string - "Collected" or "Activated"
 ]]
 function FloatingTextController.ShowPlantFood(position: Vector3, action: string)
-	local text = `🌿 Plant Food {action}!`
+	local text = `{IconAssets.GetEmoji("Herb")} Plant Food {action}!`
 	local ft = FloatingText.Create(position, text, FloatingText.Styles.PlantFood)
 	_activeTexts = Sift.Array.push(_activeTexts, ft)
 end

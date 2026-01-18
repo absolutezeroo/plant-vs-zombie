@@ -19,6 +19,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 -- Path: client/ui/components/molecules/CoinCounter.luau
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
@@ -104,16 +105,27 @@ local function CoinCounter(props: CoinCounterProps): Frame
 				PaddingRight = UDim.new(0.08, 0),
 			}),
 
-			-- Coin icon (left)
+			-- Coin icon (image when available)
+			scope:New("ImageLabel")({
+				Name = "CoinIconImage",
+				Size = UDim2.fromScale(0.35, 0.8),
+				Position = UDim2.fromScale(0, 0.5),
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundTransparency = 1,
+				Image = IconAssets.Get("Coin"),
+				Visible = IconAssets.HasImage("Coin"),
+			}),
+			-- Coin icon (emoji fallback)
 			scope:New("TextLabel")({
 				Name = "CoinIcon",
 				Size = UDim2.fromScale(0.35, 0.8),
 				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
-				Text = "👛",
+				Text = IconAssets.GetEmoji("Coin"),
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
+				Visible = not IconAssets.HasImage("Coin"),
 
 				[Children] = {
 					scope:New("UITextSizeConstraint")({

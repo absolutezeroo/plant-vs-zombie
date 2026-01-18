@@ -14,6 +14,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
 local Components = script.Parent.Parent
 local NavButton = require(Components.atoms.NavButton)
@@ -27,11 +28,11 @@ local GAP_PIXELS = 8 -- 8px gap between buttons
 
 -- Navigation items configuration
 local NAV_ITEMS = {
-	{ Id = "Profile", Icon = "👤", Color = "Action" },
-	{ Id = "Shop", Icon = "🛒", Color = "Gold" },
-	{ Id = "Deck", Icon = "🃏", Color = "Purple" },
-	{ Id = "Mutation", Icon = "🧬", Color = "Danger" },
-	{ Id = "Unlocks", Icon = "🏆", Color = "Action" },
+	{ Id = "Profile", IconName = "Profile" :: IconAssets.IconName, Color = "Action" },
+	{ Id = "Shop", IconName = "Shop" :: IconAssets.IconName, Color = "Gold" },
+	{ Id = "Deck", IconName = "Deck" :: IconAssets.IconName, Color = "Purple" },
+	{ Id = "Mutation", IconName = "Mutation" :: IconAssets.IconName, Color = "Danger" },
+	{ Id = "Unlocks", IconName = "Trophy" :: IconAssets.IconName, Color = "Action" },
 }
 
 export type NavBarProps = {
@@ -57,7 +58,7 @@ local function NavBar(props: NavBarProps): Frame
 
 		buttons[i] = NavButton({
 			Scope = scope,
-			Icon = item.Icon,
+			IconName = item.IconName,
 			Color = item.Color,
 			OnClick = function()
 				if props.OnNavigate then

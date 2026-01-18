@@ -20,7 +20,8 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameSignals = require(Shared.signals.GameSignals)
 local Theme = require(Shared.ui.design.Theme)
-local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local ToonPanel = require(Shared.ui.components.base.ToonPanel)
 
 -- Fusion 0.3 primitives
 local Children = Fusion.Children
@@ -143,17 +144,43 @@ local function BaseHealthBar(props: BaseHealthBarProps): Frame
 				MaxSize = Vector2.new(300, 50),
 			}),
 
-			-- House icon
+			-- House icon (image when available)
+			scope:New("ImageLabel")({
+				Name = "HouseIconImage",
+				Size = UDim2.fromScale(0.15, 0.9),
+				Position = UDim2.fromScale(0, 0.5),
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = Theme.Colors.Surface.Main,
+				Image = IconAssets.Get("Base"),
+				ZIndex = 5,
+				Visible = IconAssets.HasImage("Base"),
+
+				[Children] = {
+					scope:New("UIAspectRatioConstraint")({
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
+					}),
+					scope:New("UICorner")({
+						CornerRadius = UDim.new(0.2, 0),
+					}),
+					scope:New("UIStroke")({
+						Color = Theme.Colors.Surface.Stroke :: Color3,
+						Thickness = 2,
+					}),
+				},
+			}),
+			-- House icon (emoji fallback)
 			scope:New("TextLabel")({
 				Name = "HouseIcon",
 				Size = UDim2.fromScale(0.15, 0.9),
 				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundColor3 = Theme.Colors.Surface.Main,
-				Text = "🏠",
+				Text = IconAssets.GetEmoji("Base"),
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
 				ZIndex = 5,
+				Visible = not IconAssets.HasImage("Base"),
 
 				[Children] = {
 					scope:New("UIAspectRatioConstraint")({

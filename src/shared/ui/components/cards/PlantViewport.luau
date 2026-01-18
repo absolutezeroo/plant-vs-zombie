@@ -12,7 +12,7 @@
 	- Optional idle animation (rotation)
 	
 	Usage:
-		local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+		local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
 		
 		-- With Fusion scope (auto-cleanup)
 		local viewport = PlantViewport.CreateWithScope(scope, {

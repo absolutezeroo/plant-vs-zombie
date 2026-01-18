@@ -1,16 +1,14 @@
 --!strict
 --[[
-	MutationScreen.luau - Mutation Lab (Toon Pop + Responsive)
+	MutationScreen.luau - Mutation Lab (Toon Pop Cartoon Lab)
 	
-	Organism for managing plant mutations.
-	Follows EXACT same "Toon Pop" design as ShopScreen:
-	- Dark overlay background (50% black)
-	- Centered panel (90% x 90%) with BackgroundTransparency = 1
-	- Position-based layout (no UIListLayout for main sections)
-	- Each section (Header, PlantBar, Content) has its own Shadow + Main
+	A fun cartoon laboratory aesthetic:
+	- Bubbly mutation capsules with bold colors
+	- Classic Toon Pop shadow/main pattern
+	- Playful badges and icons
+	- No sci-fi neon - pure cartoon style
 	
 	Uses Fusion 0.3 scope:Method() syntax.
-	Fully responsive using Scale-based sizing.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,118 +20,48 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
-local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
+local Icon = require(Shared.ui.components.base.Icon)
 
-local Components = script.Parent.Parent
-local Atoms = Components.atoms
-local ResourcePill = require(Atoms.ResourcePill)
+-- Layout components
+local ScreenOverlay = require(Shared.ui.components.layout.ScreenOverlay)
+local ScreenHeader = require(Shared.ui.components.layout.ScreenHeader)
+local ScrollableGrid = require(Shared.ui.components.layout.ScrollableGrid)
 
 -- Fusion primitives
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
-local Out = Fusion.Out
 local peek = Fusion.peek
 
 -- Constants
 local MAX_EQUIPPED_MUTATIONS = 3
 
--- Mutation icons
-local MUTATION_ICONS: { [string]: string } = {
-	Fire = "🔥",
-	Ice = "❄️",
-	Electric = "⚡",
-	Toxic = "☠️",
-	Shadow = "🌑",
-	Solar = "☀️",
-	Reinforced = "🛡️",
-	Primal = "💥",
-	Swift = "💨",
-	Damage = "⚔️",
-	Health = "❤️",
-	Range = "🎯",
-	Speed = "⚡",
-	Inferno = "🔥",
-	Frost = "❄️",
-	Storm = "⚡",
-	Plague = "☠️",
-	Void = "🌑",
-	Radiant = "☀️",
-	Fortress = "🏰",
-	Savage = "💥",
+-- Mutation type styling (cartoon colors)
+local MUTATION_STYLES: { [string]: { Main: Color3, Shadow: Color3, Icon: string } } = {
+	Fire = { Main = Color3.fromRGB(255, 100, 50), Shadow = Color3.fromRGB(180, 60, 30), Icon = "🔥" },
+	Ice = { Main = Color3.fromRGB(100, 200, 255), Shadow = Color3.fromRGB(60, 140, 200), Icon = "❄️" },
+	Electric = { Main = Color3.fromRGB(255, 220, 50), Shadow = Color3.fromRGB(200, 160, 30), Icon = "⚡" },
+	Toxic = { Main = Color3.fromRGB(150, 230, 80), Shadow = Color3.fromRGB(100, 170, 50), Icon = "☠️" },
+	Shadow = { Main = Color3.fromRGB(140, 100, 180), Shadow = Color3.fromRGB(90, 60, 130), Icon = "🌑" },
+	Solar = { Main = Color3.fromRGB(255, 180, 50), Shadow = Color3.fromRGB(200, 130, 30), Icon = "☀️" },
+	Reinforced = { Main = Color3.fromRGB(150, 180, 210), Shadow = Color3.fromRGB(100, 130, 160), Icon = "🛡️" },
+	Primal = { Main = Color3.fromRGB(230, 100, 150), Shadow = Color3.fromRGB(170, 60, 110), Icon = "💥" },
+	Swift = { Main = Color3.fromRGB(100, 220, 200), Shadow = Color3.fromRGB(60, 160, 150), Icon = "💨" },
+	Damage = { Main = Color3.fromRGB(255, 80, 100), Shadow = Color3.fromRGB(180, 50, 70), Icon = "⚔️" },
+	Health = { Main = Color3.fromRGB(255, 130, 170), Shadow = Color3.fromRGB(200, 90, 130), Icon = "❤️" },
+	Range = { Main = Color3.fromRGB(100, 200, 130), Shadow = Color3.fromRGB(60, 150, 90), Icon = "🎯" },
 }
 
-local function getMutationIcon(mutationType: string): string
-	return MUTATION_ICONS[mutationType] or "✨"
-end
-
--- Effect display names mapping
-local EFFECT_LABELS: { [string]: string } = {
-	DamageBonus = "Damage",
-	HealthBonus = "Health",
-	CooldownReduction = "Cooldown",
-	AttackSpeedBonus = "Attack Speed",
-	AddsBurnDamage = "Burn",
-	BurnDamagePerSecond = "Burn DPS",
-	BurnDuration = "Burn Duration",
-	AddsFreeze = "Freeze",
-	FreezeChance = "Freeze Chance",
-	FreezeDuration = "Freeze Duration",
-	EnhancedSlow = "Slow",
-	AddsChainLightning = "Chain Lightning",
-	ChainCount = "Chain Targets",
-	ChainDamage = "Chain Damage",
-	ChainRange = "Chain Range",
-	AddsPoisonCloud = "Poison Cloud",
-	PoisonRadius = "Poison Radius",
-	PoisonDamagePerSecond = "Poison DPS",
-	PoisonDuration = "Poison Duration",
-	AddsLifesteal = "Lifesteal",
-	LifestealPercent = "Lifesteal",
-	AddsSunOnKill = "Sun on Kill",
-	SunPerKill = "Sun/Kill",
-	SunDropChance = "Sun Chance",
-	ExtraHealth = "Bonus HP",
-	DamageReduction = "Damage Reduction",
-	SplashDamage = "Splash Damage",
-	SplashRadius = "Splash Radius",
-	SplashPercent = "Splash %",
-	Knockback = "Knockback",
-}
-
-local function formatEffects(effects: any): string
-	if not effects then
-		return "• Enhances abilities"
-	end
-
-	local lines: { string } = {}
-	for key, value in pairs(effects) do
-		local label = EFFECT_LABELS[key] or key
-		local displayValue: string
-
-		if type(value) == "boolean" then
-			if value then
-				displayValue = "✓"
-			else
-				continue
-			end
-		elseif type(value) == "number" then
-			if key:find("Bonus") or key:find("Percent") or key:find("Reduction") or key:find("Chance") then
-				displayValue = string.format("+%d%%", math.floor((value - (if value > 1 then 1 else 0)) * 100))
-			else
-				displayValue = tostring(value)
-			end
-		else
-			displayValue = tostring(value)
-		end
-
-		table.insert(lines, `• {label}: {displayValue}`)
-	end
-
-	return if #lines == 0 then "• Enhances abilities" else table.concat(lines, "\n")
+local function getMutationStyle(mutationType: string): { Main: Color3, Shadow: Color3, Icon: string }
+	return MUTATION_STYLES[mutationType] or { 
+		Main = Theme.Colors.Purple.Main, 
+		Shadow = Theme.Colors.Purple.Shadow, 
+		Icon = "✨" 
+	}
 end
 
 export type MutationScreenProps = {
-	Scope: any,
+	Scope: Fusion.Scope<any>,
 	PlayerData: any,
 	OwnedMutations: any,
 	EquippedMutations: any,
@@ -144,185 +72,76 @@ export type MutationScreenProps = {
 }
 
 --------------------------------------------------------------------------------
--- PlantCard - Selectable plant in the plant bar (Responsive)
+-- PlantCapsule - Toon Pop plant selector (bubble/capsule style)
 --------------------------------------------------------------------------------
-local function PlantCard(
-	scope: any,
-	props: {
-		PlantType: string,
-		IsSelected: any,
-		EquippedCount: number,
-		OnSelect: () -> (),
-		LayoutOrder: number,
-	}
+local function PlantCapsule(
+	scope: Fusion.Scope<any>,
+	plantType: string,
+	isSelected: any,
+	equippedCount: number,
+	onSelect: () -> ()
 ): Frame
 	local isPressed = scope:Value(false)
-	local hasEquipped = props.EquippedCount > 0
+	local hasEquipped = equippedCount > 0
 
-	local pressOffset = scope:Spring(
+	local pressScale = scope:Spring(
 		scope:Computed(function(use)
-			return if use(isPressed) then 0.06 else 0
+			return if use(isPressed) then 0.9 else 1
 		end),
 		40,
 		0.7
 	)
 
-	-- Create plant viewport
-	local viewport = PlantViewport.CreateWithScope(scope, {
-		PlantType = props.PlantType,
-		Size = UDim2.fromScale(0.85, 0.7),
-		Position = UDim2.fromScale(0.5, 0.35),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		ZIndex = 3,
-		CameraFOV = 40,
-		CameraDistance = 1.4,
-		CameraHeight = 0.1,
-	})
-
 	return scope:New("Frame")({
-		Name = "PlantCard_" .. props.PlantType,
-		Size = UDim2.fromScale(1, 1),
+		Name = "Capsule_" .. plantType,
+		Size = UDim2.fromOffset(75, 95),
 		BackgroundTransparency = 1,
-		LayoutOrder = props.LayoutOrder,
 
 		[Children] = {
-			scope:New("UIAspectRatioConstraint")({ AspectRatio = 0.9 }),
-
-			-- Purple glow for equipped plants
-			hasEquipped and scope:New("Frame")({
-				Name = "EquippedGlow",
-				Size = UDim2.fromScale(1.1, 1.04),
+			-- Scale wrapper
+			scope:New("Frame")({
+				Name = "ScaleWrapper",
+				Size = scope:Computed(function(use)
+					local s = use(pressScale)
+					return UDim2.fromScale(s, s)
+				end),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Theme.Colors.Purple.Main,
-				BackgroundTransparency = 0.6,
-				ZIndex = 0,
+				BackgroundTransparency = 1,
 
 				[Children] = {
-					scope:New("UICorner")({ CornerRadius = UDim.new(0, 12) }),
-				},
-			}) or nil,
-
-			-- Shadow
-			scope:New("Frame")({
-				Name = "Shadow",
-				Size = UDim2.fromScale(1, 0.94),
-				Position = UDim2.fromScale(0, 0.06),
-				BackgroundColor3 = scope:Computed(function(use)
-					if use(props.IsSelected) then
-						return Theme.Colors.Action.Shadow
-					elseif hasEquipped then
-						return Theme.Colors.Purple.Shadow
-					else
-						return Theme.Colors.Surface.Shadow
-					end
-				end),
-				ZIndex = 1,
-
-				[Children] = {
-					scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-				},
-			}),
-
-			-- Main card
-			scope:New("Frame")({
-				Name = "Main",
-				Size = scope:Computed(function(use)
-					local offset = use(pressOffset)
-					return UDim2.fromScale(1, 0.94 - offset)
-				end),
-				Position = scope:Computed(function(use)
-					return UDim2.fromScale(0, use(pressOffset))
-				end),
-				BackgroundColor3 = scope:Computed(function(use)
-					if use(props.IsSelected) then
-						return Theme.Colors.Action.Main
-					elseif hasEquipped then
-						return Color3.fromRGB(60, 45, 80) -- Subtle purple tint
-					else
-						return Theme.Colors.Surface.Main
-					end
-				end),
-				ZIndex = 2,
-
-				[Children] = {
-					scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-
-					scope:New("UIStroke")({
-						Color = scope:Computed(function(use)
-							if use(props.IsSelected) then
-								return Theme.Colors.Action.Stroke or Theme.Colors.Surface.Stroke :: Color3
-							elseif hasEquipped then
-								return Theme.Colors.Purple.Main
-							else
-								return Theme.Colors.Surface.Stroke :: Color3
-							end
+					-- Shadow
+					scope:New("Frame")({
+						Name = "Shadow",
+						Size = UDim2.fromScale(1, 0.9),
+						Position = UDim2.fromScale(0.5, 0.1),
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = scope:Computed(function(use)
+							if use(isSelected) then return Theme.Colors.Purple.Shadow end
+							if hasEquipped then return Color3.fromRGB(100, 70, 130) end
+							return Theme.Colors.Surface.Shadow
 						end),
-						Thickness = scope:Computed(function(use)
-							if use(props.IsSelected) then
-								return 4
-							elseif hasEquipped then
-								return 3
-							else
-								return Theme.Layout.StrokeThickness
-							end
-						end),
-					}),
-
-					viewport,
-
-					-- Plant name
-					scope:New("TextLabel")({
-						Size = UDim2.fromScale(1, 0.2),
-						Position = UDim2.fromScale(0.5, 0.92),
-						AnchorPoint = Vector2.new(0.5, 1),
-						BackgroundTransparency = 1,
-						Text = props.PlantType,
-						TextColor3 = if hasEquipped then Theme.Colors.Purple.Main else Theme.Colors.Surface.Stroke :: Color3,
-						TextScaled = true,
-						Font = Enum.Font.GothamBold,
-						TextTruncate = Enum.TextTruncate.AtEnd,
-						ZIndex = 4,
+						ZIndex = 1,
 
 						[Children] = {
-							scope:New("UITextSizeConstraint")({ MaxTextSize = 12, MinTextSize = 8 }),
+							scope:New("UICorner")({ CornerRadius = UDim.new(0.25, 0) }),
 						},
 					}),
 
-					-- Equipped mutations badge
-					hasEquipped
-							and scope:New("Frame")({
-								Size = UDim2.fromScale(0.28, 0.28),
-								Position = UDim2.fromScale(0.95, 0.05),
-								AnchorPoint = Vector2.new(1, 0),
-								BackgroundColor3 = Theme.Colors.Purple.Main,
-								ZIndex = 5,
-
-								[Children] = {
-									scope:New("UIAspectRatioConstraint")({ AspectRatio = 1 }),
-									scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-									scope:New("TextLabel")({
-										Size = UDim2.fromScale(1, 1),
-										BackgroundTransparency = 1,
-										Text = tostring(props.EquippedCount),
-										TextColor3 = Color3.new(1, 1, 1),
-										TextScaled = true,
-										Font = Enum.Font.GothamBold,
-
-										[Children] = {
-											scope:New("UITextSizeConstraint")({ MaxTextSize = 14, MinTextSize = 8 }),
-										},
-									}),
-								},
-							})
-						or nil,
-
-					-- Click handler
+					-- Main capsule
 					scope:New("TextButton")({
-						Size = UDim2.fromScale(1, 1),
-						BackgroundTransparency = 1,
+						Name = "Main",
+						Size = UDim2.fromScale(1, 0.9),
+						Position = UDim2.fromScale(0.5, 0),
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = scope:Computed(function(use)
+							if use(isSelected) then return Theme.Colors.Purple.Main end
+							if hasEquipped then return Color3.fromRGB(140, 100, 180) end
+							return Theme.Colors.Surface.Main
+						end),
+						AutoButtonColor = false,
 						Text = "",
-						ZIndex = 10,
+						ZIndex = 2,
 
 						[OnEvent("MouseButton1Down")] = function()
 							isPressed:set(true)
@@ -330,12 +149,115 @@ local function PlantCard(
 
 						[OnEvent("MouseButton1Up")] = function()
 							isPressed:set(false)
-							props.OnSelect()
+							onSelect()
 						end,
 
 						[OnEvent("MouseLeave")] = function()
 							isPressed:set(false)
 						end,
+
+						[Children] = {
+							scope:New("UICorner")({ CornerRadius = UDim.new(0.25, 0) }),
+
+							scope:New("UIStroke")({
+								Color = scope:Computed(function(use)
+									if use(isSelected) then return Color3.new(1, 1, 1) end
+									return Theme.Colors.Surface.Stroke :: Color3
+								end),
+								Thickness = scope:Computed(function(use)
+									return if use(isSelected) then 3 else 2
+								end),
+							}),
+
+							-- Bubble highlight (top)
+							scope:New("Frame")({
+								Name = "BubbleHighlight",
+								Size = UDim2.fromScale(0.5, 0.15),
+								Position = UDim2.fromScale(0.3, 0.08),
+								BackgroundColor3 = Color3.new(1, 1, 1),
+								BackgroundTransparency = 0.7,
+								ZIndex = 3,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+								},
+							}),
+
+							-- Plant viewport
+							PlantViewport.CreateWithScope(scope, {
+								PlantType = plantType,
+								Size = UDim2.fromScale(0.85, 0.6),
+								Position = UDim2.fromScale(0.5, 0.4),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								ZIndex = 3,
+								CameraFOV = 35,
+								CameraDistance = 1.4,
+								CameraHeight = 0.1,
+							}),
+
+							-- Name tag
+							scope:New("Frame")({
+								Name = "NameTag",
+								Size = UDim2.fromScale(0.9, 0.18),
+								Position = UDim2.fromScale(0.5, 0.88),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundColor3 = scope:Computed(function(use)
+									if use(isSelected) then return Theme.Colors.Purple.Shadow end
+									return Theme.Colors.Surface.Shadow
+								end),
+								ZIndex = 4,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.4, 0) }),
+
+									scope:New("TextLabel")({
+										Size = UDim2.fromScale(0.95, 1),
+										Position = UDim2.fromScale(0.5, 0.5),
+										AnchorPoint = Vector2.new(0.5, 0.5),
+										BackgroundTransparency = 1,
+										Text = plantType,
+										TextColor3 = Color3.new(1, 1, 1),
+										TextScaled = true,
+										Font = Enum.Font.GothamBold,
+										TextTruncate = Enum.TextTruncate.AtEnd,
+
+										[Children] = {
+											scope:New("UITextSizeConstraint")({ MaxTextSize = 10, MinTextSize = 7 }),
+										},
+									}),
+								},
+							}),
+
+							-- Equipped badge (DNA bubble)
+							hasEquipped and scope:New("Frame")({
+								Name = "EquipBadge",
+								Size = UDim2.fromOffset(24, 24),
+								Position = UDim2.new(1, -2, 0, 2),
+								AnchorPoint = Vector2.new(1, 0),
+								BackgroundColor3 = Theme.Colors.Purple.Main,
+								ZIndex = 10,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+									scope:New("UIStroke")({
+										Color = Color3.new(1, 1, 1),
+										Thickness = 2,
+									}),
+									scope:New("TextLabel")({
+										Size = UDim2.fromScale(1, 1),
+										BackgroundTransparency = 1,
+										Text = "🧬" .. tostring(equippedCount),
+										TextColor3 = Color3.new(1, 1, 1),
+										TextScaled = true,
+										Font = Enum.Font.GothamBold,
+
+										[Children] = {
+											scope:New("UITextSizeConstraint")({ MaxTextSize = 10, MinTextSize = 6 }),
+										},
+									}),
+								},
+							}) or nil,
+						},
 					}),
 				},
 			}),
@@ -344,207 +266,289 @@ local function PlantCard(
 end
 
 --------------------------------------------------------------------------------
--- MutationCard - A mutation in the grid (Responsive)
+-- MutationBubble - Toon Pop mutation card (bubbly potion style)
 --------------------------------------------------------------------------------
-local function MutationCard(
-	scope: any,
-	props: {
-		MutationType: string,
-		MutationData: any,
-		IsOwned: boolean,
-		IsEquipped: boolean,
-		IsLocked: boolean,
-		IsSelected: any,
-		OnSelect: () -> (),
-		LayoutOrder: number,
-	}
+local function MutationBubble(
+	scope: Fusion.Scope<any>,
+	mutationType: string,
+	mutationData: any,
+	isOwned: boolean,
+	isEquipped: boolean,
+	isLocked: boolean,
+	isSelected: any,
+	onSelect: () -> (),
+	layoutOrder: number
 ): Frame
 	local isPressed = scope:Value(false)
+	local style = getMutationStyle(mutationType)
 
-	local pressOffset = scope:Spring(
+	local pressScale = scope:Spring(
 		scope:Computed(function(use)
-			return if use(isPressed) then 0.05 else 0
+			if isLocked then return 0.95 end
+			return if use(isPressed) then 0.88 else 1
 		end),
 		40,
 		0.7
 	)
 
-	local cardColor = if props.IsEquipped
-		then Theme.Colors.Purple.Main
-		elseif props.IsOwned then Theme.Colors.Action.Main
-		elseif props.IsLocked then Theme.Colors.Surface.Shadow
-		else Theme.Colors.Surface.Main
+	-- Card colors based on state
+	local mainColor = if isEquipped then Theme.Colors.Purple.Main
+		elseif isOwned then Theme.Colors.Action.Main
+		elseif isLocked then Theme.Colors.Surface.Shadow
+		else style.Main
 
-	local shadowColor = if props.IsEquipped
-		then Theme.Colors.Purple.Shadow
-		elseif props.IsOwned then Theme.Colors.Action.Shadow
-		elseif props.IsLocked then Color3.fromHex("#888888")
-		else Theme.Colors.Surface.Shadow
+	local shadowColor = if isEquipped then Theme.Colors.Purple.Shadow
+		elseif isOwned then Theme.Colors.Action.Shadow
+		elseif isLocked then Color3.fromRGB(80, 80, 80)
+		else style.Shadow
 
 	return scope:New("Frame")({
-		Name = "MutationCard_" .. props.MutationType,
+		Name = "Mutation_" .. mutationType,
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		LayoutOrder = props.LayoutOrder,
+		LayoutOrder = layoutOrder,
 
 		[Children] = {
-			scope:New("UIAspectRatioConstraint")({ AspectRatio = 0.82 }),
+			scope:New("UIAspectRatioConstraint")({ AspectRatio = 0.75 }),
 
-			-- Shadow
+			-- Scale wrapper
 			scope:New("Frame")({
-				Name = "Shadow",
-				Size = UDim2.fromScale(1, 0.92),
-				Position = UDim2.fromScale(0, 0.08),
-				BackgroundColor3 = shadowColor,
-				ZIndex = 1,
-
-				[Children] = {
-					scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-				},
-			}),
-
-			-- Main card
-			scope:New("Frame")({
-				Name = "Main",
+				Name = "ScaleWrapper",
 				Size = scope:Computed(function(use)
-					local offset = use(pressOffset)
-					return UDim2.fromScale(1, 0.92 - offset)
+					local s = use(pressScale)
+					return UDim2.fromScale(s, s)
 				end),
-				Position = scope:Computed(function(use)
-					return UDim2.fromScale(0, use(pressOffset))
-				end),
-				BackgroundColor3 = cardColor,
-				ZIndex = 2,
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
 
 				[Children] = {
-					scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-
-					scope:New("UIStroke")({
-						Color = scope:Computed(function(use)
-							return if use(props.IsSelected)
-								then Theme.Colors.Gold.Main
-								else Theme.Colors.Surface.Stroke :: Color3
-						end),
-						Thickness = scope:Computed(function(use)
-							return if use(props.IsSelected) then 4 else Theme.Layout.StrokeThickness
-						end),
-					}),
-
-					-- Mutation icon
-					scope:New("TextLabel")({
-						Size = UDim2.fromScale(0.6, 0.45),
-						Position = UDim2.fromScale(0.5, 0.28),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundTransparency = 1,
-						Text = getMutationIcon(props.MutationType),
-						TextScaled = true,
-						ZIndex = 3,
-
-						[Children] = {
-							scope:New("UITextSizeConstraint")({ MaxTextSize = 40, MinTextSize = 16 }),
-						},
-					}),
-
-					-- Mutation name
-					scope:New("TextLabel")({
-						Size = UDim2.fromScale(0.9, 0.18),
-						Position = UDim2.fromScale(0.5, 0.62),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundTransparency = 1,
-						Text = props.MutationData.Name or props.MutationType,
-						TextColor3 = if props.IsLocked
-							then Color3.fromHex("#888888")
-							else Theme.Colors.Surface.Stroke :: Color3,
-						TextScaled = true,
-						Font = Enum.Font.GothamBold,
-						TextTruncate = Enum.TextTruncate.AtEnd,
-						ZIndex = 3,
-
-						[Children] = {
-							scope:New("UITextSizeConstraint")({ MaxTextSize = 12, MinTextSize = 8 }),
-						},
-					}),
-
-					-- Status badge
+					-- Shadow (offset down-right for Toon Pop)
 					scope:New("Frame")({
-						Size = UDim2.fromScale(0.85, 0.16),
-						Position = UDim2.fromScale(0.5, 0.88),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundColor3 = if props.IsEquipped
-							then Theme.Colors.Purple.Shadow
-							elseif props.IsOwned then Theme.Colors.Action.Shadow
-							elseif props.IsLocked then Color3.fromHex("#666666")
-							else Theme.Colors.Gold.Main,
-						ZIndex = 3,
+						Name = "Shadow",
+						Size = UDim2.fromScale(1, 0.94),
+						Position = UDim2.fromScale(0.5, 0.06),
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = shadowColor,
+						ZIndex = 1,
 
 						[Children] = {
-							scope:New("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
-							scope:New("TextLabel")({
-								Size = UDim2.fromScale(1, 1),
-								BackgroundTransparency = 1,
-								Text = if props.IsEquipped
-									then "EQUIPPED"
-									elseif props.IsOwned then "OWNED"
-									elseif props.IsLocked then `Lv.{props.MutationData.RequiredLevel}`
-									else `${Theme.Icons.Coin}{props.MutationData.Cost}`,
-								TextColor3 = Color3.new(1, 1, 1),
-								TextScaled = true,
-								Font = Enum.Font.GothamBold,
-
-								[Children] = {
-									scope:New("UITextSizeConstraint")({ MaxTextSize = 10, MinTextSize = 6 }),
-								},
-							}),
+							scope:New("UICorner")({ CornerRadius = UDim.new(0.15, 0) }),
 						},
 					}),
 
-					-- Lock overlay
-					props.IsLocked
-							and scope:New("Frame")({
-								Size = UDim2.fromScale(1, 1),
-								BackgroundColor3 = Color3.new(0, 0, 0),
-								BackgroundTransparency = 0.5,
-								ZIndex = 8,
-
-								[Children] = {
-									scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-									scope:New("TextLabel")({
-										Size = UDim2.fromScale(1, 1),
-										BackgroundTransparency = 1,
-										Text = Theme.Icons.Lock,
-										TextScaled = true,
-
-										[Children] = {
-											scope:New("UITextSizeConstraint")({ MaxTextSize = 32, MinTextSize = 16 }),
-										},
-									}),
-								},
-							})
-						or nil,
-
-					-- Click handler
+					-- Main card
 					scope:New("TextButton")({
-						Size = UDim2.fromScale(1, 1),
-						BackgroundTransparency = 1,
+						Name = "Main",
+						Size = UDim2.fromScale(1, 0.94),
+						Position = UDim2.fromScale(0.5, 0),
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = mainColor,
+						AutoButtonColor = false,
 						Text = "",
-						ZIndex = 10,
+						ZIndex = 2,
 
 						[OnEvent("MouseButton1Down")] = function()
-							if not props.IsLocked then
-								isPressed:set(true)
-							end
+							if not isLocked then isPressed:set(true) end
 						end,
 
 						[OnEvent("MouseButton1Up")] = function()
 							isPressed:set(false)
-							if not props.IsLocked then
-								props.OnSelect()
-							end
+							if not isLocked then onSelect() end
 						end,
 
 						[OnEvent("MouseLeave")] = function()
 							isPressed:set(false)
 						end,
+
+						[Children] = {
+							scope:New("UICorner")({ CornerRadius = UDim.new(0.15, 0) }),
+
+							scope:New("UIStroke")({
+								Color = scope:Computed(function(use)
+									return if use(isSelected) then Theme.Colors.Gold.Main else Color3.new(1, 1, 1)
+								end),
+								Thickness = scope:Computed(function(use)
+									return if use(isSelected) then 4 else 2
+								end),
+							}),
+
+							-- Bubble shine (top-left)
+							not isLocked and scope:New("Frame")({
+								Name = "Shine",
+								Size = UDim2.fromScale(0.35, 0.12),
+								Position = UDim2.fromScale(0.2, 0.06),
+								BackgroundColor3 = Color3.new(1, 1, 1),
+								BackgroundTransparency = 0.6,
+								ZIndex = 3,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+								},
+							}) or nil,
+
+							-- Icon bubble (potion flask style)
+							scope:New("Frame")({
+								Name = "IconBubble",
+								Size = UDim2.fromScale(0.55, 0.35),
+								Position = UDim2.fromScale(0.5, 0.22),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundColor3 = if isLocked then Color3.fromRGB(100, 100, 100) else style.Main,
+								ZIndex = 3,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+									scope:New("UIStroke")({
+										Color = Color3.new(1, 1, 1),
+										Thickness = 2,
+									}),
+
+									-- Emoji icon
+									scope:New("TextLabel")({
+										Size = UDim2.fromScale(0.75, 0.75),
+										Position = UDim2.fromScale(0.5, 0.5),
+										AnchorPoint = Vector2.new(0.5, 0.5),
+										BackgroundTransparency = 1,
+										Text = style.Icon,
+										TextScaled = true,
+									}),
+								},
+							}),
+
+							-- Mutation name
+							scope:New("TextLabel")({
+								Name = "Name",
+								Size = UDim2.fromScale(0.9, 0.12),
+								Position = UDim2.fromScale(0.5, 0.48),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundTransparency = 1,
+								Text = mutationData.Name or mutationType,
+								TextColor3 = if isLocked then Color3.fromRGB(180, 180, 180) else Color3.new(1, 1, 1),
+								TextScaled = true,
+								Font = Enum.Font.GothamBold,
+								ZIndex = 3,
+
+								[Children] = {
+									scope:New("UITextSizeConstraint")({ MaxTextSize = 11, MinTextSize = 7 }),
+								},
+							}),
+
+							-- Power stars (tier indicator)
+							scope:New("Frame")({
+								Name = "PowerStars",
+								Size = UDim2.fromScale(0.7, 0.1),
+								Position = UDim2.fromScale(0.5, 0.58),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundTransparency = 1,
+								ZIndex = 3,
+
+								[Children] = {
+									scope:New("UIListLayout")({
+										FillDirection = Enum.FillDirection.Horizontal,
+										HorizontalAlignment = Enum.HorizontalAlignment.Center,
+										Padding = UDim.new(0.02, 0),
+									}),
+
+									-- Generate stars
+									(function()
+										local stars = {}
+										local tier = mutationData.Tier or 1
+										for i = 1, 3 do
+											local isFilled = i <= tier and not isLocked
+											table.insert(stars, scope:New("TextLabel")({
+												Size = UDim2.fromScale(0.28, 1),
+												BackgroundTransparency = 1,
+												Text = if isFilled then "⭐" else "☆",
+												TextScaled = true,
+												TextColor3 = if isFilled then Theme.Colors.Gold.Main else Color3.fromRGB(150, 150, 150),
+												LayoutOrder = i,
+											}))
+										end
+										return stars
+									end)(),
+								},
+							}),
+
+							-- Status badge
+							scope:New("Frame")({
+								Name = "StatusBadge",
+								Size = UDim2.fromScale(0.85, 0.15),
+								Position = UDim2.fromScale(0.5, 0.77),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundColor3 = if isEquipped then Theme.Colors.Purple.Shadow
+									elseif isOwned then Theme.Colors.Action.Shadow
+									elseif isLocked then Color3.fromRGB(60, 60, 60)
+									else Theme.Colors.Gold.Shadow,
+								ZIndex = 3,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.4, 0) }),
+
+									-- Status text or price
+									if isEquipped or isOwned or isLocked then
+										scope:New("TextLabel")({
+											Size = UDim2.fromScale(1, 1),
+											BackgroundTransparency = 1,
+											Text = if isEquipped then "🧬 EQUIPPED"
+												elseif isOwned then "✓ OWNED"
+												else `🔒 Lv.{mutationData.RequiredLevel}`,
+											TextColor3 = Color3.new(1, 1, 1),
+											TextScaled = true,
+											Font = Enum.Font.GothamBold,
+
+											[Children] = {
+												scope:New("UITextSizeConstraint")({ MaxTextSize = 10, MinTextSize = 6 }),
+											},
+										})
+									else
+										-- Price display
+										scope:New("Frame")({
+											Size = UDim2.fromScale(1, 1),
+											BackgroundTransparency = 1,
+
+											[Children] = {
+												scope:New("UIListLayout")({
+													FillDirection = Enum.FillDirection.Horizontal,
+													VerticalAlignment = Enum.VerticalAlignment.Center,
+													HorizontalAlignment = Enum.HorizontalAlignment.Center,
+													Padding = UDim.new(0.03, 0),
+												}),
+												Icon(scope, {
+													Name = "Coin",
+													Size = UDim2.fromScale(0.2, 0.75),
+													LayoutOrder = 1,
+												}),
+												scope:New("TextLabel")({
+													Size = UDim2.fromScale(0.5, 1),
+													BackgroundTransparency = 1,
+													Text = tostring(mutationData.Cost),
+													TextColor3 = Theme.Colors.Gold.Main,
+													TextScaled = true,
+													Font = Enum.Font.GothamBold,
+													LayoutOrder = 2,
+
+													[Children] = {
+														scope:New("UITextSizeConstraint")({ MaxTextSize = 11, MinTextSize = 7 }),
+													},
+												}),
+											},
+										}),
+								},
+							}),
+
+							-- Lock overlay
+							isLocked and scope:New("Frame")({
+								Name = "LockOverlay",
+								Size = UDim2.fromScale(1, 1),
+								BackgroundColor3 = Color3.new(0, 0, 0),
+								BackgroundTransparency = 0.5,
+								ZIndex = 10,
+
+								[Children] = {
+									scope:New("UICorner")({ CornerRadius = UDim.new(0.15, 0) }),
+								},
+							}) or nil,
+						},
 					}),
 				},
 			}),
@@ -553,7 +557,7 @@ local function MutationCard(
 end
 
 --------------------------------------------------------------------------------
--- MutationScreen Component (Same structure as ShopScreen)
+-- MutationScreen - Toon Pop Cartoon Laboratory
 --------------------------------------------------------------------------------
 local function MutationScreen(props: MutationScreenProps): Frame
 	local scope = props.Scope
@@ -562,63 +566,54 @@ local function MutationScreen(props: MutationScreenProps): Frame
 	local selectedPlant = scope:Value(nil :: string?)
 	local selectedMutation = scope:Value(nil :: string?)
 
-	-- Search filter
-	local searchQuery = scope:Value("")
-	local searchBoxRef = scope:Value(nil :: TextBox?)
+	-- Responsive sizing
+	local camera = workspace.CurrentCamera
+	local viewportSize = scope:Value(camera and camera.ViewportSize or Vector2.new(1920, 1080))
+	if camera then
+		local connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			viewportSize:set(camera.ViewportSize)
+		end)
+		table.insert(scope, connection)
+	end
 
-	-- Close button animation
-	local isClosePressed = scope:Value(false)
-	local closeOffset = scope:Spring(
-		scope:Computed(function(use)
-			return if use(isClosePressed) then 4 else 0
-		end),
-		40,
-		0.7
-	)
+	local gridCellSize = scope:Computed(function(use)
+		local size = use(viewportSize)
+		local scale = math.clamp(size.Y / 1080, 0.6, 1.5)
+		return UDim2.fromOffset(math.floor(105 * scale), math.floor(140 * scale))
+	end)
 
-	-- Action button animation
-	local isActionPressed = scope:Value(false)
-	local actionOffset = scope:Spring(
-		scope:Computed(function(use)
-			return if use(isActionPressed) then 0.06 else 0
-		end),
-		40,
-		0.7
-	)
+	local gridCellPadding = scope:Computed(function(use)
+		local size = use(viewportSize)
+		local scale = math.clamp(size.Y / 1080, 0.6, 1.5)
+		return UDim2.fromOffset(math.floor(10 * scale), math.floor(10 * scale))
+	end)
 
-	-- Unlocked plants (filtered by search, equipped first)
+	-- Unlocked plants (sorted: equipped first)
 	local unlockedPlants = scope:Computed(function(use)
 		local data = use(props.PlayerData)
-		if not data then
-			return {}
-		end
+		if not data then return {} end
 
-		local query = string.lower(use(searchQuery) or "")
 		local allEquipped = use(props.EquippedMutations) or {}
 		local unlockedList = data.UnlockedPlants or {}
-		local result: { { Type: string, Stats: any, HasEquipped: boolean } } = {}
+		local result: { { Type: string, EquippedCount: number } } = {}
 
-		for _, plantType in ipairs(unlockedList) do
-			-- Filter by search query
-			if query ~= "" and not string.find(string.lower(plantType), query, 1, true) then
-				continue
-			end
-
+		for _, plantType in unlockedList do
 			local stats = PlantData.GetStats(plantType)
 			if stats then
 				local equipped = allEquipped[plantType] or {}
-				table.insert(result, { Type = plantType, Stats = stats, HasEquipped = #equipped > 0 })
+				table.insert(result, { Type = plantType, EquippedCount = #equipped })
 			end
 		end
 
-		-- Sort: equipped plants first, then alphabetically
+		-- Sort: equipped first
 		table.sort(result, function(a, b)
-			if a.HasEquipped ~= b.HasEquipped then
-				return a.HasEquipped
+			if (a.EquippedCount > 0) ~= (b.EquippedCount > 0) then
+				return a.EquippedCount > 0
 			end
 			return a.Type < b.Type
 		end)
 
+		-- Auto-select first plant
 		local current = peek(selectedPlant)
 		if not current and #result > 0 then
 			task.defer(function()
@@ -632,19 +627,15 @@ local function MutationScreen(props: MutationScreenProps): Frame
 	-- Compatible mutations for selected plant
 	local compatibleMutations = scope:Computed(function(use)
 		local plantType = use(selectedPlant)
-		if not plantType then
-			return {}
-		end
+		if not plantType then return {} end
 
 		local plantStats = PlantData[plantType]
-		if not plantStats then
-			return {}
-		end
+		if not plantStats then return {} end
 
 		local category = plantStats.Category
 		local result: { { Type: string, Data: any } } = {}
 
-		for mutationType, data in pairs(MutationData.GetAll()) do
+		for mutationType, data in MutationData.GetAll() do
 			if table.find(data.CompatibleCategories, category) then
 				table.insert(result, { Type = mutationType, Data = data })
 			end
@@ -657,26 +648,22 @@ local function MutationScreen(props: MutationScreenProps): Frame
 		return result
 	end)
 
-	-- Equipped/Owned mutations for selected plant
+	-- Equipped/Owned for selected plant
 	local plantEquipped = scope:Computed(function(use)
 		local plantType = use(selectedPlant)
-		if not plantType then
-			return {}
-		end
+		if not plantType then return {} end
 		local allEquipped = use(props.EquippedMutations) or {}
 		return allEquipped[plantType] or {}
 	end)
 
 	local plantOwned = scope:Computed(function(use)
 		local plantType = use(selectedPlant)
-		if not plantType then
-			return {}
-		end
+		if not plantType then return {} end
 		local allOwned = use(props.OwnedMutations) or {}
 		return allOwned[plantType] or {}
 	end)
 
-	-- Player data
+	-- Player stats
 	local playerCoins = scope:Computed(function(use)
 		local data = use(props.PlayerData)
 		return if data then data.Coins else 0
@@ -687,29 +674,17 @@ local function MutationScreen(props: MutationScreenProps): Frame
 		return if data then data.Level else 1
 	end)
 
-	-- Selected mutation info
-	local selectedMutationData = scope:Computed(function(use)
-		local mutation = use(selectedMutation)
-		if not mutation then
-			return nil
-		end
-		return MutationData.Get(mutation)
-	end)
-
+	-- Selected mutation state
 	local isMutationOwned = scope:Computed(function(use)
 		local mutation = use(selectedMutation)
-		if not mutation then
-			return false
-		end
+		if not mutation then return false end
 		local owned = use(plantOwned)
 		return table.find(owned, mutation) ~= nil
 	end)
 
 	local isMutationEquipped = scope:Computed(function(use)
 		local mutation = use(selectedMutation)
-		if not mutation then
-			return false
-		end
+		if not mutation then return false end
 		local equipped = use(plantEquipped)
 		return table.find(equipped, mutation) ~= nil
 	end)
@@ -721,32 +696,22 @@ local function MutationScreen(props: MutationScreenProps): Frame
 
 	local canPurchase = scope:Computed(function(use)
 		local mutation = use(selectedMutation)
-		if not mutation then
-			return false
-		end
-		if use(isMutationOwned) then
-			return false
-		end
+		if not mutation then return false end
+		if use(isMutationOwned) then return false end
 
 		local data = MutationData.Get(mutation)
-		if not data then
-			return false
-		end
+		if not data then return false end
 
 		local level = use(playerLevel) :: number
 		local coins = use(playerCoins) :: number
-		local requiredLevel = data.RequiredLevel :: number
-		local cost = data.Cost :: number
-		return level >= requiredLevel and coins >= cost
+		return level >= data.RequiredLevel and coins >= data.Cost
 	end)
 
 	-- Action handler
 	local function performAction()
 		local plantType = peek(selectedPlant)
 		local mutation = peek(selectedMutation)
-		if not plantType or not mutation then
-			return
-		end
+		if not plantType or not mutation then return end
 
 		if peek(isMutationEquipped) then
 			props.OnUnequipMutation(plantType, mutation)
@@ -759,796 +724,270 @@ local function MutationScreen(props: MutationScreenProps): Frame
 		end
 	end
 
-	return scope:New("Frame")({
-		Name = "MutationScreen",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.5,
-		ZIndex = 100,
+	-- Action button state
+	local actionButtonText = scope:Computed(function(use)
+		local mutation = use(selectedMutation)
+		if not mutation then return "SELECT A MUTATION" end
+
+		if use(isMutationEquipped) then
+			return "❌ UNEQUIP"
+		elseif use(isMutationOwned) then
+			if use(canEquipMore) then
+				return "🧬 EQUIP"
+			else
+				return "🔒 SLOTS FULL"
+			end
+		elseif use(canPurchase) then
+			local data = MutationData.Get(mutation)
+			return `💰 BUY ({data and data.Cost or 0})`
+		else
+			return "🔒 LOCKED"
+		end
+	end)
+
+	local actionButtonColors = scope:Computed(function(use)
+		local mutation = use(selectedMutation)
+		if not mutation then 
+			return { Main = Theme.Colors.Surface.Main, Shadow = Theme.Colors.Surface.Shadow }
+		end
+
+		if use(isMutationEquipped) then
+			return { Main = Theme.Colors.Danger.Main, Shadow = Theme.Colors.Danger.Shadow }
+		elseif use(isMutationOwned) and use(canEquipMore) then
+			return { Main = Theme.Colors.Purple.Main, Shadow = Theme.Colors.Purple.Shadow }
+		elseif use(canPurchase) then
+			return { Main = Theme.Colors.Action.Main, Shadow = Theme.Colors.Action.Shadow }
+		else
+			return { Main = Theme.Colors.Surface.Main, Shadow = Theme.Colors.Surface.Shadow }
+		end
+	end)
+
+	-- Build plant bar
+	local plantBar = scope:Computed(function(use)
+		local plants = use(unlockedPlants)
+		local cards = {}
+
+		for _, p in plants do
+			local isSelected = scope:Computed(function(use2)
+				return use2(selectedPlant) == p.Type
+			end)
+
+			table.insert(cards, PlantCapsule(scope, p.Type, isSelected, p.EquippedCount, function()
+				selectedPlant:set(p.Type)
+				selectedMutation:set(nil)
+			end))
+		end
+
+		return cards
+	end)
+
+	-- Build mutation grid
+	local mutationCards = scope:Computed(function(use)
+		local mutations = use(compatibleMutations)
+		local owned = use(plantOwned)
+		local equipped = use(plantEquipped)
+		local level = use(playerLevel) :: number
+		local cards = {}
+
+		for i, m in mutations do
+			local isOwned = table.find(owned, m.Type) ~= nil
+			local isEquipped = table.find(equipped, m.Type) ~= nil
+			local isLocked = level < m.Data.RequiredLevel
+
+			local isSelected = scope:Computed(function(use2)
+				return use2(selectedMutation) == m.Type
+			end)
+
+			table.insert(cards, MutationBubble(
+				scope,
+				m.Type,
+				m.Data,
+				isOwned,
+				isEquipped,
+				isLocked,
+				isSelected,
+				function()
+					selectedMutation:set(m.Type)
+				end,
+				i
+			))
+		end
+
+		return cards
+	end)
+
+	-- Lab status badge (equipped count)
+	local labStatusBadge = scope:New("Frame")({
+		Name = "LabStatus",
+		Size = UDim2.fromScale(1, 0.85),
+		BackgroundColor3 = Theme.Colors.Purple.Main,
 
 		[Children] = {
-			-- Main panel
+			scope:New("UICorner")({ CornerRadius = UDim.new(0.4, 0) }),
+			scope:New("UIStroke")({
+				Color = Color3.new(1, 1, 1),
+				Thickness = 2,
+			}),
+
+			scope:New("TextLabel")({
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Text = scope:Computed(function(use)
+					local equipped = use(plantEquipped)
+					return `🧬 {#equipped}/{MAX_EQUIPPED_MUTATIONS}`
+				end),
+				TextColor3 = Color3.new(1, 1, 1),
+				TextScaled = true,
+				Font = Enum.Font.GothamBold,
+
+				[Children] = {
+					scope:New("UITextSizeConstraint")({ MinTextSize = 10, MaxTextSize = 14 }),
+				},
+			}),
+		},
+	})
+
+	return ScreenOverlay({
+		Scope = scope,
+		Name = "MutationScreen",
+
+		[Children] = {
+			-- Header
+			ScreenHeader({
+				Scope = scope,
+				Title = "🧬 MUTATION LAB",
+				OnClose = props.OnBack,
+				LeftContent = { labStatusBadge },
+			}),
+
+			-- Plant capsule bar (11% - 23%)
 			scope:New("Frame")({
-				Name = "Panel",
-				Size = UDim2.fromScale(0.9, 0.9),
-				Position = UDim2.fromScale(0.5, 0.5),
-				AnchorPoint = Vector2.new(0.5, 0.5),
+				Name = "PlantBar",
+				Size = UDim2.fromScale(1, 0.13),
+				Position = UDim2.fromScale(0.5, 0.11),
+				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
 
 				[Children] = {
-					-- ═══════════════════════════════════════════════
-					-- HEADER (top 10%) - Same as ShopScreen
-					-- ═══════════════════════════════════════════════
+					-- Shadow
 					scope:New("Frame")({
-						Name = "Header",
-						Size = UDim2.fromScale(1, 0.1),
-						Position = UDim2.fromScale(0.5, 0),
-						AnchorPoint = Vector2.new(0.5, 0),
-						BackgroundTransparency = 1,
+						Name = "Shadow",
+						Size = UDim2.new(1, 0, 1, -6),
+						Position = UDim2.fromOffset(0, 6),
+						BackgroundColor3 = Theme.Colors.Surface.Shadow,
+						ZIndex = 1,
 
 						[Children] = {
-							-- Shadow
-							scope:New("Frame")({
-								Name = "Shadow",
-								Size = UDim2.fromScale(1, 0.9),
-								Position = UDim2.fromScale(0.5, 0.1),
-								AnchorPoint = Vector2.new(0.5, 0),
-								BackgroundColor3 = Theme.Colors.Surface.Shadow,
-								ZIndex = 1,
-
-								[Children] = {
-									scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-								},
-							}),
-
-							-- Main header
-							scope:New("Frame")({
-								Name = "Main",
-								Size = UDim2.fromScale(1, 0.9),
-								Position = UDim2.fromScale(0.5, 0),
-								AnchorPoint = Vector2.new(0.5, 0),
-								BackgroundColor3 = Theme.Colors.Surface.Main,
-								ZIndex = 2,
-
-								[Children] = {
-									scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-
-									scope:New("UIStroke")({
-										Color = Theme.Colors.Surface.Stroke :: Color3,
-										Thickness = Theme.Layout.StrokeThickness,
-									}),
-
-									-- Title (left-center)
-									scope:New("TextLabel")({
-										Name = "Title",
-										Size = UDim2.fromScale(0.25, 0.6),
-										Position = UDim2.fromScale(0.2, 0.5),
-										AnchorPoint = Vector2.new(0, 0.5),
-										BackgroundTransparency = 1,
-										Text = "🧬 MUTATION LAB",
-										TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-										TextScaled = true,
-										Font = Theme.Typography.Fonts.Title,
-										TextXAlignment = Enum.TextXAlignment.Left,
-
-										[Children] = {
-											scope:New("UITextSizeConstraint")({ MaxTextSize = 28, MinTextSize = 14 }),
-										},
-									}),
-
-									-- Search bar (center)
-									scope:New("Frame")({
-										Name = "SearchContainer",
-										Size = UDim2.fromScale(0.25, 0.55),
-										Position = UDim2.fromScale(0.5, 0.5),
-										AnchorPoint = Vector2.new(0.5, 0.5),
-										BackgroundColor3 = Theme.Colors.Surface.Shadow,
-										ZIndex = 3,
-
-										[Children] = {
-											scope:New("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
-											scope:New("UIStroke")({
-												Color = Theme.Colors.Surface.Stroke :: Color3,
-												Thickness = 2,
-											}),
-
-											-- Search icon
-											scope:New("TextLabel")({
-												Size = UDim2.fromScale(0.12, 0.7),
-												Position = UDim2.fromScale(0.04, 0.5),
-												AnchorPoint = Vector2.new(0, 0.5),
-												BackgroundTransparency = 1,
-												Text = "🔍",
-												TextScaled = true,
-												ZIndex = 4,
-
-												[Children] = {
-													scope:New("UITextSizeConstraint")({ MaxTextSize = 16, MinTextSize = 10 }),
-												},
-											}),
-
-											-- Search TextBox
-										searchBoxRef:set(scope:New("TextBox")({
-											Name = "SearchBox",
-											Size = UDim2.fromScale(0.78, 0.8),
-											Position = UDim2.fromScale(0.18, 0.5),
-											AnchorPoint = Vector2.new(0, 0.5),
-											BackgroundTransparency = 1,
-											Text = "",
-											PlaceholderText = "Search plants...",
-											PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
-											TextColor3 = Color3.new(1, 1, 1),
-											TextScaled = true,
-											Font = Theme.Typography.Fonts.Body,
-											TextXAlignment = Enum.TextXAlignment.Left,
-											ClearTextOnFocus = false,
-											ZIndex = 4,
-
-											-- Bind Text property to searchQuery using Out
-											[Out("Text")] = searchQuery,
-
-											[Children] = {
-												scope:New("UITextSizeConstraint")({ MaxTextSize = 14, MinTextSize = 10 }),
-											},
-										})),
-
-										-- Clear button (X)
-										scope:New("TextButton")({
-											Name = "ClearSearch",
-											Size = UDim2.fromScale(0.1, 0.6),
-											Position = UDim2.fromScale(0.94, 0.5),
-											AnchorPoint = Vector2.new(1, 0.5),
-											BackgroundTransparency = 1,
-											Text = scope:Computed(function(use)
-												return if use(searchQuery) ~= "" then "✕" else ""
-											end),
-											TextColor3 = Color3.fromRGB(180, 180, 180),
-											TextScaled = true,
-											Font = Enum.Font.GothamBold,
-											ZIndex = 4,
-
-											[OnEvent("MouseButton1Click")] = function()
-												searchQuery:set("")
-												-- Also clear the TextBox directly
-												local textBox = peek(searchBoxRef)
-												if textBox then
-													textBox.Text = ""
-												end
-											end,
-
-											[Children] = {
-												scope:New("UITextSizeConstraint")({ MaxTextSize = 12, MinTextSize = 8 }),
-											},
-										}),
-									},
-								}),
-
-									-- Coins display (left)
-									scope:New("Frame")({
-										Name = "CoinsContainer",
-										Size = UDim2.fromScale(0.15, 0.6),
-										Position = UDim2.fromScale(0.02, 0.5),
-										AnchorPoint = Vector2.new(0, 0.5),
-										BackgroundTransparency = 1,
-
-										[Children] = {
-											ResourcePill({
-												Scope = scope,
-												Icon = Theme.Icons.Coin,
-												Value = playerCoins,
-												Color = "Gold",
-											}),
-										},
-									}),
-
-									-- Close button (right) - Same as ShopScreen
-									scope:New("Frame")({
-										Name = "CloseContainer",
-										Size = UDim2.fromScale(0.08, 0.75),
-										Position = UDim2.fromScale(0.98, 0.5),
-										AnchorPoint = Vector2.new(1, 0.5),
-										BackgroundTransparency = 1,
-
-										[Children] = {
-											scope:New("UIAspectRatioConstraint")({
-												AspectRatio = 1,
-												DominantAxis = Enum.DominantAxis.Height,
-											}),
-
-											-- Shadow
-											scope:New("Frame")({
-												Size = UDim2.fromScale(1, 0.9),
-												Position = UDim2.fromScale(0.5, 0.1),
-												AnchorPoint = Vector2.new(0.5, 0),
-												BackgroundColor3 = Theme.Colors.Danger.Shadow,
-												ZIndex = 1,
-
-												[Children] = {
-													scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-												},
-											}),
-
-											-- Button
-											scope:New("TextButton")({
-												Size = scope:Computed(function(use)
-													local offset = use(closeOffset) :: number
-													return UDim2.fromScale(1, 0.9 - offset * 0.01)
-												end),
-												Position = scope:Computed(function(use)
-													local offset = use(closeOffset) :: number
-													return UDim2.fromScale(0.5, offset * 0.01)
-												end),
-												AnchorPoint = Vector2.new(0.5, 0),
-												BackgroundColor3 = Theme.Colors.Danger.Main,
-												Text = Theme.Icons.Close,
-												TextColor3 = Color3.new(1, 1, 1),
-												TextScaled = true,
-												Font = Theme.Typography.Fonts.Title,
-												AutoButtonColor = false,
-												ZIndex = 2,
-
-												[OnEvent("MouseButton1Down")] = function()
-													isClosePressed:set(true)
-												end,
-
-												[OnEvent("MouseButton1Up")] = function()
-													isClosePressed:set(false)
-													props.OnBack()
-												end,
-
-												[OnEvent("MouseLeave")] = function()
-													isClosePressed:set(false)
-												end,
-
-												[Children] = {
-													scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-													scope:New("UIStroke")({
-														Color = Theme.Colors.Surface.Stroke :: Color3,
-														Thickness = 2,
-													}),
-													scope:New("UITextSizeConstraint")({
-														MaxTextSize = 24,
-														MinTextSize = 14,
-													}),
-												},
-											}),
-										},
-									}),
-								},
-							}),
+							scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
 						},
 					}),
 
-					-- ═══════════════════════════════════════════════
-					-- PLANT SELECTOR BAR (11% to 23% = 12% height)
-					-- ═══════════════════════════════════════════════
+					-- Main bar
 					scope:New("Frame")({
-						Name = "PlantBar",
-						Size = UDim2.fromScale(1, 0.12),
-						Position = UDim2.fromScale(0.5, 0.11),
-						AnchorPoint = Vector2.new(0.5, 0),
-						BackgroundTransparency = 1,
+						Name = "Main",
+						Size = UDim2.new(1, 0, 1, -6),
+						BackgroundColor3 = Theme.Colors.Surface.Main,
+						ClipsDescendants = true,
+						ZIndex = 2,
 
 						[Children] = {
-							-- Shadow
-							scope:New("Frame")({
-								Name = "Shadow",
-								Size = UDim2.fromScale(1, 0.95),
-								Position = UDim2.fromScale(0.5, 0.05),
-								AnchorPoint = Vector2.new(0.5, 0),
-								BackgroundColor3 = Theme.Colors.Surface.Shadow,
-								ZIndex = 1,
-
-								[Children] = {
-									scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-								},
+							scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
+							scope:New("UIStroke")({
+								Color = Theme.Colors.Surface.Stroke :: Color3,
+								Thickness = Theme.Layout.StrokeThickness,
 							}),
 
-							-- Main bar
+							-- Scrolling container
 							scope:New("ScrollingFrame")({
-								Name = "Main",
-								Size = UDim2.fromScale(1, 0.95),
-								Position = UDim2.fromScale(0.5, 0),
-								AnchorPoint = Vector2.new(0.5, 0),
-								BackgroundColor3 = Theme.Colors.Surface.Main,
+								Size = UDim2.fromScale(1, 1),
+								Position = UDim2.fromScale(0.5, 0.5),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundTransparency = 1,
 								ScrollBarThickness = 0,
-								ScrollingDirection = Enum.ScrollingDirection.X,
-								AutomaticCanvasSize = Enum.AutomaticSize.X,
 								CanvasSize = UDim2.fromScale(0, 0),
-								ZIndex = 2,
+								AutomaticCanvasSize = Enum.AutomaticSize.X,
+								ScrollingDirection = Enum.ScrollingDirection.X,
 
 								[Children] = {
-									scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-									scope:New("UIStroke")({
-										Color = Theme.Colors.Surface.Stroke :: Color3,
-										Thickness = Theme.Layout.StrokeThickness,
-									}),
-
 									scope:New("UIPadding")({
-										PaddingTop = UDim.new(0, 8),
-										PaddingBottom = UDim.new(0, 8),
-										PaddingLeft = UDim.new(0, 8),
-										PaddingRight = UDim.new(0, 8),
+										PaddingLeft = UDim.new(0, 10),
+										PaddingRight = UDim.new(0, 10),
+										PaddingTop = UDim.new(0, 4),
+										PaddingBottom = UDim.new(0, 4),
 									}),
 
 									scope:New("UIListLayout")({
 										FillDirection = Enum.FillDirection.Horizontal,
-										HorizontalAlignment = Enum.HorizontalAlignment.Left,
 										VerticalAlignment = Enum.VerticalAlignment.Center,
-										Padding = UDim.new(0, 6),
+										Padding = UDim.new(0, 8),
 									}),
 
-									-- Plant cards
-									scope:Computed(function(use)
-										local plants = use(unlockedPlants) :: { { Type: string, Stats: any } }
-										local allEquipped = use(props.EquippedMutations) or {}
-
-										local cards: { any } = {}
-										for i, p in plants do
-											local plantType: string = p.Type
-											local equipped = allEquipped[plantType] or {}
-											local isSelected = scope:Computed(function(use2)
-												return use2(selectedPlant) == plantType
-											end)
-
-											table.insert(
-												cards,
-												PlantCard(scope, {
-													PlantType = plantType,
-													IsSelected = isSelected,
-													EquippedCount = #equipped,
-													OnSelect = function()
-														selectedPlant:set(plantType)
-														selectedMutation:set(nil)
-													end,
-													LayoutOrder = i,
-												})
-											)
-										end
-
-										-- Spacer at end to account for right padding in AutomaticCanvasSize
-										table.insert(
-											cards,
-											scope:New("Frame")({
-												Name = "EndSpacer",
-												Size = UDim2.new(0, 8, 1, 0),
-												BackgroundTransparency = 1,
-												LayoutOrder = 9999,
-											})
-										)
-
-										return cards
-									end),
+									plantBar,
 								},
 							}),
 						},
 					}),
+				},
+			}),
 
-					-- ═══════════════════════════════════════════════
-					-- CONTENT (24% to 100% = 76% height) - Grid + Detail
-					-- ═══════════════════════════════════════════════
+			-- Mutation grid (25% - 86%)
+			ScrollableGrid({
+				Scope = scope,
+				Size = UDim2.fromScale(1, 0.61),
+				Position = UDim2.fromScale(0.5, 0.25),
+				AnchorPoint = Vector2.new(0.5, 0),
+				CellSize = gridCellSize,
+				CellPadding = gridCellPadding,
+				Children = mutationCards,
+			}),
+
+			-- Action button (bottom 10%)
+			scope:New("Frame")({
+				Name = "ActionBar",
+				Size = UDim2.fromScale(0.4, 0.08),
+				Position = UDim2.fromScale(0.5, 0.935),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+
+				[Children] = {
+					-- Shadow
 					scope:New("Frame")({
-						Name = "Content",
-						Size = UDim2.fromScale(1, 0.76),
-						Position = UDim2.fromScale(0.5, 1),
-						AnchorPoint = Vector2.new(0.5, 1),
-						BackgroundTransparency = 1,
+						Name = "Shadow",
+						Size = UDim2.new(1, 0, 1, -4),
+						Position = UDim2.fromOffset(0, 4),
+						BackgroundColor3 = scope:Computed(function(use)
+							return use(actionButtonColors).Shadow
+						end),
+						ZIndex = 1,
 
 						[Children] = {
-							-- ═══════════════════════════════════════════════
-							-- MUTATIONS GRID (left 58%)
-							-- ═══════════════════════════════════════════════
-							scope:New("Frame")({
-								Name = "GridContainer",
-								Size = UDim2.fromScale(0.58, 1),
-								Position = UDim2.fromScale(0, 0),
-								BackgroundTransparency = 1,
+							scope:New("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
+						},
+					}),
 
-								[Children] = {
-									-- Shadow
-									scope:New("Frame")({
-										Name = "Shadow",
-										Size = UDim2.fromScale(1, 0.99),
-										Position = UDim2.fromScale(0.5, 0.01),
-										AnchorPoint = Vector2.new(0.5, 0),
-										BackgroundColor3 = Theme.Colors.Surface.Shadow,
-										ZIndex = 1,
+					-- Button
+					scope:New("TextButton")({
+						Name = "ActionButton",
+						Size = UDim2.new(1, 0, 1, -4),
+						BackgroundColor3 = scope:Computed(function(use)
+							return use(actionButtonColors).Main
+						end),
+						AutoButtonColor = false,
+						Text = actionButtonText,
+						TextColor3 = Color3.new(1, 1, 1),
+						TextScaled = true,
+						Font = Enum.Font.GothamBold,
+						ZIndex = 2,
 
-										[Children] = {
-											scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-										},
-									}),
+						[OnEvent("MouseButton1Click")] = performAction,
 
-									-- Scrolling frame
-									scope:New("ScrollingFrame")({
-										Name = "Grid",
-										Size = UDim2.fromScale(1, 0.99),
-										Position = UDim2.fromScale(0.5, 0),
-										AnchorPoint = Vector2.new(0.5, 0),
-										BackgroundColor3 = Theme.Colors.Surface.Main,
-										ScrollBarThickness = 8,
-										ScrollBarImageColor3 = Theme.Colors.Surface.Shadow,
-										ScrollingDirection = Enum.ScrollingDirection.Y,
-										AutomaticCanvasSize = Enum.AutomaticSize.Y,
-										CanvasSize = UDim2.new(0, 0, 0, 0),
-										ZIndex = 2,
-
-										[Children] = {
-											scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-											scope:New("UIStroke")({
-												Color = Theme.Colors.Surface.Stroke :: Color3,
-												Thickness = Theme.Layout.StrokeThickness,
-											}),
-
-											scope:New("UIPadding")({
-												PaddingTop = UDim.new(0, 12),
-												PaddingBottom = UDim.new(0, 20),
-												PaddingLeft = UDim.new(0, 12),
-												PaddingRight = UDim.new(0, 12),
-											}),
-
-											scope:New("UIGridLayout")({
-												CellSize = UDim2.fromScale(0.115, 0.20),
-												CellPadding = UDim2.fromScale(0.008, 0.01),
-												HorizontalAlignment = Enum.HorizontalAlignment.Center,
-												SortOrder = Enum.SortOrder.LayoutOrder,
-												FillDirection = Enum.FillDirection.Horizontal,
-											}),
-
-											-- Mutation cards
-											scope:Computed(function(use)
-												local mutations =
-													use(compatibleMutations) :: { { Type: string, Data: any } }
-												local owned = use(plantOwned) :: { string }
-												local equipped = use(plantEquipped) :: { string }
-												local level = use(playerLevel) :: number
-
-												local cards: { any } = {}
-												for i, m in mutations do
-													local mutationType: string = m.Type
-													local mutData: any = m.Data
-													local isOwned = table.find(owned, mutationType) ~= nil
-													local isEquipped = table.find(equipped, mutationType) ~= nil
-													local isLocked = level < (mutData.RequiredLevel :: number)
-
-													local isSelected = scope:Computed(function(use2)
-														return use2(selectedMutation) == mutationType
-													end)
-
-													table.insert(
-														cards,
-														MutationCard(scope, {
-															MutationType = mutationType,
-															MutationData = mutData,
-															IsOwned = isOwned,
-															IsEquipped = isEquipped,
-															IsLocked = isLocked,
-															IsSelected = isSelected,
-															OnSelect = function()
-																selectedMutation:set(mutationType)
-															end,
-															LayoutOrder = i,
-														})
-													)
-												end
-												return cards
-											end),
-										},
-									}),
-								},
+						[Children] = {
+							scope:New("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
+							scope:New("UIStroke")({
+								Color = Color3.new(1, 1, 1),
+								Thickness = 2,
 							}),
-
-							-- ═══════════════════════════════════════════════
-							-- DETAIL PANEL (right 40%)
-							-- ═══════════════════════════════════════════════
-							scope:New("Frame")({
-								Name = "DetailContainer",
-								Size = UDim2.fromScale(0.40, 1),
-								Position = UDim2.fromScale(1, 0),
-								AnchorPoint = Vector2.new(1, 0),
-								BackgroundTransparency = 1,
-
-								[Children] = {
-									-- Shadow
-									scope:New("Frame")({
-										Name = "Shadow",
-										Size = UDim2.fromScale(1, 0.99),
-										Position = UDim2.fromScale(0.5, 0.01),
-										AnchorPoint = Vector2.new(0.5, 0),
-										BackgroundColor3 = Theme.Colors.Surface.Shadow,
-										ZIndex = 1,
-
-										[Children] = {
-											scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-										},
-									}),
-
-									-- Main panel
-									scope:New("Frame")({
-										Name = "Detail",
-										Size = UDim2.fromScale(1, 0.99),
-										Position = UDim2.fromScale(0.5, 0),
-										AnchorPoint = Vector2.new(0.5, 0),
-										BackgroundColor3 = Theme.Colors.Surface.Main,
-										ZIndex = 2,
-
-										[Children] = {
-											scope:New("UICorner")({ CornerRadius = Theme.Layout.CornerRadius }),
-											scope:New("UIStroke")({
-												Color = Theme.Colors.Surface.Stroke :: Color3,
-												Thickness = Theme.Layout.StrokeThickness,
-											}),
-
-											scope:New("UIPadding")({
-												PaddingTop = UDim.new(0.03, 0),
-												PaddingBottom = UDim.new(0.03, 0),
-												PaddingLeft = UDim.new(0.04, 0),
-												PaddingRight = UDim.new(0.04, 0),
-											}),
-
-											-- Content (reactive to selection)
-											scope:Computed(function(use)
-												local mutation = use(selectedMutation) :: string?
-												local data = use(selectedMutationData) :: any
-
-												if not mutation or not data then
-													-- Empty state
-													return scope:New("TextLabel")({
-														Size = UDim2.fromScale(1, 1),
-														BackgroundTransparency = 1,
-														Text = "Select a mutation\nto view details",
-														TextColor3 = Theme.Colors.Surface.Shadow,
-														TextScaled = true,
-														Font = Theme.Typography.Fonts.Body,
-														TextWrapped = true,
-
-														[Children] = {
-															scope:New("UITextSizeConstraint")({
-																MaxTextSize = 18,
-																MinTextSize = 12,
-															}),
-														},
-													})
-												end
-
-												local mutationName: string = mutation :: string
-												local isOwned = use(isMutationOwned)
-												local isEquipped = use(isMutationEquipped)
-												local canBuy = use(canPurchase)
-												local canEquip = use(canEquipMore)
-
-												local actionText = if isEquipped
-													then "UNEQUIP"
-													elseif isOwned and canEquip then "EQUIP"
-													elseif isOwned and not canEquip then "MAX EQUIPPED"
-													elseif canBuy then `BUY {Theme.Icons.Coin}{data.Cost}`
-													else "LOCKED"
-
-												local actionColor = if isEquipped
-													then Theme.Colors.Danger
-													elseif isOwned and canEquip then Theme.Colors.Action
-													elseif canBuy then Theme.Colors.Gold
-													else Theme.Colors.Surface
-
-												local actionEnabled = isEquipped or (isOwned and canEquip) or canBuy
-
-												return scope:New("Frame")({
-													Size = UDim2.fromScale(1, 1),
-													BackgroundTransparency = 1,
-
-													[Children] = {
-														-- Icon + Name header
-														scope:New("Frame")({
-															Size = UDim2.fromScale(1, 0.12),
-															BackgroundTransparency = 1,
-
-															[Children] = {
-																scope:New("TextLabel")({
-																	Size = UDim2.fromScale(0.15, 1),
-																	BackgroundTransparency = 1,
-																	Text = getMutationIcon(mutationName),
-																	TextScaled = true,
-
-																	[Children] = {
-																		scope:New("UIAspectRatioConstraint")({
-																			AspectRatio = 1,
-																		}),
-																		scope:New("UITextSizeConstraint")({
-																			MaxTextSize = 44,
-																			MinTextSize = 24,
-																		}),
-																	},
-																}),
-																scope:New("TextLabel")({
-																	Size = UDim2.fromScale(0.82, 0.55),
-																	Position = UDim2.fromScale(0.18, 0),
-																	BackgroundTransparency = 1,
-																	Text = data.Name or mutationName,
-																	TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-																	TextScaled = true,
-																	Font = Theme.Typography.Fonts.Title,
-																	TextXAlignment = Enum.TextXAlignment.Left,
-
-																	[Children] = {
-																		scope:New("UITextSizeConstraint")({
-																			MaxTextSize = 24,
-																			MinTextSize = 14,
-																		}),
-																	},
-																}),
-																scope:New("TextLabel")({
-																	Size = UDim2.fromScale(0.82, 0.4),
-																	Position = UDim2.fromScale(0.18, 0.55),
-																	BackgroundTransparency = 1,
-																	Text = `Level {data.RequiredLevel} required`,
-																	TextColor3 = Theme.Colors.Surface.Shadow,
-																	TextScaled = true,
-																	Font = Theme.Typography.Fonts.Body,
-																	TextXAlignment = Enum.TextXAlignment.Left,
-
-																	[Children] = {
-																		scope:New("UITextSizeConstraint")({
-																			MaxTextSize = 14,
-																			MinTextSize = 9,
-																		}),
-																	},
-																}),
-															},
-														}),
-
-														-- Description
-														scope:New("TextLabel")({
-															Size = UDim2.fromScale(1, 0.15),
-															Position = UDim2.fromScale(0, 0.15),
-															BackgroundTransparency = 1,
-															Text = data.Description or "No description available.",
-															TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-															TextScaled = true,
-															Font = Theme.Typography.Fonts.Body,
-															TextWrapped = true,
-															TextXAlignment = Enum.TextXAlignment.Left,
-															TextYAlignment = Enum.TextYAlignment.Top,
-
-															[Children] = {
-																scope:New("UITextSizeConstraint")({
-																	MaxTextSize = 16,
-																	MinTextSize = 10,
-																}),
-															},
-														}),
-
-														-- Effects list
-														scope:New("Frame")({
-															Size = UDim2.fromScale(1, 0.25),
-															Position = UDim2.fromScale(0, 0.34),
-															BackgroundColor3 = Theme.Colors.Surface.Shadow,
-															BackgroundTransparency = 0.5,
-
-															[Children] = {
-																scope:New("UICorner")({
-																	CornerRadius = Theme.Layout.CornerRadius,
-																}),
-																scope:New("UIPadding")({
-																	PaddingTop = UDim.new(0.08, 0),
-																	PaddingLeft = UDim.new(0.04, 0),
-																}),
-																scope:New("TextLabel")({
-																	Size = UDim2.fromScale(1, 0.2),
-																	BackgroundTransparency = 1,
-																	Text = "EFFECTS:",
-																	TextColor3 = Theme.Colors.Surface.Stroke :: Color3,
-																	TextScaled = true,
-																	Font = Enum.Font.GothamBold,
-																	TextXAlignment = Enum.TextXAlignment.Left,
-
-																	[Children] = {
-																		scope:New("UITextSizeConstraint")({
-																			MaxTextSize = 14,
-																			MinTextSize = 9,
-																		}),
-																	},
-																}),
-																scope:New("TextLabel")({
-																	Size = UDim2.fromScale(0.95, 0.7),
-																	Position = UDim2.fromScale(0, 0.25),
-																	BackgroundTransparency = 1,
-																	Text = formatEffects(data.Effects),
-																	TextColor3 = Theme.Colors.Action.Main,
-																	TextScaled = true,
-																	Font = Theme.Typography.Fonts.Body,
-																	TextXAlignment = Enum.TextXAlignment.Left,
-																	TextYAlignment = Enum.TextYAlignment.Top,
-																	TextWrapped = true,
-
-																	[Children] = {
-																		scope:New("UITextSizeConstraint")({
-																			MaxTextSize = 13,
-																			MinTextSize = 9,
-																		}),
-																	},
-																}),
-															},
-														}),
-
-														-- Action button
-														scope:New("Frame")({
-															Name = "ActionContainer",
-															Size = UDim2.fromScale(1, 0.12),
-															Position = UDim2.fromScale(0, 0.88),
-															BackgroundTransparency = 1,
-
-															[Children] = {
-																-- Shadow
-																scope:New("Frame")({
-																	Size = UDim2.fromScale(1, 0.85),
-																	Position = UDim2.fromScale(0, 0.15),
-																	BackgroundColor3 = actionColor.Shadow,
-																	ZIndex = 1,
-
-																	[Children] = {
-																		scope:New("UICorner")({
-																			CornerRadius = Theme.Layout.CornerRadius,
-																		}),
-																	},
-																}),
-
-																-- Button
-																scope:New("TextButton")({
-																	Size = scope:Computed(function(use2)
-																		local offset = use2(actionOffset)
-																		return UDim2.fromScale(1, 0.85 - offset)
-																	end),
-																	Position = scope:Computed(function(use2)
-																		return UDim2.fromScale(0, use2(actionOffset))
-																	end),
-																	BackgroundColor3 = actionColor.Main,
-																	Text = actionText,
-																	TextColor3 = Color3.new(1, 1, 1),
-																	TextScaled = true,
-																	Font = Theme.Typography.Fonts.Title,
-																	AutoButtonColor = false,
-																	ZIndex = 2,
-
-																	[OnEvent("MouseButton1Down")] = function()
-																		if actionEnabled then
-																			isActionPressed:set(true)
-																		end
-																	end,
-
-																	[OnEvent("MouseButton1Up")] = function()
-																		isActionPressed:set(false)
-																		if actionEnabled then
-																			performAction()
-																		end
-																	end,
-
-																	[OnEvent("MouseLeave")] = function()
-																		isActionPressed:set(false)
-																	end,
-
-																	[Children] = {
-																		scope:New("UICorner")({
-																			CornerRadius = Theme.Layout.CornerRadius,
-																		}),
-																		scope:New("UIStroke")({
-																			Color = Theme.Colors.Surface.Stroke :: Color3,
-																			Thickness = Theme.Layout.StrokeThickness,
-																		}),
-																		scope:New("UITextSizeConstraint")({
-																			MaxTextSize = 20,
-																			MinTextSize = 12,
-																		}),
-																	},
-																}),
-															},
-														}),
-													},
-												})
-											end),
-										},
-									}),
-								},
-							}),
+							scope:New("UITextSizeConstraint")({ MinTextSize = 12, MaxTextSize = 18 }),
 						},
 					}),
 				},

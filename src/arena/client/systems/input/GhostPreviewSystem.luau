@@ -513,6 +513,61 @@ local function handleShovel()
 	end
 end
 
+-- Handle Plant Food mode click - find plant at clicked position and send activation request
+local function handlePlantFood()
+	if not SelectionState.IsPlantFoodActive() then
+		return
+	end
+
+	-- Check if player has charges
+	if not SelectionState.HasPlantFoodCharges() then
+		Logger.Debug("GhostPreview", "PlantFood: no charges available")
+		local audio = getAudioService()
+		if audio and audio.PlayError then
+			audio.PlayError()
+		end
+		return
+	end
+
+	-- Find plant model under cursor
+	local plantModel = getPlantUnderCursor()
+
+	if plantModel then
+		local entityId = plantModel:GetAttribute("EntityId")
+		local plantType = plantModel:GetAttribute("PlantType")
+		
+		if entityId and typeof(entityId) == "number" and plantType then
+			Logger.Info("GhostPreview", `PlantFood: activating on plant entity {entityId} ({plantType})`)
+
+			-- Optimistic update: use charge
+			SelectionState.UsePlantFoodCharge()
+
+			-- Send Plant Food request to server
+			_requestId = (_requestId + 1) % 65535
+			Network.PlantFoodRequest.Fire({
+				PlantEntityId = entityId,
+			})
+
+			-- Play activation sound
+			local audio = getAudioService()
+			if audio and audio.PlayPlantPlaced then
+				audio.PlayPlantPlaced() -- Use plant sound as placeholder
+			end
+
+			-- Deactivate Plant Food mode after use
+			SelectionState.DeactivatePlantFood()
+			return
+		end
+	end
+
+	-- No plant found at click location - play error sound
+	Logger.Debug("GhostPreview", "PlantFood: no plant found at cursor")
+	local audio = getAudioService()
+	if audio and audio.PlayError then
+		audio.PlayError()
+	end
+end
+
 -- Handle click/tap to place
 local function handlePlacement()
 	local selectedPlant = Fusion.peek(SelectionState.SelectedPlant)
@@ -565,7 +620,7 @@ end
 	Setup input handlers and network listeners (called during Init phase)
 ]]
 local function setupListeners()
-	-- Left-click / touch to place or shovel
+	-- Left-click / touch to place or shovel or Plant Food
 	_trove:Connect(UserInputService.InputBegan, function(input, gameProcessed)
 		if gameProcessed then
 			return
@@ -575,20 +630,23 @@ local function setupListeners()
 			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
-			-- Check if shovel mode is active first
+			-- Check modes in priority order: Shovel > PlantFood > Placement
 			if SelectionState.IsShovelActive() then
 				handleShovel()
+			elseif SelectionState.IsPlantFoodActive() then
+				handlePlantFood()
 			else
 				handlePlacement()
 			end
 		end
 	end)
 
-	-- Right-click or ESC to cancel selection or shovel mode
+	-- Right-click or ESC to cancel selection, shovel mode, or Plant Food mode
 	_trove:Connect(UserInputService.InputBegan, function(input, _gameProcessed)
 		if input.UserInputType == Enum.UserInputType.MouseButton2 or input.KeyCode == Enum.KeyCode.Escape then
 			SelectionState.Select(nil)
 			SelectionState.DeactivateShovel()
+			SelectionState.DeactivatePlantFood()
 			destroyGhost() -- Fully destroy when canceling
 			restoreHighlightedPlant() -- Restore any highlighted plant
 		end

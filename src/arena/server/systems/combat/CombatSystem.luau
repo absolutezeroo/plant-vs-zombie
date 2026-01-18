@@ -543,15 +543,30 @@ local function OnStep(world: MatterWorld)
 										})
 									)
 									
-									-- Move zombie past the plant (jump distance = 2 cells)
+									-- Calculate jump landing position (past the plant)
 									local jumpDistance = CONFIG.ZOMBIE_BITE_RANGE * 3
-									local zombieDir = State.CachedZombieDir
+									local vaultDir = State.CachedZombieDir
+									local endX = zombiePos.X + (vaultDir.X * jumpDistance)
+									local endZ = zombiePos.Z + (vaultDir.Z * jumpDistance)
+									
+									-- Send vault event to clients (for jump animation)
+									Network.ZombieVaulted.FireAll({
+										EntityId = zombieId,
+										StartX = zombiePos.X,
+										StartY = zombiePos.Y,
+										StartZ = zombiePos.Z,
+										EndX = endX,
+										EndY = zombiePos.Y,
+										EndZ = endZ,
+									})
+									
+									-- Update server position (client will animate)
 									world:insert(
 										zombieId,
 										Components.PositionComponent({
-											X = zombiePos.X + (zombieDir.X * jumpDistance),
+											X = endX,
 											Y = zombiePos.Y,
-											Z = zombiePos.Z,
+											Z = endZ,
 										})
 									)
 									
@@ -559,9 +574,9 @@ local function OnStep(world: MatterWorld)
 									world:insert(
 										zombieId,
 										Components.MovementComponent({
-											VelocityX = zombieDir.X * stats.Speed,
+											VelocityX = vaultDir.X * stats.Speed,
 											VelocityY = 0,
-											VelocityZ = zombieDir.Z * stats.Speed,
+											VelocityZ = vaultDir.Z * stats.Speed,
 										})
 									)
 									

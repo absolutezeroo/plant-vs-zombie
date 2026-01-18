@@ -162,8 +162,8 @@ end
 	@param laneIndex - Lane number (1-5)
 	@return Array of entity IDs in that lane
 ]]
-function LaneCache.GetEntitiesInLane(laneIndex: number): { number }
-	if laneIndex < 1 or laneIndex > GridConfig.GRID_LANES then
+function LaneCache.GetEntitiesInLane(laneIndex: number?): { number }
+	if laneIndex == nil or laneIndex < 1 or laneIndex > GridConfig.GRID_LANES then
 		return {}
 	end
 	return _lanes[laneIndex]

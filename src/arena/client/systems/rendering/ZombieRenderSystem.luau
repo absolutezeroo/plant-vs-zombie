@@ -70,8 +70,16 @@ type ZombieVisual = {
 	Lane: number,
 	TargetX: number,
 	FeetOffset: number, -- Distance from root to feet for ground alignment
+	IsVaulting: boolean?, -- True while playing vault animation
+	IsGlowing: boolean?, -- True for Plant Food zombies
 }
 local _zombieVisuals: { [number]: ZombieVisual } = {}
+
+-- Vault animation config
+local VAULT_CONFIG = {
+	DURATION = 0.5, -- Seconds for the jump arc
+	HEIGHT = 8, -- Peak height of the jump arc (studs)
+}
 
 -- Trove for cleanup
 local _trove = Trove.new()
@@ -102,7 +110,7 @@ local MODEL_FALLBACKS: { [string]: string } = {
 	MiniGargantuar = "Gargantuar",
 }
 
-local function createZombieVisual(entityId: number, zombieType: string, lane: number, positionX: number): ZombieVisual
+local function createZombieVisual(entityId: number, zombieType: string, lane: number, positionX: number, isGlowing: boolean?): ZombieVisual
 	local z = getLaneZ(lane)
 	local groundY = if MapConfig.IsInitialized() then MapConfig.GetConfig().GridY else 0
 
@@ -236,12 +244,41 @@ local function createZombieVisual(entityId: number, zombieType: string, lane: nu
 
 	Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) emerging from ground`)
 
+	-- Apply Plant Food glow effect if this zombie is glowing
+	if isGlowing then
+		Logger.Debug("ZombieRender", `Zombie {entityId} is GLOWING (Plant Food)`)
+		
+		-- Find a main part for the PointLight
+		local mainPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+		if mainPart then
+			-- Green glow light
+			local glowLight = Instance.new("PointLight")
+			glowLight.Name = "PlantFoodGlow"
+			glowLight.Color = Color3.fromRGB(100, 255, 100) -- Green
+			glowLight.Brightness = 3
+			glowLight.Range = 8
+			glowLight.Shadows = false
+			glowLight.Parent = mainPart
+			
+			-- Highlight effect for outline
+			local highlight = Instance.new("Highlight")
+			highlight.Name = "PlantFoodHighlight"
+			highlight.FillColor = Color3.fromRGB(100, 255, 100)
+			highlight.FillTransparency = 0.7
+			highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+			highlight.OutlineTransparency = 0
+			highlight.Adornee = model
+			highlight.Parent = model
+		end
+	end
+
 	return {
 		Model = model,
 		ZombieType = zombieType,
 		Lane = lane,
 		TargetX = positionX,
 		FeetOffset = feetOffset, -- Store for movement updates
+		IsGlowing = isGlowing,
 	}
 end
 
@@ -262,12 +299,13 @@ local function setupNetworkListeners()
 		local zombieType = tostring(data.ZombieType) -- Convert enum to string
 		local lane = data.Lane
 		local positionX = data.PositionX
+		local isGlowing = data.IsGlowing
 
 		if _zombieVisuals[entityId] then
 			Logger.Warn("ZombieRender", `Zombie {entityId} already exists, updating`)
 			_zombieVisuals[entityId].TargetX = positionX
 		else
-			_zombieVisuals[entityId] = createZombieVisual(entityId, zombieType, lane, positionX)
+			_zombieVisuals[entityId] = createZombieVisual(entityId, zombieType, lane, positionX, isGlowing)
 			Logger.Debug("ZombieRender", `Zombie {entityId} ({zombieType}) spawned in lane {lane}`)
 		end
 	end))
@@ -370,6 +408,72 @@ local function setupNetworkListeners()
 			Logger.Debug("ZombieRender", `Status {statusType} overlay removed from zombie {entityId}`)
 		end
 	end))
+
+	-- Zombie vaulted over a plant (Pole Vaulter jump animation)
+	_trove:Add(Network.ZombieVaulted.On(function(data)
+		local entityId = data.EntityId
+		local visual = _zombieVisuals[entityId]
+		if not visual or not visual.Model.Parent then
+			return
+		end
+
+		-- Mark as vaulting (disable normal interpolation)
+		visual.IsVaulting = true
+
+		-- Start and end positions
+		local startPos = Vector3.new(data.StartX, data.StartY, data.StartZ)
+		local endPos = Vector3.new(data.EndX, data.EndY, data.EndZ)
+		local peakHeight = VAULT_CONFIG.HEIGHT
+		local duration = VAULT_CONFIG.DURATION
+
+		-- Get zombie facing direction
+		local zombieDir = MapConfig.GetZombieDirection()
+		local baseCFrame = CFrame.Angles(0, math.pi / 2, 0)
+
+		-- Play vault animation in a separate thread
+		task.spawn(function()
+			local startTime = os.clock()
+
+			while true do
+				local elapsed = os.clock() - startTime
+				local t = math.min(elapsed / duration, 1)
+
+				-- Parabolic arc for Y position (peaks at t=0.5)
+				local arcT = 4 * t * (1 - t) -- Parabola: 0 at t=0, 1 at t=0.5, 0 at t=1
+				local currentY = startPos.Y + (peakHeight * arcT)
+
+				-- Linear interpolation for X and Z
+				local currentX = startPos.X + (endPos.X - startPos.X) * t
+				local currentZ = startPos.Z + (endPos.Z - startPos.Z) * t
+
+				local currentPos = Vector3.new(currentX, currentY, currentZ)
+				local facingCFrame = CFrame.lookAt(currentPos, currentPos + zombieDir) * baseCFrame
+
+				-- Update model position
+				if visual.Model and visual.Model.Parent then
+					visual.Model:PivotTo(facingCFrame)
+				else
+					break -- Model destroyed
+				end
+
+				if t >= 1 then
+					break -- Animation complete
+				end
+
+				task.wait() -- Wait one frame
+			end
+
+			-- Update target position and end vaulting
+			if visual then
+				visual.TargetX = endPos.X
+				visual.IsVaulting = false
+			end
+
+			Logger.Debug("ZombieRender", `Zombie {entityId} vault animation complete`)
+		end)
+
+		Logger.Debug("ZombieRender", `Zombie {entityId} vaulting from {startPos} to {endPos}`)
+	end))
 end
 
 --[[
@@ -406,6 +510,11 @@ local function ZombieRenderSystem(_world)
 	for entityId, visual in _zombieVisuals do
 		if not visual.Model.Parent then
 			_zombieVisuals[entityId] = nil
+			continue
+		end
+
+		-- Skip interpolation if zombie is vaulting (animation handles position)
+		if visual.IsVaulting then
 			continue
 		end
 

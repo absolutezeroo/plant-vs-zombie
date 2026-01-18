@@ -27,6 +27,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local ProgressionData = require(Shared.data.ProgressionData)
 local EntityPool = require(Shared.utils.EntityPool)
+local Logger = require(Shared.utils.Logger)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -34,6 +35,7 @@ local Network = require(Shared.network.generated.server)
 -- Server modules
 local Server = script.Parent.Parent.Parent
 local GridService = require(Server.services.GridService)
+local PlantFoodService = require(Server.services.PlantFoodService)
 
 -- 2. CONFIGURATION (no config needed for this system)
 local CONFIG = table.freeze({
@@ -103,6 +105,24 @@ local function OnStep(world)
 			-- Check if it's a zombie (need to drop coins)
 			local zombie = world:get(id, Components.ZombieTypeComponent)
 			if zombie then
+				-- Check if zombie was glowing (Plant Food carrier)
+				local plantFood = world:get(id, Components.PlantFoodComponent)
+				if plantFood and plantFood.IsGlowing then
+					-- Award Plant Food charge to all players
+					for _, player in Players:GetPlayers() do
+						PlantFoodService.AddCharge(player, 1)
+						Logger.Info("EntityDeath", `🌟 Player {player.Name} collected Plant Food from glowing zombie`)
+					end
+					
+					-- Broadcast Plant Food collected VFX
+					local pfPos = world:get(id, Components.PositionComponent)
+					Network.PlantFoodCollected.FireAll({
+						CollectorId = 0, -- All players collect
+						NewChargeCount = 0, -- Individual updates sent via PlantFoodChargeUpdate
+						ZombieEntityId = id,
+					})
+				end
+				
 				local coinValue = ProgressionData.ZombieCoinRewards[zombie.ZombieType] or CONFIG.DEFAULT_COIN_VALUE
 
 				local pos = world:get(id, Components.PositionComponent)

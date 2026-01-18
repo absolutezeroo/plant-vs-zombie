@@ -22,7 +22,9 @@ local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local Logger = require(Shared.utils.Logger)
 local Theme = require(Shared.ui.design.Theme)
-local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local ToonPanel = require(Shared.ui.components.base.ToonPanel)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion 0.3 primitives
 local Children = Fusion.Children
@@ -149,6 +151,9 @@ local function MutationBadge(scope: Scope, mutationId: string): Instance
 		return scope:New("Frame")({ Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1 })
 	end
 
+	-- Get IconName for the mutation type (e.g., "Fire", "Ice", "Electric")
+	local iconName = mutation.Type or "Mutation"
+
 	return scope:New("Frame")({
 		Size = UDim2.new(1, 0, 0, 40), -- Fixed pixel height for AutomaticCanvasSize
 		BackgroundColor3 = mutation.Color,
@@ -168,21 +173,44 @@ local function MutationBadge(scope: Scope, mutationId: string): Instance
 				PaddingRight = UDim.new(0.03, 0),
 			}),
 
-			-- Icon + Name
-			scope:New("TextLabel")({
+			-- Icon + Name Row
+			scope:New("Frame")({
+				Name = "NameRow",
 				Size = UDim2.fromScale(1, 0.5),
 				Position = UDim2.fromScale(0, 0.05),
 				BackgroundTransparency = 1,
-				Text = `{mutation.Icon} {mutation.Name}`,
-				TextColor3 = mutation.Color,
-				TextScaled = true,
-				Font = Theme.Typography.Fonts.Title,
-				TextXAlignment = Enum.TextXAlignment.Left,
 
 				[Children] = {
-					scope:New("UITextSizeConstraint")({
-						MaxTextSize = 14,
-						MinTextSize = 10,
+					scope:New("UIListLayout")({
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, 4),
+					}),
+
+					-- Mutation Type Icon
+					Icon(scope, {
+						Name = iconName,
+						Size = UDim2.new(0, 16, 0, 16),
+						LayoutOrder = 1,
+					}),
+
+					-- Mutation Name
+					scope:New("TextLabel")({
+						Size = UDim2.new(1, -20, 1, 0),
+						BackgroundTransparency = 1,
+						Text = mutation.Name,
+						TextColor3 = mutation.Color,
+						TextScaled = true,
+						Font = Theme.Typography.Fonts.Title,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						LayoutOrder = 2,
+
+						[Children] = {
+							scope:New("UITextSizeConstraint")({
+								MaxTextSize = 14,
+								MinTextSize = 10,
+							}),
+						},
 					}),
 				},
 			}),
@@ -594,12 +622,10 @@ local function PlantTooltip(props: PlantTooltipProps): Instance
 										LayoutOrder = 1,
 
 										[Children] = {
-											scope:New("TextLabel")({
+											-- Mutation icon (uses Icon component for automatic image/emoji fallback)
+											Icon(scope, {
+												Name = "Mutation",
 												Size = UDim2.fromScale(0.12, 1),
-												BackgroundTransparency = 1,
-												Text = "🧬",
-												TextScaled = true,
-												Font = Enum.Font.GothamBold,
 											}),
 											scope:New("TextLabel")({
 												Size = UDim2.fromScale(0.85, 1),

@@ -27,7 +27,7 @@ local Logger = require(Shared.utils.Logger)
 local Network = require(Shared.network.generated.client)
 local Theme = require(Shared.ui.design.Theme)
 local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)
-local ToonButton = require(Shared.ui.components.atoms.ToonButton)
+local ToonButton = require(Shared.ui.components.base.ToonButton)
 
 -- Client references (controllers is inside client)
 local Client = script.Parent.Parent
@@ -41,6 +41,7 @@ local UI = Client:WaitForChild("ui")
 local Components = UI:WaitForChild("components")
 local SunCounter = require(Components.molecules.SunCounter)
 local PlantCounter = require(Components.molecules.PlantCounter)
+local PlantFoodCounter = require(Components.molecules.PlantFoodCounter)
 local CoinCounter = require(Components.molecules.CoinCounter)
 local SeedBank = require(Components.organisms.SeedBank)
 local WaveProgressBar = require(Components.molecules.WaveProgressBar)
@@ -200,6 +201,12 @@ local function buildHUD(scope: any, preparationPhase: any, preparationTime: any,
 					CoinCounter({
 						Scope = scope,
 						LayoutOrder = 4,
+					}),
+
+					-- Plant Food Counter (after coins)
+					PlantFoodCounter({
+						Scope = scope,
+						LayoutOrder = 5,
 					}),
 				},
 			}),

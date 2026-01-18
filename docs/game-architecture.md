@@ -29,7 +29,7 @@ brief: '_bmad-output/planning-artifacts/game-brief-plant-vs-zombie-2026-01-05.md
 - **Performance Optimization:** Lane-based spatial hashing delivers O(1) targeting queries; entity pooling pre-spawns 200 entities; 15ms frame budget enforced by SafetySystem
 - **Event Architecture:** Ephemeral event entities (DamageEvent, DeathEvent) enable decoupled system communication with guaranteed single-frame lifecycle
 
-**Project Structure:** Hybrid organization (server/client/shared) with 40+ specific file locations mapped across 10 core systems. Rojo syncs filesystem to Roblox Studio with architectural boundaries enforced (server-only validation, client-only presentation, shared data/config).
+**Project Structure:** Hybrid organization (server/client/shared) with 40+ specific file locations mapped across 10 core systems. Argon syncs filesystem to Roblox Studio with architectural boundaries enforced (server-only validation, client-only presentation, shared data/config).
 
 **Implementation Patterns:** 10 patterns documented with concrete Luau code examples ensuring AI agent consistency. 3 novel patterns solve unique technical challenges (Lane-Based Spatial Hashing, Ephemeral Event Component Lifecycle, Hybrid Prediction with Zap).
 
@@ -43,7 +43,6 @@ brief: '_bmad-output/planning-artifacts/game-brief-plant-vs-zombie-2026-01-05.md
 
 **Required Tools:**
 - **Roblox Studio:** Latest release (download from [roblox.com/create](https://www.roblox.com/create))
-- **Rojo:** v7.4.0+ (filesystem sync) — [rojo.space](https://rojo.space)
 - **Wally:** v0.3.2+ (package manager) — [wally.run](https://wally.run)
 - **Rokit:** v0.1.0+ (toolchain manager) — [rokit.gg](https://rokit.gg)
 - **Git:** For version control
@@ -60,24 +59,24 @@ brief: '_bmad-output/planning-artifacts/game-brief-plant-vs-zombie-2026-01-05.md
 git clone <repository-url>
 cd plant-vs-zombie
 
-# 2. Install toolchain (Rojo, Wally)
+# 2. Install toolchain (Argon, Wally)
 rokit install
 
 # 3. Install package dependencies (Matter, Zap, Fusion, ProfileStore)
 wally install
 
-# 4. Generate Rojo sourcemap for VS Code
-rojo sourcemap default.project.json --output sourcemap.json
+# 4. Generate argon sourcemap for VS Code
+argon sourcemap default.project.json --output sourcemap.json
 
-# 5. Start Rojo sync server
-rojo serve default.project.json
+# 5. Start Argon sync server
+argon serve default.project.json
 ```
 
 ### First Steps in Roblox Studio
 
-1. **Connect Rojo:**
+1. **Connect Argon:**
    - Open Roblox Studio
-   - In Studio, go to Plugins → Rojo → "Connect to localhost:34872"
+   - In Studio, go to Plugins → Argon → "Connect to localhost:34872"
    - Studio will sync with filesystem automatically
 
 2. **Verify Package Installation:**
@@ -204,9 +203,9 @@ MEMORY_LIMIT = 600     -- MB, emergency protocols at thresholds
   - Use Case: All menus, HUD elements, reactive card selection
   
 - **ProfileStore** - Session-locked DataStore wrapper\n  - Repository: [MadStudioRoblox/ProfileStore](https://github.com/MadStudioRoblox/ProfileStore)\n  - Use Case: Player profiles (prevents duplication exploits, safe for trading V2)\n\n- **Promise** - Async/await for Luau\n  - Repository: [evaera/roblox-lua-promise](https://github.com/evaera/roblox-lua-promise)\n  - Use Case: Data loading, teleports, HTTP requests, retry logic\n\n- **Trove** - Connection/instance cleanup manager\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: All :Connect() calls in Services/Controllers (prevents memory leaks)\n\n- **Sift** - Immutable table utilities\n  - Repository: [csqrl/sift](https://github.com/csqrl/sift)\n  - Use Case: Component updates in Matter (immutability required)\n\n- **Signal** - Custom event emitter\n  - Repository: [sleitnick/RbxUtil](https://github.com/sleitnick/RbxUtil)\n  - Use Case: UI Controller ↔ Manager communication (replaces BindableEvent)\n\n- **Cmdr** - Developer console & command framework\n  - Repository: [evaera/Cmdr](https://github.com/evaera/Cmdr)\n  - Use Case: In-game developer console, debug commands, admin tools\n\n**Development Toolchain:**
-- **Rojo** - Filesystem-to-Roblox sync (enables VS Code workflow)
+- **Argon** - Filesystem-to-Roblox sync (enables VS Code workflow)
 - **Wally** - Package manager (Rust-like dependency management)
-- **GitHub Actions** - CI/CD pipeline (StyLua, Luau type checking, Rojo build validation)
+- **GitHub Actions** - CI/CD pipeline (StyLua, Luau type checking, Argon build validation)
 
 ### Complexity Drivers
 
@@ -692,7 +691,7 @@ return {
 
 #### Supporting Tools
 
-**Rojo (Filesystem Sync)**
+**Argon (Filesystem Sync)**
 
 **Repository:** [rojo-rbx/rojo](https://github.com/rojo-rbx/rojo)  
 **Version:** 7.3.0+ (latest stable)  
@@ -700,10 +699,10 @@ return {
 
 **Purpose:** Sync local filesystem to Roblox Studio (enables VS Code workflow).
 
-**What Rojo Provides:**
+**What Argon Provides:**
 - `default.project.json` configuration (maps folders to Roblox services)
 - Live sync (file changes reflect in Studio <2 seconds)
-- CLI build command (`rojo build` outputs `.rbxl` file for CI/CD)
+- CLI build command (`argon build` outputs `.rbxl` file for CI/CD)
 
 **Project Structure Mapping:**
 ```json
@@ -765,7 +764,7 @@ profilestore = "MadStudioRoblox/ProfileStore@1.0.0"
 **Pipeline Steps:**
 1. **StyLua Formatting:** Fail if code not formatted (`stylua --check src/`)
 2. **Luau Type Checking:** Fail if type errors (`luau-lsp analyze src/`)
-3. **Rojo Build Validation:** Fail if project structure invalid (`rojo build --output test.rbxl`)
+3. **Argon Build Validation:** Fail if project structure invalid (`argon build --output test.rbxl`)
 4. **Zap Code Generation:** Fail if schema compilation errors (`zap src/shared/network/schema.zap`)
 
 **CI Configuration (`.github/workflows/ci.yml`):**
@@ -782,7 +781,7 @@ jobs:
           args: --check src/
       - uses: ok-nick/setup-aftman@v0.3.0
       - run: luau-lsp analyze src/
-      - run: rojo build --output test.rbxl
+      - run: argon build --output test.rbxl
 ```
 
 ---
@@ -819,7 +818,7 @@ The chosen frameworks (Matter, Zap, Fusion, ProfileStore) provide these architec
 | **Client Prediction** | Custom (Zap + Matter) | None (rejected: high latency feel) |
 | **UI State Management** | Fusion (reactive state) | Roact (rejected: less performant) |
 | **Data Persistence** | ProfileStore (session locking) | Raw DataStore (rejected: duplication exploits) |
-| **Project Structure** | Rojo (filesystem sync) | Studio-only (rejected: no version control) |
+| **Project Structure** | Argon (filesystem sync) | Studio-only (rejected: no version control) |
 | **Dependency Management** | Wally (package manager) | Manual Git submodules (rejected: hard to update) |
 
 ---
@@ -876,7 +875,7 @@ These decisions are NOT provided by the engine or frameworks—they must be desi
 
 **Pattern:** Hybrid (By Type at Root, By System Within)
 
-**Rationale:** Roblox enforces a type-based root structure (ServerScriptService, ReplicatedStorage, StarterPlayer), so we embrace this constraint while organizing by system within each realm. This hybrid approach aligns with Rojo's filesystem sync patterns and provides clear architectural boundaries (server authority vs client presentation vs shared data).
+**Rationale:** Roblox enforces a type-based root structure (ServerScriptService, ReplicatedStorage, StarterPlayer), so we embrace this constraint while organizing by system within each realm. This hybrid approach aligns with Argon's filesystem sync patterns and provides clear architectural boundaries (server authority vs client presentation vs shared data).
 
 ### Directory Structure
 
@@ -1049,7 +1048,7 @@ plant-vs-zombie/
 │   │   ├── Fusion/
 │   │   └── ProfileStore/
 │
-├── default.project.json           # Rojo sync configuration
+├── default.project.json           # Argon sync configuration
 ├── wally.toml                     # Package dependencies
 ├── rokit.toml                     # Toolchain management
 ├── .gitignore
@@ -1205,7 +1204,7 @@ plant-vs-zombie/
 - Balance formulas with anti-cheat significance (wave budget, damage calculations)
 - ProfileStore keys or schemas with sensitive data
 
-#### Rojo Sync Strategy
+#### Argon Sync Strategy
 
 **Mapping (default.project.json):**
 ```json
@@ -1241,7 +1240,7 @@ plant-vs-zombie/
 
 **Development Workflow:**
 1. Edit files in `src/` filesystem folders
-2. Rojo watches for changes and syncs to Studio
+2. Argon watches for changes and syncs to Studio
 3. Studio runs code from synced locations
 4. No manual copy-paste between filesystem and Studio
 

@@ -20,7 +20,8 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameSignals = require(Shared.signals.GameSignals)
 local Theme = require(Shared.ui.design.Theme)
-local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
+local IconAssets = require(Shared.ui.design.IconAssets)
+local ToonPanel = require(Shared.ui.components.base.ToonPanel)
 
 -- Fusion 0.3 primitives
 local Children = Fusion.Children
@@ -199,8 +200,8 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				},
 			}),
 
-			-- Zombie emoji (moves along bar)
-			scope:New("TextLabel")({
+			-- Zombie icon (moves along bar)
+			scope:New("Frame")({
 				Name = "ZombieHead",
 				Size = UDim2.fromScale(0.12, 0.9),
 				Position = scope:Computed(function(use)
@@ -211,10 +212,51 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 				end),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Color3.fromRGB(100, 180, 100), -- Zombie green
-				Text = "🧟",
-				TextScaled = true,
-				Font = Enum.Font.GothamBold,
 				ZIndex = 10,
+
+				[Children] = {
+					scope:New("UIAspectRatioConstraint")({
+						AspectRatio = 1,
+						DominantAxis = Enum.DominantAxis.Height,
+					}),
+					scope:New("UICorner")({
+						CornerRadius = UDim.new(0.5, 0),
+					}),
+					scope:New("UIStroke")({
+						Color = Theme.Colors.Surface.Stroke :: Color3,
+						Thickness = 2,
+					}),
+					-- Icon
+					scope:New("ImageLabel")({
+						Size = UDim2.fromScale(0.8, 0.8),
+						Position = UDim2.fromScale(0.5, 0.5),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundTransparency = 1,
+						Image = IconAssets.Get("Zombie"),
+						ScaleType = Enum.ScaleType.Fit,
+						Visible = IconAssets.HasImage("Zombie"),
+					}),
+					scope:New("TextLabel")({
+						Size = UDim2.fromScale(1, 1),
+						BackgroundTransparency = 1,
+						Text = IconAssets.GetEmoji("Zombie"),
+						TextScaled = true,
+						Font = Enum.Font.GothamBold,
+						Visible = not IconAssets.HasImage("Zombie"),
+					}),
+				},
+			}),
+
+			-- Flag icon (image when available)
+			scope:New("ImageLabel")({
+				Name = "FlagIconImage",
+				Size = UDim2.fromScale(0.12, 0.9),
+				Position = UDim2.fromScale(0.92, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Theme.Colors.Danger.Main,
+				Image = IconAssets.Get("Flag"),
+				ZIndex = 5,
+				Visible = IconAssets.HasImage("Flag"),
 
 				[Children] = {
 					scope:New("UIAspectRatioConstraint")({
@@ -230,18 +272,18 @@ local function WaveProgressBar(props: WaveProgressBarProps): Frame
 					}),
 				},
 			}),
-
-			-- Flag emoji (end of bar)
+			-- Flag icon (emoji fallback)
 			scope:New("TextLabel")({
 				Name = "FlagIcon",
 				Size = UDim2.fromScale(0.12, 0.9),
 				Position = UDim2.fromScale(0.92, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Theme.Colors.Danger.Main,
-				Text = "🚩",
+				Text = IconAssets.GetEmoji("Flag"),
 				TextScaled = true,
 				Font = Enum.Font.GothamBold,
 				ZIndex = 5,
+				Visible = not IconAssets.HasImage("Flag"),
 
 				[Children] = {
 					scope:New("UIAspectRatioConstraint")({

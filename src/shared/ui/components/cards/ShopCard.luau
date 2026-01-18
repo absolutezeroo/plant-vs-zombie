@@ -14,8 +14,10 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 local PlantData = require(Shared.data.PlantData)
-local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
+local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion primitives
 local Children = Fusion.Children
@@ -43,18 +45,6 @@ local function ShopCard(props: ShopCardProps): Frame
 	local scope = props.Scope
 	local plantStats = PlantData[props.PlantType]
 	local sunCost = props.SunCost or (plantStats and plantStats.Cost) or 100
-
-	-- Create 3D plant viewport
-	local plantViewport = PlantViewport.CreateWithScope(scope, {
-		PlantType = props.PlantType,
-		Size = UDim2.new(1, -10, 0, VIEWPORT_HEIGHT),
-		Position = UDim2.new(0.5, 0, 0, 25),
-		AnchorPoint = Vector2.new(0.5, 0),
-		ZIndex = 3,
-		CameraFOV = 30, -- Slightly narrower for larger plant
-		CameraDistance = 1.8,
-		CameraHeight = 0.15,
-	})
 
 	-- State
 	local isHovered = scope:Value(false)
@@ -143,41 +133,30 @@ local function ShopCard(props: ShopCardProps): Frame
 								Thickness = Theme.Layout.StrokeThickness,
 							}),
 
-							-- Owned badge (top)
-							scope:Computed(function(use)
-								if not use(props.IsUnlocked) then
-									return nil
-								end
-								return scope:New("Frame")({
-									Name = "OwnedBadge",
-									Size = UDim2.new(1, 0, 0, 26),
-									BackgroundColor3 = Theme.Colors.Action.Main,
-									ZIndex = 3,
+							-- Background effect behind plant
+							scope:New("ImageLabel")({
+								Name = "PlantBg",
+								Size = UDim2.new(1, 20, 0, VIEWPORT_HEIGHT + 30),
+								Position = UDim2.new(0.5, 0, 0, 10),
+								AnchorPoint = Vector2.new(0.5, 0),
+								BackgroundTransparency = 1,
+								Image = "rbxassetid://137482510225499",
+								ImageTransparency = 0,
+								ScaleType = Enum.ScaleType.Fit,
+								ZIndex = 3,
+							}),
 
-									[Children] = {
-										scope:New("UICorner")({
-											CornerRadius = Theme.Layout.CornerRadius,
-										}),
-										-- Bottom cover
-										scope:New("Frame")({
-											Size = UDim2.new(1, 0, 0, 12),
-											Position = UDim2.new(0, 0, 1, -12),
-											BackgroundColor3 = Theme.Colors.Action.Main,
-										}),
-										scope:New("TextLabel")({
-											Size = UDim2.fromScale(1, 1),
-											BackgroundTransparency = 1,
-											Text = `{Theme.Icons.Check} OWNED`,
-											TextColor3 = Color3.new(1, 1, 1),
-											TextSize = 12,
-											Font = Theme.Typography.Fonts.Body,
-										}),
-									},
-								})
-							end),
-
-							-- 3D Plant viewport
-							plantViewport,
+							-- 3D Plant viewport (ZIndex = 4 to be on top of bg)
+							PlantViewport.CreateWithScope(scope, {
+								PlantType = props.PlantType,
+								Size = UDim2.new(1, -10, 0, VIEWPORT_HEIGHT),
+								Position = UDim2.new(0.5, 0, 0, 25),
+								AnchorPoint = Vector2.new(0.5, 0),
+								ZIndex = 4,
+								CameraFOV = 30,
+								CameraDistance = 1.8,
+								CameraHeight = 0.15,
+							}),
 
 							-- Plant name
 							scope:New("TextLabel")({
@@ -208,30 +187,6 @@ local function ShopCard(props: ShopCardProps): Frame
 									})
 								or nil,
 
-							-- Sun cost pill
-							scope:New("Frame")({
-								Name = "SunCost",
-								Size = UDim2.fromOffset(60, 22),
-								Position = UDim2.new(0.5, 0, 0, 142), -- Below category
-								AnchorPoint = Vector2.new(0.5, 0),
-								BackgroundColor3 = Theme.Colors.Warning.Main,
-								ZIndex = 3,
-
-								[Children] = {
-									scope:New("UICorner")({
-										CornerRadius = UDim.new(0.5, 0),
-									}),
-									scope:New("TextLabel")({
-										Size = UDim2.fromScale(1, 1),
-										BackgroundTransparency = 1,
-										Text = `{Theme.Icons.Sun} {sunCost}`,
-										TextColor3 = Color3.fromRGB(80, 50, 20), -- Dark brown for better contrast
-										TextSize = 11,
-										Font = Enum.Font.GothamBold, -- More readable
-									}),
-								},
-							}),
-
 							-- Buy button / Owned indicator
 							scope:Computed(function(use)
 								if use(props.IsUnlocked) then
@@ -247,13 +202,25 @@ local function ShopCard(props: ShopCardProps): Frame
 											scope:New("UICorner")({
 												CornerRadius = UDim.new(0, 8),
 											}),
+											scope:New("UIListLayout")({
+												FillDirection = Enum.FillDirection.Horizontal,
+												VerticalAlignment = Enum.VerticalAlignment.Center,
+												HorizontalAlignment = Enum.HorizontalAlignment.Center,
+												Padding = UDim.new(0, 4),
+											}),
+										Icon(scope, {
+											Name = "Check",
+											Size = UDim2.fromOffset(16, 16),
+											Color = Theme.Colors.Action.Main,
+											}),
 											scope:New("TextLabel")({
-												Size = UDim2.fromScale(1, 1),
+												Size = UDim2.fromOffset(60, 20),
 												BackgroundTransparency = 1,
-												Text = `{Theme.Icons.Check} Collection`,
+												Text = "OWNED",
 												TextColor3 = Theme.Colors.Action.Main,
 												TextSize = 12,
 												Font = Theme.Typography.Fonts.Body,
+												TextXAlignment = Enum.TextXAlignment.Left,
 											}),
 										},
 									})
@@ -272,10 +239,7 @@ local function ShopCard(props: ShopCardProps): Frame
 									Size = UDim2.new(1, -16, 0, 36),
 									Position = UDim2.new(0, 8, 1, -44),
 									BackgroundColor3 = bgColor,
-									Text = `{Theme.Icons.Coin} {props.Cost}`,
-									TextColor3 = textCol,
-									TextSize = 14,
-									Font = Enum.Font.GothamBold, -- More readable than LuckiestGuy on colored bg
+									Text = "",
 									AutoButtonColor = false,
 									ZIndex = 10,
 
@@ -292,6 +256,26 @@ local function ShopCard(props: ShopCardProps): Frame
 										scope:New("UIStroke")({
 											Color = Theme.Colors.Surface.Stroke :: Color3,
 											Thickness = 2,
+										}),
+										scope:New("UIListLayout")({
+											FillDirection = Enum.FillDirection.Horizontal,
+											VerticalAlignment = Enum.VerticalAlignment.Center,
+											HorizontalAlignment = Enum.HorizontalAlignment.Center,
+											Padding = UDim.new(0, 4),
+										}),
+									Icon(scope, {
+										Name = "Coin",
+										Size = UDim2.fromOffset(18, 18),
+										}),
+										scope:New("TextLabel")({
+											Name = "PriceText",
+											Size = UDim2.fromOffset(50, 20),
+											BackgroundTransparency = 1,
+											Text = tostring(props.Cost),
+											TextColor3 = textCol,
+											TextSize = 14,
+											Font = Enum.Font.GothamBold,
+											TextXAlignment = Enum.TextXAlignment.Left,
 										}),
 									},
 								})

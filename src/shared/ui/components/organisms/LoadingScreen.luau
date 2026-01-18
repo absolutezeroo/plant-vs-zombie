@@ -24,6 +24,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 local ChanceUtils = require(Shared.utils.ChanceUtils)
 local BlurManager = require(Shared.ui.utils.BlurManager)
 
@@ -341,27 +342,49 @@ function LoadingScreen:_createUI()
 										ZIndex = 2,
 									}),
 
-									-- Decorative emojis
+									-- Decorative icons (image when available)
+									New(scope, "ImageLabel")({
+										Size = UDim2.fromOffset(40, 40),
+										Position = UDim2.new(0, -10, 1, -10),
+										AnchorPoint = Vector2.new(0, 1),
+										BackgroundTransparency = 1,
+										Image = IconAssets.Get("Seedling"),
+										ImageTransparency = 0.4,
+										ZIndex = 2,
+										Visible = IconAssets.HasImage("Seedling"),
+									}),
 									New(scope, "TextLabel")({
 										Size = UDim2.fromOffset(40, 40),
 										Position = UDim2.new(0, -10, 1, -10),
 										AnchorPoint = Vector2.new(0, 1),
 										BackgroundTransparency = 1,
-										Text = "🌱",
+										Text = IconAssets.GetEmoji("Seedling"),
 										TextSize = 28,
 										TextTransparency = 0.4,
 										ZIndex = 2,
+										Visible = not IconAssets.HasImage("Seedling"),
 									}),
 
+									New(scope, "ImageLabel")({
+										Size = UDim2.fromOffset(40, 40),
+										Position = UDim2.new(1, 10, 1, -10),
+										AnchorPoint = Vector2.new(1, 1),
+										BackgroundTransparency = 1,
+										Image = IconAssets.Get("Herb"),
+										ImageTransparency = 0.4,
+										ZIndex = 2,
+										Visible = IconAssets.HasImage("Herb"),
+									}),
 									New(scope, "TextLabel")({
 										Size = UDim2.fromOffset(40, 40),
 										Position = UDim2.new(1, 10, 1, -10),
 										AnchorPoint = Vector2.new(1, 1),
 										BackgroundTransparency = 1,
-										Text = "🌿",
+										Text = IconAssets.GetEmoji("Herb"),
 										TextSize = 28,
 										TextTransparency = 0.4,
 										ZIndex = 2,
+										Visible = not IconAssets.HasImage("Herb"),
 									}),
 								},
 							}),

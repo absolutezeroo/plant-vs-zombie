@@ -40,6 +40,9 @@ local Controllers = Client:FindFirstChild("controllers")
 assert(Controllers, "VFXAudioSystem: controllers folder not found")
 local FloatingTextController = require(Controllers.FloatingTextController)
 
+-- Selection state (in modules folder)
+local SelectionState = require(Modules.SelectionState)
+
 -- State
 local _isWaveActive = false
 local _currentWave = 0
@@ -200,7 +203,7 @@ local function Init(_world: any)
 	end))
 
 	-- XP Gained feedback (floating text near player)
-	_trove:Add(Network.XPGained.On(function(data)
+	_trove:Add(Network.XPGained.SetCallback(function(data)
 		-- Show XP popup at screen center (no world position needed)
 		local camera = workspace.CurrentCamera
 		if camera then
@@ -212,7 +215,7 @@ local function Init(_world: any)
 	end))
 
 	-- Level Up celebration
-	_trove:Add(Network.LevelUp.On(function(data)
+	_trove:Add(Network.LevelUp.SetCallback(function(data)
 		-- Show level up popup at screen center
 		local camera = workspace.CurrentCamera
 		if camera then
@@ -226,33 +229,26 @@ local function Init(_world: any)
 		Logger.Info("VFXAudio", `Level up! New level: {data.NewLevel}`)
 	end))
 
-	-- PlantFood Collected
+	-- PlantFood Collected (from glowing zombie death)
 	_trove:Add(Network.PlantFoodCollected.On(function(data)
-		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
-		FloatingTextController.ShowPlantFood(pos, "Collected")
+		-- No position in packet - just play a UI sound
+		AudioService.PlaySound("SunCollect")
 
-		-- Play pickup sound
-		AudioService.PlaySound("SunCollect", { Position = pos })
-
-		Logger.Debug("VFXAudio", `PlantFood collected at {pos}`)
+		Logger.Debug("VFXAudio", `PlantFood collected from zombie {data.ZombieEntityId}`)
 	end))
 
 	-- PlantFood Activated (on a plant)
 	_trove:Add(Network.PlantFoodActivated.On(function(data)
-		local pos = Vector3.new(data.PositionX, data.PositionY, data.PositionZ)
-		FloatingTextController.ShowPlantFood(pos, "Activated")
+		-- No position in packet - show VFX on the plant entity if we can find it
+		AudioService.PlaySound("PlantFood")
 
-		-- Play activation sound
-		AudioService.PlaySound("PlantFood", { Position = pos })
-		VFXService.PlayExplosion(pos, 3) -- Small burst VFX
-
-		Logger.Debug("VFXAudio", `PlantFood activated on entity {data.EntityId}`)
+		Logger.Debug("VFXAudio", `PlantFood activated on plant {data.PlantEntityId} ({data.PlantType})`)
 	end))
 
 	-- PlantFood Charge Update (UI feedback)
-	_trove:Add(Network.PlantFoodChargeUpdate.On(function(data)
-		-- This could update a UI bar, for now just log
-		Logger.Debug("VFXAudio", `PlantFood charge: {data.CurrentCharge}/{data.MaxCharge}`)
+	_trove:Add(Network.PlantFoodChargeUpdate.SetCallback(function(data)
+		SelectionState.SetPlantFoodCharges(data.ChargeCount)
+		Logger.Debug("VFXAudio", `PlantFood charge updated: {data.ChargeCount}`)
 	end))
 
 	Logger.Info("VFXAudioSystem", "Initialized VFX and Audio services")

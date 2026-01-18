@@ -325,7 +325,8 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
 
 	-- Check if this zombie should be a Plant Food carrier (glowing)
 	local PlantFoodService = getPlantFoodService()
-	if PlantFoodService.ShouldZombieBeGlowing() then
+	local isGlowing = PlantFoodService.ShouldZombieBeGlowing()
+	if isGlowing then
 		world:insert(
 			entityId,
 			PlantFoodComponent({
@@ -335,13 +336,14 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
 		Logger.Info("WaveSpawner", `🌟 GLOWING {zombieType} in lane {lane}`)
 	end
 
-	-- Broadcast to clients
+	-- Broadcast to clients (include IsGlowing for visual effect)
 	local Network = getNetwork()
 	Network.ZombieSpawned.FireAll({
 		EntityId = entityId,
 		ZombieType = zombieType :: any,
 		Lane = lane :: any,
 		PositionX = spawnPos.X,
+		IsGlowing = isGlowing,
 	})
 
 	-- Fire SpawnEvent for VFX/Audio systems (e.g., spawn particles)

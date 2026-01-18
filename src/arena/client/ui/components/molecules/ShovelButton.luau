@@ -15,6 +15,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
 -- Path: client/ui/components/molecules/ShovelButton.luau
 local Client = script.Parent.Parent.Parent.Parent
@@ -25,9 +26,6 @@ local SelectionState = require(Modules.SelectionState)
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
-
--- Shovel icon as text (can be replaced with image)
-local SHOVEL_ICON = "🔨" -- Or use ImageLabel with shovel image
 
 export type ShovelButtonProps = {
 	Scope: Fusion.Scope<any>,
@@ -194,27 +192,51 @@ local function ShovelButton(props: ShovelButtonProps): Frame
 								Thickness = borderThickness,
 							}),
 
-							-- Shovel Icon
-							scope:New("TextLabel")({
-								Name = "ShovelIcon",
-								Size = UDim2.fromScale(0.7, 0.7),
-								Position = UDim2.fromScale(0.5, 0.5),
-								AnchorPoint = Vector2.new(0.5, 0.5),
-								BackgroundTransparency = 1,
-								Text = SHOVEL_ICON,
-								TextScaled = true,
-								Font = Enum.Font.GothamBold,
-								TextColor3 = scope:Computed(function(use)
-									return if use(isShovelActive)
-										then Color3.fromHex("#FF6B35")
-										else Color3.new(0.3, 0.3, 0.3)
-								end),
-								ZIndex = 3,
+-- Shovel Icon Container
+								scope:New("Frame")({
+									Name = "ShovelIcon",
+									Size = UDim2.fromScale(0.7, 0.7),
+									Position = UDim2.fromScale(0.5, 0.5),
+									AnchorPoint = Vector2.new(0.5, 0.5),
+									BackgroundTransparency = 1,
+									ZIndex = 3,
 
-								[Children] = {
-									scope:New("UITextSizeConstraint")({
-										MaxTextSize = 40,
-										MinTextSize = 12,
+									[Children] = {
+										-- Image version
+										scope:New("ImageLabel")({
+											Name = "Image",
+											Size = UDim2.fromScale(1, 1),
+											BackgroundTransparency = 1,
+											Image = IconAssets.Get("Shovel"),
+											ImageColor3 = scope:Computed(function(use)
+												return if use(isShovelActive)
+													then Color3.fromHex("#FF6B35")
+													else Color3.new(0.3, 0.3, 0.3)
+											end),
+											ScaleType = Enum.ScaleType.Fit,
+											Visible = IconAssets.HasImage("Shovel"),
+										}),
+										-- Emoji fallback
+										scope:New("TextLabel")({
+											Name = "Emoji",
+											Size = UDim2.fromScale(1, 1),
+											BackgroundTransparency = 1,
+											Text = IconAssets.GetEmoji("Shovel"),
+											TextScaled = true,
+											Font = Enum.Font.GothamBold,
+											TextColor3 = scope:Computed(function(use)
+												return if use(isShovelActive)
+													then Color3.fromHex("#FF6B35")
+													else Color3.new(0.3, 0.3, 0.3)
+											end),
+											Visible = not IconAssets.HasImage("Shovel"),
+
+											[Children] = {
+												scope:New("UITextSizeConstraint")({
+													MaxTextSize = 40,
+													MinTextSize = 12,
+												}),
+											},
 									}),
 								},
 							}),

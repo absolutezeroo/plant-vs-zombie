@@ -314,7 +314,7 @@ local function createLeaveButtonUI(): ScreenGui
 							local world = use(worldConfig)
 							local diff = use(difficultyConfig)
 							if world and diff then
-								return `🌿 {world.Name} ({diff.Name})`
+								return `{world.Name} ({diff.Name})`
 							end
 							return "Loading..."
 						end),

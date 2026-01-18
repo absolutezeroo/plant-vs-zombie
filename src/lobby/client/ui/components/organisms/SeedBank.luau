@@ -1,12 +1,15 @@
 --!strict
 --[[
-	SeedBank.luau - Horizontal plant deck bar with "Toon Pop" style (Lobby - Responsive)
+	SeedBank.luau - Lobby deck preview bar (Toon Pop + Responsive)
 	
-	Organism component displaying the player's equipped plants.
-	Uses ToonPanel as container and SeedCard for each plant.
+	Displays the player's equipped plants in a stylish horizontal bar.
+	Uses DeckSlot for consistent visual style with DeckBuilder.
 	
-	Handles click to show tooltip.
-	Fully responsive using Scale-based sizing.
+	Features:
+	- Shadow + Main frame pattern (Toon Pop depth)
+	- Gradient background accent
+	- Reactive to deck changes
+	- Click to show plant tooltip
 	
 	Uses Fusion 0.3 scope:Method() syntax.
 ]]
@@ -17,14 +20,19 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local ToonPanel = require(Shared.ui.components.atoms.ToonPanel)
-
-local Molecules = script.Parent.Parent.molecules
-local SeedCard = require(Molecules.SeedCard)
+local Theme = require(Shared.ui.design.Theme)
+local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
+local MutationData = require(Shared.data.MutationData)
 
 -- Fusion 0.3 primitives
 local Children = Fusion.Children
+local OnEvent = Fusion.OnEvent
 local peek = Fusion.peek
+
+-- Colors
+local GOLD_BORDER = Color3.fromHex("#FFD700")
+local SLOT_BG = Color3.fromRGB(60, 70, 80)
+local SLOT_SHADOW = Color3.fromRGB(35, 40, 50)
 
 export type SeedBankProps = {
 	Scope: Fusion.Scope<any>,
@@ -34,119 +42,314 @@ export type SeedBankProps = {
 	Position: UDim2?,
 	AnchorPoint: Vector2?,
 	ZIndex: number?,
-	LayoutOrder: number?,
 }
 
---[[
-	SeedBank Component (Lobby - Responsive)
-	
-	A horizontal bar containing SeedCards for equipped plants.
-	Wrapped in a ToonPanel for consistent styling.
-	
-	Uses percentage-based sizing that scales with viewport.
-	
-	@param props SeedBankProps
-	@return Frame
-]]
+-- Individual seed slot component (inline for simplicity)
+local function SeedSlot(
+	scope: Fusion.Scope<any>,
+	plantType: string,
+	mutations: { string },
+	onClick: () -> ()
+): Frame
+	local isHovered = scope:Value(false)
+	local isPressed = scope:Value(false)
+	local hasMutations = #mutations > 0
+
+	-- Press animation
+	local pressScale = scope:Spring(
+		scope:Computed(function(use)
+			return if use(isPressed) then 0.9 else 1
+		end),
+		45,
+		0.6
+	)
+
+	-- Hover scale
+	local hoverScale = scope:Spring(
+		scope:Computed(function(use)
+			if use(isHovered) and not use(isPressed) then
+				return 1.08
+			end
+			return 1
+		end),
+		40,
+		0.7
+	)
+
+	-- Combined scale
+	local combinedScale = scope:Computed(function(use)
+		return use(pressScale) * use(hoverScale)
+	end)
+
+	-- Border color
+	local borderColor = if hasMutations then GOLD_BORDER else Theme.Colors.Surface.Stroke
+
+	-- Build mutation icons
+	local mutationIcons: { any } = {}
+	for i, mutId in mutations do
+		if i > 3 then break end
+		local mutData = MutationData.Get(mutId)
+		if mutData then
+			table.insert(mutationIcons, scope:New("Frame")({
+				Name = "Mut" .. i,
+				Size = UDim2.fromOffset(16, 16),
+				BackgroundColor3 = mutData.Color,
+				LayoutOrder = i,
+
+				[Children] = {
+					scope:New("UICorner")({
+						CornerRadius = UDim.new(0.3, 0),
+					}),
+					scope:New("UIStroke")({
+						Color = Color3.new(1, 1, 1),
+						Thickness = 1,
+					}),
+					scope:New("TextLabel")({
+						Size = UDim2.fromScale(1, 1),
+						BackgroundTransparency = 1,
+						Text = mutData.Icon or "✨",
+						TextSize = 10,
+						Font = Enum.Font.GothamBold,
+					}),
+				},
+			}))
+		end
+	end
+
+	return scope:New("Frame")({
+		Name = "Slot_" .. plantType,
+		Size = UDim2.fromOffset(80, 100),
+		BackgroundTransparency = 1,
+
+		[Children] = {
+			-- Scale wrapper
+			scope:New("Frame")({
+				Name = "ScaleWrapper",
+				Size = scope:Computed(function(use)
+					local s = use(combinedScale)
+					return UDim2.fromScale(s, s)
+				end),
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+
+				[Children] = {
+					-- Shadow
+					scope:New("Frame")({
+						Name = "Shadow",
+						Size = UDim2.fromScale(1, 0.92),
+						Position = UDim2.fromScale(0.5, 0.08),
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = if hasMutations 
+							then Color3.fromHex("#B8860B") 
+							else SLOT_SHADOW,
+						ZIndex = 1,
+
+						[Children] = {
+							scope:New("UICorner")({
+								CornerRadius = UDim.new(0.15, 0),
+							}),
+						},
+					}),
+
+					-- Main card
+					scope:New("TextButton")({
+						Name = "Main",
+						Size = UDim2.fromScale(1, 0.92),
+						Position = UDim2.fromScale(0.5, 0),
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = SLOT_BG,
+						AutoButtonColor = false,
+						Text = "",
+						ClipsDescendants = true,
+						ZIndex = 2,
+
+						[OnEvent("MouseButton1Down")] = function()
+							isPressed:set(true)
+						end,
+
+						[OnEvent("MouseButton1Up")] = function()
+							isPressed:set(false)
+							if peek(isHovered) then
+								onClick()
+							end
+						end,
+
+						[OnEvent("MouseEnter")] = function()
+							isHovered:set(true)
+						end,
+
+						[OnEvent("MouseLeave")] = function()
+							isHovered:set(false)
+							isPressed:set(false)
+						end,
+
+						[Children] = {
+							scope:New("UICorner")({
+								CornerRadius = UDim.new(0.15, 0),
+							}),
+
+							scope:New("UIStroke")({
+								Color = borderColor,
+								Thickness = if hasMutations then 3 else 2,
+							}),
+
+							-- Gradient overlay for depth
+							scope:New("UIGradient")({
+								Color = ColorSequence.new({
+									ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+									ColorSequenceKeypoint.new(0.5, Color3.new(0.9, 0.9, 0.9)),
+									ColorSequenceKeypoint.new(1, Color3.new(0.75, 0.75, 0.75)),
+								}),
+								Rotation = 90,
+							}),
+
+							-- 3D Plant viewport
+							PlantViewport.CreateWithScope(scope, {
+								PlantType = plantType,
+								Size = UDim2.fromScale(0.95, 0.7),
+								Position = UDim2.fromScale(0.5, 0.35),
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								ZIndex = 3,
+								CameraFOV = 30,
+								CameraDistance = 1.4,
+								CameraHeight = 0.15,
+							}),
+
+							-- Plant name
+							scope:New("TextLabel")({
+								Name = "PlantName",
+								Size = UDim2.new(1, -8, 0, 14),
+								Position = UDim2.new(0.5, 0, 1, -18),
+								AnchorPoint = Vector2.new(0.5, 0),
+								BackgroundTransparency = 1,
+								Text = plantType,
+								TextColor3 = Color3.new(1, 1, 1),
+								TextSize = 11,
+								Font = Enum.Font.GothamBold,
+								TextTruncate = Enum.TextTruncate.AtEnd,
+								ZIndex = 4,
+							}),
+
+							-- Mutation icons row (bottom-left)
+							#mutationIcons > 0 and scope:New("Frame")({
+								Name = "Mutations",
+								Size = UDim2.fromOffset(#mutationIcons * 18, 16),
+								Position = UDim2.fromOffset(4, 4),
+								BackgroundTransparency = 1,
+								ZIndex = 5,
+
+								[Children] = {
+									scope:New("UIListLayout")({
+										FillDirection = Enum.FillDirection.Horizontal,
+										Padding = UDim.new(0, 2),
+									}),
+									table.unpack(mutationIcons),
+								},
+							}) or nil,
+						},
+					}),
+				},
+			}),
+		},
+	})
+end
+
 local function SeedBank(props: SeedBankProps): Frame
 	local scope = props.Scope
 	local equippedPlants = props.EquippedPlants
 	local equippedMutations = props.EquippedMutations
-	local onPlantClick = props.OnPlantClick
 
-	local position = props.Position or UDim2.fromScale(0.5, 0.98)
-	local anchorPoint = props.AnchorPoint or Vector2.new(0.5, 1)
-	local zIndex = props.ZIndex or 1
-	local layoutOrder = props.LayoutOrder or 0
+	-- Build slots using ForValues for proper lifecycle
+	local slotsArray = scope:ForValues(equippedPlants, function(use, innerScope, plantType)
+		local mutations = use(equippedMutations)
+		local plantMutations = mutations[plantType] or {}
 
-	-- Constants for layout
-	local CARD_PIXEL_SIZE = 108 -- Square card size in pixels (panel height 120 - padding 12)
-	local GAP_PIXELS = 6 -- Gap between cards
-	local PADDING_PIXELS = 16 -- Total horizontal padding (8 each side)
-
-	-- Calculate number of elements (reactive)
-	local cardCount = scope:Computed(function(use)
-		local plants = use(equippedPlants)
-		return math.max(1, #plants)
-	end)
-
-	-- Panel width in pixels = padding + (cards * size) + ((cards-1) * gap)
-	local panelWidthPixels = scope:Computed(function(use)
-		local count = use(cardCount)
-		return PADDING_PIXELS + (CARD_PIXEL_SIZE * count) + (GAP_PIXELS * (count - 1))
-	end)
-
-	-- Build SeedCard array with reactive mutations using ForValues
-	-- Fusion 0.3: scope:ForValues(input, function(use, scope, value))
-	local seedCardsArray = scope:ForValues(equippedPlants, function(use, innerScope, plantType)
-		-- Create a Computed that reactively extracts mutations for this specific plant
-		local plantMutations = innerScope:Computed(function(use2)
-			local allMutations = use2(equippedMutations)
-			return allMutations[plantType] or {}
+		return SeedSlot(innerScope, plantType, plantMutations, function()
+			props.OnPlantClick(plantType, plantMutations)
 		end)
-
-		-- Wrapper frame for each card slot (square, full height)
-		return innerScope:New("Frame")({
-			Name = `CardSlot_{plantType}`,
-			Size = UDim2.fromScale(1, 1), -- Full size, aspect handled by SeedCard
-			BackgroundTransparency = 1,
-
-			[Children] = {
-				-- Force square size based on height
-				innerScope:New("UIAspectRatioConstraint")({
-					AspectRatio = 1,
-					DominantAxis = Enum.DominantAxis.Height,
-				}),
-
-				SeedCard({
-					Scope = innerScope,
-					PlantType = plantType,
-					EquippedMutations = plantMutations,
-					OnClick = function()
-						local mutations = peek(plantMutations)
-						onPlantClick(plantType, mutations)
-					end,
-				}),
-			},
-		})
 	end)
 
-	return ToonPanel({
-		Scope = scope,
+	-- Calculate width based on deck size
+	local barWidth = scope:Computed(function(use)
+		local plants = use(equippedPlants)
+		local count = math.max(1, #plants)
+		-- 80px per slot + 8px gap + 24px padding
+		return 24 + (count * 80) + ((count - 1) * 8)
+	end)
+
+	return scope:New("Frame")({
+		Name = "SeedBank",
 		Size = scope:Computed(function(use)
-			return UDim2.new(0, use(panelWidthPixels), 0.12, 0) -- Pixel width, 12% height
+			return UDim2.fromOffset(use(barWidth), 130)
 		end),
-		Position = position,
-		AnchorPoint = anchorPoint,
-		ZIndex = zIndex,
-		LayoutOrder = layoutOrder,
+		Position = props.Position or UDim2.fromScale(0.5, 0.98),
+		AnchorPoint = props.AnchorPoint or Vector2.new(0.5, 1),
+		BackgroundTransparency = 1,
+		ZIndex = props.ZIndex or 1,
 
 		[Children] = {
-			-- Size constraints for panel
-			scope:New("UISizeConstraint")({
-				MinSize = Vector2.new(150, 80),
-				MaxSize = Vector2.new(800, 120),
+			-- Shadow layer (Toon Pop depth)
+			scope:New("Frame")({
+				Name = "Shadow",
+				Size = UDim2.new(1, 0, 1, -8),
+				Position = UDim2.fromOffset(0, 8),
+				BackgroundColor3 = Theme.Colors.Surface.Shadow,
+				ZIndex = 1,
+
+				[Children] = {
+					scope:New("UICorner")({
+						CornerRadius = UDim.new(0, 16),
+					}),
+				},
 			}),
 
-			-- Padding inside panel (fixed pixels)
-			scope:New("UIPadding")({
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
-				PaddingTop = UDim.new(0, 6),
-				PaddingBottom = UDim.new(0, 6),
-			}),
+			-- Main bar
+			scope:New("Frame")({
+				Name = "Main",
+				Size = UDim2.new(1, 0, 1, -8),
+				BackgroundColor3 = Theme.Colors.Surface.Main,
+				ZIndex = 2,
 
-			-- List layout for cards
-			scope:New("UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, 6),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
+				[Children] = {
+					scope:New("UICorner")({
+						CornerRadius = UDim.new(0, 16),
+					}),
 
-			-- Seed cards (reactive array from ForValues)
-			seedCardsArray,
+					scope:New("UIStroke")({
+						Color = Theme.Colors.Surface.Stroke :: Color3,
+						Thickness = 3,
+					}),
+
+					-- Inner gradient for depth
+					scope:New("UIGradient")({
+						Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+							ColorSequenceKeypoint.new(1, Color3.new(0.9, 0.9, 0.9)),
+						}),
+						Rotation = 90,
+					}),
+
+					-- Padding
+					scope:New("UIPadding")({
+						PaddingLeft = UDim.new(0, 12),
+						PaddingRight = UDim.new(0, 12),
+						PaddingTop = UDim.new(0, 8),
+						PaddingBottom = UDim.new(0, 8),
+					}),
+
+					-- Slots layout
+					scope:New("UIListLayout")({
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, 8),
+					}),
+
+					-- Reactive slots
+					slotsArray,
+				},
+			}),
 		},
 	})
 end

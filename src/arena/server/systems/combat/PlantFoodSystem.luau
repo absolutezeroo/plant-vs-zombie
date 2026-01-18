@@ -88,6 +88,10 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 	if ability.RapidFireShots and ability.ShotInterval then
 		local shots = ability.RapidFireShots
 		local interval = ability.ShotInterval
+		
+		-- Get plant's lane from GridPositionComponent
+		local gridPos = world:get(plantId, Components.GridPositionComponent)
+		local plantLane = gridPos and gridPos.Row or 3 -- Default to middle lane
 
 		task.spawn(function()
 			for i = 1, shots do
@@ -100,16 +104,22 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 					break
 				end
 
-				-- Create rapid-fire projectile
+				local spawnX = plantPos.X + 2
+				
+				-- Create rapid-fire projectile with all required fields
 				local projId = EntityPool.Spawn(
 					Components.ProjectileComponent({
 						Damage = 20,
 						Speed = 30,
-						SourcePlantId = plantId,
-						OwnerId = player.UserId,
+						DirectionX = 1, -- Forward direction
+						DirectionZ = 0,
+						SpawnX = spawnX,
+						Lane = plantLane,
+						MaxRange = 100,
+						SourceEntity = plantId,
 					}),
 					Components.PositionComponent({
-						X = plantPos.X + 2,
+						X = spawnX,
 						Y = plantPos.Y + 2.5,
 						Z = plantPos.Z,
 					})

@@ -485,7 +485,7 @@ src/
 - **Server-Only Code:** `src/server/` — authority validation, ProfileStore operations, wave generation
 - **Client-Only Code:** `src/client/` — input handling, VFX/Audio, UI rendering, prediction
 - **Shared Code:** `src/shared/` — ONLY components (pure data), config modules, utilities, type definitions
-- **Rojo Mapping:** Server → ServerScriptService, Client → StarterPlayerScripts, Shared → ReplicatedStorage
+- **Argon Mapping:** Server → ServerScriptService, Client → StarterPlayerScripts, Shared → ReplicatedStorage
 
 ### System Location Rules
 
@@ -593,7 +593,7 @@ return table.freeze(GridConfig) -- Make immutable
 - NEVER put balance formulas with anti-cheat significance in `src/shared/`
 - Components in `src/shared/` are data-only — no behavior, no secrets
 
-### Import Pattern (Rojo Paths)
+### Import Pattern (Argon Paths)
 
 ```lua
 -- Server code

@@ -20,6 +20,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 -- Path: client/ui/components/molecules/SunCounter.luau
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
+local IconAssets = require(Shared.ui.design.IconAssets)
 
 local Client = script.Parent.Parent.Parent.Parent
 local Modules = Client:WaitForChild("modules")
@@ -120,21 +121,41 @@ local function SunCounter(props: SunCounterProps): Frame
 				PaddingRight = UDim.new(0.08, 0),
 			}),
 
-			-- Sun icon (left)
-			scope:New("TextLabel")({
+			-- Sun icon (left) - Uses ImageLabel with emoji fallback
+			scope:New("Frame")({
 				Name = "SunIcon",
 				Size = UDim2.fromScale(0.35, 0.8),
 				Position = UDim2.fromScale(0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
-				Text = "☀️",
-				TextScaled = true,
-				Font = Enum.Font.GothamBold,
 
 				[Children] = {
-					scope:New("UITextSizeConstraint")({
-						MaxTextSize = 22,
-						MinTextSize = 12,
+					-- Image version (shown when asset is uploaded)
+					scope:New("ImageLabel")({
+						Name = "Image",
+						Size = UDim2.fromScale(1, 1),
+						BackgroundTransparency = 1,
+						Image = IconAssets.Get("Sun"),
+						ImageColor3 = Colors.Icon,
+						ScaleType = Enum.ScaleType.Fit,
+						Visible = IconAssets.HasImage("Sun"),
+					}),
+					-- Emoji fallback (shown when no image asset)
+					scope:New("TextLabel")({
+						Name = "Emoji",
+						Size = UDim2.fromScale(1, 1),
+						BackgroundTransparency = 1,
+						Text = IconAssets.GetEmoji("Sun"),
+						TextScaled = true,
+						Font = Enum.Font.GothamBold,
+						Visible = not IconAssets.HasImage("Sun"),
+
+						[Children] = {
+							scope:New("UITextSizeConstraint")({
+								MaxTextSize = 22,
+								MinTextSize = 12,
+							}),
+						},
 					}),
 				},
 			}),

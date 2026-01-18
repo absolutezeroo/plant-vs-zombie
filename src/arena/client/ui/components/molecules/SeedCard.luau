@@ -21,7 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local Theme = require(Shared.ui.design.Theme)
-local PlantViewport = require(Shared.ui.components.atoms.PlantViewport)
+local PlantViewport = require(Shared.ui.components.cards.PlantViewport)
 
 -- Path: client/ui/components/molecules/SeedCard.luau
 local Client = script.Parent.Parent.Parent.Parent

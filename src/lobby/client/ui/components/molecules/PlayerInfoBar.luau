@@ -14,10 +14,13 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 
+-- Shared UI components
+local LevelBadge = require(Shared.ui.components.indicators.LevelBadge)
+local ResourcePill = require(Shared.ui.components.indicators.ResourcePill)
+
+-- Local atoms
 local Atoms = script.Parent.Parent.atoms
 local AvatarFrame = require(Atoms.AvatarFrame)
-local LevelBadge = require(Atoms.LevelBadge)
-local ResourcePill = require(Atoms.ResourcePill)
 
 -- Fusion primitives
 local Children = Fusion.Children
@@ -101,7 +104,7 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 					-- Coins
 					ResourcePill({
 						Scope = scope,
-						Icon = Theme.Icons.Coin,
+						IconName = "Coin",
 						Value = props.Coins,
 						Color = "Gold",
 						Width = 100,
@@ -111,7 +114,7 @@ local function PlayerInfoBar(props: PlayerInfoBarProps): Frame
 					-- Gems
 					ResourcePill({
 						Scope = scope,
-						Icon = Theme.Icons.Gem,
+						IconName = "Gem",
 						Value = props.Gems,
 						Color = "Purple",
 						Width = 100,
