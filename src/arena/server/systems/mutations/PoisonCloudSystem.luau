@@ -25,12 +25,12 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
-local LaneCache = require(Shared.utils.LaneCache)
+local Logger = require(Shared.utils.core.Logger)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
-local ECSUtils = require(Shared.utils.ECSUtils)
-local MathUtils = require(Shared.utils.MathUtils)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
+local MathUtils = require(Shared.utils.core.MathUtils)
 
 -- Network for VFX events
 local Network = require(Shared.network.generated.server)

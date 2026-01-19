@@ -37,6 +37,7 @@ local RewardCalculator = require(Server.managers.wave.RewardCalculator)
 local WaveBroadcaster = require(Server.managers.wave.WaveBroadcaster)
 local BaseHealth = require(Server.modules.BaseHealth)
 local SunService = require(Server.services.SunService)
+local ServerEventBus = require(Server.services.ServerEventBus)
 
 -- Types
 type GameState = GameStateManager.GameState
@@ -300,9 +301,18 @@ function WaveService.CanStartGame(): boolean
 end
 
 function WaveService.SetGameState(state: GameState)
+	local oldState = getStateManager():GetState()
 	local success = getStateManager():SetState(state)
-	if success and (state == "Victory" or state == "Defeat") then
-		handleGameEnd(state == "Victory")
+	if success then
+		-- Fire ServerEventBus event for game state transitions
+		ServerEventBus.FireGameStateChanged({
+			OldState = oldState,
+			NewState = state,
+		})
+		
+		if state == "Victory" or state == "Defeat" then
+			handleGameEnd(state == "Victory")
+		end
 	end
 end
 

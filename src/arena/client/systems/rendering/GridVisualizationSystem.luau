@@ -27,7 +27,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local Network = require(Shared.network.generated.client)
 
 -- Configuration

@@ -22,13 +22,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
-local LaneCache = require(Shared.utils.LaneCache)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 
 -- Service (contains state + API)
 local Server = script.Parent.Parent.Parent
 local WaveService = require(Server.services.WaveService)
 local BaseHealth = require(Server.modules.BaseHealth)
+local ServerEventBus = require(Server.services.ServerEventBus)
 
 --------------------------------------------------------------------------------
 -- [2] CONFIG (frozen constants)
@@ -139,6 +140,14 @@ local function startWave(waveNumber: number, world: any, state: any, spawner: an
 	end
 
 	broadcaster:BroadcastWaveStarted(waveNumber, 0)
+	
+	-- Fire ServerEventBus event for analytics/achievements
+	ServerEventBus.FireWaveStarted({
+		WaveNumber = waveNumber,
+		TotalWaves = state.TotalWaves,
+		Phase = if state.UsingDefinedWave then "Defined" else state.CurrentPhase,
+		Budget = if not state.UsingDefinedWave then state.TotalBudget else nil,
+	})
 end
 
 --------------------------------------------------------------------------------
@@ -240,6 +249,13 @@ local function OnStep(world)
 		}))
 
 		broadcaster:BroadcastWaveCompleted(state.CurrentWave, true)
+		
+		-- Fire ServerEventBus event for analytics/achievements
+		ServerEventBus.FireWaveCompleted({
+			WaveNumber = state.CurrentWave,
+			ZombiesKilled = 0, -- TODO: Track zombies killed per wave
+			TimeElapsed = currentTime - state.WaveStartTime,
+		})
 
 		-- Check victory
 		if state.CurrentWave >= state.TotalWaves then

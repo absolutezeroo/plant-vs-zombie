@@ -19,6 +19,7 @@ local CONFIG = table.freeze({
 	-- List of all ephemeral event components to clean up each frame
 	EVENT_COMPONENTS = {
 		Components.DamageEvent,
+		Components.DamageIntent,
 		Components.DeathEvent,
 		Components.SpawnEvent,
 		Components.ProjectileHitEvent,

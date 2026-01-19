@@ -24,7 +24,7 @@ end
 local Cmdr = require(CmdrClient)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Set activation keys (F2 and semicolon)
 Cmdr:SetActivationKeys({ Enum.KeyCode.F2, Enum.KeyCode.Semicolon })

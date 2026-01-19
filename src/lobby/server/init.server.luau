@@ -20,7 +20,7 @@ local _serverTrove = Trove.new()
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local TeleportData = require(Shared.data.TeleportData)
 local WorldData = require(Shared.data.WorldData)
 local DifficultyData = require(Shared.data.DifficultyData)

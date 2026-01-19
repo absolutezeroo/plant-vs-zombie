@@ -16,7 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
-local EntityPool = require(Shared.utils.EntityPool)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)

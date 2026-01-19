@@ -29,8 +29,8 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local MutationData = require(Shared.data.MutationData)
-local Logger = require(Shared.utils.Logger)
-local ECSUtils = require(Shared.utils.ECSUtils)
+local Logger = require(Shared.utils.core.Logger)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 
 -- Server services
 local Server = script.Parent.Parent.Parent

@@ -29,8 +29,8 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
-local EntityPool = require(Shared.utils.EntityPool)
+local Logger = require(Shared.utils.core.Logger)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
 
 -- Network (lazy load)
 local Network: any = nil

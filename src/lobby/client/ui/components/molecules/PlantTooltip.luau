@@ -22,7 +22,7 @@ local PlantData = require(Shared.data.PlantData)
 local MutationData = require(Shared.data.MutationData)
 local Theme = require(Shared.ui.design.Theme)
 local IconAssets = require(Shared.ui.design.IconAssets)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local Icon = require(Shared.ui.components.base.Icon)
 
 -- Fusion primitives

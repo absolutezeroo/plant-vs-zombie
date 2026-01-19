@@ -30,10 +30,10 @@ assert(Shared, "PlantRenderSystem: Shared folder not found")
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
-local GridUtils = require(Shared.utils.GridUtils)
-local Logger = require(Shared.utils.Logger)
+local GridUtils = require(Shared.utils.grid.GridUtils)
+local Logger = require(Shared.utils.core.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
-local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+local AttachmentUtils = require(Shared.utils.grid.AttachmentUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent

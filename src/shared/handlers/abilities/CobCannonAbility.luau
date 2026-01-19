@@ -21,10 +21,10 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
-local LaneCache = require(Shared.utils.LaneCache)
-local ECSUtils = require(Shared.utils.ECSUtils)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Network (lazy load to avoid issues)
 local Network: any = nil

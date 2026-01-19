@@ -23,8 +23,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
-local Logger = require(Shared.utils.Logger)
-local LaneCache = require(Shared.utils.LaneCache)
+local Logger = require(Shared.utils.core.Logger)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 
 -- Server modules
 local Server = script.Parent.Parent.Parent

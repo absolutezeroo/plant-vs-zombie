@@ -38,10 +38,10 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
-local AttachmentUtils = require(Shared.utils.AttachmentUtils)
-local Logger = require(Shared.utils.Logger)
+local AttachmentUtils = require(Shared.utils.grid.AttachmentUtils)
+local Logger = require(Shared.utils.core.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
-local VFXUtils = require(Shared.utils.VFXUtils)
+local VFXUtils = require(Shared.utils.vfx.VFXUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent

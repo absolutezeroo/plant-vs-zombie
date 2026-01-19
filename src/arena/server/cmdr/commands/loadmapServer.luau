@@ -8,7 +8,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = script.Parent.Parent.Parent
-local Logger = require(ReplicatedStorage.Shared.utils.Logger)
+local Logger = require(ReplicatedStorage.Shared.utils.core.Logger)
 
 return function(context, mapId: string)
 	-- Get MapLoader service

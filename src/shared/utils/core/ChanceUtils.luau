@@ -8,7 +8,7 @@
 	- Testable RNG (can be seeded for unit tests)
 	
 	USAGE:
-	local ChanceUtils = require(Shared.utils.ChanceUtils)
+	local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 	if ChanceUtils.Roll(0.25) then -- 25% chance
 		-- success
 	end

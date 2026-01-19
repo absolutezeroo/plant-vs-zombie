@@ -15,7 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 
 -- Network for VFX events
 local Network = require(Shared.network.generated.server)

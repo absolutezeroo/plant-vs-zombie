@@ -32,11 +32,11 @@ local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
-local Logger = require(Shared.utils.Logger)
-local LaneCache = require(Shared.utils.LaneCache)
-local ECSUtils = require(Shared.utils.ECSUtils)
-local EntityPool = require(Shared.utils.EntityPool)
-local NetworkUtils = require(Shared.utils.NetworkUtils)
+local Logger = require(Shared.utils.core.Logger)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local NetworkUtils = require(Shared.utils.network.NetworkUtils)
 
 -- Server modules
 local Server = script.Parent.Parent.Parent

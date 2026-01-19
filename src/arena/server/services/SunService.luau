@@ -24,10 +24,20 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
+local ValidationMiddleware = require(Shared.utils.combat.ValidationMiddleware)
 
 -- Network for broadcasting sun updates
 local Network = require(Shared.network.generated.server)
+
+-- Lazy-loaded (to avoid circular dependency)
+local ServerEventBus = nil :: any?
+local function getServerEventBus()
+	if not ServerEventBus then
+		ServerEventBus = require(script.Parent.ServerEventBus)
+	end
+	return ServerEventBus
+end
 
 -- ============================================================
 -- SECTION 2: CONFIG (immutable settings)
@@ -106,16 +116,39 @@ end
 	Spend sun from a player
 	@param player Player
 	@param amount number - Amount to spend
+	@param reason string? - Optional reason for spending (for middleware context)
 	@return boolean - True if successful, false if insufficient
 ]]
-function SunService.SpendSun(player: Player, amount: number): boolean
+function SunService.SpendSun(player: Player, amount: number, reason: string?): boolean
 	initialize() -- Ensure initialized
+
+	-- Run middleware validation hooks (God Mode integration)
+	local allowed, middlewareReason = ValidationMiddleware.Validate("SpendSun", {
+		Player = player,
+		Amount = amount,
+		Reason = reason or "Unknown",
+		CurrentSun = State.PlayerSun[player] or 0,
+	})
+	if not allowed then
+		Logger.Debug("SunService", `SpendSun blocked by middleware for {player.Name}: {middlewareReason}`)
+		return false
+	end
+
 	local current = State.PlayerSun[player] or 0
 	if current < amount then
 		return false
 	end
 	State.PlayerSun[player] = current - amount
 	Logger.Debug("SunService", `{player.Name} spent {amount} sun, now has {State.PlayerSun[player]}`)
+	
+	-- Fire ServerEventBus event for analytics/achievements
+	getServerEventBus().FireSunSpent({
+		Player = player,
+		Amount = amount,
+		Reason = reason or "Unknown",
+		Remaining = State.PlayerSun[player],
+	})
+	
 	return true
 end
 

@@ -33,7 +33,7 @@ local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Services
 local LightingService = require(script.Parent.LightingService)

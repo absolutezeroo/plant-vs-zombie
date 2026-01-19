@@ -12,7 +12,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Fusion = require(Packages:WaitForChild("Fusion"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local ProgressionData = require(Shared.data.ProgressionData)
 
 local Network = require(Shared.network.generated.client)

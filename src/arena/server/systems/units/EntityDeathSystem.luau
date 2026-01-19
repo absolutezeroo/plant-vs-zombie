@@ -25,10 +25,13 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
+
+-- Server services
+local ServerEventBus = require(script.Parent.Parent.Parent.services.ServerEventBus)
 local ProgressionData = require(Shared.data.ProgressionData)
-local EntityPool = require(Shared.utils.EntityPool)
-local Logger = require(Shared.utils.Logger)
-local NetworkUtils = require(Shared.utils.NetworkUtils)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local Logger = require(Shared.utils.core.Logger)
+local NetworkUtils = require(Shared.utils.network.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -100,6 +103,20 @@ local function OnStep(world)
 			-- Check if it's a plant (need to clear grid - also auto-decrements owner's plant count)
 			local plant = world:get(id, Components.PlantTypeComponent)
 			if plant then
+				-- Fire ServerEventBus event for plant death
+				local plantDeathPos = world:get(id, Components.PositionComponent)
+				ServerEventBus.FireEntityDied({
+					EntityId = id,
+					EntityType = "Plant",
+					Position = {
+						X = if plantDeathPos then plantDeathPos.X else 0,
+						Y = if plantDeathPos then plantDeathPos.Y else 0,
+						Z = if plantDeathPos then plantDeathPos.Z else 0,
+					},
+					PlantType = plant.PlantType,
+					Lane = plant.Lane,
+				})
+				
 				GridService.Clear(plant.Column, plant.Lane)
 				
 				-- Check if this plant was protected by a Pumpkin shell
@@ -129,6 +146,20 @@ local function OnStep(world)
 			-- Check if it's a zombie (need to drop coins)
 			local zombie = world:get(id, Components.ZombieTypeComponent)
 			if zombie then
+				-- Fire ServerEventBus event for zombie death
+				local zombieDeathPos = world:get(id, Components.PositionComponent)
+				ServerEventBus.FireEntityDied({
+					EntityId = id,
+					EntityType = "Zombie",
+					Position = {
+						X = if zombieDeathPos then zombieDeathPos.X else 0,
+						Y = if zombieDeathPos then zombieDeathPos.Y else 0,
+						Z = if zombieDeathPos then zombieDeathPos.Z else 0,
+					},
+					ZombieType = zombie.ZombieType,
+					Lane = zombie.Lane,
+				})
+				
 				-- Check if zombie was glowing (Plant Food carrier)
 				local plantFood = world:get(id, Components.PlantFoodComponent)
 				if plantFood and plantFood.IsGlowing then

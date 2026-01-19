@@ -14,7 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local ECSUtils = require(Shared.utils.ECSUtils)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 
 -- Network for VFX events
 local Network = require(Shared.network.generated.server)

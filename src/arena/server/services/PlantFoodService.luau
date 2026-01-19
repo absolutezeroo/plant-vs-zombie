@@ -25,8 +25,8 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConstants = require(Shared.config.GameConstants)
-local Logger = require(Shared.utils.Logger)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local Logger = require(Shared.utils.core.Logger)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)

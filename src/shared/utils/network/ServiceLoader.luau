@@ -8,7 +8,7 @@
     Note: Uses --!nonstrict due to complex Fusion type inference.
     
     Usage:
-        local ServiceLoader = require(Shared.utils.ServiceLoader)
+        local ServiceLoader = require(Shared.utils.network.ServiceLoader)
         local loader = ServiceLoader.new()
         
         loader:AddStep("Network", function()
@@ -31,7 +31,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Sift = require(Packages.Sift)
 local Promise = require(Packages.Promise)
 local LoadingScreen = require(Shared.ui.components.organisms.LoadingScreen)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 local ServiceLoader = {}
 ServiceLoader.__index = ServiceLoader

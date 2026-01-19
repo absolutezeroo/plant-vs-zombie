@@ -21,8 +21,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
-local EntityPool = require(Shared.utils.EntityPool)
-local NetworkUtils = require(Shared.utils.NetworkUtils)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local NetworkUtils = require(Shared.utils.network.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)

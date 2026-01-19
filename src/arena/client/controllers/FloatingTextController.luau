@@ -19,7 +19,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
 local IconAssets = require(Shared.ui.design.IconAssets)
 

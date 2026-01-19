@@ -16,7 +16,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 
 -- 2. CONFIGURATION

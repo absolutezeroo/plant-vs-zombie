@@ -17,9 +17,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PlantData = require(Shared.data.PlantData)
 local GameConstants = require(Shared.config.GameConstants)
-local LaneCache = require(Shared.utils.LaneCache)
-local ECSUtils = require(Shared.utils.ECSUtils)
-local NetworkUtils = require(Shared.utils.NetworkUtils)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
+local NetworkUtils = require(Shared.utils.network.NetworkUtils)
 local Components = require(Shared.components)
 
 -- ============================================

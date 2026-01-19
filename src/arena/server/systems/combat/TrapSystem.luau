@@ -20,9 +20,9 @@ local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
 local ZombieData = require(Shared.data.ZombieData)
-local LaneCache = require(Shared.utils.LaneCache)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
-local ECSUtils = require(Shared.utils.ECSUtils)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)

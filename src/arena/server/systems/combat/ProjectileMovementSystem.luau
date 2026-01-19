@@ -21,8 +21,8 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GameConstants = require(Shared.config.GameConstants)
-local EntityPool = require(Shared.utils.EntityPool)
-local LaneCache = require(Shared.utils.LaneCache)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 
 local Network = require(Shared.network.generated.server)
 

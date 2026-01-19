@@ -15,7 +15,7 @@
 	- Zombie hooks are executed on damage/kill for extensibility
 	
 	USAGE:
-	local ECSUtils = require(Shared.utils.ECSUtils)
+	local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 	local died = ECSUtils.DamageEntity(world, zombieId, 50, Components)
 ]]
 
@@ -703,6 +703,100 @@ function ECSUtils.HasAnyComponent(world: any, entityId: number, components: { an
 	end
 
 	return false
+end
+
+-- ============================================
+-- Damage Intent System (In-Flight Modification)
+-- ============================================
+
+--[[
+	Spawn a DamageIntent entity for in-flight damage modification.
+	
+	Use this instead of direct DamageEntity() when you want:
+	- Damage modifiers (armor, rage, vulnerability) to apply
+	- ServerEventBus.OnDamageDealt to fire with full context
+	- Critical hit calculations
+	
+	The DamageIntent will be processed by:
+	1. DamageModifierSystem (P:172) - applies modifiers
+	2. DamageResolverSystem (P:175) - applies to health
+	3. EventCleanupSystem (P:400) - cleans up
+	
+	@param world any - Matter World instance
+	@param sourceId number - Entity dealing the damage
+	@param targetId number - Entity receiving the damage
+	@param amount number - Base damage amount
+	@param Components ComponentRegistry - Component registry
+	@param options table? - Optional configuration
+		- DamageType: string ("Normal", "Fire", "Ice", "Poison", etc.)
+		- SourcePlantType: string (for tracking)
+	@return number - DamageIntent entity ID
+]]
+function ECSUtils.SpawnDamageIntent(
+	world: any,
+	sourceId: number,
+	targetId: number,
+	amount: number,
+	Components: ComponentRegistry,
+	options: { DamageType: string?, SourcePlantType: string? }?
+): number
+	local DamageIntent = Components.DamageIntent
+	if not DamageIntent then
+		-- Fallback: direct damage if DamageIntent not available
+		ECSUtils.DamageEntity(world, targetId, amount, Components)
+		return 0
+	end
+	
+	local opts = options or {}
+	
+	local intentId = world:spawn(DamageIntent({
+		TargetId = targetId,
+		SourceId = sourceId,
+		Amount = amount,
+		FinalAmount = amount, -- Will be recalculated by DamageModifierSystem
+		DamageType = opts.DamageType or "Normal",
+		IsCritical = false, -- Will be set by modifiers
+		Multiplier = 1.0,
+		FlatBonus = 0,
+		SourcePlantType = opts.SourcePlantType or "",
+		ModifiersApplied = false,
+		Resolved = false,
+	}))
+	
+	return intentId
+end
+
+--[[
+	Spawn multiple DamageIntent entities for splash damage.
+	
+	@param world any - Matter World instance
+	@param sourceId number - Entity dealing the damage
+	@param targets {number} - Array of target entity IDs
+	@param amount number - Base damage amount per target
+	@param Components ComponentRegistry - Component registry
+	@param options table? - Optional configuration
+	@return {number} - Array of DamageIntent entity IDs
+]]
+function ECSUtils.SpawnSplashDamageIntent(
+	world: any,
+	sourceId: number,
+	targets: { number },
+	amount: number,
+	Components: ComponentRegistry,
+	options: { DamageType: string?, SourcePlantType: string? }?
+): { number }
+	local intentIds = {}
+	
+	for _, targetId in targets do
+		local intentId = ECSUtils.SpawnDamageIntent(
+			world, sourceId, targetId, amount, Components, options
+		)
+		if intentId > 0 then
+			table.insert(intentIds, intentId)
+		end
+	end
+	
+	return intentIds
 end
 
 return ECSUtils

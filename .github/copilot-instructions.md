@@ -82,7 +82,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 * **Rule:** Never hardcode Vector3 offsets (e.g., `Vector3.new(0, 5, 0)`). Visuals change, code shouldn't break.
 * **✅ GOOD:** Use **Attachments**. Look for attachments named "Muzzle", "Overhead", or "Center" inside the model.
     ```lua
-    local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+    local AttachmentUtils = require(Shared.utils.grid.AttachmentUtils)
     local muzzlePos = AttachmentUtils.GetWorldPosition(model, "Muzzle")
     ```
 
@@ -103,7 +103,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 * **❌ BAD:** Iterating `world:query()` to find targets.
 * **✅ GOOD:** Use **`LaneCache`**.
     ```lua
-    local LaneCache = require(Shared.utils.LaneCache)
+    local LaneCache = require(Shared.utils.ecs.LaneCache)
     -- Get only zombies in the same row
     local zombies = LaneCache.GetEntitiesInLane(row)
     ```
@@ -112,7 +112,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 * **❌ BAD:** Direct `world:insert(id, HealthComponent({...}))` for damage/heal.
 * **✅ GOOD:** Use **`ECSUtils`** for consistent behavior.
     ```lua
-    local ECSUtils = require(Shared.utils.ECSUtils)
+    local ECSUtils = require(Shared.utils.ecs.ECSUtils)
     local actualDamage, isDead = ECSUtils.DamageEntity(world, zombieId, 50, Components)
     ECSUtils.KillEntity(world, zombieId, Components)  -- Instant kill
     ECSUtils.BoostHealth(world, plantId, 100, Components)  -- Armor boost
@@ -122,7 +122,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 * **❌ BAD:** Raw `math.random()` calls scattered everywhere.
 * **✅ GOOD:** Use **`ChanceUtils`** for consistent RNG.
     ```lua
-    local ChanceUtils = require(Shared.utils.ChanceUtils)
+    local ChanceUtils = require(Shared.utils.core.ChanceUtils)
     if ChanceUtils.Roll(0.3) then  -- 30% chance
     local lane = ChanceUtils.RandomLane()
     local offset = ChanceUtils.RandomOffset(2)  -- -2 to +2
@@ -133,7 +133,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 * **❌ BAD:** Creating anchor Parts and cloning emitters inline.
 * **✅ GOOD:** Use **`VFXUtils`** for standardized VFX patterns.
     ```lua
-    local VFXUtils = require(Shared.utils.VFXUtils)
+    local VFXUtils = require(Shared.utils.vfx.VFXUtils)
     VFXUtils.CloneAndEmit(particleEmitter, position)  -- Clone, emit, auto-cleanup
     VFXUtils.PlayFromModel(model, "Death")  -- Play VFX from model's VFX folder
     VFXUtils.AttachIdleVFX(model)  -- Persistent idle particles
@@ -141,7 +141,7 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 
 ### 6. System Lifecycle (SystemManager Pipeline)
 * **Pattern:** Systems have `Init` (can yield) and `OnStep` (cannot yield).
-* **Reference:** See `src/shared/utils/SystemManager.luau` for implementation details.
+* **Reference:** See `src/shared/utils/ecs/SystemManager.luau` for implementation details.
 
 ### 7. Data-Driven Content
 * **Rule:** Never hardcode stats (Damage, Health, Speed).

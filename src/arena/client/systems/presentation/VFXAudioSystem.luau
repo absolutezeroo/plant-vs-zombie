@@ -25,7 +25,7 @@ local Trove = require(Packages.Trove)
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "VFXAudioSystem: Shared folder not found")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/presentation/)
 local Client = script.Parent.Parent.Parent

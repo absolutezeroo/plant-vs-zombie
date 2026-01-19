@@ -11,7 +11,7 @@
 	- Reduces risk of typos or missing fields
 	
 	USAGE:
-	local NetworkUtils = require(Shared.utils.NetworkUtils)
+	local NetworkUtils = require(Shared.utils.network.NetworkUtils)
 	NetworkUtils.BroadcastEntityDied(zombieId)
 	NetworkUtils.BroadcastDamage(zombieId, 50, "Projectile", position)
 ]]

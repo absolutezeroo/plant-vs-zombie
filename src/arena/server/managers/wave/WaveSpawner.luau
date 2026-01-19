@@ -19,10 +19,10 @@ local MapConfig = require(Shared.config.MapConfig)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
 local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local Components = require(Shared.components)
-local EntityPool = require(Shared.utils.EntityPool)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 
 -- Components
 local PositionComponent = Components.PositionComponent

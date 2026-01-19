@@ -29,9 +29,9 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
-local Logger = require(Shared.utils.Logger)
-local LaneCache = require(Shared.utils.LaneCache)
-local ECSUtils = require(Shared.utils.ECSUtils)
+local Logger = require(Shared.utils.core.Logger)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 
 -- Server modules
 local Server = script.Parent.Parent.Parent

@@ -29,15 +29,15 @@ local _serverTrove = Trove.new()
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
-local ErrorHandler = require(Shared.utils.ErrorHandler)
-local EntityPool = require(Shared.utils.EntityPool)
+local Logger = require(Shared.utils.core.Logger)
+local ErrorHandler = require(Shared.utils.core.ErrorHandler)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
 local PerformanceConfig = require(Shared.config.PerformanceConfig)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local TeleportData = require(Shared.data.TeleportData)
 local TeleportDataHandler = require(Shared.services.TeleportDataHandler)
-local SystemManager = require(Shared.utils.SystemManager)
+local SystemManager = require(Shared.utils.ecs.SystemManager)
 
 -- Import components via index module
 local Components = require(Shared.components)

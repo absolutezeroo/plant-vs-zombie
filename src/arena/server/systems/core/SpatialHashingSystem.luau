@@ -19,7 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local LaneCache = require(Shared.utils.LaneCache)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 local MapConfig = require(Shared.config.MapConfig)
 
 -- 2. CONFIGURATION

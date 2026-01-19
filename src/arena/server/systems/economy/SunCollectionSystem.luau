@@ -26,8 +26,8 @@ local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local Logger = require(Shared.utils.Logger)
-local EntityPool = require(Shared.utils.EntityPool)
+local Logger = require(Shared.utils.core.Logger)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -35,6 +35,7 @@ local Network = require(Shared.network.generated.server)
 -- Server services
 local Server = script.Parent.Parent.Parent
 local SunService = require(Server.services.SunService)
+local ServerEventBus = require(Server.services.ServerEventBus)
 
 -- ============================================================
 -- SECTION 2: CONFIG (immutable settings)
@@ -115,6 +116,14 @@ local function OnStep(world)
 				SunEntityId = request.EntityId,
 				CollectorId = request.Player.UserId,
 				NewTotal = newTotal,
+			})
+			
+			-- Fire ServerEventBus event for analytics/achievements
+			ServerEventBus.FireSunCollected({
+				Player = request.Player,
+				Amount = value,
+				SourceType = "Unknown", -- TODO: Determine source from SunComponent
+				Total = newTotal,
 			})
 
 			-- Send success response

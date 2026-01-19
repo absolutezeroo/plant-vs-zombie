@@ -28,9 +28,9 @@ local Sift = require(Packages:WaitForChild("Sift"))
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local TeleportData = require(Shared.data.TeleportData)
-local ServiceLoader = require(Shared.utils.ServiceLoader)
+local ServiceLoader = require(Shared.utils.network.ServiceLoader)
 local LobbySignals = require(Shared.signals.LobbySignals)
 
 -- Get local player

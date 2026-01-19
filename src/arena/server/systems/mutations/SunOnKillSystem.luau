@@ -12,8 +12,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local EntityPool = require(Shared.utils.EntityPool)
-local Logger = require(Shared.utils.Logger)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local Logger = require(Shared.utils.core.Logger)
 
 -- 2. CONFIGURATION
 local CONFIG = table.freeze({

@@ -10,9 +10,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local EntityPool = require(Shared.utils.EntityPool)
-local Logger = require(Shared.utils.Logger)
-local ECSUtils = require(Shared.utils.ECSUtils)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local Logger = require(Shared.utils.core.Logger)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 
 return function(_context)
 	local world = EntityPool.GetWorld()

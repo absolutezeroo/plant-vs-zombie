@@ -34,18 +34,20 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
 local GameConstants = require(Shared.config.GameConstants)
-local GridUtils = require(Shared.utils.GridUtils)
+local GridUtils = require(Shared.utils.grid.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local WorldData = require(Shared.data.WorldData)
-local Logger = require(Shared.utils.Logger)
-local EntityPool = require(Shared.utils.EntityPool)
-local NetworkUtils = require(Shared.utils.NetworkUtils)
+local Logger = require(Shared.utils.core.Logger)
+local ValidationMiddleware = require(Shared.utils.combat.ValidationMiddleware)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local NetworkUtils = require(Shared.utils.network.NetworkUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)
 
 -- Server services
 local Server = script.Parent.Parent.Parent
+local ServerEventBus = require(Server.services.ServerEventBus)
 local GridService = require(Server.services.GridService)
 local SunService = require(Server.services.SunService)
 local WaveService = require(Server.services.WaveService)
@@ -363,6 +365,16 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 		PositionY = worldPos.Y + 2,
 		PositionZ = worldPos.Z,
 	}))
+	
+	-- Fire ServerEventBus event for analytics/achievements
+	ServerEventBus.FirePlantPlaced({
+		Player = player,
+		PlantType = plantType,
+		Column = column,
+		Lane = lane,
+		EntityId = entityId,
+		Cost = stats.Cost,
+	})
 
 	return entityId
 end
@@ -374,6 +386,18 @@ local function handlePlacementRequest(
 	lane: number,
 	plantType: string
 ): (boolean, string?)
+	-- Run middleware validation hooks first (God Mode integration)
+	local allowed, middlewareReason = ValidationMiddleware.Validate("PlacePlant", {
+		Player = player,
+		PlantType = plantType,
+		Column = column,
+		Lane = lane,
+	})
+	if not allowed then
+		Logger.Warn("PlacementSystem", `Placement blocked by middleware for {player.Name}: {middlewareReason}`)
+		return false, middlewareReason
+	end
+
 	local success, reason = validatePlacement(player, column, lane, plantType)
 
 	if not success then
@@ -406,6 +430,22 @@ local function handleShovelRequest(player: Player, plantEntityId: number): (bool
 	local plantType = world:get(plantEntityId, Components.PlantTypeComponent)
 	local owner = world:get(plantEntityId, Components.OwnerComponent)
 
+	-- Run middleware validation hooks (God Mode integration)
+	local plantComp = plantType
+	local column = if plantComp then plantComp.Column else 0
+	local lane = if plantComp then plantComp.Lane else 0
+	local allowed, middlewareReason = ValidationMiddleware.Validate("ShovelPlant", {
+		Player = player,
+		Column = column,
+		Lane = lane,
+		EntityId = plantEntityId,
+		PlantType = if plantComp then plantComp.PlantType else nil,
+	})
+	if not allowed then
+		Logger.Warn("PlacementSystem", `Shovel blocked by middleware for {player.Name}: {middlewareReason}`)
+		return false, middlewareReason
+	end
+
 	if not plantType then
 		return false, "Not a plant"
 	end
@@ -437,6 +477,15 @@ local function handleShovelRequest(player: Player, plantEntityId: number): (bool
 
 	-- Broadcast removal to all clients (use EntityDied event)
 	NetworkUtils.BroadcastEntityDied(plantEntityId)
+	
+	-- Fire ServerEventBus event for analytics/achievements
+	ServerEventBus.FirePlantShoveled({
+		Player = player,
+		PlantType = plantType.PlantType,
+		Column = plantType.Column,
+		Lane = plantType.Lane,
+		RefundAmount = refundAmount,
+	})
 
 	return true, nil
 end

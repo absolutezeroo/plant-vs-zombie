@@ -15,7 +15,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Promise = require(Packages:WaitForChild("Promise"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local TeleportData = require(Shared.data.TeleportData)
 
 -- Dependencies

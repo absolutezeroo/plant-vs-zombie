@@ -18,7 +18,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Cmdr = require(Packages:WaitForChild("Cmdr"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Whitelisted UserIds (add your UserId here for production testing)
 local WHITELISTED_USERS: { number } = {

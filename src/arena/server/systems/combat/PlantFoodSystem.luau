@@ -32,10 +32,11 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
-local Logger = require(Shared.utils.Logger)
-local EntityPool = require(Shared.utils.EntityPool)
-local ECSUtils = require(Shared.utils.ECSUtils)
-local LaneCache = require(Shared.utils.LaneCache)
+local Logger = require(Shared.utils.core.Logger)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local ValidationMiddleware = require(Shared.utils.combat.ValidationMiddleware)
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -279,6 +280,19 @@ local function OnStep(world)
 
 		if not plant then
 			Logger.Warn("PlantFood", `Invalid plant entity {plantId}`)
+			continue
+		end
+
+		-- Run middleware validation hooks (God Mode integration)
+		local allowed, middlewareReason = ValidationMiddleware.Validate("UsePlantFood", {
+			Player = player,
+			TargetEntity = plantId,
+			PlantType = plant.PlantType,
+			Column = plant.Column,
+			Lane = plant.Lane,
+		})
+		if not allowed then
+			Logger.Warn("PlantFood", `Plant Food blocked by middleware for {player.Name}: {middlewareReason}`)
 			continue
 		end
 

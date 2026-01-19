@@ -38,7 +38,7 @@
     
     USAGE:
     ```lua
-    local SystemManager = require(Shared.utils.SystemManager)
+    local SystemManager = require(Shared.utils.ecs.SystemManager)
     
     -- Register systems (pass the module tables)
     SystemManager.RegisterAll({
@@ -84,7 +84,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Sift = require(Packages.Sift)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Types
 export type SystemModule = {

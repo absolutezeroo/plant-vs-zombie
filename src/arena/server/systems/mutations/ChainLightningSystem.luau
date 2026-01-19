@@ -15,10 +15,10 @@ local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
-local LaneCache = require(Shared.utils.LaneCache)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 local GridConfig = require(Shared.config.GridConfig)
-local ECSUtils = require(Shared.utils.ECSUtils)
-local Logger = require(Shared.utils.Logger)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Network for VFX events
 local Network = require(Shared.network.generated.server)

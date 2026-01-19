@@ -31,13 +31,13 @@ local Trove = require(Packages:WaitForChild("Trove"))
 
 -- Import shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
-local ErrorHandler = require(Shared.utils.ErrorHandler)
+local Logger = require(Shared.utils.core.Logger)
+local ErrorHandler = require(Shared.utils.core.ErrorHandler)
 local NetworkConfig = require(Shared.config.NetworkConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
-local ServiceLoader = require(Shared.utils.ServiceLoader)
-local SystemManager = require(Shared.utils.SystemManager)
+local ServiceLoader = require(Shared.utils.network.ServiceLoader)
+local SystemManager = require(Shared.utils.ecs.SystemManager)
 local GameSignals = require(Shared.signals.GameSignals)
 
 -- Client MUST wait for server to send MapConfigSync with authoritative values.

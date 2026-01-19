@@ -28,10 +28,10 @@ local ZombieData = require(Shared.data.ZombieData)
 local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
 local PlantData = require(Shared.data.PlantData)
 local Types = require(Shared.Types)
-local EntityPool = require(Shared.utils.EntityPool)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
-local ECSUtils = require(Shared.utils.ECSUtils)
-local LaneCache = require(Shared.utils.LaneCache)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
+local ECSUtils = require(Shared.utils.ecs.ECSUtils)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
 
 type MatterWorld = Types.MatterWorld
 
@@ -86,8 +86,54 @@ end
 
 -- Logging removed (was _frameStats debug log)
 
+--[[
+	Spawn a DamageIntent for the damage pipeline.
+	This enables God Mode hooks (DamageModifierSystem) to modify damage in-flight.
+	
+	Returns estimated kill status based on current health (modifiers may change this).
+	@param sourceEntityId number - Entity dealing damage (plant/projectile owner)
+	@param sourcePlantType string? - Plant type for tracking
+]]
+local function spawnDamageIntent(
+	world: MatterWorld,
+	targetId: number,
+	damage: number,
+	sourceEntityId: number?,
+	sourcePlantType: string?,
+	damageType: string?
+): boolean
+	local health = world:get(targetId, Components.HealthComponent)
+	if not health then
+		return false
+	end
+	
+	-- Spawn DamageIntent for the damage pipeline
+	ECSUtils.SpawnDamageIntent(
+		world,
+		sourceEntityId or 0,
+		targetId,
+		damage,
+		Components,
+		{
+			DamageType = damageType or "Normal",
+			SourcePlantType = sourcePlantType or "",
+		}
+	)
+	
+	-- Return estimated kill (actual result may differ after modifiers)
+	return health.Current <= damage
+end
+
 -- Apply damage to an entity (returns true if killed)
-local function applyDamage(world: MatterWorld, entityId: number, damage: number, piercesShields: boolean?): boolean
+-- LEGACY: Still handles shield logic, then spawns DamageIntent for the rest
+local function applyDamage(
+	world: MatterWorld,
+	entityId: number,
+	damage: number,
+	piercesShields: boolean?,
+	sourceEntityId: number?,
+	sourcePlantType: string?
+): boolean
 	local health = world:get(entityId, Components.HealthComponent)
 
 	if not health then
@@ -147,18 +193,20 @@ local function applyDamage(world: MatterWorld, entityId: number, damage: number,
 		end
 	end
 
-	-- Apply damage using ECSUtils (handles clamping and returns actual damage)
-	local actualDamage, isDead = ECSUtils.DamageEntity(world, entityId, damage, Components)
+	-- Spawn DamageIntent for damage pipeline (God Mode hooks)
+	local estimatedKill = spawnDamageIntent(
+		world, entityId, damage, 
+		sourceEntityId, sourcePlantType, "Normal"
+	)
 
-	-- Broadcast damage event
-	local newHealth = world:get(entityId, Components.HealthComponent)
+	-- Broadcast damage event (immediate feedback, actual damage applied by DamageResolverSystem)
 	Network.EntityDamaged.FireAll({
 		EntityId = entityId,
-		NewHealth = newHealth and newHealth.Current or 0,
-		DamageAmount = actualDamage,
+		NewHealth = math.max(0, health.Current - damage), -- Estimated
+		DamageAmount = damage,
 	})
 
-	return isDead
+	return estimatedKill
 end
 
 -- Apply splash damage to zombies near impact point
@@ -179,6 +227,15 @@ local function applySplashDamage(
 
 	-- O(lane_range) lookup instead of O(N) world:query
 	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(centerLane, laneRadius)
+	
+	-- Get source plant type for tracking
+	local sourcePlantType = ""
+	if proj.SourceEntity then
+		local plant = world:get(proj.SourceEntity, Components.PlantTypeComponent)
+		if plant then
+			sourcePlantType = plant.PlantType
+		end
+	end
 
 	for _, zombieId in zombiesInRange do
 		local zombiePos = LaneCache.GetPosition(zombieId)
@@ -191,7 +248,10 @@ local function applySplashDamage(
 		local distance = math.sqrt(dx * dx + dz * dz)
 
 		if distance <= splash.SplashRadius then
-			local killed = applyDamage(world, zombieId, splash.SplashDamage, proj.PiercesShields)
+			local killed = applyDamage(
+				world, zombieId, splash.SplashDamage, 
+				proj.PiercesShields, proj.SourceEntity, sourcePlantType
+			)
 			hitCount += 1
 
 			-- Apply slow if frozen splash (check immunity)
@@ -384,9 +444,37 @@ local function OnStep(world: MatterWorld)
 				if enhanced and enhanced.DamageMultiplier then
 					damage = math.floor(damage * enhanced.DamageMultiplier)
 				end
+				
+				-- Get source plant type for DamageIntent tracking
+				local sourcePlantType = ""
+				if proj.SourceEntity then
+					local sourcePlant = world:get(proj.SourceEntity, Components.PlantTypeComponent)
+					if sourcePlant then
+						sourcePlantType = sourcePlant.PlantType
+					end
+				end
+				
+				-- Determine damage type (Fire for fire peas, Ice for frozen)
+				local damageType = "Normal"
+				if enhanced and enhanced.IsFirePea then
+					damageType = "Fire"
+				elseif proj.IsFrozen then
+					damageType = "Ice"
+				end
 
-				-- Apply damage
-				local killed = applyDamage(world, zombieId, damage, proj.PiercesShields)
+				-- Apply damage via DamageIntent pipeline
+				local killed = spawnDamageIntent(
+					world, zombieId, damage,
+					proj.SourceEntity, sourcePlantType, damageType
+				)
+				
+				-- Broadcast damage for client feedback
+				local zombieHealth = world:get(zombieId, Components.HealthComponent)
+				Network.EntityDamaged.FireAll({
+					EntityId = zombieId,
+					NewHealth = zombieHealth and math.max(0, zombieHealth.Current - damage) or 0,
+					DamageAmount = damage,
+				})
 
 				-- Spawn ProjectileHitEvent for mutation systems to process
 				if proj.SourceEntity then
@@ -511,7 +599,11 @@ local function OnStep(world: MatterWorld)
 				-- Attack the enemy zombie
 				local lastAttack = State.ZombieAttackTimes[zombieId] or 0
 				if currentTime - lastAttack >= stats.AttackSpeed then
-					local killed = applyDamage(world, target.TargetEntity, stats.Damage)
+					-- Hypnotized zombie attacks other zombies with "Bite" damage type
+					local killed = spawnDamageIntent(
+						world, target.TargetEntity, stats.Damage,
+						zombieId, "HypnotizedZombie", "Bite"
+					)
 					State.ZombieAttackTimes[zombieId] = currentTime
 					State.FrameStats.zombieBites += 1
 					
@@ -630,7 +722,10 @@ local function OnStep(world: MatterWorld)
 				end
 				
 				-- Bite the actual target!
-				local killed = applyDamage(world, actualTarget, stats.Damage)
+				local killed = spawnDamageIntent(
+					world, actualTarget, stats.Damage,
+					zombieId, zombie.ZombieType, "Bite"
+				)
 				State.ZombieAttackTimes[zombieId] = currentTime
 				State.FrameStats.zombieBites += 1
 

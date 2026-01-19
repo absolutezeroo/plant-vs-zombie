@@ -21,8 +21,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
-local EntityPool = require(Shared.utils.EntityPool)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 
 -- Network
 local Network = require(Shared.network.generated.server)

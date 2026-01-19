@@ -66,6 +66,7 @@ return {
 
 	-- Event components
 	DamageEvent = require(Events.DamageEvent),
+	DamageIntent = require(Events.DamageIntent),
 	DeathEvent = require(Events.DeathEvent),
 	SpawnEvent = require(Events.SpawnEvent),
 	ProjectileHitEvent = require(Events.ProjectileHitEvent),

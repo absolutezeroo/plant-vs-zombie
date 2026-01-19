@@ -23,7 +23,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local Network = require(Shared.network.generated.client)
 local Theme = require(Shared.ui.design.Theme)
 local ResponsiveUtils = require(Shared.ui.utils.ResponsiveUtils)

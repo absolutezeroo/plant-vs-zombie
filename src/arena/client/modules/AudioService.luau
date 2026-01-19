@@ -15,9 +15,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))

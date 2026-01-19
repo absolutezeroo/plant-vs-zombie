@@ -29,9 +29,9 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local ZombieData = require(Shared.data.ZombieData)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local GameSignals = require(Shared.signals.GameSignals)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/rendering/)
 local Client = script.Parent.Parent.Parent
@@ -185,7 +185,7 @@ local function createZombieVisual(entityId: number, zombieType: string, lane: nu
 	
 	-- Play dirt burst VFX at ground level
 	local groundPos = Vector3.new(positionX, groundY, z)
-	local VFXUtils = require(Shared.utils.VFXUtils)
+	local VFXUtils = require(Shared.utils.vfx.VFXUtils)
 	VFXUtils.DirtBurst(groundPos)
 
 	if hasEmergeAnim then
@@ -584,7 +584,7 @@ local function setupNetworkListeners()
 		end)
 
 		-- Play divert VFX (dust puff)
-		local VFXUtils = require(Shared.utils.VFXUtils)
+		local VFXUtils = require(Shared.utils.vfx.VFXUtils)
 		VFXUtils.DirtBurst(currentPos)
 
 		Logger.Debug("ZombieRender", `Zombie {entityId} diverted from lane {oldLane} to lane {newLane}`)

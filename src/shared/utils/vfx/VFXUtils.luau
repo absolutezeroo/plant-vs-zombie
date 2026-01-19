@@ -13,7 +13,7 @@
 	- Support for EmitCount attribute on particle emitters
 	
 	USAGE:
-	local VFXUtils = require(Shared.utils.VFXUtils)
+	local VFXUtils = require(Shared.utils.vfx.VFXUtils)
 	VFXUtils.CloneAndEmit(shootVFX, muzzlePosition, 8)
 ]]
 

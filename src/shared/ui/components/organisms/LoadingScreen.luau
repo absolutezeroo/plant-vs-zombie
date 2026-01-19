@@ -25,7 +25,7 @@ local Fusion = require(Packages:WaitForChild("Fusion"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared.ui.design.Theme)
 local IconAssets = require(Shared.ui.design.IconAssets)
-local ChanceUtils = require(Shared.utils.ChanceUtils)
+local ChanceUtils = require(Shared.utils.core.ChanceUtils)
 local BlurManager = require(Shared.ui.utils.BlurManager)
 
 -- Fusion primitives

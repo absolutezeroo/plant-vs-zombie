@@ -25,9 +25,9 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
-local LaneCache = require(Shared.utils.LaneCache)
-local EntityPool = require(Shared.utils.EntityPool)
-local GridDetection = require(Shared.utils.GridDetection)
+local LaneCache = require(Shared.utils.ecs.LaneCache)
+local EntityPool = require(Shared.utils.ecs.EntityPool)
+local GridDetection = require(Shared.utils.grid.GridDetection)
 
 local Network = require(Shared.network.generated.server)
 

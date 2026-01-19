@@ -29,10 +29,10 @@ local Trove = require(Packages.Trove)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "GhostPreviewSystem: Shared folder not found")
 local MapConfig = require(Shared.config.MapConfig)
-local GridUtils = require(Shared.utils.GridUtils)
+local GridUtils = require(Shared.utils.grid.GridUtils)
 local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/input/)
 local Client = script.Parent.Parent.Parent

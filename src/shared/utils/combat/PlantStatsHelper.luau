@@ -9,7 +9,7 @@
 	Use when you may have nil stats or optional fields.
 	
 	USAGE:
-	local PlantStatsHelper = require(Shared.utils.PlantStatsHelper)
+	local PlantStatsHelper = require(Shared.utils.combat.PlantStatsHelper)
 	local helper = PlantStatsHelper.FromStats(stats)
 	local damage = helper:GetDamage(25)  -- Returns stats.Damage or 25
 ]]

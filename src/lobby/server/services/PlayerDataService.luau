@@ -31,7 +31,7 @@ local Trove = require(Packages:WaitForChild("Trove"))
 local Sift = require(Packages:WaitForChild("Sift"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Logger = require(Shared.utils.Logger)
+local Logger = require(Shared.utils.core.Logger)
 local ProfileTemplate = require(Shared.data.ProfileTemplate) :: any
 local PlayerDataCore = require(Shared.services.PlayerDataCore) :: any
 local ProgressionData = require(Shared.data.ProgressionData)

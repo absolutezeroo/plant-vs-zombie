@@ -1936,7 +1936,7 @@ end
 local pos = part.Position + Vector3.new(0, 2, 0) -- NEVER!
 
 -- ✅ REQUIRED: Attachment-based positioning
-local AttachmentUtils = require(Shared.utils.AttachmentUtils)
+local AttachmentUtils = require(Shared.utils.grid.AttachmentUtils)
 local pos = AttachmentUtils.GetWorldPosition(model, "Muzzle")
 ```
 
