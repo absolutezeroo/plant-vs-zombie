@@ -213,7 +213,7 @@ local function MutationBadge(scope: any, mutationId: string): Frame
 					-- Mutation Type Icon
 					Icon(scope, {
 						Name = iconName,
-						Size = UDim2.new(0, 16, 0, 16),
+						Size = UDim2.fromOffset(16, 16),
 						LayoutOrder = 1,
 					}),
 

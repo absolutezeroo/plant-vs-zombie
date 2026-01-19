@@ -72,6 +72,9 @@ return {
 	WaveStateEvent = require(Events.WaveStateEvent),
 	CoinDropEvent = require(Events.CoinDropEvent),
 	PlantActionEvent = require(Events.PlantActionEvent),
+	TileModifierComponent = require(Events.TileModifierComponent),
+	SpawnMinionEvent = require(Events.SpawnMinionEvent),
+	DeathExplosionEvent = require(Events.DeathExplosionEvent),
 
 	-- Mutation components
 	BurnEffectComponent = require(Mutations.BurnEffectComponent),
@@ -86,4 +89,5 @@ return {
 	DamageReductionComponent = require(Mutations.DamageReductionComponent),
 	SplashDamageComponent = require(Mutations.SplashDamageComponent),
 	MutationsComponent = require(Mutations.MutationsComponent),
+	RageComponent = require(Mutations.RageComponent),
 }

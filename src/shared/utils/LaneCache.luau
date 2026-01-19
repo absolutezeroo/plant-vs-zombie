@@ -438,6 +438,73 @@ function LaneCache.GetEnemyCountInLane(laneIndex: number): number
 end
 
 --[[
+	Get the closest enemy zombie to a position (non-hypnotized)
+	
+	Optimized search: starts from sourceLane and expands outward.
+	Uses squared distance to avoid sqrt until final result.
+	
+	@param x - X position to search from
+	@param z - Z position to search from
+	@param sourceLane - Optional starting lane (searches adjacent lanes in order)
+	@return entityId, distanceSquared or nil if no enemies
+]]
+function LaneCache.GetClosestEnemy(x: number, z: number, sourceLane: number?): (number?, number?)
+	local closestId: number? = nil
+	local closestDistSq: number = math.huge
+	
+	-- Build lane search order: start from sourceLane, then expand outward
+	local searchOrder: { number }
+	if sourceLane and sourceLane >= 1 and sourceLane <= GridConfig.GRID_LANES then
+		searchOrder = { sourceLane }
+		-- Add adjacent lanes in expanding order (1, 2, 3... distance)
+		for offset = 1, GridConfig.GRID_LANES do
+			local laneUp = sourceLane - offset
+			local laneDown = sourceLane + offset
+			if laneUp >= 1 then
+				table.insert(searchOrder, laneUp)
+			end
+			if laneDown <= GridConfig.GRID_LANES then
+				table.insert(searchOrder, laneDown)
+			end
+		end
+	else
+		-- No source lane, search all lanes 1-5
+		searchOrder = {}
+		for i = 1, GridConfig.GRID_LANES do
+			table.insert(searchOrder, i)
+		end
+	end
+	
+	-- Search lanes in order
+	for _, laneIndex in searchOrder do
+		local entities = _lanes[laneIndex]
+		
+		for _, entityId in entities do
+			-- Skip hypnotized zombies (allies)
+			if _hypnotizedZombies[entityId] then
+				continue
+			end
+			
+			local pos = _positions[entityId]
+			if not pos then
+				continue
+			end
+			
+			local dx = pos.X - x
+			local dz = pos.Z - z
+			local distSq = dx * dx + dz * dz
+			
+			if distSq < closestDistSq then
+				closestDistSq = distSq
+				closestId = entityId
+			end
+		end
+	end
+	
+	return closestId, if closestId then closestDistSq else nil
+end
+
+--[[
 	Check if there are enemy zombies (non-hypnotized) in a lane in the specified direction
 	
 	@param laneIndex - Lane number (1-5)

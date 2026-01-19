@@ -29,6 +29,7 @@ local Matter = require(Packages:WaitForChild("Matter"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
+local MapConfig = require(Shared.config.MapConfig)
 local PlantData = require(Shared.data.PlantData)
 local PlantFoodData = require(Shared.data.PlantFoodData)
 local Logger = require(Shared.utils.Logger)
@@ -55,6 +56,17 @@ local CONFIG = table.freeze({
 -- ============================================================
 local State = {
 	PendingRequests = {} :: { { player: Player, plantEntityId: number } },
+	-- Rapid Fire queue: tracks ongoing rapid-fire abilities (no task.wait needed)
+	RapidFireQueue = {} :: {
+		[number]: {
+			plantId: number,
+			lane: number,
+			shotsRemaining: number,
+			nextShotTime: number,
+			interval: number,
+		}
+	},
+	RapidFireNextId = 1,
 }
 
 -- ============================================================
@@ -84,54 +96,28 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 		Logger.Info("PlantFood", `{plantType} produced {ability.InstantSun} instant sun`)
 	end
 
-	-- Rapid Fire (Peashooter, Repeater, etc.)
+	-- Rapid Fire (Peashooter, Repeater, etc.) - Queue for time-based processing
 	if ability.RapidFireShots and ability.ShotInterval then
 		local shots = ability.RapidFireShots
 		local interval = ability.ShotInterval
 		
-		-- Get plant's lane from GridPositionComponent
-		local gridPos = world:get(plantId, Components.GridPositionComponent)
-		local plantLane = gridPos and gridPos.Row or 3 -- Default to middle lane
+		-- Get plant's lane from PlantTypeComponent (plants use Lane, not GridPositionComponent.Row)
+		local plantTypeComp = world:get(plantId, Components.PlantTypeComponent)
+		local plantLane = plantTypeComp and plantTypeComp.Lane or 3 -- Default to middle lane
 
-		task.spawn(function()
-			for i = 1, shots do
-				if not world:contains(plantId) then
-					break
-				end
-
-				local plantPos = world:get(plantId, Components.PositionComponent)
-				if not plantPos then
-					break
-				end
-
-				local spawnX = plantPos.X + 2
-				
-				-- Create rapid-fire projectile with all required fields
-				local projId = EntityPool.Spawn(
-					Components.ProjectileComponent({
-						Damage = 20,
-						Speed = 30,
-						DirectionX = 1, -- Forward direction
-						DirectionZ = 0,
-						SpawnX = spawnX,
-						Lane = plantLane,
-						MaxRange = 100,
-						SourceEntity = plantId,
-					}),
-					Components.PositionComponent({
-						X = spawnX,
-						Y = plantPos.Y + 2.5,
-						Z = plantPos.Z,
-					})
-				)
-
-				if not projId then
-					break
-				end
-
-				task.wait(interval)
-			end
-		end)
+		-- Add to rapid fire queue (processed in OnStep, no task.wait)
+		local queueId = State.RapidFireNextId
+		State.RapidFireNextId = State.RapidFireNextId + 1
+		
+		State.RapidFireQueue[queueId] = {
+			plantId = plantId,
+			lane = plantLane,
+			shotsRemaining = shots,
+			nextShotTime = os.clock(), -- Fire first shot immediately
+			interval = interval,
+		}
+		
+		Logger.Info("PlantFood", `{plantType} rapid fire queued: {shots} shots`)
 	end
 
 	-- Freeze All (Snow Pea) - Using LaneCache for O(1) iteration
@@ -208,6 +194,81 @@ end
 -- SECTION 5: ONSTEP (main ECS loop)
 -- ============================================================
 local function OnStep(world)
+	local currentTime = os.clock()
+
+	-- Process Rapid Fire queue (time-based, no task.wait)
+	for queueId, rapidFire in State.RapidFireQueue do
+		-- Check if plant still exists
+		if not world:contains(rapidFire.plantId) then
+			State.RapidFireQueue[queueId] = nil
+			continue
+		end
+
+		-- Check if it's time to fire next shot
+		if currentTime < rapidFire.nextShotTime then
+			continue
+		end
+
+		-- Get current plant position
+		local plantPos = world:get(rapidFire.plantId, Components.PositionComponent)
+		if not plantPos then
+			State.RapidFireQueue[queueId] = nil
+			continue
+		end
+
+		-- Get zombie direction from MapConfig (plants shoot opposite direction)
+		local zombieDir = MapConfig.GetZombieDirection()
+		local shootDirX = -zombieDir.X -- Opposite of zombie direction
+		local shootDirZ = -zombieDir.Z
+
+		-- Fire projectile with correct direction
+		local spawnOffsetX = 2 * shootDirX
+		local spawnOffsetZ = 2 * shootDirZ
+		local spawnX = plantPos.X + spawnOffsetX
+		local spawnZ = plantPos.Z + spawnOffsetZ
+		
+		local projId = EntityPool.Spawn(
+			Components.ProjectileComponent({
+				Damage = 20,
+				Speed = 30,
+				DirectionX = shootDirX,
+				DirectionZ = shootDirZ,
+				SpawnX = spawnX,
+				Lane = rapidFire.lane,
+				MaxRange = 100,
+				SourceEntity = rapidFire.plantId,
+			}),
+			Components.PositionComponent({
+				X = spawnX,
+				Y = plantPos.Y + 2.5,
+				Z = spawnZ,
+			})
+		)
+
+		if projId then
+			-- Network broadcast for client VFX
+			Network.ProjectileSpawned.FireAll({
+				EntityId = projId,
+				Lane = rapidFire.lane,
+				StartX = spawnX,
+				Variant = "Pea",
+				IsEnhanced = false,
+				IsFrozen = false,
+			})
+		end
+
+		-- Decrement shots remaining
+		rapidFire.shotsRemaining = rapidFire.shotsRemaining - 1
+
+		if rapidFire.shotsRemaining <= 0 then
+			-- Finished rapid fire
+			State.RapidFireQueue[queueId] = nil
+		else
+			-- Schedule next shot
+			rapidFire.nextShotTime = currentTime + rapidFire.interval
+		end
+	end
+
 	-- Process pending Plant Food activation requests
 	for _, request in State.PendingRequests do
 		local player = request.player
@@ -284,6 +345,8 @@ end
 
 local function Dispose()
 	table.clear(State.PendingRequests)
+	table.clear(State.RapidFireQueue)
+	State.RapidFireNextId = 1
 	Logger.Debug("PlantFoodSystem", "Disposed")
 end
 

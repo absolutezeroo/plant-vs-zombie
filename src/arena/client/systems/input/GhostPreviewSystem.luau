@@ -31,6 +31,7 @@ assert(Shared, "GhostPreviewSystem: Shared folder not found")
 local MapConfig = require(Shared.config.MapConfig)
 local GridUtils = require(Shared.utils.GridUtils)
 local PlantData = require(Shared.data.PlantData)
+local PlantFoodData = require(Shared.data.PlantFoodData)
 local Logger = require(Shared.utils.Logger)
 
 -- Client root (script.Parent.Parent.Parent since we're in systems/input/)
@@ -81,16 +82,20 @@ local _currentCell: { Column: number, Lane: number }? = nil
 local _isValid = false
 local _warnedPlantTypes: { [string]: boolean } = {} -- Track warned plant types to avoid spam
 
--- Shovel highlight state
+-- Shovel/PlantFood highlight state
 local _highlightedPlant: Model? = nil
+local _highlightMode: string? = nil -- "Shovel" or "PlantFood" or "PlantFoodInvalid"
 local _originalPartData: { [BasePart]: { Color: Color3, Material: Enum.Material, Transparency: number } } = {}
 
 -- Colors
 local VALID_COLOR = Color3.fromRGB(100, 255, 100) -- Green
 local INVALID_COLOR = Color3.fromRGB(255, 100, 100) -- Red
 local SHOVEL_COLOR = Color3.fromRGB(255, 80, 80) -- Red for shovel target
+local PLANTFOOD_VALID_COLOR = Color3.fromRGB(255, 215, 0) -- Gold for valid PlantFood target
+local PLANTFOOD_INVALID_COLOR = Color3.fromRGB(100, 100, 100) -- Gray for invalid PlantFood target
 local GHOST_TRANSPARENCY = 0.5
 local SHOVEL_TRANSPARENCY = 0.3
+local PLANTFOOD_TRANSPARENCY = 0.2
 
 -- Cache grid Y to avoid calling MapConfig.GetConfig() every frame (it can yield)
 local _cachedGridY: number? = nil
@@ -273,24 +278,26 @@ local function restoreHighlightedPlant()
 			end
 		end
 		_highlightedPlant = nil
+		_highlightMode = nil
 		table.clear(_originalPartData)
 	end
 end
 
 --[[
-	Apply shovel highlight effect to a plant model
+	Apply highlight effect to a plant model with specified color
 ]]
-local function applyShovelHighlight(plantModel: Model)
-	-- If same plant, do nothing
-	if _highlightedPlant == plantModel then
+local function applyHighlight(plantModel: Model, color: Color3, transparency: number, mode: string)
+	-- If same plant and same mode, do nothing
+	if _highlightedPlant == plantModel and _highlightMode == mode then
 		return
 	end
 
 	-- Restore previous highlight
 	restoreHighlightedPlant()
 
-	-- Save original appearance and apply red highlight
+	-- Save original appearance and apply highlight
 	_highlightedPlant = plantModel
+	_highlightMode = mode
 	for _, descendant in plantModel:GetDescendants() do
 		if descendant:IsA("BasePart") and descendant.Name ~= "Root" then
 			-- Save original
@@ -300,10 +307,29 @@ local function applyShovelHighlight(plantModel: Model)
 				Transparency = descendant.Transparency,
 			}
 			-- Apply highlight
-			descendant.Color = SHOVEL_COLOR
+			descendant.Color = color
 			descendant.Material = Enum.Material.Neon
-			descendant.Transparency = SHOVEL_TRANSPARENCY
+			descendant.Transparency = transparency
 		end
+	end
+end
+
+--[[
+	Apply shovel highlight effect to a plant model
+]]
+local function applyShovelHighlight(plantModel: Model)
+	applyHighlight(plantModel, SHOVEL_COLOR, SHOVEL_TRANSPARENCY, "Shovel")
+end
+
+--[[
+	Apply PlantFood highlight effect to a plant model
+	Gold = valid (has PlantFood ability), Gray = invalid (no ability)
+]]
+local function applyPlantFoodHighlight(plantModel: Model, hasAbility: boolean)
+	if hasAbility then
+		applyHighlight(plantModel, PLANTFOOD_VALID_COLOR, PLANTFOOD_TRANSPARENCY, "PlantFood")
+	else
+		applyHighlight(plantModel, PLANTFOOD_INVALID_COLOR, PLANTFOOD_TRANSPARENCY, "PlantFoodInvalid")
 	end
 end
 
@@ -356,6 +382,27 @@ local function updateShovelPreview()
 
 	if plantModel then
 		applyShovelHighlight(plantModel)
+	else
+		restoreHighlightedPlant()
+	end
+end
+
+--[[
+	Update PlantFood preview - highlight plant under cursor
+	Gold = has PlantFood ability, Gray = no ability defined
+]]
+local function updatePlantFoodPreview()
+	local plantModel = getPlantUnderCursor()
+
+	if plantModel then
+		local plantType = plantModel:GetAttribute("PlantType")
+		local hasAbility = false
+		
+		if plantType and typeof(plantType) == "string" then
+			hasAbility = PlantFoodData.GetAbility(plantType) ~= nil
+		end
+		
+		applyPlantFoodHighlight(plantModel, hasAbility)
 	else
 		restoreHighlightedPlant()
 	end
@@ -421,7 +468,14 @@ local function GhostPreviewSystem(world)
 		return
 	end
 
-	-- Not in shovel mode, restore any highlighted plant
+	-- In PlantFood mode, show gold/gray highlight on targeted plant
+	if SelectionState.IsPlantFoodActive() then
+		hideGhost()
+		updatePlantFoodPreview()
+		return
+	end
+
+	-- Not in special mode, restore any highlighted plant
 	restoreHighlightedPlant()
 
 	local selectedPlant = Fusion.peek(SelectionState.SelectedPlant)
@@ -513,7 +567,7 @@ local function handleShovel()
 	end
 end
 
--- Handle Plant Food mode click - find plant at clicked position and send activation request
+-- Handle Plant Food mode click - raycast at click moment for accuracy
 local function handlePlantFood()
 	if not SelectionState.IsPlantFoodActive() then
 		return
@@ -529,15 +583,31 @@ local function handlePlantFood()
 		return
 	end
 
-	-- Find plant model under cursor
+	-- Do fresh raycast at click moment (more accurate than stale _highlightedPlant)
 	local plantModel = getPlantUnderCursor()
+	
+	-- Debug: compare with highlighted plant
+	local highlightedId = if _highlightedPlant then _highlightedPlant:GetAttribute("EntityId") else nil
+	local raycastId = if plantModel then plantModel:GetAttribute("EntityId") else nil
+	Logger.Debug("GhostPreview", `PlantFood click: highlighted={highlightedId or "nil"}, raycast={raycastId or "nil"}`)
 
 	if plantModel then
 		local entityId = plantModel:GetAttribute("EntityId")
 		local plantType = plantModel:GetAttribute("PlantType")
 		
-		if entityId and typeof(entityId) == "number" and plantType then
-			Logger.Info("GhostPreview", `PlantFood: activating on plant entity {entityId} ({plantType})`)
+		if entityId and typeof(entityId) == "number" and plantType and typeof(plantType) == "string" then
+			-- Check if plant has a PlantFood ability
+			local ability = PlantFoodData.GetAbility(plantType)
+			if not ability then
+				Logger.Debug("GhostPreview", `PlantFood: {plantType} has no PlantFood ability`)
+				local audio = getAudioService()
+				if audio and audio.PlayError then
+					audio.PlayError()
+				end
+				return
+			end
+			
+			Logger.Info("GhostPreview", `PlantFood: activating {ability.Name} on plant entity {entityId} ({plantType})`)
 
 			-- Optimistic update: use charge
 			SelectionState.UsePlantFoodCharge()
@@ -561,7 +631,7 @@ local function handlePlantFood()
 	end
 
 	-- No plant found at click location - play error sound
-	Logger.Debug("GhostPreview", "PlantFood: no plant found at cursor")
+	Logger.Debug("GhostPreview", "PlantFood: no plant found at cursor (raycast missed)")
 	local audio = getAudioService()
 	if audio and audio.PlayError then
 		audio.PlayError()

@@ -550,6 +550,41 @@ event FogIlluminationUpdate = {
     }
 }
 
+-- ==========================
+-- TILE MODIFIERS (Map Events)
+-- ==========================
+
+-- Tile modifier applied (crater, fire, ice, tombstone, etc.)
+event TileModifierApplied = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        Column: Column,
+        Lane: Lane,
+        ModifierType: string.utf8,
+        Duration: f32?,
+        VisualAssetName: string.utf8,
+        VisualColorR: f32,
+        VisualColorG: f32,
+        VisualColorB: f32,
+        VisualTransparency: f32,
+    }
+}
+
+-- Tile modifier expired/removed
+event TileModifierExpired = {
+    from: Server,
+    type: Reliable,
+    call: ManyAsync,
+    data: struct {
+        EntityId: EntityId,
+        Column: Column,
+        Lane: Lane,
+    }
+}
+
 -- Zombie position update (batched, unreliable for smooth movement)
 event ZombiePositionBatch = {
     from: Server,

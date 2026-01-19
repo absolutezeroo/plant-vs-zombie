@@ -6,11 +6,13 @@
 	- Health manipulation (damage, heal, modify)
 	- Entity type identification (IsPlant, IsZombie, IsAlive)
 	- Status effect application with refresh strategies
+	- Zombie ability hooks integration
 	
 	PHILOSOPHY:
 	- Functions are pure helpers, they don't store state
 	- All functions take world + components as parameters for decoupling
 	- Uses Sift for immutable component updates
+	- Zombie hooks are executed on damage/kill for extensibility
 	
 	USAGE:
 	local ECSUtils = require(Shared.utils.ECSUtils)
@@ -20,6 +22,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Sift = require(Packages:WaitForChild("Sift"))
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
 
 local ECSUtils = {}
 
@@ -36,19 +41,47 @@ export type ComponentRegistry = {
 -- ============================================
 
 --[[
+	Build ability context for zombie hooks
+]]
+local function buildZombieAbilityContext(
+	world: any,
+	entityId: number,
+	zombieType: string,
+	currentHealth: number,
+	maxHealth: number,
+	damageReceived: number?,
+	damageSource: string?,
+	killerEntityId: number?
+): ZombieAbilityData.AbilityContext
+	return {
+		EntityId = entityId,
+		World = world,
+		ZombieType = zombieType,
+		CurrentHealth = currentHealth,
+		MaxHealth = maxHealth,
+		DamageReceived = damageReceived,
+		DamageSource = damageSource,
+		KillerEntityId = killerEntityId,
+	}
+end
+
+--[[
 	Apply damage to an entity
+	For zombies: executes OnDamaged and OnHalfHealth/OnQuarterHealth hooks
 	
 	@param world any - Matter World instance
 	@param entityId number - Target entity ID
 	@param damage number - Damage amount (positive)
 	@param Components ComponentRegistry - Component registry with HealthComponent
+	@param damageSource string? - Optional damage source ("Projectile", "Explosion", etc.)
 	@return (number, boolean) - (actualDamage, isDead)
 ]]
 function ECSUtils.DamageEntity(
 	world: any,
 	entityId: number,
 	damage: number,
-	Components: ComponentRegistry
+	Components: ComponentRegistry,
+	damageSource: string?
 ): (number, boolean)
 	if not world:contains(entityId) then
 		return 0, false
@@ -62,8 +95,34 @@ function ECSUtils.DamageEntity(
 
 	local currentHealth = health.Current :: number
 	local maxHealth = health.Max :: number
+	
+	-- Check if this is a zombie and get type for ability hooks
+	local zombieType: string? = nil
+	local ZombieTypeComponent = Components.ZombieTypeComponent
+	if ZombieTypeComponent then
+		local zombie = world:get(entityId, ZombieTypeComponent)
+		if zombie then
+			zombieType = zombie.ZombieType
+		end
+	end
+	
+	-- Execute OnDamaged hook for zombies (can cancel damage)
+	if zombieType then
+		local ctx = buildZombieAbilityContext(
+			world, entityId, zombieType,
+			currentHealth, maxHealth,
+			damage, damageSource, nil
+		)
+		local cancelled = ZombieAbilityData.ExecuteHook("OnDamaged", zombieType, ctx)
+		if cancelled then
+			return 0, false -- Damage was cancelled by ability
+		end
+	end
+	
 	local actualDamage = math.min(damage, currentHealth)
 	local newHealth = math.max(0, currentHealth - damage)
+	local previousHealthPercent = currentHealth / maxHealth
+	local newHealthPercent = newHealth / maxHealth
 
 	world:insert(
 		entityId,
@@ -72,6 +131,25 @@ function ECSUtils.DamageEntity(
 			Max = maxHealth,
 		})
 	)
+	
+	-- Execute health threshold hooks for zombies
+	if zombieType then
+		local ctx = buildZombieAbilityContext(
+			world, entityId, zombieType,
+			newHealth, maxHealth,
+			actualDamage, damageSource, nil
+		)
+		
+		-- OnHalfHealth: triggered when crossing 50% threshold
+		if previousHealthPercent > 0.5 and newHealthPercent <= 0.5 then
+			ZombieAbilityData.ExecuteHook("OnHalfHealth", zombieType, ctx)
+		end
+		
+		-- OnQuarterHealth: triggered when crossing 25% threshold
+		if previousHealthPercent > 0.25 and newHealthPercent <= 0.25 then
+			ZombieAbilityData.ExecuteHook("OnQuarterHealth", zombieType, ctx)
+		end
+	end
 
 	return actualDamage, newHealth <= 0
 end
@@ -203,13 +281,20 @@ end
 
 --[[
 	Instantly kill an entity by setting health to 0
+	For zombies: executes OnDeath hook (can trigger explosions, minion spawns, etc.)
 	
 	@param world any - Matter World instance
 	@param entityId number - Target entity ID
 	@param Components ComponentRegistry - Component registry with HealthComponent
+	@param killerEntityId number? - Optional entity that caused the kill
 	@return boolean - True if entity was killed (had health > 0)
 ]]
-function ECSUtils.KillEntity(world: any, entityId: number, Components: ComponentRegistry): boolean
+function ECSUtils.KillEntity(
+	world: any,
+	entityId: number,
+	Components: ComponentRegistry,
+	killerEntityId: number?
+): boolean
 	if not world:contains(entityId) then
 		return false
 	end
@@ -220,15 +305,44 @@ function ECSUtils.KillEntity(world: any, entityId: number, Components: Component
 		return false
 	end
 
-	local wasAlive = (health.Current :: number) > 0
+	local currentHealth = health.Current :: number
+	local maxHealth = health.Max :: number
+	local wasAlive = currentHealth > 0
+	
+	-- Check if this is a zombie for ability hooks
+	local zombieType: string? = nil
+	local ZombieTypeComponent = Components.ZombieTypeComponent
+	if ZombieTypeComponent then
+		local zombie = world:get(entityId, ZombieTypeComponent)
+		if zombie then
+			zombieType = zombie.ZombieType
+		end
+	end
+	
+	-- Check for InstantKill immunity (bosses)
+	if zombieType and ZombieAbilityData.HasImmunity(zombieType, "InstantKill") then
+		-- Boss is immune to instant kill - deal massive damage instead
+		-- This allows abilities like Chomper to still hurt bosses
+		return false
+	end
 
 	world:insert(
 		entityId,
 		HealthComponent({
 			Current = 0,
-			Max = health.Max :: number,
+			Max = maxHealth,
 		})
 	)
+	
+	-- Execute OnDeath hook for zombies
+	if zombieType and wasAlive then
+		local ctx = buildZombieAbilityContext(
+			world, entityId, zombieType,
+			0, maxHealth,
+			currentHealth, "InstantKill", killerEntityId
+		)
+		ZombieAbilityData.ExecuteHook("OnDeath", zombieType, ctx)
+	end
 
 	return wasAlive
 end

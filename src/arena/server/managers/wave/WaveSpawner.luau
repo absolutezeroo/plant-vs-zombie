@@ -18,6 +18,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MapConfig = require(Shared.config.MapConfig)
 local GridConfig = require(Shared.config.GridConfig)
 local ZombieData = require(Shared.data.ZombieData)
+local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
 local Logger = require(Shared.utils.Logger)
 local Components = require(Shared.components)
 local EntityPool = require(Shared.utils.EntityPool)
@@ -354,6 +355,16 @@ function WaveSpawner:SpawnZombie(world: any, zombieType: string, lane: number, w
 		PositionY = spawnPos.Y,
 		PositionZ = spawnPos.Z,
 	}))
+	
+	-- Execute OnSpawn ability hook (for abilities that trigger on spawn)
+	local ctx: ZombieAbilityData.AbilityContext = {
+		EntityId = entityId,
+		World = world,
+		ZombieType = zombieType,
+		CurrentHealth = health,
+		MaxHealth = health,
+	}
+	ZombieAbilityData.ExecuteHook("OnSpawn", zombieType, ctx)
 
 	Logger.Debug("WaveSpawner", `Spawned {zombieType} in lane {lane}`)
 

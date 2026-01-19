@@ -11,12 +11,15 @@
 	- PotatoMine arming and detonation
 	- Jalapeno lane-wide fire
 	- IceShroom global freeze
-	- Chomper instant-kill + chewing
-	- Squash jump-and-squash
 	- Explode-o-nut death explosion
 	
+	DELEGATED TO PlantAbilityRegistry:
+	- Chomper instant-kill + chewing (ChomperAbility.luau)
+	- Squash jump-and-squash (SquashAbility.luau)
+	- CobCannon targeting (CobCannonAbility.luau)
+	
 	LIFECYCLE:
-	- Init(): No init needed
+	- Init(): Setup network handlers, initialize ability registry
 	- OnStep(): Main loop (CANNOT yield) - processes special plants
 	- Dispose(): Clear tracking state
 ]]
@@ -27,19 +30,23 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
-local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local PlantData = require(Shared.data.PlantData)
+local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
 local Logger = require(Shared.utils.Logger)
 local LaneCache = require(Shared.utils.LaneCache)
 local EntityPool = require(Shared.utils.EntityPool)
 local ECSUtils = require(Shared.utils.ECSUtils)
 local NetworkUtils = require(Shared.utils.NetworkUtils)
+
+-- Plant Ability Registry (delegates complex abilities to handlers)
+local PlantAbilities = require(Shared.handlers.abilities)
+local PlantAbilityRegistry = PlantAbilities.Registry
+local CobCannonAbility = PlantAbilities.CobCannon
 
 -- Network
 local Network = require(Shared.network.generated.server)
@@ -62,20 +69,8 @@ local CONFIG = table.freeze({
 	ARM_DURATION = GameConstants.ExplosiveDefaults.ARM_DURATION,
 	TRIGGER_RADIUS = GameConstants.ExplosiveDefaults.TRIGGER_RADIUS,
 
-	-- Chomper defaults (from GameConstants.ChomperDefaults)
-	CHEW_DURATION = GameConstants.ChomperDefaults.CHEW_DURATION,
-	CHOMP_RANGE = GameConstants.ChomperDefaults.CHOMP_RANGE,
-
-	-- Squash defaults (system-specific, no global constant)
-	JUMP_DURATION = 0.5,
-	SQUASH_RANGE = 6,
-
 	-- Freeze defaults
 	FREEZE_DURATION = 4,
-
-	-- CobCannon defaults
-	COB_COOLDOWN = 30, -- Seconds between shots
-	COB_FLIGHT_TIME = 1.5, -- Time for corn cob to reach target
 })
 
 -- ============================================================
@@ -84,12 +79,8 @@ local CONFIG = table.freeze({
 local State = {
 	-- Track plants with fuse timers
 	FusePlants = {} :: { [number]: { explodeTime: number, plantType: string } },
-	-- Track Squash jumping state
-	SquashJumps = {} :: { [number]: { targetX: number, targetZ: number, startTime: number, startX: number, startZ: number } },
-	-- Track CobCannon cooldowns
-	CobCooldowns = {} :: { [number]: number }, -- entityId -> nextFireTime
-	-- Track pending CobCannon explosions
-	PendingCobExplosions = {} :: { [number]: { impactTime: number, targetX: number, targetZ: number, damage: number, splashRadius: number } },
+	-- Track entities with registered ability handlers
+	HandlerEntities = {} :: { [number]: boolean },
 }
 
 -- ============================================================
@@ -110,37 +101,45 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 		-- IceShroom: Freeze ALL zombies on screen (using LaneCache for O(1) iteration)
 		local freezeDuration = stats.FreezeDuration or CONFIG.FREEZE_DURATION
 		local allZombies = LaneCache.GetAllZombies()
+		local frozenCount = 0
 		
 		for _, zombieId in allZombies do
 			if not world:contains(zombieId) then
 				continue
 			end
 			
-			-- Apply freeze (slow to 0%)
-			world:insert(
-				zombieId,
-				Components.SlowComponent({
-					SlowPercent = 1.0,
-					Duration = freezeDuration,
-					AppliedAt = currentTime,
-				})
-			)
+			-- Check for Freeze immunity
+			local zombie = world:get(zombieId, Components.ZombieTypeComponent)
+			local zombieType = zombie and zombie.ZombieType or "Basic"
+			
+			if not ZombieAbilityData.HasImmunity(zombieType, "Freeze") then
+				-- Apply freeze (slow to 0%)
+				world:insert(
+					zombieId,
+					Components.SlowComponent({
+						SlowPercent = 1.0,
+						Duration = freezeDuration,
+						AppliedAt = currentTime,
+					})
+				)
 
-			-- Stop movement
-			world:insert(
-				zombieId,
-				Components.MovementComponent({
-					VelocityX = 0,
-					VelocityY = 0,
-					VelocityZ = 0,
-				})
-			)
+				-- Stop movement
+				world:insert(
+					zombieId,
+					Components.MovementComponent({
+						VelocityX = 0,
+						VelocityY = 0,
+						VelocityZ = 0,
+					})
+				)
+				frozenCount += 1
+			end
 
-			-- Small damage
+			-- Small damage (always applies, even to immune zombies)
 			ECSUtils.DamageEntity(world, zombieId, stats.Damage or 20, Components)
 			killCount += 1
 		end
-		Logger.Info("SpecialPlant", `IceShroom {entityId} froze {killCount} zombies for {freezeDuration}s`)
+		Logger.Info("SpecialPlant", `IceShroom {entityId} froze {frozenCount} zombies for {freezeDuration}s (damaged {killCount})`)
 	elseif stats.IsLaneWide then
 		-- Jalapeno: Destroy entire lane
 		local plant = world:get(entityId, Components.PlantTypeComponent)
@@ -227,50 +226,6 @@ local function handleExplosion(world: any, entityId: number, pos: any, plantType
 	EntityPool.SafeDespawn(entityId, world)
 end
 
--- Handle CobCannon explosion at target location
-local function handleCobExplosion(world: any, explosionId: number, targetX: number, targetZ: number, damage: number, splashRadius: number)
-	local killCount = 0
-
-	-- Find zombies in splash radius across nearby lanes
-	local targetLane = math.floor((targetZ / GridConfig.CELL_SIZE) + 0.5) -- Approximate lane
-	targetLane = math.clamp(targetLane, 1, GridConfig.GRID_LANES)
-	local laneRadius = math.ceil(splashRadius / GridConfig.CELL_SIZE)
-
-	local zombiesInRange = LaneCache.GetEntitiesInLaneRange(targetLane, laneRadius)
-
-	for _, zombieId in zombiesInRange do
-		local zombiePos = LaneCache.GetPosition(zombieId)
-		if not zombiePos then
-			continue
-		end
-
-		local dx = zombiePos.X - targetX
-		local dz = zombiePos.Z - targetZ
-		local distance = math.sqrt(dx * dx + dz * dz)
-
-		if distance <= splashRadius then
-			-- CobCannon deals massive damage but might not instant-kill
-			local _, isDead = ECSUtils.DamageEntity(world, zombieId, damage, Components)
-			if isDead then
-				killCount += 1
-			end
-		end
-	end
-
-	Logger.Info("SpecialPlant", `CobCannon explosion at ({targetX}, {targetZ}) killed {killCount} zombies`)
-
-	-- Broadcast explosion VFX
-	Network.ExplosionVFX.FireAll({
-		PositionX = targetX,
-		PositionY = 1,
-		PositionZ = targetZ,
-		Radius = splashRadius,
-	})
-
-	-- Clean up pending explosion
-	State.PendingCobExplosions[explosionId] = nil
-end
-
 -- Explode PotatoMine: kill the triggering zombie
 local function explodePotatoMine(world: any, mineId: number, minePos: any, triggeredByZombieId: number)
 	Logger.Info("SpecialPlant", `PotatoMine {mineId} detonated by zombie {triggeredByZombieId}!`)
@@ -299,61 +254,11 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 	EntityPool.SafeDespawn(mineId, world)
 end
 
--- Find nearest zombie in range for Chomper/Squash
-local function findNearestZombieInRange(world: any, plantPos: any, lane: number, range: number): (number?, any?)
-	local nearestId = nil
-	local nearestPos = nil
-	local nearestDist = range + 1
-
-	local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
-
-	for _, zombieId in zombiesInLane do
-		if not world:contains(zombieId) then
-			continue
-		end
-
-		local zombiePos = world:get(zombieId, Components.PositionComponent)
-		if not zombiePos then
-			continue
-		end
-
-		local distance = zombiePos.X - plantPos.X
-		if distance > 0 and distance <= range and distance < nearestDist then
-			nearestId = zombieId
-			nearestPos = zombiePos
-			nearestDist = distance
-		end
-	end
-
-	return nearestId, nearestPos
-end
-
 -- ============================================================
 -- SECTION 5: ONSTEP (main ECS loop)
 -- ============================================================
 local function OnStep(world)
 	local currentTime = os.clock()
-
-	-- Process pending CobCannon explosions
-	for explosionId, explosion in State.PendingCobExplosions do
-		if currentTime >= explosion.impactTime then
-			handleCobExplosion(
-				world,
-				explosionId,
-				explosion.targetX,
-				explosion.targetZ,
-				explosion.damage,
-				explosion.splashRadius
-			)
-		end
-	end
-
-	-- Clean up CobCannon cooldowns for despawned entities
-	for entityId in State.CobCooldowns do
-		if not world:contains(entityId) then
-			State.CobCooldowns[entityId] = nil
-		end
-	end
 
 	-- React to SpawnEvent for new special plants
 	for _, event in world:query(Components.SpawnEvent) do
@@ -489,137 +394,64 @@ local function OnStep(world)
 		end
 	end
 
-	-- Process Chomper chewing completion
-	for plantId, pos, plant, chewing in
-		world:query(Components.PositionComponent, Components.PlantTypeComponent, Components.ChewingComponent)
-	do
-		if currentTime - chewing.ChewStartTime >= chewing.ChewDuration then
-			world:remove(plantId, Components.ChewingComponent)
-			Logger.Debug("SpecialPlant", `Chomper {plantId} finished chewing`)
-		end
-	end
-
-	-- Process Chomper looking for targets (when not chewing)
+	-- ================================================================
+	-- DELEGATED ABILITIES (Chomper, Squash, CobCannon)
+	-- These are now handled by PlantAbilityRegistry handlers
+	-- ================================================================
+	
+	-- Process plants with registered ability handlers
 	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
-		local stats = PlantData[plant.PlantType]
-		if not stats or not stats.IsInstantKill then
+		-- Check if this plant type has a registered handler
+		if not PlantAbilityRegistry.HasHandler(plant.PlantType) then
 			continue
 		end
-		if stats.JumpsToTarget then
-			continue
-		end -- Squash handled separately
-
-		-- Skip if already chewing
-		if world:get(plantId, Components.ChewingComponent) then
-			continue
+		
+		-- Initialize state if new entity
+		if not State.HandlerEntities[plantId] then
+			PlantAbilityRegistry.InitState(plantId, plant.PlantType)
+			State.HandlerEntities[plantId] = true
 		end
-
-		local chompRange = stats.Range or CONFIG.CHOMP_RANGE
-		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, chompRange)
-
-		if zombieId then
-			-- Chomp! Instant kill
-			ECSUtils.KillEntity(world, zombieId, Components)
-
-			-- Start chewing
-			local chewDuration = stats.ChewDuration or CONFIG.CHEW_DURATION
-			world:insert(
-				plantId,
-				Components.ChewingComponent({
-					ChewDuration = chewDuration,
-					ChewStartTime = currentTime,
-				})
-			)
-
-			Logger.Info("SpecialPlant", `Chomper {plantId} ate zombie {zombieId}, chewing for {chewDuration}s`)
-
-			NetworkUtils.BroadcastEntityDied(zombieId)
-		end
-	end
-
-	-- Process Squash jumping
-	for plantId, jumpData in State.SquashJumps do
-		if not world:contains(plantId) then
-			State.SquashJumps[plantId] = nil
-			continue
-		end
-
-		local jumpProgress = (currentTime - jumpData.startTime) / CONFIG.JUMP_DURATION
-
-		if jumpProgress >= 1 then
-			-- Landed! Kill zombie at target location
-			local plant = world:get(plantId, Components.PlantTypeComponent)
-			if plant then
-				local zombiesInLane = LaneCache.GetEntitiesInLane(plant.Lane)
-
-				for _, zombieId in zombiesInLane do
-					if not world:contains(zombieId) then
-						continue
-					end
-
-					local zombiePos = world:get(zombieId, Components.PositionComponent)
-					if not zombiePos then
-						continue
-					end
-
-					local dx = math.abs(zombiePos.X - jumpData.targetX)
-					local dz = math.abs(zombiePos.Z - jumpData.targetZ)
-					if dx < 3 and dz < 3 then
-						if ECSUtils.KillEntity(world, zombieId, Components) then
-							Logger.Info("SpecialPlant", `Squash {plantId} squashed zombie {zombieId}`)
-							NetworkUtils.BroadcastEntityDied(zombieId)
-							end
-						break
-					end
-				end
-
-				-- Squash dies after landing
-				GridService.Clear(plant.Column, plant.Lane)
-				NetworkUtils.BroadcastEntityDied(plantId)
-				EntityPool.SafeDespawn(plantId, world)
+		
+		-- Build ability context
+		local ctx = {
+			EntityId = plantId,
+			World = world,
+			PlantType = plant.PlantType,
+			Position = { X = pos.X, Y = pos.Y, Z = pos.Z },
+			Lane = plant.Lane,
+			Column = plant.Column,
+			CurrentTime = currentTime,
+		}
+		
+		-- Execute OnTick for this plant's handler
+		local result = PlantAbilityRegistry.ExecuteOnTick(ctx)
+		
+		if result then
+			-- Log message if provided
+			if result.Message then
+				Logger.Info("SpecialPlant", result.Message)
 			end
-			State.SquashJumps[plantId] = nil
-		else
-			-- Update position during jump (arc motion)
-			local arcHeight = math.sin(jumpProgress * math.pi) * 5
-			local newX = jumpData.startX + (jumpData.targetX - jumpData.startX) * jumpProgress
-			local newZ = jumpData.startZ + (jumpData.targetZ - jumpData.startZ) * jumpProgress
-
-			world:insert(
-				plantId,
-				Components.PositionComponent({
-					X = newX,
-					Y = 2.5 + arcHeight,
-					Z = newZ,
-				})
-			)
+			
+			-- Handle despawn request
+			if result.Despawn then
+				if result.ClearGrid then
+					GridService.Clear(plant.Column, plant.Lane)
+				end
+				EntityPool.SafeDespawn(plantId, world)
+				State.HandlerEntities[plantId] = nil
+				PlantAbilityRegistry.CleanupState(plantId, plant.PlantType)
+			end
 		end
 	end
-
-	-- Process Squash looking for targets
-	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
-		local stats = PlantData[plant.PlantType]
-		if not stats or not stats.JumpsToTarget then
-			continue
-		end
-
-		-- Skip if already jumping
-		if State.SquashJumps[plantId] then
-			continue
-		end
-
-		local squashRange = stats.Range or CONFIG.SQUASH_RANGE
-		local zombieId, zombiePos = findNearestZombieInRange(world, pos, plant.Lane, squashRange)
-
-		if zombieId and zombiePos then
-			State.SquashJumps[plantId] = {
-				targetX = zombiePos.X,
-				targetZ = zombiePos.Z,
-				startTime = currentTime,
-				startX = pos.X,
-				startZ = pos.Z,
-			}
-			Logger.Debug("SpecialPlant", `Squash {plantId} jumping to zombie {zombieId}`)
+	
+	-- Cleanup handler state for despawned entities
+	for entityId in State.HandlerEntities do
+		if not world:contains(entityId) then
+			local plant = world:get(entityId, Components.PlantTypeComponent)
+			if plant then
+				PlantAbilityRegistry.CleanupState(entityId, plant.PlantType)
+			end
+			State.HandlerEntities[entityId] = nil
 		end
 	end
 
@@ -641,7 +473,7 @@ local _world: any = nil
 local function Init(world)
 	_world = world
 	
-	-- Listen for CobCannon fire requests
+	-- Listen for CobCannon fire requests (delegates to CobCannonAbility)
 	Network.CobCannonFireRequest.SetCallback(function(player: Player, data)
 		local plantId = data.PlantEntityId
 		local targetLane = data.TargetLane
@@ -659,47 +491,15 @@ local function Init(world)
 			return
 		end
 
-		-- Check cooldown
+		-- Delegate to CobCannonAbility handler
 		local currentTime = os.clock()
-		local nextFireTime = State.CobCooldowns[plantId] or 0
-		if currentTime < nextFireTime then
-			Logger.Debug("SpecialPlant", `CobCannon {plantId} on cooldown, {nextFireTime - currentTime}s remaining`)
+		local success, errorMsg = CobCannonAbility.Fire(_world, plantId, targetColumn, targetLane, currentTime)
+		
+		if not success then
+			Logger.Debug("SpecialPlant", `CobCannon fire failed: {errorMsg or "unknown"}`)
 			return
 		end
-
-		-- Get target world position
-		local targetPos = MapConfig.GridToWorld(targetColumn, targetLane)
-		local targetX = targetPos.X
-		local targetZ = targetPos.Z
-
-		-- Get stats
-		local stats = PlantData.CobCannon
-		local damage = stats.Damage or 1800
-		local splashRadius = stats.SplashRadius or 9
-		local cooldown = stats.Cooldown or CONFIG.COB_COOLDOWN
-		local flightTime = CONFIG.COB_FLIGHT_TIME
-
-		-- Set cooldown
-		State.CobCooldowns[plantId] = currentTime + cooldown
-
-		-- Schedule explosion
-		local explosionId = plantId * 1000 + currentTime -- Unique ID
-		State.PendingCobExplosions[explosionId] = {
-			impactTime = currentTime + flightTime,
-			targetX = targetX,
-			targetZ = targetZ,
-			damage = damage,
-			splashRadius = splashRadius,
-		}
-
-		-- Broadcast to clients for VFX
-		Network.CobCannonFired.FireAll({
-			PlantEntityId = plantId,
-			TargetX = targetX,
-			TargetZ = targetZ,
-			ImpactTime = flightTime,
-		})
-
+		
 		Logger.Info("SpecialPlant", `Player {player.Name} fired CobCannon {plantId} at ({targetColumn}, {targetLane})`)
 	end)
 	
@@ -707,10 +507,15 @@ local function Init(world)
 end
 
 local function Dispose()
+	-- Clear state
 	table.clear(State.FusePlants)
-	table.clear(State.SquashJumps)
-	table.clear(State.CobCooldowns)
-	table.clear(State.PendingCobExplosions)
+	
+	-- Clear all handler states and tracking
+	for entityId, _ in State.HandlerEntities do
+		PlantAbilityRegistry.CleanupState(entityId, nil) -- nil = all handlers
+	end
+	table.clear(State.HandlerEntities)
+	
 	_world = nil
 	Logger.Debug("SpecialPlantSystem", "Disposed")
 end

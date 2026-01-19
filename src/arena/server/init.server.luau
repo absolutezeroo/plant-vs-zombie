@@ -124,6 +124,11 @@ Logger.Info("Server", "Matter World created")
 EntityPool.Initialize(world, Tags.InactiveTag, Components)
 Logger.Info("Server", "Entity Pool initialized", EntityPool.GetStats())
 
+-- Initialize TileModifierService (needs world reference)
+local TileModifierService = require(Server.services.TileModifierService)
+TileModifierService.Init(world)
+Logger.Info("Server", "TileModifierService initialized")
+
 -- Load all systems from systems folder (RECURSIVELY scan subfolders)
 local function loadSystem(moduleScript: ModuleScript)
 	local success, system = ErrorHandler.Try(function()
@@ -403,6 +408,7 @@ _G.ArenaSendPlayerToLobby = sendPlayerToLobby
 game:BindToClose(function()
 	Logger.Info("Server", "Server shutting down - disposing all systems")
 	_serverTrove:Clean() -- Clean up all server-level connections (including Matter loop)
+	TileModifierService.Dispose() -- Clean up tile modifiers
 	TeleportDataHandler.Dispose() -- Clean up TeleportDataHandler
 	SystemManager.DisposeAll()
 	Logger.Info("Server", "Matter loop stopped")

@@ -25,6 +25,7 @@ local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
 local GameConstants = require(Shared.config.GameConstants)
 local ZombieData = require(Shared.data.ZombieData)
+local ZombieAbilityData = require(Shared.data.ZombieAbilityData)
 local PlantData = require(Shared.data.PlantData)
 local Types = require(Shared.Types)
 local EntityPool = require(Shared.utils.EntityPool)
@@ -193,17 +194,21 @@ local function applySplashDamage(
 			local killed = applyDamage(world, zombieId, splash.SplashDamage, proj.PiercesShields)
 			hitCount += 1
 
-			-- Apply slow if frozen splash
+			-- Apply slow if frozen splash (check immunity)
 			if proj.IsFrozen and not killed and proj.SlowPercent then
-				world:insert(
-					zombieId,
-					Components.SlowComponent({
-						SlowPercent = proj.SlowPercent,
-						Duration = proj.SlowDuration,
-						AppliedAt = os.clock(),
-					})
-				)
-				State.FrameStats.slowsApplied += 1
+				local zombie = world:get(zombieId, Components.ZombieTypeComponent)
+				local zombieType = zombie and zombie.ZombieType or "Basic"
+				if not ZombieAbilityData.HasImmunity(zombieType, "Slow") then
+					world:insert(
+						zombieId,
+						Components.SlowComponent({
+							SlowPercent = proj.SlowPercent,
+							Duration = proj.SlowDuration,
+							AppliedAt = os.clock(),
+						})
+					)
+					State.FrameStats.slowsApplied += 1
+				end
 			end
 		end
 	end
@@ -398,17 +403,21 @@ local function OnStep(world: MatterWorld)
 				end
 
 				-- Apply slow effect if frozen projectile (and not fire pea)
+				-- Check for Slow immunity (e.g., Zomboni, Frozen zombies)
 				if proj.IsFrozen and not killed and proj.SlowPercent and proj.SlowDuration then
 					if not (enhanced and enhanced.IsFirePea) then
-						world:insert(
-							zombieId,
-							Components.SlowComponent({
-								SlowPercent = proj.SlowPercent,
-								Duration = proj.SlowDuration,
-								AppliedAt = currentTime,
-							})
-						)
-						State.FrameStats.slowsApplied += 1
+						local zombieType = zombie.ZombieType
+						if not ZombieAbilityData.HasImmunity(zombieType, "Slow") then
+							world:insert(
+								zombieId,
+								Components.SlowComponent({
+									SlowPercent = proj.SlowPercent,
+									Duration = proj.SlowDuration,
+									AppliedAt = currentTime,
+								})
+							)
+							State.FrameStats.slowsApplied += 1
+						end
 					end
 				end
 
@@ -602,6 +611,22 @@ local function OnStep(world: MatterWorld)
 					if world:contains(pumpkinId) then
 						actualTarget = pumpkinId
 					end
+				end
+				
+				-- Execute OnEat ability hook (can cancel the bite or modify behavior)
+				local health = world:get(zombieId, Components.HealthComponent)
+				local eatCtx: ZombieAbilityData.AbilityContext = {
+					EntityId = zombieId,
+					World = world,
+					ZombieType = zombie.ZombieType,
+					CurrentHealth = health and health.Current or 0,
+					MaxHealth = health and health.Max or 0,
+				}
+				local eatCancelled = ZombieAbilityData.ExecuteHook("OnEat", zombie.ZombieType, eatCtx, actualTarget)
+				if eatCancelled then
+					-- Ability handled the eat (e.g., Bungee steals plant)
+					State.ZombieAttackTimes[zombieId] = currentTime
+					continue
 				end
 				
 				-- Bite the actual target!

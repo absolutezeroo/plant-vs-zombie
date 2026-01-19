@@ -91,6 +91,11 @@ local _trove = Trove.new()
 
 local INTERPOLATION_SPEED = 10 -- How fast to interpolate to target position
 
+-- Cached MapConfig values (set in Init, rarely change)
+local _cachedGroundY: number = 0
+local _cachedZombieDir: Vector3 = Vector3.new(-1, 0, 0)
+local _mapConfigCached: boolean = false
+
 -- Groan system: random zombie groans for immersion
 local GROAN_CONFIG = {
 	MIN_INTERVAL = 2.0, -- Minimum seconds between groans
@@ -114,6 +119,7 @@ local MODEL_FALLBACKS: { [string]: string } = {
 	Imp = "Basic",
 	MiniGargantuar = "Gargantuar",
 }
+local DEFAULT_FALLBACK_MODEL = "Basic"
 
 local function createZombieVisual(entityId: number, zombieType: string, lane: number, positionX: number, isGlowing: boolean?): ZombieVisual
 	local z = getLaneZ(lane)
@@ -123,9 +129,9 @@ local function createZombieVisual(entityId: number, zombieType: string, lane: nu
 	local modelName = zombieType
 	local modelTemplate = ZombieAssets and ZombieAssets:FindFirstChild(modelName)
 
-	-- Try specific fallback first, then default to Basic
+	-- Try specific fallback first, then default fallback
 	if not modelTemplate then
-		modelName = MODEL_FALLBACKS[zombieType] or "Basic"
+		modelName = MODEL_FALLBACKS[zombieType] or DEFAULT_FALLBACK_MODEL
 		modelTemplate = ZombieAssets and ZombieAssets:FindFirstChild(modelName)
 	end
 
@@ -590,6 +596,26 @@ end
 ]]
 local function Init(_world)
 	setupNetworkListeners()
+	
+	-- Cache MapConfig values (they don't change during gameplay)
+	if MapConfig.IsInitialized() then
+		_cachedGroundY = MapConfig.GetConfig().GridY
+		_cachedZombieDir = MapConfig.GetZombieDirection()
+		_mapConfigCached = true
+	end
+	
+	-- Listen for map config sync to update cache
+	_trove:Add(Network.MapConfigSync.On(function(_data)
+		task.defer(function()
+			if MapConfig.IsInitialized() then
+				_cachedGroundY = MapConfig.GetConfig().GridY
+				_cachedZombieDir = MapConfig.GetZombieDirection()
+				_mapConfigCached = true
+				Logger.Debug("ZombieRender", "MapConfig cache updated")
+			end
+		end)
+	end))
+	
 	Logger.Debug("ZombieRender", "Initialized")
 end
 
@@ -608,12 +634,21 @@ local function ZombieRenderSystem(_world)
 		return
 	end
 
+	-- Update cache if not yet cached (late initialization)
+	if not _mapConfigCached then
+		_cachedGroundY = MapConfig.GetConfig().GridY
+		_cachedZombieDir = MapConfig.GetZombieDirection()
+		_mapConfigCached = true
+	end
+
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
 	local Matter = require(Packages:FindFirstChild("Matter"))
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
-	local groundY = MapConfig.GetConfig().GridY
-	local zombieDir = MapConfig.GetZombieDirection()
+	
+	-- Use cached values (no function calls per frame)
+	local groundY = _cachedGroundY
+	local zombieDir = _cachedZombieDir
 
 	-- Interpolate zombie positions
 	for entityId, visual in _zombieVisuals do
@@ -708,6 +743,12 @@ local function Dispose()
 	for entityId in _zombieVisuals do
 		destroyZombieVisual(entityId)
 	end
+
+	-- Reset cached values
+	_mapConfigCached = false
+	_cachedGroundY = 0
+	_cachedZombieDir = Vector3.new(-1, 0, 0)
+	_nextGroanTime = 0
 
 	Logger.Debug("ZombieRender", "Disposed")
 end

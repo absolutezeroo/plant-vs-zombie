@@ -15,12 +15,10 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local _Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 local MapConfig = require(Shared.config.MapConfig)
-local _TeleportData = require(Shared.data.TeleportData)
 
 -- NEW: Data-driven world and difficulty
 local WorldData = require(Shared.data.WorldData)

@@ -111,7 +111,7 @@ local ASSETS: { [IconName]: string } = {
 	
 	-- Game State
 	Skull = "rbxassetid://71826897653619",
-	Trophy = "rbxassetid://rbxassetid://99141582413139",
+	Trophy = "rbxassetid://99141582413139",
 	Heart = "rbxassetid://111059481508710",
 	Shield = "rbxassetid://78513424205591",
 	

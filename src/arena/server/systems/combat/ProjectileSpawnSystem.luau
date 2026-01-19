@@ -46,7 +46,7 @@ local CONFIG = table.freeze({
 	CATAPULT_SPEED = GameConstants.Projectile.CATAPULT_SPEED,
 	SPAWN_OFFSET_X = GameConstants.Projectile.SPAWN_OFFSET_X,
 	SPAWN_OFFSET_Y = GameConstants.Projectile.SPAWN_OFFSET_Y,
-	SHOOT_RANGE = GameConstants.Grid.LANE_WIDTH * (MapConfig.GRID_SIZE_X - 1), -- Dynamic based on grid
+	SHOOT_RANGE = GameConstants.Grid.CELL_WIDTH * (GridConfig.GRID_COLUMNS - 1), -- Dynamic based on grid
 })
 
 --------------------------------------------------------------------------------
@@ -443,36 +443,9 @@ local function fireHomingProjectile(world: any, plantId: number, lane: number, s
 	local laneCenter = MapConfig.GridToWorld(1, lane)
 	local plantZ = laneCenter.Z
 
-	-- Find closest zombie across ALL lanes
-	local allZombies = LaneCache.GetAllZombies()
-	if #allZombies == 0 then
-		return nil
-	end
-
-	local closestZombie: number? = nil
-	local closestDist = math.huge
-
-	for _, zombieId in allZombies do
-		-- Skip hypnotized zombies (allies)
-		if LaneCache.IsHypnotized(zombieId) then
-			continue
-		end
-		
-		local zombiePos = LaneCache.GetPosition(zombieId)
-		if not zombiePos then
-			continue
-		end
-
-		local dx = zombiePos.X - startX
-		local dz = zombiePos.Z - plantZ
-		local dist = dx * dx + dz * dz -- No sqrt for comparison
-
-		if dist < closestDist then
-			closestDist = dist
-			closestZombie = zombieId
-		end
-	end
-
+	-- Find closest enemy zombie using optimized LaneCache function
+	-- Searches from plant's lane outward for better cache locality
+	local closestZombie = LaneCache.GetClosestEnemy(startX, plantZ, lane)
 	if not closestZombie then
 		return nil
 	end

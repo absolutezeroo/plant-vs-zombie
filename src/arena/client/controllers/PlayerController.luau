@@ -12,12 +12,16 @@ local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Trove = require(Packages:WaitForChild("Trove"))
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
 
 local PlayerController = {}
 
 local _initialized = false
+local _trove: any = nil
 local PLAYER_COLLISION_GROUP = "Players"
 
 --[[
@@ -29,8 +33,8 @@ local function setCollisionGroup(model: Model, groupName: string)
 			descendant.CollisionGroup = groupName
 		end
 	end
-	-- Also handle parts added later (accessories, etc.)
-	model.DescendantAdded:Connect(function(descendant)
+	-- Also handle parts added later (accessories, etc.) - cleaned up via Trove
+	_trove:Connect(model.DescendantAdded, function(descendant)
 		if descendant:IsA("BasePart") then
 			descendant.CollisionGroup = groupName
 		end
@@ -63,6 +67,7 @@ function PlayerController.Init()
 		return
 	end
 	_initialized = true
+	_trove = Trove.new()
 
 	local player = Players.LocalPlayer
 
@@ -71,10 +76,22 @@ function PlayerController.Init()
 		setupCharacter(player.Character)
 	end
 
-	-- Setup future characters (respawn)
-	player.CharacterAdded:Connect(setupCharacter)
+	-- Setup future characters (respawn) - cleaned up via Trove
+	_trove:Connect(player.CharacterAdded, setupCharacter)
 
 	Logger.Info("PlayerController", "Initialized - Jump disabled in Arena")
+end
+
+--[[
+	Cleanup controller resources
+]]
+function PlayerController.Dispose()
+	if _trove then
+		_trove:Destroy()
+		_trove = nil
+	end
+	_initialized = false
+	Logger.Debug("PlayerController", "Disposed")
 end
 
 return PlayerController

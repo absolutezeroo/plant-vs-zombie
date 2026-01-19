@@ -16,7 +16,6 @@
 ]]
 
 local Players = game:GetService("Players")
-local _RunService = game:GetService("RunService") -- Reserved for future use
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Packages
@@ -26,7 +25,6 @@ local Trove = require(Packages:WaitForChild("Trove"))
 -- Shared modules
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.Logger)
-local _LobbyConfig = require(Shared.config.LobbyConfig) -- Reserved for future use
 
 -- Shared handlers (pure logic)
 local PadLogicHandler = require(Shared.handlers.lobby.PadLogicHandler)
