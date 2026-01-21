@@ -21,26 +21,8 @@ local CONFIG = table.freeze({
 	SPAWN_HEIGHT_OFFSET = 3, -- Studs above ground
 })
 
--- 3. STATE (minimal - stateless system)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 3. MAIN LOOP
+local function SunOnKillSystem(world)
 	-- Process ProjectileHitEvents: spawn sun on kills from plants with SunOnKillComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		-- Only process kills
@@ -84,10 +66,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 4. EXPORT
 return {
 	priority = 375,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = SunOnKillSystem,
 }

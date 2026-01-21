@@ -145,9 +145,9 @@ local function EnhancementSystem(world)
 	end
 end
 
--- 5. EXPORT
--- Priority 165: Must run AFTER Projectile movement (160) but BEFORE Combat detection (170)
--- to ensure projectiles are enhanced on the same frame they hit.
+-- ============================================================
+-- SECTION 5: MODULE EXPORT
+-- ============================================================
 return {
 	priority = 165,
 	system = EnhancementSystem,

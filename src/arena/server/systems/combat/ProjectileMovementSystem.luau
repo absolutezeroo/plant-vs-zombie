@@ -2,6 +2,8 @@
 --[[
 	ProjectileMovementSystem.luau - Server-side projectile movement
 	
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
+	
 	Priority: 161 (After spawn, before enhancement/combat detection)
 	
 	Handles:
@@ -17,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -38,14 +41,7 @@ local CONFIG = table.freeze({
 })
 
 --------------------------------------------------------------------------------
--- [3] STATE (mutable runtime state)
---------------------------------------------------------------------------------
-local State = {
-	IsInitialized = false,
-}
-
---------------------------------------------------------------------------------
--- [4] PRIVATE HELPERS
+-- [3] PRIVATE HELPERS
 --------------------------------------------------------------------------------
 
 -- Find a new target for homing projectile when current target dies
@@ -128,9 +124,9 @@ local function turnToward(
 end
 
 --------------------------------------------------------------------------------
--- [5] ONSTEP (main loop - CANNOT yield)
+-- [4] SYSTEM FUNCTION (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
-local function OnStep(world)
+local function ProjectileMovementSystem(world)
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, CONFIG.MIN_DT, CONFIG.MAX_DT)
@@ -230,26 +226,9 @@ local function OnStep(world)
 end
 
 --------------------------------------------------------------------------------
--- [6] INIT / DISPOSE
---------------------------------------------------------------------------------
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	State.IsInitialized = true
-end
-
-local function Dispose()
-	State.IsInitialized = false
-end
-
---------------------------------------------------------------------------------
--- [7] EXPORT
+-- [5] EXPORT (V3 - priority + system only)
 --------------------------------------------------------------------------------
 return {
 	priority = 161,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = ProjectileMovementSystem,
 }

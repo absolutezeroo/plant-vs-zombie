@@ -2,6 +2,8 @@
 --[[
 	ProjectileSpawnSystem.luau - Server-side projectile spawning logic
 	
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
+	
 	Priority: 160 (Simulation phase - after zombie movement)
 	
 	Handles:
@@ -18,6 +20,9 @@
 -- [1] IMPORTS
 --------------------------------------------------------------------------------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -50,27 +55,9 @@ local CONFIG = table.freeze({
 })
 
 --------------------------------------------------------------------------------
--- [3] STATE (mutable runtime state)
+-- [3] PRIVATE HELPERS
 --------------------------------------------------------------------------------
-local State = {
-	PlantFireTimes = {} :: { [number]: number },
-	PendingMultiShots = {} :: {
-		[number]: {
-			shotsRemaining: number,
-			nextShotTime: number,
-			lane: number,
-			startX: number,
-			plantType: string,
-			direction: number,
-		},
-	},
-	CachedZombieDir = Vector3.zero,
-	IsInitialized = false,
-}
 
---------------------------------------------------------------------------------
--- [4] PRIVATE HELPERS
---------------------------------------------------------------------------------
 -- Check if there are enemy zombies (non-hypnotized) in the lane within shoot range
 -- Uses LaneCache for O(1) lane lookup + O(lane_size) direction check
 local function hasZombiesInLane(
@@ -79,9 +66,10 @@ local function hasZombiesInLane(
 	plantX: number,
 	plantZ: number,
 	checkBehind: boolean?,
-	customRange: number?
+	customRange: number?,
+	cachedZombieDir: Vector3
 ): boolean
-	local zombieDir = State.CachedZombieDir
+	local zombieDir = cachedZombieDir
 	local shootRange = customRange or CONFIG.SHOOT_RANGE
 	-- Use HasEnemiesInDirection to skip hypnotized zombies (allies)
 	return LaneCache.HasEnemiesInDirection(
@@ -124,10 +112,11 @@ local function spawnProjectile(
 	lane: number,
 	startX: number,
 	plantType: string,
-	direction: number?
+	direction: number?,
+	cachedZombieDir: Vector3
 )
 	-- Get the direction plants should shoot (opposite of zombie direction)
-	local zombieDir = State.CachedZombieDir
+	local zombieDir = cachedZombieDir
 	-- Plants shoot in the opposite direction (toward zombie spawns)
 	local forwardDirX = -zombieDir.X
 	local forwardDirZ = -zombieDir.Z
@@ -232,23 +221,37 @@ local function spawnProjectile(
 end
 
 -- Fire all lanes for Threepeater (center + adjacent lanes)
-local function fireThreeLanes(world: any, plantId: number, centerLane: number, startX: number, plantType: string)
+local function fireThreeLanes(
+	world: any,
+	plantId: number,
+	centerLane: number,
+	startX: number,
+	plantType: string,
+	cachedZombieDir: Vector3
+)
 	-- Fire center lane
-	spawnProjectile(world, plantId, centerLane, startX, plantType, 1)
+	spawnProjectile(world, plantId, centerLane, startX, plantType, 1, cachedZombieDir)
 
 	-- Fire upper lane (if exists)
 	if centerLane > 1 then
-		spawnProjectile(world, plantId, centerLane - 1, startX, plantType, 1)
+		spawnProjectile(world, plantId, centerLane - 1, startX, plantType, 1, cachedZombieDir)
 	end
 
 	-- Fire lower lane (if exists)
 	if centerLane < GridConfig.GRID_LANES then
-		spawnProjectile(world, plantId, centerLane + 1, startX, plantType, 1)
+		spawnProjectile(world, plantId, centerLane + 1, startX, plantType, 1, cachedZombieDir)
 	end
 end
 
 -- Fire in multiple directions for Starfruit
-local function fireMultiDirection(world: any, plantId: number, lane: number, startX: number, plantType: string)
+local function fireMultiDirection(
+	world: any,
+	plantId: number,
+	lane: number,
+	startX: number,
+	plantType: string,
+	cachedZombieDir: Vector3
+)
 	-- STARFRUIT: 5 directions on a GRID
 	-- Forward (→), Up (⬆), Down (⬇), BackUp (↖), BackDown (↙)
 
@@ -259,7 +262,7 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 	local offsetY = if spawnOffset then spawnOffset.Y else CONFIG.SPAWN_OFFSET_Y
 
 	-- Zombie direction (they go toward -X typically)
-	local zombieDir = State.CachedZombieDir
+	local zombieDir = cachedZombieDir
 	local forwardSign = if zombieDir.X < 0 then 1 else -1 -- Toward zombies
 
 	-- Adjacent lanes
@@ -268,7 +271,7 @@ local function fireMultiDirection(world: any, plantId: number, lane: number, sta
 
 	-- Check which directions have zombies
 	-- Forward: zombies ahead in same lane
-	local hasForward = hasZombiesInLane(world, lane, startX, 0, false)
+	local hasForward = hasZombiesInLane(world, lane, startX, 0, false, nil, cachedZombieDir)
 
 	-- Up/Down: zombies in adjacent lane but ONLY if on the grid
 	local hasUp = GridDetection.HasZombiesOnGrid(laneUp)
@@ -426,10 +429,6 @@ local function fireAllDirections(world: any, plantId: number, lane: number, star
 	end
 end
 
---------------------------------------------------------------------------------
--- [5] ONSTEP (main loop - CANNOT yield)
---------------------------------------------------------------------------------
-
 -- Fire homing projectile (Cattail) - targets closest zombie in ANY lane
 local function fireHomingProjectile(world: any, plantId: number, lane: number, startX: number, plantType: string)
 	local stats = PlantData[plantType]
@@ -514,12 +513,33 @@ local function fireHomingProjectile(world: any, plantId: number, lane: number, s
 	return entityId
 end
 
-local function OnStep(world)
+--------------------------------------------------------------------------------
+-- [4] SYSTEM FUNCTION (main loop - CANNOT yield)
+--------------------------------------------------------------------------------
+local function ProjectileSpawnSystem(world)
 	local currentTime = os.clock()
+
+	-- State managed via Hooks.useMap (persistent across frames)
+	-- Note: useMap returns { value: T }, so access via .value
+	local stateWrapper = Hooks.useMap("ProjectileSpawnState", {
+		PlantFireTimes = {} :: { [number]: number },
+		PendingMultiShots = {} :: {
+			[number]: {
+				shotsRemaining: number,
+				nextShotTime: number,
+				lane: number,
+				startX: number,
+				plantType: string,
+				direction: number,
+			},
+		},
+		CachedZombieDir = Vector3.zero,
+	})
+	local state = stateWrapper.value
 
 	-- Refresh cached MapConfig values (may change after loadmap)
 	if MapConfig.IsInitialized() then
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
+		state.CachedZombieDir = MapConfig.GetZombieDirection()
 	end
 
 	-- EVENT-DRIVEN CLEANUP: Clean up state for dead plants before main logic
@@ -527,21 +547,21 @@ local function OnStep(world)
 	for _, deathEvent in world:query(Components.DeathEvent) do
 		if deathEvent.EntityType == "Plant" then
 			local plantId = deathEvent.Target
-			State.PlantFireTimes[plantId] = nil
-			State.PendingMultiShots[plantId] = nil
+			state.PlantFireTimes[plantId] = nil
+			state.PendingMultiShots[plantId] = nil
 		end
 	end
 
 	-- Process pending multi-shots (Repeater, GatlingPea, etc.)
-	for plantId, shotData in State.PendingMultiShots do
+	for plantId, shotData in state.PendingMultiShots do
 		if currentTime >= shotData.nextShotTime then
 			if world:contains(plantId) and canPlantShoot(world, plantId) then
-				spawnProjectile(world, plantId, shotData.lane, shotData.startX, shotData.plantType, shotData.direction)
+				spawnProjectile(world, plantId, shotData.lane, shotData.startX, shotData.plantType, shotData.direction, state.CachedZombieDir)
 			end
 
 			shotData.shotsRemaining -= 1
 			if shotData.shotsRemaining <= 0 then
-				State.PendingMultiShots[plantId] = nil
+				state.PendingMultiShots[plantId] = nil
 			else
 				local stats = PlantData[shotData.plantType]
 				local shotDelay = (stats and stats.ShotDelay) or CONFIG.SHOT_DELAY
@@ -567,7 +587,7 @@ local function OnStep(world)
 
 		-- Check fire cooldown (use AttackSpeed from PlantData if available)
 		local fireInterval = if stats.AttackSpeed > 0 then (1 / stats.AttackSpeed) else CONFIG.FIRE_INTERVAL
-		local lastFire = State.PlantFireTimes[plantId] or 0
+		local lastFire = state.PlantFireTimes[plantId] or 0
 		if currentTime - lastFire < fireInterval then
 			continue
 		end
@@ -583,17 +603,17 @@ local function OnStep(world)
 			local minLane = math.max(1, plant.Lane - 1)
 			local maxLane = math.min(GridConfig.GRID_LANES, plant.Lane + 1)
 			for checkLane = minLane, maxLane do
-				if GridDetection.HasZombiesOnGrid(checkLane) or hasZombiesInLane(world, checkLane, pos.X, pos.Z, false) then
+				if GridDetection.HasZombiesOnGrid(checkLane) or hasZombiesInLane(world, checkLane, pos.X, pos.Z, false, nil, state.CachedZombieDir) then
 					hasTargets = true
 					break
 				end
 			end
 		else
 			-- Normal: check forward
-			hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, pos.Z, false)
+			hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, pos.Z, false, nil, state.CachedZombieDir)
 			-- SplitPea: also check behind
 			if stats.ShootsBehind and not hasTargets then
-				hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, pos.Z, true)
+				hasTargets = hasZombiesInLane(world, plant.Lane, pos.X, pos.Z, true, nil, state.CachedZombieDir)
 			end
 		end
 
@@ -604,7 +624,7 @@ local function OnStep(world)
 		-- Range check for short-range mushrooms
 		if stats.Range and stats.Range > 0 then
 			local hasInRange = false
-			local zombieDir = State.CachedZombieDir
+			local zombieDir = state.CachedZombieDir
 
 			-- For ShootsAllDirections (GloomShroom), check all nearby lanes
 			local lanesToCheck: { number }
@@ -660,7 +680,7 @@ local function OnStep(world)
 			end
 		end
 
-		State.PlantFireTimes[plantId] = currentTime
+		state.PlantFireTimes[plantId] = currentTime
 
 		-- Fire based on plant type behavior
 		if stats.IsHoming then
@@ -671,19 +691,19 @@ local function OnStep(world)
 			fireAllDirections(world, plantId, plant.Lane, pos.X, plantType)
 		elseif stats.ShootsMultiDirection then
 			-- Starfruit: 5 directions
-			fireMultiDirection(world, plantId, plant.Lane, pos.X, plantType)
+			fireMultiDirection(world, plantId, plant.Lane, pos.X, plantType, state.CachedZombieDir)
 		elseif stats.IsThreeLane then
 			-- Threepeater: 3 lanes
-			fireThreeLanes(world, plantId, plant.Lane, pos.X, plantType)
+			fireThreeLanes(world, plantId, plant.Lane, pos.X, plantType, state.CachedZombieDir)
 		else
 			-- Normal forward shot
-			spawnProjectile(world, plantId, plant.Lane, pos.X, plantType, 1)
+			spawnProjectile(world, plantId, plant.Lane, pos.X, plantType, 1, state.CachedZombieDir)
 
 			-- SplitPea: also fire backward
 			if stats.ShootsBehind then
-				spawnProjectile(world, plantId, plant.Lane, pos.X, plantType, -1)
+				spawnProjectile(world, plantId, plant.Lane, pos.X, plantType, -1, state.CachedZombieDir)
 				-- SplitPea fires 2 peas backward
-				State.PendingMultiShots[plantId] = {
+				state.PendingMultiShots[plantId] = {
 					shotsRemaining = 1,
 					nextShotTime = currentTime + (stats.ShotDelay or CONFIG.SHOT_DELAY),
 					lane = plant.Lane,
@@ -697,7 +717,7 @@ local function OnStep(world)
 			if stats.IsRepeater then
 				local totalShots = (stats.ShotsPerBurst or 2) - 1 -- -1 because we already fired one
 				if totalShots > 0 then
-					State.PendingMultiShots[plantId] = {
+					state.PendingMultiShots[plantId] = {
 						shotsRemaining = totalShots,
 						nextShotTime = currentTime + (stats.ShotDelay or CONFIG.SHOT_DELAY),
 						lane = plant.Lane,
@@ -712,32 +732,9 @@ local function OnStep(world)
 end
 
 --------------------------------------------------------------------------------
--- [6] INIT / DISPOSE
---------------------------------------------------------------------------------
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	-- Pre-cache MapConfig values to avoid yield in OnStep
-	State.CachedZombieDir = MapConfig.GetZombieDirection()
-
-	State.IsInitialized = true
-end
-
-local function Dispose()
-	State.IsInitialized = false
-	State.CachedZombieDir = Vector3.zero
-	table.clear(State.PlantFireTimes)
-	table.clear(State.PendingMultiShots)
-end
-
---------------------------------------------------------------------------------
--- [7] EXPORT
+-- [5] EXPORT (V3 - priority + system only)
 --------------------------------------------------------------------------------
 return {
 	priority = 160,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = ProjectileSpawnSystem,
 }

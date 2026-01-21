@@ -10,14 +10,17 @@
 	- Scaredy-shroom hiding when zombies near (HidesWhenNear)
 	- Sun-shroom growing over time (GrowsOverTime)
 	
-	V2.0 Architecture:
-	- Init(world): No init needed
-	- Dispose(): Clear tracking state
-	- OnStep(world): Process mushroom behaviors
+	HOOKS ARCHITECTURE:
+	- Uses per-entity useMap for SunShroom growth tracking (auto-cleanup)
 ]]
 
 -- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local MatterHooks = require(Packages.MatterHooks)
+local useMap = MatterHooks.useMap
+local useMemo = MatterHooks.useMemo
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -37,37 +40,16 @@ local CONFIG = table.freeze({
 	SUN_SHROOM_LARGE_VALUE = GameConstants.MushroomDefaults.SUN_SHROOM_LARGE_VALUE,
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	SunShroomPlanted = {} :: { [number]: number }, -- entityId -> plantTime
-	WaveService = nil :: any,
-}
-
--- 4. PRIVATE HELPERS
-
--- Lazy-load WaveService to avoid circular dependencies
-local function getWaveService()
-	if not State.WaveService then
-		State.WaveService = require(Server.services.WaveService)
-	end
-	return State.WaveService
-end
+-- 3. PRIVATE HELPERS
 
 -- Check if it's currently day based on WorldData.IsNight
-local function isDay(): boolean
-	local waveService = getWaveService()
-	return waveService.IsDay()
+local function isDay(WaveService): boolean
+	return WaveService.IsDay()
 end
 
 -- Get current SunShroom sun value (grows over time)
-local function getSunShroomValue(entityId: number): number
-	local plantTime = State.SunShroomPlanted[entityId]
-	if not plantTime then
-		return CONFIG.SUN_SHROOM_LARGE_VALUE
-	end
-
-	local elapsed = os.clock() - plantTime
+local function getSunShroomValue(plantTime: number, currentTime: number): number
+	local elapsed = currentTime - plantTime
 	if elapsed >= CONFIG.SUN_SHROOM_GROW_TIME then
 		return CONFIG.SUN_SHROOM_LARGE_VALUE
 	else
@@ -80,14 +62,14 @@ local function getSunShroomValue(entityId: number): number
 end
 
 -- Initialize a newly spawned mushroom
-local function initializeMushroom(world, entityId: number, plantType: string)
+local function initializeMushroom(world, entityId: number, plantType: string, WaveService, currentTime: number)
 	local stats = PlantData[plantType]
 	if not stats or not stats.IsMushroom then
 		return
 	end
 
 	-- Check if mushroom sleeps during day
-	if stats.SleepsDuringDay and isDay() then
+	if stats.SleepsDuringDay and isDay(WaveService) then
 		world:insert(
 			entityId,
 			Components.SleepingComponent({
@@ -96,12 +78,6 @@ local function initializeMushroom(world, entityId: number, plantType: string)
 			})
 		)
 		Logger.Debug("Mushroom", `{plantType} {entityId} is sleeping (day time)`)
-	end
-
-	-- Track SunShroom growth
-	if stats.GrowsOverTime then
-		State.SunShroomPlanted[entityId] = os.clock()
-		Logger.Debug("Mushroom", `SunShroom {entityId} planted, will grow over time`)
 	end
 
 	-- Initialize Scaredy-shroom hiding component
@@ -132,23 +108,15 @@ local function wakeMushroom(world, entityId: number)
 	end
 end
 
--- 5. LIFECYCLE: INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 6. LIFECYCLE: DISPOSE
-local function Dispose()
-	table.clear(State.SunShroomPlanted)
-	State.WaveService = nil
-	State.IsInitialized = false
-end
-
--- 7. MAIN LOOP
+-- 4. MAIN LOOP
 local function OnStep(world)
+	local currentTime = os.clock()
+
+	-- Lazy-load WaveService once per system lifecycle
+	local WaveService = useMemo(function()
+		return require(Server.services.WaveService)
+	end, {})
+
 	-- React to SpawnEvent for new mushroom plants
 	for _, event in world:query(Components.SpawnEvent) do
 		if event.EntityType ~= "Plant" then
@@ -165,7 +133,7 @@ local function OnStep(world)
 			continue
 		end
 
-		initializeMushroom(world, entityId, plant.PlantType)
+		initializeMushroom(world, entityId, plant.PlantType, WaveService, currentTime)
 	end
 
 	-- React to PlantActionEvent for Coffee Bean waking mushrooms
@@ -241,19 +209,10 @@ local function OnStep(world)
 			end
 		end
 	end
-
-	-- Cleanup for despawned entities
-	for entityId in State.SunShroomPlanted do
-		if not world:contains(entityId) then
-			State.SunShroomPlanted[entityId] = nil
-		end
-	end
 end
 
--- 8. EXPORT
+-- 5. EXPORT
 return {
 	priority = 155,
-	Init = Init,
-	Dispose = Dispose,
 	system = OnStep,
 }

@@ -2,6 +2,8 @@
 --[[
 	FogSystem.luau - Server-side fog management
 	
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
+	
 	Priority: 180 (Simulation phase - after combat)
 	
 	Handles:
@@ -10,10 +12,8 @@
 	- Blover instant fog clearing
 	- Sending fog state to clients
 	
-	LIFECYCLE:
-	- Init(): Subscribe to map/wave fog config
-	- OnStep(): Update illuminated cells based on Plantern positions
-	- Dispose(): Clear state
+	NOTE: Public API (EnableFog, DisableFog) moved to FogService.
+	This system only handles ECS logic.
 ]]
 
 --------------------------------------------------------------------------------
@@ -22,7 +22,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -32,6 +32,9 @@ local PlantData = require(Shared.data.PlantData)
 local Logger = require(Shared.utils.core.Logger)
 
 local Network = require(Shared.network.generated.server)
+
+-- Server services
+local Server = script.Parent.Parent.Parent
 
 --------------------------------------------------------------------------------
 -- [2] CONFIG (frozen constants)
@@ -45,22 +48,7 @@ local CONFIG = table.freeze({
 })
 
 --------------------------------------------------------------------------------
--- [3] STATE (mutable runtime state)
---------------------------------------------------------------------------------
-local State = {
-	-- Entity ID of the singleton fog zone entity (if any)
-	FogZoneEntity = nil :: number?,
-	-- Whether fog is currently active
-	IsFogActive = false,
-	-- Cached illuminated cells (rebuilt each frame)
-	IlluminatedCells = {} :: { [string]: boolean },
-	-- Last sent state (to avoid spamming network)
-	LastSentState = nil :: string?,
-	IsInitialized = false,
-}
-
---------------------------------------------------------------------------------
--- [4] PRIVATE HELPERS
+-- [3] PRIVATE HELPERS
 --------------------------------------------------------------------------------
 
 -- Create a cell key from column and lane
@@ -101,11 +89,28 @@ local function getIlluminatedCells(
 end
 
 --------------------------------------------------------------------------------
--- [5] ONSTEP (main loop - CANNOT yield)
+-- [4] SYSTEM FUNCTION (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
-local function OnStep(world)
+local function FogSystem(world)
+	-- State managed via Hooks.useMap (persistent across frames)
+	-- Note: useMap returns { value: T }, so access via .value
+	local stateWrapper = Hooks.useMap("FogSystemState", {
+		IsFogActive = false,
+		IlluminatedCells = {} :: { [string]: boolean },
+		LastSentState = nil :: string?,
+	})
+	local state = stateWrapper.value
+
+	-- Lazy load FogService via useMemo (empty deps = once)
+	local FogService = Hooks.useMemo(function()
+		return require(Server.services.FogService)
+	end, {})
+
+	-- Sync fog state from FogService (source of truth for fog activation)
+	state.IsFogActive = FogService.IsFogActive()
+
 	-- Skip if no fog active
-	if not State.IsFogActive then
+	if not state.IsFogActive then
 		return
 	end
 
@@ -130,12 +135,8 @@ local function OnStep(world)
 		local stats = PlantData[plant.PlantType]
 		if stats and stats.IsInstant and stats.RemovesFog then
 			-- Blover: Instantly clear all fog
-			State.IsFogActive = false
+			FogService.DisableFog()
 			Logger.Info("FogSystem", "Blover cleared all fog")
-
-			-- Notify clients
-			Network.FogCleared.FireAll({})
-
 			return
 		end
 	end
@@ -146,7 +147,7 @@ local function OnStep(world)
 		if not plant then
 			continue
 		end
-		
+
 		local stats = PlantData[plant.PlantType]
 		if not stats or not stats.RemovesFog or stats.IsInstant then
 			continue
@@ -168,9 +169,9 @@ local function OnStep(world)
 		stateKey = stateKey .. key .. ";"
 	end
 
-	if stateKey ~= State.LastSentState then
-		State.IlluminatedCells = newIlluminatedCells
-		State.LastSentState = stateKey
+	if stateKey ~= state.LastSentState then
+		state.IlluminatedCells = newIlluminatedCells
+		state.LastSentState = stateKey
 
 		-- Convert to array for network
 		local illuminatedArray: { string } = {}
@@ -186,94 +187,9 @@ local function OnStep(world)
 end
 
 --------------------------------------------------------------------------------
--- [6] INIT / DISPOSE
---------------------------------------------------------------------------------
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	-- Check if current map has fog (could be set by WaveManager or map config)
-	-- For now, fog is disabled by default and must be enabled by map/wave
-	State.IsFogActive = false
-
-	State.IsInitialized = true
-	Logger.Debug("FogSystem", "Initialized")
-end
-
-local function Dispose()
-	State.FogZoneEntity = nil
-	State.IsFogActive = false
-	table.clear(State.IlluminatedCells)
-	State.LastSentState = nil
-	State.IsInitialized = false
-	Logger.Debug("FogSystem", "Disposed")
-end
-
--- Enable fog for current level (called by WaveManager or map loader)
--- If no foggyColumns provided, uses FogBounds from MapConfig if available
-local function EnableFog(foggyColumns: { number }?)
-	State.IsFogActive = true
-	
-	-- Check if map has FogBounds defined
-	local hasFogBounds = MapConfig.HasFogBounds()
-	local fogBoundsA, fogBoundsB = MapConfig.GetFogBounds()
-	
-	if hasFogBounds and fogBoundsA and fogBoundsB then
-		-- Use FogBounds from map config
-		Network.FogEnabled.FireAll({
-			FoggyColumns = {}, -- Empty, using bounds instead
-			UseFogBounds = true,
-			FogBoundsAX = fogBoundsA.X,
-			FogBoundsAY = fogBoundsA.Y,
-			FogBoundsAZ = fogBoundsA.Z,
-			FogBoundsBX = fogBoundsB.X,
-			FogBoundsBY = fogBoundsB.Y,
-			FogBoundsBZ = fogBoundsB.Z,
-		})
-		Logger.Info("FogSystem", `Fog enabled with bounds: {fogBoundsA} to {fogBoundsB}`)
-	else
-		-- Fallback to column-based fog
-		local columns = foggyColumns or CONFIG.DEFAULT_FOG_COLUMNS
-		Network.FogEnabled.FireAll({
-			FoggyColumns = columns,
-			UseFogBounds = false,
-		})
-		Logger.Info("FogSystem", `Fog enabled on columns: {table.concat(columns, ", ")}`)
-	end
-end
-
--- Enable fog using only FogBounds from MapConfig (no fallback)
-local function EnableFogFromBounds(): boolean
-	if not MapConfig.HasFogBounds() then
-		Logger.Warn("FogSystem", "EnableFogFromBounds called but no FogBounds defined in map")
-		return false
-	end
-	
-	EnableFog(nil)
-	return true
-end
-
--- Disable fog
-local function DisableFog()
-	State.IsFogActive = false
-	Network.FogCleared.FireAll({})
-	Logger.Info("FogSystem", "Fog disabled")
-end
-
---------------------------------------------------------------------------------
--- [7] EXPORT
+-- [5] EXPORT (V3 - priority + system only)
 --------------------------------------------------------------------------------
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
-	-- Public API for WaveManager/MapLoader
-	EnableFog = EnableFog,
-	EnableFogFromBounds = EnableFogFromBounds,
-	DisableFog = DisableFog,
-	IsFogActive = function()
-		return State.IsFogActive
-	end,
+	system = FogSystem,
 }

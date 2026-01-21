@@ -2,17 +2,12 @@
 --[[
 	PoisonCloudSystem.luau - Handles poison clouds and poisoned zombies
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
 	
 	Priority: 365 (Combat processing)
 	
 	Spawns poison clouds when plants with PoisonCloudComponent die.
 	Damages zombies inside poison clouds over time.
-	
-	LIFECYCLE:
-	- Init(): No init needed
-	- OnStep(): Main loop (CANNOT yield) - processes poison clouds
-	- Dispose(): Clear active clouds
 ]]
 
 -- ============================================================
@@ -21,7 +16,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -44,7 +39,7 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
+-- SECTION 3: TYPES
 -- ============================================================
 export type ActiveCloud = {
 	Position: { X: number, Y: number, Z: number },
@@ -55,11 +50,6 @@ export type ActiveCloud = {
 	LastTickTime: number,
 }
 
-local State = {
-	ActiveClouds = {} :: { ActiveCloud },
-	IsInitialized = false,
-}
-
 -- ============================================================
 -- SECTION 4: PRIVATE HELPERS
 -- ============================================================
@@ -67,6 +57,7 @@ local State = {
 -- Spawn a poison cloud at a position
 -- NOTE: MapConfig.WorldToGrid is safe to call - MapConfig.Initialize() is called at server bootstrap
 local function spawnPoisonCloud(
+	state: any,
 	position: { X: number, Y: number, Z: number },
 	radius: number,
 	damagePerSecond: number,
@@ -74,7 +65,7 @@ local function spawnPoisonCloud(
 )
 	local _, lane = MapConfig.WorldToGrid(Vector3.new(position.X, position.Y, position.Z))
 
-	table.insert(State.ActiveClouds, {
+	table.insert(state.ActiveClouds, {
 		Position = position,
 		Lane = lane or 3,
 		Radius = radius,
@@ -99,10 +90,18 @@ local function spawnPoisonCloud(
 end
 
 -- ============================================================
--- SECTION 5: ONSTEP (main ECS loop)
+-- SECTION 5: SYSTEM FUNCTION (main ECS loop)
 -- ============================================================
-local function OnStep(world)
+local function PoisonCloudSystem(world)
 	local currentTime = os.clock()
+
+	-- State managed via Hooks.useMap (persistent across frames)
+	-- Note: useMap returns { value: T }, so access via .value
+	local stateWrapper = Hooks.useMap("PoisonCloudState", {
+		ActiveClouds = {} :: { ActiveCloud },
+	})
+	local state = stateWrapper.value
+
 	local cloudsToRemove = {}
 
 	-- React to plant deaths with PoisonCloudComponent
@@ -122,6 +121,7 @@ local function OnStep(world)
 
 			-- Spawn cloud at death location
 			spawnPoisonCloud(
+				state,
 				{ X = pos.X, Y = pos.Y, Z = pos.Z },
 				poisonCloud.Radius,
 				poisonCloud.DamagePerSecond,
@@ -131,7 +131,7 @@ local function OnStep(world)
 	end
 
 	-- Process each active cloud
-	for i, cloud in State.ActiveClouds do
+	for i, cloud in state.ActiveClouds do
 		local elapsed = currentTime - cloud.LastTickTime
 		cloud.RemainingDuration -= elapsed
 
@@ -163,7 +163,7 @@ local function OnStep(world)
 
 					if distance <= cloud.Radius then
 						-- Apply poison damage
-						local actualDamage, died =
+						local actualDamage, _died =
 							ECSUtils.DamageEntity(world, entityId, cloud.DamagePerSecond, Components)
 						if actualDamage > 0 then
 							world:insert(
@@ -192,33 +192,14 @@ local function OnStep(world)
 
 	-- Remove expired clouds (in reverse order to preserve indices)
 	for i = #cloudsToRemove, 1, -1 do
-		table.remove(State.ActiveClouds, cloudsToRemove[i])
+		table.remove(state.ActiveClouds, cloudsToRemove[i])
 	end
 end
 
 -- ============================================================
--- SECTION 6: INIT / DISPOSE
--- ============================================================
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-	Logger.Debug("PoisonCloudSystem", "Initialized")
-end
-
-local function Dispose()
-	State.IsInitialized = false
-	table.clear(State.ActiveClouds)
-	Logger.Debug("PoisonCloudSystem", "Disposed")
-end
-
--- ============================================================
--- SECTION 7: MODULE EXPORT
+-- SECTION 6: EXPORT (V3 - priority + system only)
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = PoisonCloudSystem,
 }

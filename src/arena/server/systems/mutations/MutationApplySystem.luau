@@ -184,7 +184,7 @@ end
 -- ============================================================
 -- SECTION 5: ONSTEP (main ECS loop)
 -- ============================================================
-local function OnStep(world)
+local function MutationApplySystem(world)
 	-- Watch for new plants being spawned
 	for entityId, plantType, owner in
 		world:query(Components.PlantTypeComponent, Components.OwnerComponent):without(Components.MutationsComponent)
@@ -217,24 +217,9 @@ local function OnStep(world)
 end
 
 -- ============================================================
--- SECTION 6: INIT / DISPOSE
--- ============================================================
-local function Init(_world)
-	-- No initialization needed
-	Logger.Debug("MutationApplySystem", "Initialized")
-end
-
-local function Dispose()
-	-- MutationService handles cache cleanup
-	Logger.Debug("MutationApplySystem", "Disposed")
-end
-
--- ============================================================
 -- SECTION 7: MODULE EXPORT
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = MutationApplySystem,
 }

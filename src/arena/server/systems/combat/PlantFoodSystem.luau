@@ -2,7 +2,7 @@
 --[[
 	PlantFoodSystem.luau - Plant Food mechanics
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
 	
 	Priority: 185 (After death system 180, before cleanup)
 	
@@ -10,11 +10,6 @@
 	- Processing Plant Food activation requests
 	- Detecting glowing zombie deaths for charge collection
 	- Executing Plant Food abilities on plants
-	
-	LIFECYCLE:
-	- Init(): Setup network handlers (CAN yield)
-	- OnStep(): Main loop (CANNOT yield) - processes requests
-	- Dispose(): Clear pending requests
 ]]
 
 -- ============================================================
@@ -24,7 +19,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -43,7 +38,6 @@ local Network = require(Shared.network.generated.server)
 
 -- Server services
 local Server = script.Parent.Parent.Parent
-local PlantFoodService = require(Server.services.PlantFoodService)
 
 -- ============================================================
 -- SECTION 2: CONFIG (immutable settings)
@@ -53,29 +47,18 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
--- ============================================================
-local State = {
-	PendingRequests = {} :: { { player: Player, plantEntityId: number } },
-	-- Rapid Fire queue: tracks ongoing rapid-fire abilities (no task.wait needed)
-	RapidFireQueue = {} :: {
-		[number]: {
-			plantId: number,
-			lane: number,
-			shotsRemaining: number,
-			nextShotTime: number,
-			interval: number,
-		}
-	},
-	RapidFireNextId = 1,
-}
-
--- ============================================================
--- SECTION 4: PRIVATE HELPERS
+-- SECTION 3: PRIVATE HELPERS
 -- ============================================================
 
 -- Execute Plant Food ability on a plant
-local function executeAbility(world: any, plantId: number, plantType: string, player: Player)
+local function executeAbility(
+	world: any,
+	plantId: number,
+	plantType: string,
+	player: Player,
+	state: any,
+	SunService: any
+)
 	local ability = PlantFoodData.GetAbility(plantType)
 	if not ability then
 		Logger.Warn("PlantFood", `No Plant Food ability defined for {plantType}`)
@@ -91,7 +74,6 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 
 	-- Instant Sun (Sunflower)
 	if ability.InstantSun then
-		local SunService = require(Server.services.SunService)
 		SunService.AddSun(player, ability.InstantSun)
 		SunService.BroadcastSunUpdate(player)
 		Logger.Info("PlantFood", `{plantType} produced {ability.InstantSun} instant sun`)
@@ -107,10 +89,10 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 		local plantLane = plantTypeComp and plantTypeComp.Lane or 3 -- Default to middle lane
 
 		-- Add to rapid fire queue (processed in OnStep, no task.wait)
-		local queueId = State.RapidFireNextId
-		State.RapidFireNextId = State.RapidFireNextId + 1
+		local queueId = state.RapidFireNextId
+		state.RapidFireNextId = state.RapidFireNextId + 1
 		
-		State.RapidFireQueue[queueId] = {
+		state.RapidFireQueue[queueId] = {
 			plantId = plantId,
 			lane = plantLane,
 			shotsRemaining = shots,
@@ -192,16 +174,56 @@ local function executeAbility(world: any, plantId: number, plantType: string, pl
 end
 
 -- ============================================================
--- SECTION 5: ONSTEP (main ECS loop)
+-- SECTION 4: SYSTEM FUNCTION (main ECS loop)
 -- ============================================================
-local function OnStep(world)
+local function PlantFoodSystem(world)
 	local currentTime = os.clock()
 
+	-- State managed via Hooks.useMap (persistent across frames)
+	-- Note: useMap returns { value: T }, so access via .value
+	local stateWrapper = Hooks.useMap("PlantFoodState", {
+		PendingRequests = {} :: { { player: Player, plantEntityId: number } },
+		RapidFireQueue = {} :: {
+			[number]: {
+				plantId: number,
+				lane: number,
+				shotsRemaining: number,
+				nextShotTime: number,
+				interval: number,
+			}
+		},
+		RapidFireNextId = 1,
+		CachedZombieDir = Vector3.zero,
+	})
+	local state = stateWrapper.value
+
+	-- Lazy load services via useMemo (empty deps = once)
+	local PlantFoodService, SunService = Hooks.useMemo(function()
+		return require(Server.services.PlantFoodService), require(Server.services.SunService)
+	end, {})
+
+	-- Setup network handler once via useMemo
+	Hooks.useMemo(function()
+		Network.PlantFoodRequest.SetCallback(function(player, data)
+			table.insert(state.PendingRequests, {
+				player = player,
+				plantEntityId = data.PlantEntityId,
+			})
+		end)
+		Logger.Debug("PlantFoodSystem", "Initialized network handler")
+		return true
+	end, {})
+
+	-- Cache MapConfig values
+	if MapConfig.IsInitialized() then
+		state.CachedZombieDir = MapConfig.GetZombieDirection()
+	end
+
 	-- Process Rapid Fire queue (time-based, no task.wait)
-	for queueId, rapidFire in State.RapidFireQueue do
+	for queueId, rapidFire in state.RapidFireQueue do
 		-- Check if plant still exists
 		if not world:contains(rapidFire.plantId) then
-			State.RapidFireQueue[queueId] = nil
+			state.RapidFireQueue[queueId] = nil
 			continue
 		end
 
@@ -213,12 +235,12 @@ local function OnStep(world)
 		-- Get current plant position
 		local plantPos = world:get(rapidFire.plantId, Components.PositionComponent)
 		if not plantPos then
-			State.RapidFireQueue[queueId] = nil
+			state.RapidFireQueue[queueId] = nil
 			continue
 		end
 
-		-- Get zombie direction from MapConfig (plants shoot opposite direction)
-		local zombieDir = MapConfig.GetZombieDirection()
+		-- Get zombie direction from cached value (plants shoot opposite direction)
+		local zombieDir = state.CachedZombieDir
 		local shootDirX = -zombieDir.X -- Opposite of zombie direction
 		local shootDirZ = -zombieDir.Z
 
@@ -263,7 +285,7 @@ local function OnStep(world)
 
 		if rapidFire.shotsRemaining <= 0 then
 			-- Finished rapid fire
-			State.RapidFireQueue[queueId] = nil
+			state.RapidFireQueue[queueId] = nil
 		else
 			-- Schedule next shot
 			rapidFire.nextShotTime = currentTime + rapidFire.interval
@@ -271,7 +293,7 @@ local function OnStep(world)
 	end
 
 	-- Process pending Plant Food activation requests
-	for _, request in State.PendingRequests do
+	for _, request in state.PendingRequests do
 		local player = request.player
 		local plantId = request.plantEntityId
 
@@ -303,7 +325,7 @@ local function OnStep(world)
 		end
 
 		-- Execute the ability
-		executeAbility(world, plantId, plant.PlantType, player)
+		executeAbility(world, plantId, plant.PlantType, player, state, SunService)
 
 		-- Broadcast activation event
 		Network.PlantFoodActivated.FireAll({
@@ -314,7 +336,7 @@ local function OnStep(world)
 	end
 
 	-- Clear processed requests
-	table.clear(State.PendingRequests)
+	table.clear(state.PendingRequests)
 
 	-- Handle glowing zombie deaths (grant Plant Food charges)
 	for entityId, record in world:queryChanged(Components.HealthComponent) do
@@ -343,33 +365,9 @@ local function OnStep(world)
 end
 
 -- ============================================================
--- SECTION 6: INIT / DISPOSE
--- ============================================================
-local function Init(_world)
-	-- Setup network handler for Plant Food requests
-	Network.PlantFoodRequest.SetCallback(function(player, data)
-		table.insert(State.PendingRequests, {
-			player = player,
-			plantEntityId = data.PlantEntityId,
-		})
-	end)
-
-	Logger.Debug("PlantFoodSystem", "Initialized")
-end
-
-local function Dispose()
-	table.clear(State.PendingRequests)
-	table.clear(State.RapidFireQueue)
-	State.RapidFireNextId = 1
-	Logger.Debug("PlantFoodSystem", "Disposed")
-end
-
--- ============================================================
--- SECTION 7: MODULE EXPORT
+-- SECTION 5: EXPORT (V3 - priority + system only)
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = PlantFoodSystem,
 }

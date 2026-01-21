@@ -24,25 +24,7 @@ local CONFIG = table.freeze({
 	TICK_INTERVAL = 1, -- Seconds between burn ticks
 })
 
--- 3. STATE (minimal - stateless system)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-end
-
--- Helper: Apply burn to a zombie
+-- 3. PRIVATE HELPERS
 local function applyBurn(world, zombieEntityId: number, damagePerSecond: number, duration: number)
 	if not world:contains(zombieEntityId) then
 		return
@@ -88,8 +70,8 @@ local function applyBurn(world, zombieEntityId: number, damagePerSecond: number,
 	end
 end
 
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 4. MAIN LOOP
+local function BurnDamageSystem(world)
 	local currentTime = os.clock()
 
 	-- 1. Process ProjectileHitEvents: apply burns from plants with BurnEffectComponent
@@ -168,10 +150,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 return {
 	priority = 350,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = BurnDamageSystem,
 }

@@ -2,7 +2,7 @@
 --[[
 	DamageResolverSystem.luau - Applies finalized damage to entities
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
 	
 	Priority: 175 (After damage modifiers, before entity death)
 	
@@ -20,11 +20,6 @@
 	2. DamageModifierSystem applies modifiers (P:172)
 	3. THIS SYSTEM applies damage to Health (P:175)
 	4. EntityDeathSystem handles death (P:180)
-	
-	LIFECYCLE:
-	- Init(): N/A
-	- OnStep(): Query DamageIntent, apply to Health
-	- Dispose(): N/A
 ]]
 
 -- ============================================================
@@ -32,14 +27,16 @@
 -- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages.MatterHooks)
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local Logger = require(Shared.utils.core.Logger)
 local ECSUtils = require(Shared.utils.ecs.ECSUtils)
 
--- Server services
+-- Server services (lazy loaded via useMemo)
 local Server = script.Parent.Parent.Parent
-local ServerEventBus = require(Server.services.ServerEventBus)
 
 -- ============================================================
 -- SECTION 2: CONFIG (immutable settings)
@@ -49,14 +46,7 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
--- ============================================================
-local State = {
-	IsInitialized = false,
-}
-
--- ============================================================
--- SECTION 4: PRIVATE HELPERS
+-- SECTION 3: PRIVATE HELPERS
 -- ============================================================
 
 -- Get the actual damage target (handles shell protection)
@@ -97,29 +87,14 @@ local function applyDamage(world: any, targetId: number, amount: number): (numbe
 end
 
 -- ============================================================
--- SECTION 5: LIFECYCLE: INIT
+-- SECTION 4: SYSTEM FUNCTION (main ECS loop)
 -- ============================================================
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
+local function DamageResolverSystem(world)
+	-- Lazy load ServerEventBus via useMemo (empty deps = once)
+	local ServerEventBus = Hooks.useMemo(function()
+		return require(Server.services.ServerEventBus)
+	end, {})
 	
-	State.IsInitialized = true
-	Logger.Debug("DamageResolverSystem", "Initialized")
-end
-
--- ============================================================
--- SECTION 6: LIFECYCLE: DISPOSE
--- ============================================================
-local function Dispose()
-	State.IsInitialized = false
-	Logger.Debug("DamageResolverSystem", "Disposed")
-end
-
--- ============================================================
--- SECTION 7: ONSTEP (main ECS loop)
--- ============================================================
-local function OnStep(world)
 	-- Query all DamageIntent that have modifiers applied but not resolved
 	for id, intent in world:query(Components.DamageIntent) do
 		if intent.ModifiersApplied and not intent.Resolved then
@@ -205,11 +180,9 @@ local function OnStep(world)
 end
 
 -- ============================================================
--- SECTION 8: EXPORT
+-- SECTION 5: EXPORT
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = DamageResolverSystem,
 }

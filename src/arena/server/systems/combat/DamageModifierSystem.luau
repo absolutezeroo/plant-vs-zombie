@@ -2,7 +2,7 @@
 --[[
 	DamageModifierSystem.luau - Applies registered damage modifiers
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	SYSTEM V3 ARCHITECTURE (Matter Hooks)
 	
 	Priority: 172 (After combat detection, before damage resolution)
 	
@@ -18,17 +18,15 @@
 	1. CombatSystem spawns DamageIntent (P:170)
 	2. THIS SYSTEM applies modifiers (P:172)
 	3. DamageResolverSystem applies to Health (P:175)
-	
-	LIFECYCLE:
-	- Init(): Register built-in modifiers from ECS components
-	- OnStep(): Query DamageIntent, apply registry modifiers
-	- Dispose(): Clear built-in modifier registrations
 ]]
 
 -- ============================================================
 -- SECTION 1: IMPORTS
 -- ============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -43,14 +41,7 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
--- ============================================================
-local State = {
-	IsInitialized = false,
-}
-
--- ============================================================
--- SECTION 4: BUILT-IN MODIFIERS
+-- SECTION 3: BUILT-IN MODIFIERS
 -- These modifiers read ECS components to modify damage
 -- ============================================================
 
@@ -145,14 +136,9 @@ local function frozenVulnerabilityModifier(world: any, intent: any, _Components:
 end
 
 -- ============================================================
--- SECTION 5: LIFECYCLE: INIT
+-- SECTION 4: REGISTER MODIFIERS (called once via useMemo)
 -- ============================================================
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	
-	-- Register built-in modifiers
+local function registerBuiltInModifiers()
 	DamageModifierRegistry.Register("BuiltIn:DamageReduction", {
 		Priority = 100, -- Early - armor applies first
 		Callback = damageReductionModifier,
@@ -177,29 +163,19 @@ local function Init(_world)
 		Description = "RageComponent crit chance and damage boost",
 	})
 	
-	State.IsInitialized = true
 	Logger.Debug("DamageModifierSystem", 
-		`Initialized with {DamageModifierRegistry.GetCount()} modifiers`)
-end
-
--- ============================================================
--- SECTION 6: LIFECYCLE: DISPOSE
--- ============================================================
-local function Dispose()
-	-- Unregister built-in modifiers
-	DamageModifierRegistry.Unregister("BuiltIn:DamageReduction")
-	DamageModifierRegistry.Unregister("BuiltIn:ShellProtection")
-	DamageModifierRegistry.Unregister("BuiltIn:FrozenVulnerability")
-	DamageModifierRegistry.Unregister("BuiltIn:RageCritical")
+		`Registered {DamageModifierRegistry.GetCount()} modifiers`)
 	
-	State.IsInitialized = false
-	Logger.Debug("DamageModifierSystem", "Disposed")
+	return true
 end
 
 -- ============================================================
--- SECTION 7: ONSTEP (main ECS loop)
+-- SECTION 5: SYSTEM FUNCTION (main ECS loop)
 -- ============================================================
-local function OnStep(world)
+local function DamageModifierSystem(world)
+	-- One-time initialization via useMemo (empty deps = run once)
+	Hooks.useMemo(registerBuiltInModifiers, {})
+	
 	-- Query all DamageIntent that haven't had modifiers applied
 	for id, intent in world:query(Components.DamageIntent) do
 		if not intent.ModifiersApplied and not intent.Resolved then
@@ -259,11 +235,9 @@ local function OnStep(world)
 end
 
 -- ============================================================
--- SECTION 8: EXPORT
+-- SECTION 6: EXPORT
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = DamageModifierSystem,
 }

@@ -24,26 +24,8 @@ local CONFIG = table.freeze({
 	MIN_HEAL_AMOUNT = 1,
 })
 
--- 3. STATE (minimal - this system is stateless)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 3. MAIN LOOP
+local function LifestealSystem(world)
 	-- Process ProjectileHitEvents: heal plants with LifestealComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
@@ -86,10 +68,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 4. EXPORT
 return {
 	priority = 370,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = LifestealSystem,
 }

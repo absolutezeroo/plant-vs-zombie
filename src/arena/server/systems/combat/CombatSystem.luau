@@ -311,11 +311,8 @@ end
 --------------------------------------------------------------------------------
 -- [4] SYSTEM (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
-local function system(world: MatterWorld)
+local function CombatSystem(world: MatterWorld)
 	local currentTime = os.clock()
-
-	-- Use hooks for mutable state that persists across frames
-	local zombieAttackTimes = useMap("ZombieAttackTimes", {} :: { [number]: number })
 	
 	-- Use memoized config values (refreshed when MapConfig is initialized)
 	local isMapInit = MapConfig.IsInitialized()
@@ -519,6 +516,9 @@ local function system(world: MatterWorld)
 	for zombieId, zombiePos, zombie, zombieHealth in
 		world:query(Components.PositionComponent, Components.ZombieTypeComponent, Components.HealthComponent)
 	do
+		-- Per-entity attack time tracking (auto-cleanup when entity leaves query)
+		local attackState = useMap(zombieId, { lastAttack = 0 :: number })
+		
 		-- Skip stunned zombies
 		local stun = world:get(zombieId, Components.StunComponent)
 		if stun then
@@ -551,19 +551,19 @@ local function system(world: MatterWorld)
 							VelocityZ = -zombieDir.Z * stats.Speed,
 						})
 					)
-					zombieAttackTimes.value[zombieId] = nil
+					attackState.value.lastAttack = 0
 					continue
 				end
 				
 				-- Attack the enemy zombie
-				local lastAttack = zombieAttackTimes.value[zombieId] or 0
+				local lastAttack = attackState.value.lastAttack
 				if currentTime - lastAttack >= stats.AttackSpeed then
 					-- Hypnotized zombie attacks other zombies with "Bite" damage type
 					local killed = spawnDamageIntent(
 						world, target.TargetEntity, stats.Damage,
 						zombieId, "HypnotizedZombie", "Bite"
 					)
-					zombieAttackTimes.value[zombieId] = currentTime
+					attackState.value.lastAttack = currentTime
 					
 					if killed then
 						-- Resume moving backward
@@ -576,7 +576,7 @@ local function system(world: MatterWorld)
 								VelocityZ = -zombieDir.Z * stats.Speed,
 							})
 						)
-						zombieAttackTimes.value[zombieId] = nil
+						attackState.value.lastAttack = 0
 					end
 				end
 			else
@@ -642,12 +642,12 @@ local function system(world: MatterWorld)
 						VelocityZ = zombieDir.Z * stats.Speed,
 					})
 				)
-				zombieAttackTimes.value[zombieId] = nil
+				attackState.value.lastAttack = 0
 				continue
 			end
 
 			-- Check attack timer
-			local lastAttack = zombieAttackTimes.value[zombieId] or 0
+			local lastAttack = attackState.value.lastAttack
 			if currentTime - lastAttack >= stats.AttackSpeed then
 				-- Determine actual target (may be redirected to Pumpkin shell)
 				local actualTarget = target.TargetEntity
@@ -673,7 +673,7 @@ local function system(world: MatterWorld)
 				local eatCancelled = ZombieAbilityData.ExecuteHook("OnEat", zombie.ZombieType, eatCtx, actualTarget)
 				if eatCancelled then
 					-- Ability handled the eat (e.g., Bungee steals plant)
-					zombieAttackTimes.value[zombieId] = currentTime
+					attackState.value.lastAttack = currentTime
 					continue
 				end
 				
@@ -682,7 +682,7 @@ local function system(world: MatterWorld)
 					world, actualTarget, stats.Damage,
 					zombieId, zombie.ZombieType, "Bite"
 				)
-				zombieAttackTimes.value[zombieId] = currentTime
+				attackState.value.lastAttack = currentTime
 
 				if killed then
 					-- Check if we killed a HypnoShroom (before Pumpkin check, as HypnoShroom may be protected)
@@ -714,7 +714,7 @@ local function system(world: MatterWorld)
 								ZombieId = zombieId,
 							})
 							
-							zombieAttackTimes.value[zombieId] = nil
+							attackState.value.lastAttack = 0
 							continue
 						end
 					end
@@ -747,7 +747,7 @@ local function system(world: MatterWorld)
 							VelocityZ = zombieDir.Z * stats.Speed,
 						})
 					)
-					zombieAttackTimes.value[zombieId] = nil
+					attackState.value.lastAttack = 0
 				end
 			end
 		else
@@ -858,7 +858,7 @@ local function system(world: MatterWorld)
 								})
 							)
 
-							zombieAttackTimes.value[zombieId] = currentTime
+							attackState.value.lastAttack = currentTime
 							break
 						end
 					end
@@ -912,18 +912,11 @@ local function system(world: MatterWorld)
 								VelocityZ = 0,
 							})
 						)
-						zombieAttackTimes.value[zombieId] = currentTime
+						attackState.value.lastAttack = currentTime
 						break
 					end
 				end
 			end
-		end
-	end
-
-	-- Clean up attack times for despawned zombies
-	for zombieId in zombieAttackTimes.value do
-		if not world:contains(zombieId) then
-			zombieAttackTimes.value[zombieId] = nil
 		end
 	end
 end
@@ -933,5 +926,5 @@ end
 --------------------------------------------------------------------------------
 return {
 	priority = 170,
-	system = system,
+	system = CombatSystem,
 }

@@ -27,25 +27,7 @@ local CONFIG = table.freeze({
 	DEFAULT_SLOW_DURATION = GameConstants.Combat.DEFAULT_SLOW_DURATION,
 })
 
--- 3. STATE (minimal - stateless system)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-end
-
--- Helper: Try to freeze a zombie (with chance roll)
+-- 3. PRIVATE HELPERS
 local function tryFreeze(
 	world,
 	zombieEntityId: number,
@@ -120,8 +102,8 @@ local function tryFreeze(
 	end
 end
 
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 4. MAIN LOOP
+local function FreezeSystem(world)
 	local currentTime = os.clock()
 
 	-- 1. Process ProjectileHitEvents: apply freezes from plants with FreezeEffectComponent
@@ -166,10 +148,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 return {
 	priority = 355,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = FreezeSystem,
 }

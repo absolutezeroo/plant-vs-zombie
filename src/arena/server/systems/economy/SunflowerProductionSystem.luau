@@ -6,10 +6,18 @@
 	
 	Sunflowers produce sun orbs every 24 seconds.
 	Sun spawns at plant position and can be collected.
+	
+	HOOKS ARCHITECTURE:
+	- Uses per-entity useMap for production timers (auto-cleanup)
 ]]
 
 -- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local MatterHooks = require(Packages.MatterHooks)
+local useMap = MatterHooks.useMap
+local useMemo = MatterHooks.useMemo
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -32,44 +40,16 @@ local CONFIG = table.freeze({
 	SPAWN_OFFSET_Y = 3,
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	ProductionTimers = {} :: { [number]: number }, -- entityId -> nextProductionTime
-	PlantSpawnTimes = {} :: { [number]: number }, -- entityId -> spawnTime
-	WaveService = nil :: any, -- Lazy-loaded reference
-}
-
--- Helper: Get WaveService
-local function getWaveService()
-	if not State.WaveService then
-		State.WaveService = require(Server.services.WaveService)
-	end
-	return State.WaveService
-end
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-	table.clear(State.ProductionTimers)
-	table.clear(State.PlantSpawnTimes)
-	State.WaveService = nil
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 3. MAIN LOOP
+local function SunflowerProductionSystem(world)
 	local currentTime = os.clock()
 
+	-- Lazy-load WaveService once per system lifecycle
+	local WaveService = useMemo(function()
+		return require(Server.services.WaveService)
+	end, {})
+
 	-- Only produce sun during "Playing" or "Preparation" states
-	local WaveService = getWaveService()
 	local gameState = WaveService.GetGameState()
 
 	if gameState ~= "Playing" and gameState ~= "Preparation" then
@@ -83,32 +63,27 @@ local function OnStep(world)
 			continue
 		end
 
+		-- Per-entity production state (auto-cleanup when entity leaves query)
+		local productionState = useMap(id, {
+			spawnTime = currentTime,
+			nextProductionTime = currentTime + (stats.FirstSunDelay or CONFIG.FIRST_PRODUCTION_DELAY),
+		})
+
 		-- Read production values from PlantData (with defaults)
-		local firstDelay = stats.FirstSunDelay or CONFIG.FIRST_PRODUCTION_DELAY
 		local productionInterval = stats.SunProductionInterval or CONFIG.PRODUCTION_INTERVAL
 		local sunCount = stats.SunCount or 1 -- Number of suns to spawn per production
-
-		-- Track when this plant was first seen (for growth mechanics like Sun-shroom)
-		if not State.PlantSpawnTimes[id] then
-			State.PlantSpawnTimes[id] = currentTime
-		end
 
 		-- Calculate sun value (supports growth over time like Sun-shroom)
 		local sunValue = stats.SunValue or CONFIG.SUN_VALUE
 		if stats.SunValueGrown and stats.GrowthTime then
-			local plantAge = currentTime - State.PlantSpawnTimes[id]
+			local plantAge = currentTime - productionState.value.spawnTime
 			if plantAge >= stats.GrowthTime then
 				sunValue = stats.SunValueGrown
 			end
 		end
 
-		-- Initialize timer for new sun-producing plants
-		if not State.ProductionTimers[id] then
-			State.ProductionTimers[id] = currentTime + firstDelay
-		end
-
 		-- Check if it's time to produce
-		if currentTime >= State.ProductionTimers[id] then
+		if currentTime >= productionState.value.nextProductionTime then
 			-- Get plant owner (sun belongs to the player who placed the plant)
 			local owner = world:get(id, Components.OwnerComponent)
 			local ownerId = if owner then owner.PlayerId else nil
@@ -149,23 +124,13 @@ local function OnStep(world)
 			end
 
 			-- Reset timer for next production
-			State.ProductionTimers[id] = currentTime + productionInterval
-		end
-	end
-
-	-- Cleanup timers for despawned sunflowers
-	for id in State.ProductionTimers do
-		if not world:contains(id) then
-			State.ProductionTimers[id] = nil
-			State.PlantSpawnTimes[id] = nil
+			productionState.value.nextProductionTime = currentTime + productionInterval
 		end
 	end
 end
 
--- 7. EXPORT
+-- 4. EXPORT
 return {
 	priority = 305,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = SunflowerProductionSystem,
 }

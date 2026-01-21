@@ -26,25 +26,7 @@ local CONFIG = table.freeze({
 	DEFAULT_CENTER_LANE = 3, -- Middle lane fallback
 })
 
--- 3. STATE (minimal - stateless system)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-end
-
--- Helper: Apply splash damage at a position
+-- 3. PRIVATE HELPERS
 -- Uses LaneCache for O(lane_range) lookup instead of O(N) world:query
 local function applySplashDamage(
 	world,
@@ -111,8 +93,8 @@ local function applySplashDamage(
 	end
 end
 
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 4. MAIN LOOP
+local function SplashDamageSystem(world)
 	-- Process ProjectileHitEvents: apply splash damage from plants with SplashDamageComponent
 	for _, hitEvent in world:query(Components.ProjectileHitEvent) do
 		local sourcePlant = hitEvent.SourcePlant
@@ -144,10 +126,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 return {
 	priority = 345,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = SplashDamageSystem,
 }
