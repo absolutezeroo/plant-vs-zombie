@@ -2,7 +2,7 @@
 --[[
 	PlacementSystem.luau - Server-side plant placement validation
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
+	SYSTEM V3 ARCHITECTURE (Matter Hooks pattern)
 	
 	Priority: 200 (Core game logic)
 	
@@ -13,11 +13,6 @@
 	- Plant not on cooldown (server cooldown tracking)
 	
 	Spawns plant entity on success, rejects on failure.
-	
-	LIFECYCLE:
-	- Init(): Setup player listeners and network handlers (CAN yield)
-	- OnStep(): Main loop (CANNOT yield) - stores world reference
-	- Dispose(): Cleanup player connections and state
 ]]
 
 -- ============================================================
@@ -27,7 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages.MatterHooks)
 local Trove = require(Packages:WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -61,12 +56,11 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
+-- SECTION 3: STATE TYPE (managed by hooks)
 -- ============================================================
-local State = {
-	World = nil :: any?,
-	Trove = Trove.new(),
-	PlayerCooldowns = {} :: { [Player]: { [string]: number } },
+type PlacementState = {
+	World: any?,
+	PlayerCooldowns: { [Player]: { [string]: number } },
 }
 
 -- ============================================================
@@ -74,19 +68,19 @@ local State = {
 -- ============================================================
 
 -- Initialize new player
-local function onPlayerAdded(player: Player)
-	State.PlayerCooldowns[player] = {}
+local function onPlayerAdded(player: Player, state: { value: PlacementState })
+	state.value.PlayerCooldowns[player] = {}
 	Logger.Debug("PlacementSystem", `Player {player.Name} initialized`)
 end
 
-local function onPlayerRemoving(player: Player)
-	State.PlayerCooldowns[player] = nil
+local function onPlayerRemoving(player: Player, state: { value: PlacementState })
+	state.value.PlayerCooldowns[player] = nil
 	GridService.ClearPlayerData(player.UserId)
 end
 
 -- Validate placement request
-local function validatePlacement(player: Player, column: number, lane: number, plantType: string): (boolean, string?)
-	local world = State.World
+local function validatePlacement(state: { value: PlacementState }, player: Player, column: number, lane: number, plantType: string): (boolean, string?)
+	local world = state.value.World
 	if not world then
 		return false, "World not ready"
 	end
@@ -204,7 +198,7 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 	end
 
 	-- Check cooldown
-	local cooldowns = State.PlayerCooldowns[player]
+	local cooldowns = state.value.PlayerCooldowns[player]
 	if cooldowns then
 		local cooldownEnd = cooldowns[plantType]
 		if cooldownEnd and os.clock() < cooldownEnd then
@@ -233,8 +227,8 @@ local function validatePlacement(player: Player, column: number, lane: number, p
 end
 
 -- Spawn plant entity
-local function spawnPlant(player: Player, column: number, lane: number, plantType: string): number
-	local world = State.World
+local function spawnPlant(state: { value: PlacementState }, player: Player, column: number, lane: number, plantType: string): number
+	local world = state.value.World
 	if not world then
 		Logger.Error("PlacementSystem", "World not initialized")
 		return -1
@@ -267,7 +261,7 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 			-- Coffee Bean is consumed - don't spawn entity
 			-- Deduct sun and start cooldown
 			SunService.SpendSun(player, stats.Cost)
-			local cooldowns = State.PlayerCooldowns[player]
+			local cooldowns = state.value.PlayerCooldowns[player]
 			if cooldowns then
 				cooldowns[plantType] = os.clock() + stats.Cooldown
 			end
@@ -328,7 +322,7 @@ local function spawnPlant(player: Player, column: number, lane: number, plantTyp
 	SunService.SpendSun(player, stats.Cost)
 
 	-- Start cooldown
-	local cooldowns = State.PlayerCooldowns[player]
+	local cooldowns = state.value.PlayerCooldowns[player]
 	if cooldowns then
 		cooldowns[plantType] = os.clock() + stats.Cooldown
 	end
@@ -381,6 +375,7 @@ end
 
 -- Handle placement request
 local function handlePlacementRequest(
+	state: { value: PlacementState },
 	player: Player,
 	column: number,
 	lane: number,
@@ -398,14 +393,14 @@ local function handlePlacementRequest(
 		return false, middlewareReason
 	end
 
-	local success, reason = validatePlacement(player, column, lane, plantType)
+	local success, reason = validatePlacement(state, player, column, lane, plantType)
 
 	if not success then
 		Logger.Warn("PlacementSystem", `Placement denied for {player.Name}: {reason}`)
 		return false, reason
 	end
 
-	local entityId = spawnPlant(player, column, lane, plantType)
+	local entityId = spawnPlant(state, player, column, lane, plantType)
 	if entityId < 0 and not PlantData[plantType].CanStackOnMushroom then
 		-- entityId -1 is valid for Coffee Bean (consumed on use)
 		return false, "Spawn failed"
@@ -415,8 +410,8 @@ local function handlePlacementRequest(
 end
 
 -- Shovel (remove) a plant and refund partial sun
-local function handleShovelRequest(player: Player, plantEntityId: number): (boolean, string?)
-	local world = State.World
+local function handleShovelRequest(state: { value: PlacementState }, player: Player, plantEntityId: number): (boolean, string?)
+	local world = state.value.World
 	if not world then
 		return false, "World not ready"
 	end
@@ -490,11 +485,11 @@ local function handleShovelRequest(player: Player, plantEntityId: number): (bool
 	return true, nil
 end
 
--- Set up network handlers
-local function setupNetworkHandlers()
+-- Set up network handlers (called via useMemo)
+local function setupNetworkHandlers(state: { value: PlacementState })
 	-- Placement request handler
 	Network.PlacePlantRequest.SetCallback(function(player: Player, data)
-		if not State.World then
+		if not state.value.World then
 			Logger.Warn("PlacementSystem", "World not initialized, rejecting placement")
 			Network.RequestResponse.Fire(player, {
 				RequestId = data.RequestId,
@@ -508,7 +503,7 @@ local function setupNetworkHandlers()
 		local column = data.Column
 		local lane = data.Lane
 
-		local success, reason = handlePlacementRequest(player, column, lane, plantType)
+		local success, reason = handlePlacementRequest(state, player, column, lane, plantType)
 
 		-- Map reason to error code
 		local errorCode = 0
@@ -529,7 +524,7 @@ local function setupNetworkHandlers()
 
 	-- Shovel request handler
 	Network.ShovelPlantRequest.SetCallback(function(player: Player, data)
-		if not State.World then
+		if not state.value.World then
 			Logger.Warn("PlacementSystem", "World not initialized, rejecting shovel")
 			Network.RequestResponse.Fire(player, {
 				RequestId = data.RequestId,
@@ -539,7 +534,7 @@ local function setupNetworkHandlers()
 			return
 		end
 
-		local success, reason = handleShovelRequest(player, data.PlantEntityId)
+		local success, reason = handleShovelRequest(state, player, data.PlantEntityId)
 
 		-- Map reason to error code
 		local errorCode = 0
@@ -560,47 +555,51 @@ local function setupNetworkHandlers()
 end
 
 -- ============================================================
--- SECTION 5: ONSTEP (main ECS loop)
+-- SECTION 5: SYSTEM FUNCTION (main ECS loop)
 -- ============================================================
-local function OnStep(world)
-	State.World = world
+local function PlacementSystem(world)
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("PlacementState", {
+		World = nil :: any?,
+		PlayerCooldowns = {} :: { [Player]: { [string]: number } },
+	})
+
+	-- Update world reference each frame
+	state.value.World = world
+
+	-- Initialize player tracking and network handlers once via useMemo
+	Hooks.useMemo(function()
+		-- Setup player listeners
+		local trove = Trove.new()
+
+		trove:Connect(Players.PlayerAdded, function(player: Player)
+			onPlayerAdded(player, state)
+		end)
+		trove:Connect(Players.PlayerRemoving, function(player: Player)
+			onPlayerRemoving(player, state)
+		end)
+
+		-- Initialize existing players
+		for _, player in Players:GetPlayers() do
+			onPlayerAdded(player, state)
+		end
+
+		-- Setup network handlers
+		setupNetworkHandlers(state)
+
+		Logger.Debug("PlacementSystem", "Initialized")
+
+		return trove
+	end, {})
+
 	-- Cooldown processing handled by os.clock() comparisons
 	-- No per-frame work needed
 end
 
 -- ============================================================
--- SECTION 6: INIT / DISPOSE
--- ============================================================
-local function Init(_world)
-	-- Setup player listeners
-	State.Trove:Connect(Players.PlayerAdded, onPlayerAdded)
-	State.Trove:Connect(Players.PlayerRemoving, onPlayerRemoving)
-
-	-- Initialize existing players
-	for _, player in Players:GetPlayers() do
-		onPlayerAdded(player)
-	end
-
-	-- Setup network handlers
-	setupNetworkHandlers()
-
-	Logger.Debug("PlacementSystem", "Initialized")
-end
-
-local function Dispose()
-	State.Trove:Destroy()
-	State.Trove = Trove.new()
-	table.clear(State.PlayerCooldowns)
-	State.World = nil
-	Logger.Debug("PlacementSystem", "Disposed")
-end
-
--- ============================================================
--- SECTION 7: MODULE EXPORT
+-- SECTION 6: MODULE EXPORT
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = PlacementSystem,
 }

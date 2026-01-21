@@ -7,10 +7,15 @@
 	Handles:
 	- Gargantuar spawning Imp at 50% health
 	- Boss-specific death effects
+	
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -27,41 +32,28 @@ local CONFIG = table.freeze({
 	MINION_SPAWN_Y = 1,
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	HasSpawnedMinion = {} :: { [number]: boolean },
-	CachedZombieDir = Vector3.new(-1, 0, 0),
+-- 3. TYPES
+type BossState = {
+	HasSpawnedMinion: { [number]: boolean },
+	CachedZombieDir: Vector3,
 }
 
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	-- Pre-cache MapConfig values to avoid yield in OnStep
-	-- Note: MapConfig.GetZombieDirection() works regardless of init state
-	State.CachedZombieDir = MapConfig.GetZombieDirection()
-
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-	State.CachedZombieDir = Vector3.new(-1, 0, 0)
-	table.clear(State.HasSpawnedMinion)
-end
-
 -- Helper: Spawn a minion zombie at the boss's position
-local function spawnMinion(world, bossId: number, minionType: string, lane: number, posX: number, posZ: number)
+local function spawnMinion(
+	world,
+	state: { value: BossState },
+	bossId: number,
+	minionType: string,
+	lane: number,
+	posX: number,
+	posZ: number
+)
 	local minionStats = ZombieData[minionType]
 	if not minionStats then
 		return
 	end
 
-	local direction = State.CachedZombieDir
+	local direction = state.value.CachedZombieDir
 
 	local minionId = EntityPool.Spawn(
 		Components.PositionComponent({
@@ -98,13 +90,19 @@ local function spawnMinion(world, bossId: number, minionType: string, lane: numb
 	})
 end
 
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 4. SYSTEM FUNCTION
+local function BossSystem(world)
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("BossState", {
+		HasSpawnedMinion = {} :: { [number]: boolean },
+		CachedZombieDir = Vector3.new(-1, 0, 0),
+	})
+
 	-- Refresh cached MapConfig values (may change after loadmap)
 	if MapConfig.IsInitialized() then
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
+		state.value.CachedZombieDir = MapConfig.GetZombieDirection()
 	end
-	
+
 	-- Check all zombies for boss behavior
 	for zombieId, health, zombie, pos in
 		world:query(Components.HealthComponent, Components.ZombieTypeComponent, Components.PositionComponent)
@@ -115,7 +113,7 @@ local function OnStep(world)
 		end
 
 		-- Check if boss should spawn minion at 50% health
-		if stats.SpawnsOnHalfHealth and not State.HasSpawnedMinion[zombieId] then
+		if stats.SpawnsOnHalfHealth and not state.value.HasSpawnedMinion[zombieId] then
 			local halfHealth = health.Max / 2
 
 			if health.Current <= halfHealth and health.Current > 0 then
@@ -124,26 +122,24 @@ local function OnStep(world)
 
 				for i = 1, spawnCount do
 					local offsetZ = (i - 1) * 2
-					spawnMinion(world, zombieId, minionType, zombie.Lane, pos.X, pos.Z + offsetZ)
+					spawnMinion(world, state, zombieId, minionType, zombie.Lane, pos.X, pos.Z + offsetZ)
 				end
 
-				State.HasSpawnedMinion[zombieId] = true
+				state.value.HasSpawnedMinion[zombieId] = true
 			end
 		end
 	end
 
 	-- Clean up tracking for despawned bosses
-	for zombieId in State.HasSpawnedMinion do
+	for zombieId in state.value.HasSpawnedMinion do
 		if not world:contains(zombieId) then
-			State.HasSpawnedMinion[zombieId] = nil
+			state.value.HasSpawnedMinion[zombieId] = nil
 		end
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 return {
 	priority = 175,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = BossSystem,
 }

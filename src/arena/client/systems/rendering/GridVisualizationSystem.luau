@@ -8,10 +8,7 @@
 	Listens for MapConfigSync and creates grid when config is received.
 	Toggle with DEBUG_GRID_VISIBLE constant.
 	
-	LIFECYCLE:
-	- Init(): Setup MapConfigSync listener, create grid if already initialized
-	- system(): No per-frame updates
-	- Dispose(): Destroy grid folder, disconnect listeners
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +21,7 @@ assert(Shared, "GridVisualizationSystem: Shared folder not found - ensure init.c
 local Packages = ReplicatedStorage:FindFirstChild("Packages")
 assert(Packages, "GridVisualizationSystem: Packages folder not found")
 local Trove = require(Packages:WaitForChild("Trove"))
+local Hooks = require(Packages.MatterHooks)
 
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
@@ -123,71 +121,50 @@ local function destroyGrid()
 end
 
 --------------------------------------------------------------------------------
--- INIT: Called once before Matter loop (CAN yield)
---------------------------------------------------------------------------------
-local function Init(_world: any)
-	-- Listen for MapConfigSync from server (event-driven, not polling!)
-	_trove:Add(Network.MapConfigSync.On(function(data)
-		Logger.Info("GridVisualization", `MapConfigSync received, creating grid`)
-		-- MapConfig.ApplyFromServer is called by init.client.luau
-		-- We just need to wait a frame for it to be applied
-		task.defer(function()
-			createGrid()
-		end)
-	end))
-
-	-- IMPORTANT: Do NOT create grid if MapConfig was initialized locally
-	-- We MUST wait for server's MapConfigSync to ensure correct GridY
-	-- Only create grid when config comes from server (UsingVisualConfig + correct GridY)
-	if MapConfig.IsInitialized() and MapConfig.IsUsingVisualConfig() then
-		local config = MapConfig.GetConfig()
-		-- Sanity check: GridY should be positive (above ground)
-		if config.GridY > 0 then
-			Logger.Info("GridVisualization", "MapConfig already synced from server, creating grid")
-			createGrid()
-		else
-			Logger.Warn(
-				"GridVisualization",
-				`Skipping grid creation - suspicious GridY={config.GridY}, waiting for server sync`
-			)
-		end
-	end
-
-	Logger.Debug("GridVisualizationSystem", "Initialized with MapConfigSync listener")
-end
-
---------------------------------------------------------------------------------
--- SYSTEM: Called every frame by Matter (CANNOT yield)
+-- SYSTEM FUNCTION
 --------------------------------------------------------------------------------
 local function GridVisualizationSystem(_world: any)
+	-- Initialize network listeners and grid once via useMemo
+	Hooks.useMemo(function()
+		-- Listen for MapConfigSync from server (event-driven, not polling!)
+		_trove:Add(Network.MapConfigSync.On(function(data)
+			Logger.Info("GridVisualization", `MapConfigSync received, creating grid`)
+			-- MapConfig.ApplyFromServer is called by init.client.luau
+			-- We just need to wait a frame for it to be applied
+			task.defer(function()
+				createGrid()
+			end)
+		end))
+
+		-- IMPORTANT: Do NOT create grid if MapConfig was initialized locally
+		-- We MUST wait for server's MapConfigSync to ensure correct GridY
+		-- Only create grid when config comes from server (UsingVisualConfig + correct GridY)
+		if MapConfig.IsInitialized() and MapConfig.IsUsingVisualConfig() then
+			local config = MapConfig.GetConfig()
+			-- Sanity check: GridY should be positive (above ground)
+			if config.GridY > 0 then
+				Logger.Info("GridVisualization", "MapConfig already synced from server, creating grid")
+				createGrid()
+			else
+				Logger.Warn(
+					"GridVisualization",
+					`Skipping grid creation - suspicious GridY={config.GridY}, waiting for server sync`
+				)
+			end
+		end
+
+		Logger.Debug("GridVisualizationSystem", "Initialized with MapConfigSync listener")
+		return true
+	end, {})
+
 	-- No per-frame updates needed
-	-- Grid is static, created in Init
-end
-
---------------------------------------------------------------------------------
--- DISPOSE: Called on cleanup (player leave, game end)
---------------------------------------------------------------------------------
-local function Dispose(_player: Player?)
-	if _player then
-		-- Player-specific cleanup (none for this system)
-		return
-	end
-
-	-- Disconnect all listeners
-	_trove:Clean()
-
-	-- Full cleanup
-	destroyGrid()
-	Logger.Debug("GridVisualizationSystem", "Disposed")
+	-- Grid is static, created during initialization
 end
 
 --------------------------------------------------------------------------------
 -- MODULE EXPORT
 --------------------------------------------------------------------------------
 return {
-	_name = "GridVisualizationSystem",
 	priority = 350,
 	system = GridVisualizationSystem,
-	Init = Init,
-	Dispose = Dispose,
 }

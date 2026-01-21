@@ -17,10 +17,7 @@
 	MUZZLE FLASH:
 	When projectile spawns, checks source plant's VFX/Shoot for muzzle flash.
 	
-	LIFECYCLE:
-	- Init(): Setup network listeners (CAN yield)
-	- system(): Move projectiles each frame (CANNOT yield)
-	- Dispose(): Disconnect events, cleanup visuals
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,6 +32,8 @@ assert(Shared, "ProjectileRenderSystem: Shared folder not found")
 local Packages = ReplicatedStorage:FindFirstChild("Packages")
 assert(Packages, "ProjectileRenderSystem: Packages folder not found")
 local Trove = require(Packages:WaitForChild("Trove"))
+local Hooks = require(Packages.MatterHooks)
+local Matter = require(Packages.Matter)
 
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
@@ -504,12 +503,9 @@ local function setupNetworkListeners()
 end
 
 --[[
-	Init - Setup network listeners (CAN yield)
+	Init - Setup network listeners (via useMemo)
 ]]
-local function Init(_world)
-	setupNetworkListeners()
-	Logger.Debug("ProjectileRender", "Initialized")
-end
+-- setupNetworkListeners is called within system via useMemo
 
 -- Movement config
 local MovementConfig = {
@@ -518,11 +514,17 @@ local MovementConfig = {
 }
 
 --[[
-	System - Move projectiles each frame (CANNOT yield)
+	System - Initialize on first run and move projectiles each frame
 ]]
 local function ProjectileRenderSystem(_world)
+	-- One-time initialization via hooks
+	Hooks.useMemo(function()
+		setupNetworkListeners()
+		Logger.Debug("ProjectileRender", "Initialized")
+		return true
+	end, {})
+
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
-	local Matter = require(Packages:FindFirstChild("Matter"))
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 
@@ -595,25 +597,7 @@ local function ProjectileRenderSystem(_world)
 	end
 end
 
---[[
-	Dispose - Cleanup all visuals and connections
-]]
-local function Dispose()
-	-- Disconnect all events
-	_trove:Clean()
-
-	-- Destroy all projectile visuals
-	for entityId in _projectileVisuals do
-		destroyProjectileVisual(entityId)
-	end
-
-	Logger.Debug("ProjectileRender", "Disposed")
-end
-
 return {
-	_name = "ProjectileRenderSystem",
 	priority = 420,
 	system = ProjectileRenderSystem,
-	Init = Init,
-	Dispose = Dispose,
 }

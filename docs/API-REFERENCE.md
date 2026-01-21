@@ -635,6 +635,119 @@ Visual effects utilities. Eliminates duplicate clone/emit patterns.
 
 ---
 
+## 🎮 God Mode Architecture
+
+### ValidationMiddleware (Level 1 - Pre-Action)
+
+**Location:** `src/shared/utils/combat/ValidationMiddleware.luau`
+
+Blocks or allows player actions BEFORE they execute. All player actions should validate here first.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Register(action, callback)` | `string, (context) -> (boolean, string?)` | `string` | Register hook, returns hookId |
+| `Unregister(action, hookId)` | `string, string` | `boolean` | Remove hook by ID |
+| `Validate(action, context)` | `string, table` | `boolean, string?` | Validate action, returns allowed + reason |
+| `ClearAll()` | - | `void` | Clear all registered hooks (testing) |
+| `GetRegisteredActions()` | - | `{string}` | List all actions with hooks |
+
+**Supported Actions:**
+| Action | Context Fields |
+|--------|---------------|
+| `PlacePlant` | `Player, PlantType, Row, Column` |
+| `ShovelPlant` | `Player, PlantId, Row, Column` |
+| `SpendSun` | `Player, Amount` |
+| `UsePlantFood` | `Player, PlantId` |
+| `StartWave` | `Player?` |
+| `CollectSun` | `Player, Amount` |
+
+---
+
+### ServerEventBus (Level 3 - Post-Action)
+
+**Location:** `src/arena/server/services/ServerEventBus.luau`
+
+Signal-based event bus for reacting to game events AFTER they happen.
+
+| Event | Payload Type | Description |
+|-------|--------------|-------------|
+| `OnEntityDied` | `EntityDiedPayload` | Entity was killed |
+| `OnPlantPlaced` | `PlantPlacedPayload` | Plant was placed |
+| `OnPlantShoveled` | `PlantShoveledPayload` | Plant was shoveled |
+| `OnSunSpent` | `SunSpentPayload` | Sun was spent |
+| `OnSunCollected` | `SunCollectedPayload` | Sun was collected |
+| `OnWaveStarted` | `WaveStartedPayload` | Wave began |
+| `OnWaveCompleted` | `WaveCompletedPayload` | Wave finished |
+| `OnGameStateChanged` | `GameStateChangedPayload` | Game state changed |
+| `OnDamageDealt` | `DamageDealtPayload` | Damage was dealt |
+| `OnPlantFoodUsed` | `PlantFoodUsedPayload` | Plant food activated |
+| `OnMutationTriggered` | `MutationTriggeredPayload` | Mutation effect triggered |
+
+**Payload Types:**
+```lua
+type EntityDiedPayload = { EntityId: number, EntityType: string, Position: Vector3, KillerId: number?, KillerType: string? }
+type PlantPlacedPayload = { PlantId: number, PlantType: string, Row: number, Column: number, PlayerId: number }
+type SunSpentPayload = { PlayerId: number, Amount: number, NewBalance: number, Reason: string }
+type DamageDealtPayload = { TargetId: number, SourceId: number, Amount: number, DamageType: string, IsCritical: boolean }
+```
+
+---
+
+### DamageModifierRegistry (Level 2 - In-Flight)
+
+**Location:** `src/shared/utils/combat/DamageModifierRegistry.luau`
+
+Registry for damage modifiers that transform DamageIntent components.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Register(modifier)` | `DamageModifier` | `string` | Register modifier, returns ID |
+| `Unregister(modifierId)` | `string` | `boolean` | Remove modifier |
+| `ApplyModifiers(intent, world)` | `DamageIntentData, World` | `DamageIntentData` | Apply all modifiers |
+| `SetEnabled(modifierId, enabled)` | `string, boolean` | `void` | Enable/disable modifier |
+| `IsEnabled(modifierId)` | `string` | `boolean` | Check if enabled |
+| `GetModifiers()` | - | `{DamageModifier}` | Get all modifiers |
+| `Clear()` | - | `void` | Clear all modifiers |
+
+**DamageModifier Type:**
+```lua
+type DamageModifier = {
+    Id: string,           -- Unique identifier
+    Priority: number,     -- Lower = runs first (default 100)
+    Enabled: boolean?,    -- Default true
+    Apply: (intent: DamageIntentData, world: World) -> DamageIntentData,
+}
+```
+
+---
+
+### DamageIntent Component
+
+**Location:** `src/shared/components/events/DamageIntent.luau`
+
+Ephemeral component for in-flight damage modification.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `TargetId` | `number` | Entity receiving damage |
+| `SourceId` | `number?` | Entity dealing damage |
+| `Amount` | `number` | Base damage amount |
+| `FinalAmount` | `number?` | Modified damage (set by modifiers) |
+| `DamageType` | `string` | `"Normal"`, `"Fire"`, `"Ice"`, etc. |
+| `IsCritical` | `boolean?` | Critical hit flag |
+| `Multiplier` | `number?` | Damage multiplier (default 1.0) |
+| `FlatBonus` | `number?` | Flat damage bonus |
+| `ModifiersApplied` | `boolean?` | Has passed through modifiers |
+| `Resolved` | `boolean?` | Has been applied to target |
+
+**Pipeline Flow:**
+1. `CombatSystem (P:170)` spawns DamageIntent
+2. `DamageModifierSystem (P:172)` applies all modifiers
+3. `DamageResolverSystem (P:175)` applies damage via ECSUtils
+4. `EntityDeathSystem (P:180)` handles deaths
+
+---
+
 ## Common Mistakes to Avoid
 
 ### ❌ Wrong Function Names
@@ -680,7 +793,10 @@ model:PivotTo(cframe)
 ## Version History
 
 | Version | Date | Changes |
-|---------|------|---------|| 2.2 | 2026-01-18 | Added LightingService and MapService documentation. Updated to Argon toolchain. || 2.1 | 2026-01-12 | Operation Swarm Cleanup: Added complete GridService API documentation. System priority corrections. |
+|---------|------|---------|
+| 2.3 | 2026-01-19 | Added God Mode Architecture: ValidationMiddleware, ServerEventBus, DamageModifierRegistry, DamageIntent pipeline documentation |
+| 2.2 | 2026-01-18 | Added LightingService and MapService documentation. Updated to Argon toolchain. |
+| 2.1 | 2026-01-12 | Operation Swarm Cleanup: Added complete GridService API documentation. System priority corrections. |
 | 2.0 | 2026-01-12 | Post-Refactoring V2 sync: Updated all service APIs to match isolated state pattern. WaveService now includes Preparation state, auto-start, and internal accessors. SunService includes ResetPlayer. MutationService includes LoadMutationsFromProfile. |
 | 1.2 | 2026-01-10 | Added ECS Services (WaveService, SunService, MutationService, PlantFoodService, StatsService) |
 | 1.1 | 2026-01-10 | Added ChanceUtils, ECSUtils, VFXUtils documentation |

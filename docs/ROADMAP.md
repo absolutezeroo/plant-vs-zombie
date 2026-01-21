@@ -1,6 +1,6 @@
 # 🌻 ROADMAP - Garden Swarm - État d'Implémentation
 
-> **Dernière mise à jour automatisée:** 18 Janvier 2026  
+> **Dernière mise à jour automatisée:** 20 Janvier 2026  
 > Basé sur l'analyse complète du codebase (`PlantData.luau`, Systems ECS, Services, UI)
 
 ---
@@ -36,8 +36,8 @@
 | **SplitPea**    | 125     | 20      | `ShootsBehind`                  | ✅ Implémenté     | Tire avant/arrière                            |
 | **GatlingPea**  | 250     | 20×4    | `ShotsPerBurst=4`               | ✅ Implémenté     | Variante Repeater                             |
 | **Starfruit**   | 125     | 20×5    | `ShootsMultiDirection`          | ✅ Implémenté     | `fireMultiDirection()` 5 directions           |
-| **Cactus**      | 125     | 20      | `CanHitFlying`                  | ⚠️ Partiel       | Flag existe, flying zombies?                  |
-| **Cattail**     | 225     | 20      | `IsHoming`, `RequiresLilyPad`   | ❌ Non implémenté | Système homing manquant                       |
+| **Cactus**      | 125     | 20      | `CanHitFlying`                  | ✅ Implémenté    | CombatSystem vérifie IsFlying                 |
+| **Cattail**     | 225     | 20      | `IsHoming`, `RequiresLilyPad`   | ✅ Implémenté    | `fireHomingProjectile()` + HomingComponent    |
 
 ### 🎃 2. CATAPULTES / LOBBERS (5 plantes)
 
@@ -47,7 +47,7 @@
 | **KernelPult**  | 100     | 20      | `CanStun`, `StunChance=0.2`              | ✅ Implémenté     | StunComponent + Butter variant |
 | **MelonPult**   | 300     | 80      | `HasSplash`, `SplashRadius=3`            | ✅ Implémenté     | SplashComponent ajouté         |
 | **WinterMelon** | 500     | 80+slow | `IsFrozen` + `HasSplash`                 | ✅ Implémenté     | Combo splash+freeze            |
-| **CobCannon**   | 500     | 1800    | `IsManualFire`, `RequiresTwoKernelPults` | ❌ Non implémenté | UI click-to-fire manquant      |
+| **CobCannon**   | 500     | 1800    | `IsManualFire`, `RequiresTwoKernelPults` | ✅ Implémenté    | CobCannonAbility + network handler complet    |
 
 ### 💣 3. EXPLOSIVES / INSTANT-KILL (7 plantes)
 
@@ -59,7 +59,7 @@
 | **DoomShroom** | 125     | 1800   | `LeavesCrater`                    | ✅ Implémenté | Explosion + cratère bloque placement   |
 | **IceShroom**  | 75      | 20     | `FreezesAll`, `FreezeDuration=4`  | ✅ Implémenté | Gèle tous les zombies                  |
 | **Squash**     | 50      | 1800   | `JumpsToTarget`                   | ✅ Implémenté | Animation saut dans SpecialPlantSystem |
-| **TangleKelp** | 25      | 1800   | `IsInstantKill`, `RequiresWater`  | ⚠️ Partiel   | Logique OK, placement eau à valider    |
+| **TangleKelp** | 25      | 1800   | `IsInstantKill`, `RequiresWater`  | ✅ Implémenté | PlacementSystem valide RequiresWater         |
 
 ### 😋 4. INSTANT-KILL SPÉCIAUX (1 plante)
 
@@ -75,7 +75,7 @@
 | **TallNut**     | 125     | 800 | `BlocksJumpers`              | ✅ Implémenté     | Pole Vaulter ne peut pas sauter         |
 | **Pumpkin**     | 125     | 400 | `IsShell`, `CanStackOnPlant` | ✅ Implémenté    | ShellComponent + damage routing         |
 | **Garlic**      | 50      | 200 | `DivertsZombies`             | ✅ Implémenté    | TrapSystem complet (lane switch)        |
-| **ExplodeONut** | 50      | 400 | `ExplodesOnDeath`            | ⚠️ Partiel       | Logique dans SpecialPlantSystem         |
+| **ExplodeONut** | 50      | 400 | `ExplodesOnDeath`            | ✅ Implémenté    | EntityDeathSystem + handleDeathExplosion()   |
 
 ### 🌻 6. PRODUCTEURS (4 plantes)
 
@@ -83,7 +83,7 @@
 |-------------------|---------|------------|-----------------------------|------------------|-------------------------------|
 | **Sunflower**     | 50      | 25☀️/30s   | `ProducesSun`, `SunCount=1` | ✅ MVP            | SunflowerProductionSystem     |
 | **TwinSunflower** | 150     | 50☀️/24s   | `SunCount=2`                | ✅ Implémenté     | Double production             |
-| **SunShroom**     | 25      | 15→25☀️    | `GrowthTime=120`            | ⚠️ Partiel       | Croissance à implémenter      |
+| **SunShroom**     | 25      | 15→25☀️    | `GrowthTime=120`            | ✅ Implémenté    | MushroomSystem getSunShroomValue()   |
 | **Marigold**    | 50      | Coins      | `ProducesCoins`             | ✅ Implémenté    | CoinProductionSystem ajouté   |
 
 ### 🍄 7. CHAMPIGNONS (7 plantes)
@@ -91,12 +91,12 @@
 | Plante            | Coût ☀️ | Mécanique Spéciale              | État             | Notes                                   |
 |-------------------|---------|---------------------------------|------------------|-----------------------------------------|
 | **PuffShroom**    | 0       | `Range=18` (court)              | ✅ Implémenté     | Range limité dans ProjectileSpawnSystem |
-| **SeaShroom**     | 0       | `RequiresWater`                 | ⚠️ Partiel       | Validation eau à compléter              |
+| **SeaShroom**     | 0       | `RequiresWater`                 | ✅ Implémenté    | PlacementSystem valide RequiresWater         |
 | **FumeShroom**    | 75      | `PiercesShields`                | ✅ Implémenté     | Flag dans ProjectileComponent           |
 | **ScaredyShroom** | 25      | `HidesWhenNear`, `HideRadius=6` | ✅ Implémenté     | HidingComponent + MushroomSystem        |
-| **HypnoShroom**   | 75      | `HypnotizesOnDeath`             | ❌ Non implémenté | Retourne zombie = complexe              |
-| **GloomShroom**   | 150     | `ShootsAllDirections`           | ⚠️ Partiel       | 8 directions à implémenter              |
-| **CoffeeBean**    | 75      | `WakesMushrooms`                | ⚠️ Partiel       | SleepingComponent existe                |
+| **HypnoShroom**   | 75      | `HypnotizesOnDeath`             | ✅ Implémenté    | CombatSystem + HypnotizedComponent      |
+| **GloomShroom**   | 150     | `ShootsAllDirections`           | ✅ Implémenté    | `fireAllDirections()` 8 directions       |
+| **CoffeeBean**    | 75      | `WakesMushrooms`                | ✅ Implémenté    | PlacementSystem + PlantActionEvent + MushroomSystem |
 
 ### 🔧 8. SUPPORT / UTILITAIRES (9 plantes)
 
@@ -104,11 +104,11 @@
 |------------------|---------|------------------------------------------|------------------|------------------------------|
 | **Torchwood**    | 175     | `EnhancesPeas`, `FireDamageMultiplier=2` | ✅ Implémenté     | EnhancementSystem complet    |
 | **Plantern**     | 25      | `RemovesFog`                             | ❌ Non implémenté | Fog system manquant          |
-| **Blover**       | 100     | `RemovesFlying`                          | ⚠️ Partiel       | Flying zombies à implémenter |
+| **Blover**       | 100     | `RemovesFlying`                          | ✅ Implémenté    | SpecialPlantSystem tue flying zombies |
 | **UmbrellaLeaf** | 100     | `DeflectsProjectiles`                    | ❌ Non implémenté | Catapult zombies?            |
 | **GoldMagnet**   | 50      | `CollectsCoins`                          | ❌ Non implémenté | Coin system manquant         |
-| **LilyPad**      | 25      | `IsWaterPlatform`                        | ⚠️ Partiel       | Platform system basique      |
-| **FlowerPot**    | 25      | `IsGroundPlatform`                       | ⚠️ Partiel       | Pour niveaux roof            |
+| **LilyPad**      | 25      | `IsWaterPlatform`                        | ✅ Implémenté    | PlacementSystem valide WaterLanes     |
+| **FlowerPot**    | 25      | `IsGroundPlatform`                       | ✅ Implémenté    | PlacementSystem valide IsGroundPlatform |
 | **GraveBuster**  | 75      | `RemovesGraves`                          | ❌ Non implémenté | Grave spawning manquant      |
 | **Imitater**     | +0      | `IsImitater`                             | ❌ Non implémenté | Clone plant complexe         |
 
@@ -126,16 +126,16 @@
 
 | Catégorie    | Total  | ✅ Complet    | ⚠️ Partiel   | ❌ Non implémenté |
 |--------------|--------|--------------|--------------|------------------|
-| Shooters     | 9      | 7            | 1            | 1                |
-| Catapultes   | 5      | 4            | 0            | 1                |
-| Explosives   | 7      | 5            | 2            | 0                |
+| Shooters     | 9      | 9            | 0            | 0                |
+| Catapultes   | 5      | 5            | 0            | 0                |
+| Explosives   | 7      | 7            | 0            | 0                |
 | Instant-Kill | 1      | 1            | 0            | 0                |
-| Défensives   | 5      | 3            | 1            | 1                |
-| Producteurs  | 4      | 3            | 1            | 0                |
-| Champignons  | 7      | 3            | 2            | 2                |
-| Support      | 9      | 1            | 3            | 5                |
+| Défensives   | 5      | 5            | 0            | 0                |
+| Producteurs  | 4      | 4            | 0            | 0                |
+| Champignons  | 7      | 7            | 0            | 0                |
+| Support      | 9      | 4            | 0            | 5                |
 | Pièges       | 1      | 1            | 0            | 0                |
-| **TOTAL**    | **48** | **28 (58%)** | **11 (23%)** | **9 (19%)**      |
+| **TOTAL**    | **48** | **43 (90%)** | **0 (0%)**   | **5 (10%)**      |
 
 ---
 
@@ -311,33 +311,30 @@
 
 ## 🎯 PROCHAINES ÉTAPES RECOMMANDÉES
 
-### 🔴 Haute Priorité (Sprint 3)
+### ✅ Sprint 3 COMPLÉTÉ
 
-1. **Cattail Homing Projectiles** (~6h)
-   - Créer `HomingProjectileComponent` (existe déjà!)
-   - Implémenter logique homing dans `ProjectileMovementSystem`
-   - Target: zombie le plus proche cross-lane
+Les systèmes suivants étaient marqués comme non-implémentés mais sont en fait **DÉJÀ COMPLETS** :
 
-2. **CobCannon Manual Fire** (~8h)
-   - UI: Click-to-fire targeting overlay
-   - Network: `CobCannonFireRequest` event (déjà dans packets.zap!)
-   - Server: Spawn projectile at target position
+1. **✅ Cattail Homing Projectiles** - `fireHomingProjectile()` + `HomingComponent` + tracking dans `ProjectileMovementSystem`
+2. **✅ CobCannon Manual Fire** - `CobCannonAbility.luau` + `CobCannonFireRequest` network handler
+3. **✅ HypnoShroom** - `HypnotizedComponent` + CombatSystem toggle faction + `ZombieMovementSystem` reverse
+4. **✅ Flying Zombies** - Balloon zombie dans `ZombieData`, `CanHitFlying` dans CombatSystem, `IsFlying` check
+5. **✅ Water Platform System** - `PlacementSystem` valide `RequiresWater`, `IsWaterPlatform`, `RequiresLilyPad`
+6. **✅ GloomShroom 8-way** - `fireAllDirections()` dans ProjectileSpawnSystem
+7. **✅ CoffeeBean Wake** - `PlantActionEvent("WakeMushroom")` + MushroomSystem handler
+8. **✅ ExplodeONut** - `handleDeathExplosion()` ajouté dans EntityDeathSystem
 
-3. **HypnoShroom** (~6h)
-   - `HypnotizedComponent` (existe!)
-   - Toggle faction dans `ZombieMovementSystem`
-   - VFX: Swirl eyes indicator
+### 🟡 Plantes restantes à implémenter (5)
 
-### 🟡 Moyenne Priorité (Sprint 4)
+| Plante | Mécanique | Effort | Notes |
+|--------|-----------|--------|-------|
+| **Plantern** | `RemovesFog` | 4h | FogSystem existe, ajouter zone illuminée |
+| **UmbrellaLeaf** | `DeflectsProjectiles` | 4h | Nécessite catapult zombies |
+| **GoldMagnet** | `CollectsCoins` | 3h | Auto-collect coins in range |
+| **GraveBuster** | `RemovesGraves` | 4h | Nécessite grave spawning system |
+| **Imitater** | `IsImitater` | 6h | Clone plant avec UI selection |
 
-4. **Flying Zombies** (~6h)
-   - `CanHitFlying` flag déjà dans ProjectileComponent
-   - Créer `FlyingZombie` dans ZombieData
-   - Modifier CombatSystem pour hit detection aérienne
-
-5. **Imitater Clone** (~6h)
-   - UI selection du plant à imiter
-   - Spawn duplicate avec visuals différents
+**Effort total restant:** ~21h
    - Cooldown séparé
 
 ### 🟢 Basse Priorité (Polish)

@@ -7,10 +7,15 @@
 	Handles:
 	- Torchwood converting peas to fire peas (EnhancesPeas)
 	- Fire pea damage multiplier (FireDamageMultiplier)
+	
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -25,28 +30,18 @@ local CONFIG = table.freeze({
 	DEFAULT_FIRE_MULTIPLIER = 2, -- 2x damage
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	EnhancedProjectiles = {} :: { [number]: boolean }, -- Prevent double-enhancement
+-- 3. TYPES
+type EnhancementState = {
+	EnhancedProjectiles: { [number]: boolean }, -- Prevent double-enhancement
 }
 
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
+-- 4. SYSTEM FUNCTION
+local function EnhancementSystem(world)
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("EnhancementState", {
+		EnhancedProjectiles = {} :: { [number]: boolean },
+	})
 
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-	table.clear(State.EnhancedProjectiles)
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
 	-- Find all Torchwood plants
 	local torchwoods = {}
 	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
@@ -69,7 +64,7 @@ local function OnStep(world)
 	-- Check each projectile
 	for projId, projPos, proj in world:query(Components.PositionComponent, Components.ProjectileComponent) do
 		-- Skip already enhanced
-		if State.EnhancedProjectiles[projId] then
+		if state.value.EnhancedProjectiles[projId] then
 			continue
 		end
 
@@ -104,7 +99,7 @@ local function OnStep(world)
 					})
 				)
 
-				State.EnhancedProjectiles[projId] = true
+				state.value.EnhancedProjectiles[projId] = true
 
 				-- If it was a frozen pea, it's no longer frozen (fire melts ice)
 				if proj.IsFrozen then
@@ -143,19 +138,17 @@ local function OnStep(world)
 	end
 
 	-- Cleanup tracked projectiles
-	for projId in State.EnhancedProjectiles do
+	for projId in state.value.EnhancedProjectiles do
 		if not world:contains(projId) then
-			State.EnhancedProjectiles[projId] = nil
+			state.value.EnhancedProjectiles[projId] = nil
 		end
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 -- Priority 165: Must run AFTER Projectile movement (160) but BEFORE Combat detection (170)
 -- to ensure projectiles are enhanced on the same frame they hit.
 return {
 	priority = 165,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = EnhancementSystem,
 }

@@ -2,18 +2,13 @@
 --[[
 	SunCollectionSystem.luau - Server-side sun collection processing
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
-	
 	Priority: 310 (After sun spawning)
 	
 	Handles sun collection requests from clients via Zap.
 	Validates the sun entity exists and is collectible.
 	Awards sun to player via SunService and despawns entity.
 	
-	LIFECYCLE:
-	- Init(): Setup network listener (CAN yield)
-	- OnStep(): Main loop (CANNOT yield) - processes collection queue
-	- Dispose(): Clear collection queue
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- ============================================================
@@ -22,7 +17,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -45,11 +40,11 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
+-- SECTION 3: TYPES
 -- ============================================================
-local State = {
-	World = nil :: any?,
-	CollectionQueue = {} :: { { Player: Player, EntityId: number, RequestId: number } },
+type CollectionRequest = { Player: Player, EntityId: number, RequestId: number }
+type CollectionState = {
+	CollectionQueue: { CollectionRequest },
 }
 
 -- ============================================================
@@ -57,8 +52,8 @@ local State = {
 -- ============================================================
 
 -- Queue a collection request (called by network handler)
-local function queueCollection(player: Player, entityId: number, requestId: number)
-	table.insert(State.CollectionQueue, {
+local function queueCollection(state: { value: CollectionState }, player: Player, entityId: number, requestId: number)
+	table.insert(state.value.CollectionQueue, {
 		Player = player,
 		EntityId = entityId,
 		RequestId = requestId,
@@ -97,13 +92,25 @@ local function processCollection(world: any, player: Player, entityId: number): 
 end
 
 -- ============================================================
--- SECTION 5: ONSTEP (main ECS loop)
+-- SECTION 5: SYSTEM FUNCTION
 -- ============================================================
-local function OnStep(world)
-	State.World = world
+local function SunCollectionSystem(world)
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("SunCollectionState", {
+		CollectionQueue = {} :: { CollectionRequest },
+	})
+
+	-- Set up network handler once via useMemo
+	Hooks.useMemo(function()
+		Network.CollectSunRequest.SetCallback(function(player: Player, data)
+			queueCollection(state, player, data.SunEntityId, data.RequestId)
+		end)
+		Logger.Debug("SunCollectionSystem", "Network handler initialized")
+		return true
+	end, {})
 
 	-- Process collection queue
-	for _, request in State.CollectionQueue do
+	for _, request in state.value.CollectionQueue do
 		local value = processCollection(world, request.Player, request.EntityId)
 
 		if value then
@@ -117,7 +124,7 @@ local function OnStep(world)
 				CollectorId = request.Player.UserId,
 				NewTotal = newTotal,
 			})
-			
+
 			-- Fire ServerEventBus event for analytics/achievements
 			ServerEventBus.FireSunCollected({
 				Player = request.Player,
@@ -143,33 +150,13 @@ local function OnStep(world)
 	end
 
 	-- Clear queue
-	table.clear(State.CollectionQueue)
+	table.clear(state.value.CollectionQueue)
 end
 
 -- ============================================================
--- SECTION 6: INIT / DISPOSE
--- ============================================================
-local function Init(_world)
-	-- Set up network handler
-	Network.CollectSunRequest.SetCallback(function(player: Player, data)
-		queueCollection(player, data.SunEntityId, data.RequestId)
-	end)
-
-	Logger.Debug("SunCollectionSystem", "Initialized")
-end
-
-local function Dispose()
-	table.clear(State.CollectionQueue)
-	State.World = nil
-	Logger.Debug("SunCollectionSystem", "Disposed")
-end
-
--- ============================================================
--- SECTION 7: MODULE EXPORT
+-- SECTION 6: MODULE EXPORT
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = SunCollectionSystem,
 }

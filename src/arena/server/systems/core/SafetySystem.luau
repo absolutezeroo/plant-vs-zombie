@@ -6,10 +6,15 @@
 	
 	CRITICAL SYSTEM - This prevents crashes from entity overflow.
 	Enforces ENTITY_CAP of 200 entities maximum.
+	
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Logger = require(Shared.utils.core.Logger)
@@ -22,28 +27,11 @@ local CONFIG = table.freeze({
 	WARNING_COOLDOWN = 5, -- Seconds between warnings
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	LastWarningTime = 0,
-}
+-- 3. SYSTEM FUNCTION
+local function SafetySystem(world)
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("SafetyState", { LastWarningTime = 0 })
 
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-	State.LastWarningTime = 0
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
 	local activeCount = 0
 	local inactiveCount = 0
 
@@ -67,21 +55,19 @@ local function OnStep(world)
 	elseif activeCount > warningLimit then
 		-- Throttled warning
 		local now = tick()
-		if now - State.LastWarningTime >= CONFIG.WARNING_COOLDOWN then
+		if now - state.value.LastWarningTime >= CONFIG.WARNING_COOLDOWN then
 			Logger.Warn("SafetySystem", "Approaching entity cap", {
 				ActiveCount = activeCount,
 				Cap = PerformanceConfig.ENTITY_CAP,
 				Percent = math.floor((activeCount / PerformanceConfig.ENTITY_CAP) * 100),
 			})
-			State.LastWarningTime = now
+			state.value.LastWarningTime = now
 		end
 	end
 end
 
--- 7. EXPORT
+-- 4. EXPORT
 return {
 	priority = 1,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = SafetySystem,
 }

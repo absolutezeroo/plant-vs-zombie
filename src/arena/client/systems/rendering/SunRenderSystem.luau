@@ -8,10 +8,7 @@
 	Creates visual sun orbs with falling animation.
 	Handles collection input (click/tap on sun).
 	
-	LIFECYCLE:
-	- Init(): Setup network listeners & input handlers (CAN yield)
-	- system(): Animate falling suns (CANNOT yield)
-	- Dispose(): Disconnect events, cleanup visuals
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +22,8 @@ local RunService = game:GetService("RunService")
 local Packages = ReplicatedStorage:FindFirstChild("Packages")
 assert(Packages, "SunRenderSystem: Packages folder not found")
 local Trove = require(Packages:WaitForChild("Trove"))
+local Hooks = require(Packages.MatterHooks)
+local Matter = require(Packages.Matter)
 
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
 assert(Shared, "SunRenderSystem: Shared folder not found")
@@ -193,7 +192,7 @@ local function handleInput(input: InputObject, gameProcessed: boolean)
 end
 
 --[[
-	Setup network event listeners & input handlers (called during Init phase)
+	Init - Setup listeners (via useMemo in system)
 ]]
 local function setupListeners()
 	_trove:Connect(UserInputService.InputBegan, handleInput)
@@ -264,6 +263,8 @@ local function setupListeners()
 		table.clear(_sunData)
 		Logger.Debug("SunRender", "Cleared all sun visuals for map unload")
 	end))
+
+	Logger.Debug("SunRender", "Initialized")
 end
 
 --[[
@@ -277,14 +278,6 @@ local function destroySunVisual(entityId: number)
 	end
 end
 
---[[
-	Init - Setup listeners (CAN yield)
-]]
-local function Init(_world)
-	setupListeners()
-	Logger.Debug("SunRender", "Initialized")
-end
-
 -- Movement config
 local MovementConfig = {
 	MIN_DT = 1 / 120, -- Minimum deltaTime
@@ -292,11 +285,16 @@ local MovementConfig = {
 }
 
 --[[
-	System - Animate falling suns (CANNOT yield)
+	System - Initialize on first run and animate falling suns
 ]]
 local function SunRenderSystem(_world)
+	-- Initialize network listeners once via useMemo
+	Hooks.useMemo(function()
+		setupListeners()
+		return true
+	end, {})
+
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
-	local Matter = require(Packages:FindFirstChild("Matter"))
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, MovementConfig.MIN_DT, MovementConfig.MAX_DT)
 
@@ -315,25 +313,7 @@ local function SunRenderSystem(_world)
 	end
 end
 
---[[
-	Dispose - Cleanup all visuals and connections
-]]
-local function Dispose()
-	-- Disconnect all events
-	_trove:Clean()
-
-	-- Destroy all sun visuals
-	for entityId in _sunData do
-		destroySunVisual(entityId)
-	end
-
-	Logger.Debug("SunRender", "Disposed")
-end
-
 return {
-	_name = "SunRenderSystem",
 	priority = 400,
 	system = SunRenderSystem,
-	Init = Init,
-	Dispose = Dispose,
 }

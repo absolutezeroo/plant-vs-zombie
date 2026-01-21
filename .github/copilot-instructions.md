@@ -162,7 +162,148 @@ For every implementation, refer to these specific API docs. Do not hallucinate A
 
 ---
 
-## 🏗️ CODING STANDARDS & ARCHITECTURE RULES
+## � GOD MODE ARCHITECTURE (3-LEVEL INTERVENTION)
+
+The God Mode system provides hooks at ALL gameplay stages for external systems (dev tools, mutations, buffs, events).
+
+### Level 1: ValidationMiddleware (PRE-ACTION BLOCKING)
+* **Location:** `src/shared/utils/combat/ValidationMiddleware.luau`
+* **Purpose:** Block or allow player actions BEFORE they happen.
+* **Rule:** ALL player actions MUST call `ValidationMiddleware.Validate()` before executing.
+
+```lua
+local ValidationMiddleware = require(Shared.utils.combat.ValidationMiddleware)
+
+-- ❌ BAD: Direct action without validation
+PlacementService.PlacePlant(player, plantType, row, col)
+
+-- ✅ GOOD: Validate first
+local allowed, reason = ValidationMiddleware.Validate("PlacePlant", {
+    Player = player,
+    PlantType = plantType,
+    Row = row,
+    Column = col
+})
+if not allowed then
+    warn("Blocked:", reason)
+    return
+end
+PlacementService.PlacePlant(player, plantType, row, col)
+```
+
+**Available Actions:**
+| Action | Context Fields | Used In |
+|--------|---------------|---------|
+| `PlacePlant` | Player, PlantType, Row, Column | PlacementSystem |
+| `ShovelPlant` | Player, PlantId, Row, Column | PlacementSystem |
+| `SpendSun` | Player, Amount | SunService |
+| `UsePlantFood` | Player, PlantId | PlantFoodSystem |
+| `StartWave` | Player? | WaveService |
+| `CollectSun` | Player, Amount | SunService |
+
+**Registering Hooks:**
+```lua
+local hookId = ValidationMiddleware.Register("PlacePlant", function(context)
+    if context.Column == 1 then
+        return false, "Cannot plant in column 1"
+    end
+    return true
+end)
+-- Later: ValidationMiddleware.Unregister("PlacePlant", hookId)
+```
+
+---
+
+### Level 2: DamageIntent Pipeline (IN-FLIGHT MODIFICATION)
+* **Components:** `src/shared/components/events/DamageIntent.luau`
+* **Registry:** `src/shared/utils/combat/DamageModifierRegistry.luau`
+* **Systems:** `DamageModifierSystem` (P:172) → `DamageResolverSystem` (P:175)
+* **Purpose:** Modify damage values WHILE they flow through the system.
+
+**The Two Paths:**
+| Path | When to Use | How |
+|------|-------------|-----|
+| **DamageIntent** | Normal combat (projectiles, zombie bites) | `CombatSystem.spawnDamageIntent()` |
+| **Direct ECSUtils** | Bypass modifiers (mutations, abilities) | `ECSUtils.DamageEntity()` directly |
+
+```lua
+-- ✅ MODIFIABLE PATH (goes through DamageModifierSystem)
+-- Used by CombatSystem for projectiles and zombie attacks
+local function applyDamage(world, targetId, damage, Components, sourceInfo)
+    local intent = world:spawn(
+        Components.DamageIntent({
+            TargetId = targetId,
+            SourceId = sourceInfo.SourceId,
+            Amount = damage,
+            DamageType = sourceInfo.DamageType or "Normal",
+        })
+    )
+end
+
+-- ✅ BYPASS PATH (direct damage, no modifiers)
+-- Used by mutations and special abilities
+ECSUtils.DamageEntity(world, targetId, damage, Components)
+```
+
+**Registering Damage Modifiers:**
+```lua
+local DamageModifierRegistry = require(Shared.utils.combat.DamageModifierRegistry)
+
+local modifierId = DamageModifierRegistry.Register({
+    Id = "CriticalHitMutation",
+    Priority = 100,  -- Higher = runs later
+    Apply = function(intent, world)
+        if ChanceUtils.Roll(0.15) then  -- 15% crit chance
+            intent.FinalAmount *= 2
+            intent.IsCritical = true
+        end
+        return intent
+    end,
+})
+-- Later: DamageModifierRegistry.Unregister(modifierId)
+```
+
+---
+
+### Level 3: ServerEventBus (POST-ACTION REACTION)
+* **Location:** `src/arena/server/services/ServerEventBus.luau`
+* **Purpose:** React to events AFTER they happen. Pure observation, no blocking.
+
+**Available Events:**
+| Event | Payload | Fired By |
+|-------|---------|----------|
+| `OnEntityDied` | `{ EntityId, EntityType, Position, KillerId?, KillerType? }` | EntityDeathSystem |
+| `OnPlantPlaced` | `{ PlantId, PlantType, Row, Column, PlayerId }` | PlacementSystem |
+| `OnPlantShoveled` | `{ PlantId, PlantType, Row, Column, PlayerId, SunRefund }` | PlacementSystem |
+| `OnSunSpent` | `{ PlayerId, Amount, NewBalance, Reason }` | SunService |
+| `OnSunCollected` | `{ PlayerId, Amount, NewBalance, SourceType }` | SunService |
+| `OnWaveStarted` | `{ WaveNumber, TotalWaves }` | WaveService |
+| `OnWaveCompleted` | `{ WaveNumber, TotalWaves, IsFinalWave }` | WaveService |
+| `OnGameStateChanged` | `{ OldState, NewState }` | WaveService |
+| `OnDamageDealt` | `{ TargetId, SourceId, Amount, DamageType, IsCritical }` | DamageResolverSystem |
+| `OnPlantFoodUsed` | `{ PlayerId, PlantId, PlantType }` | PlantFoodService |
+| `OnMutationTriggered` | `{ PlantId, MutationType, EffectData }` | MutationSystem |
+
+**Subscribing to Events:**
+```lua
+local ServerEventBus = require(Arena.server.services.ServerEventBus)
+
+-- Subscribe (returns connection for cleanup)
+local connection = ServerEventBus.OnEntityDied:Connect(function(payload)
+    if payload.EntityType == "Zombie" then
+        StatsService.IncrementStat(payload.KillerId, "ZombiesKilled", 1)
+    end
+end)
+
+-- Cleanup with Trove
+_trove:Add(ServerEventBus.OnPlantPlaced:Connect(function(payload)
+    print("Plant placed:", payload.PlantType)
+end))
+```
+
+---
+
+## �🏗️ CODING STANDARDS & ARCHITECTURE RULES
 
 * **Strict Typing:** Every file MUST start with `--!strict`. All functions must have type annotations.
 * **Linting (MANDATORY):**

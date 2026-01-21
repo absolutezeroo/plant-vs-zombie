@@ -2,8 +2,6 @@
 --[[
 	SpecialPlantSystem.luau - Server-side special plant abilities
 	
-	SYSTEM V2 ARCHITECTURE (see docs/SYSTEM-STANDARD.md)
-	
 	Priority: 175 (Simulation phase - after projectiles, before combat)
 	
 	Handles:
@@ -18,10 +16,7 @@
 	- Squash jump-and-squash (SquashAbility.luau)
 	- CobCannon targeting (CobCannonAbility.luau)
 	
-	LIFECYCLE:
-	- Init(): Setup network handlers, initialize ability registry
-	- OnStep(): Main loop (CANNOT yield) - processes special plants
-	- Dispose(): Clear tracking state
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- ============================================================
@@ -30,6 +25,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -74,13 +70,12 @@ local CONFIG = table.freeze({
 })
 
 -- ============================================================
--- SECTION 3: STATE (all mutable data)
+-- SECTION 3: TYPES
 -- ============================================================
-local State = {
-	-- Track plants with fuse timers
-	FusePlants = {} :: { [number]: { explodeTime: number, plantType: string } },
-	-- Track entities with registered ability handlers
-	HandlerEntities = {} :: { [number]: boolean },
+type FuseData = { explodeTime: number, plantType: string }
+type SpecialPlantState = {
+	FusePlants: { [number]: FuseData },
+	HandlerEntities: { [number]: boolean },
 }
 
 -- ============================================================
@@ -88,7 +83,13 @@ local State = {
 -- ============================================================
 
 -- Handle explosion for various plant types
-local function handleExplosion(world: any, entityId: number, pos: any, plantType: string)
+local function handleExplosion(
+	world: any,
+	state: { value: SpecialPlantState },
+	entityId: number,
+	pos: any,
+	plantType: string
+)
 	local stats = PlantData[plantType]
 	if not stats then
 		return
@@ -255,10 +256,52 @@ local function explodePotatoMine(world: any, mineId: number, minePos: any, trigg
 end
 
 -- ============================================================
--- SECTION 5: ONSTEP (main ECS loop)
+-- SECTION 5: SYSTEM FUNCTION
 -- ============================================================
-local function OnStep(world)
+local function SpecialPlantSystem(world)
 	local currentTime = os.clock()
+
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("SpecialPlantState", {
+		FusePlants = {} :: { [number]: FuseData },
+		HandlerEntities = {} :: { [number]: boolean },
+	})
+
+	-- Set up network handler once via useMemo
+	Hooks.useMemo(function()
+		-- Listen for CobCannon fire requests (delegates to CobCannonAbility)
+		Network.CobCannonFireRequest.SetCallback(function(player: Player, data)
+			local plantId = data.PlantEntityId
+			local targetLane = data.TargetLane
+			local targetColumn = data.TargetColumn
+
+			-- Validate plant exists and is a CobCannon
+			if not world:contains(plantId) then
+				Logger.Warn("SpecialPlant", `CobCannon fire failed: plant {plantId} not found`)
+				return
+			end
+
+			local plant = world:get(plantId, Components.PlantTypeComponent)
+			if not plant or plant.PlantType ~= "CobCannon" then
+				Logger.Warn("SpecialPlant", `CobCannon fire failed: entity {plantId} is not a CobCannon`)
+				return
+			end
+
+			-- Delegate to CobCannonAbility handler
+			local cbTime = os.clock()
+			local success, errorMsg = CobCannonAbility.Fire(world, plantId, targetColumn, targetLane, cbTime)
+
+			if not success then
+				Logger.Debug("SpecialPlant", `CobCannon fire failed: {errorMsg or "unknown"}`)
+				return
+			end
+
+			Logger.Info("SpecialPlant", `Player {player.Name} fired CobCannon {plantId} at ({targetColumn}, {targetLane})`)
+		end)
+
+		Logger.Debug("SpecialPlantSystem", "Network handler initialized")
+		return true
+	end, {})
 
 	-- React to SpawnEvent for new special plants
 	for _, event in world:query(Components.SpawnEvent) do
@@ -284,7 +327,7 @@ local function OnStep(world)
 		-- Initialize special plant behaviors
 		if stats.ExplodesOnPlace then
 			local fuseTime = stats.FuseTime or CONFIG.FUSE_TIME
-			State.FusePlants[entityId] = {
+			state.value.FusePlants[entityId] = {
 				explodeTime = currentTime + fuseTime,
 				plantType = plant.PlantType,
 			}
@@ -294,17 +337,17 @@ local function OnStep(world)
 			local killCount = 0
 			local allZombies = LaneCache.GetAllZombies()
 			local ZombieData = require(Shared.data.ZombieData)
-			
+
 			for _, zombieId in allZombies do
 				if not world:contains(zombieId) then
 					continue
 				end
-				
+
 				local zombie = world:get(zombieId, Components.ZombieTypeComponent)
 				if not zombie then
 					continue
 				end
-				
+
 				local zombieStats = ZombieData[zombie.ZombieType]
 				if zombieStats and zombieStats.IsFlying then
 					if ECSUtils.KillEntity(world, zombieId, Components) then
@@ -312,9 +355,9 @@ local function OnStep(world)
 					end
 				end
 			end
-			
+
 			Logger.Info("SpecialPlant", `Blover {entityId} blew away {killCount} flying zombies!`)
-			
+
 			-- Blover disappears after use
 			GridService.Clear(plant.Column, plant.Lane)
 			NetworkUtils.BroadcastEntityDied(entityId)
@@ -334,15 +377,15 @@ local function OnStep(world)
 	end
 
 	-- Process fuse plants (CherryBomb, DoomShroom, IceShroom, Jalapeno)
-	for entityId, fuseData in State.FusePlants do
+	for entityId, fuseData in state.value.FusePlants do
 		if currentTime >= fuseData.explodeTime then
 			if world:contains(entityId) then
 				local pos = world:get(entityId, Components.PositionComponent)
 				if pos then
-					handleExplosion(world, entityId, pos, fuseData.plantType)
+					handleExplosion(world, state, entityId, pos, fuseData.plantType)
 				end
 			end
-			State.FusePlants[entityId] = nil
+			state.value.FusePlants[entityId] = nil
 		end
 	end
 
@@ -398,20 +441,20 @@ local function OnStep(world)
 	-- DELEGATED ABILITIES (Chomper, Squash, CobCannon)
 	-- These are now handled by PlantAbilityRegistry handlers
 	-- ================================================================
-	
+
 	-- Process plants with registered ability handlers
 	for plantId, pos, plant in world:query(Components.PositionComponent, Components.PlantTypeComponent) do
 		-- Check if this plant type has a registered handler
 		if not PlantAbilityRegistry.HasHandler(plant.PlantType) then
 			continue
 		end
-		
+
 		-- Initialize state if new entity
-		if not State.HandlerEntities[plantId] then
+		if not state.value.HandlerEntities[plantId] then
 			PlantAbilityRegistry.InitState(plantId, plant.PlantType)
-			State.HandlerEntities[plantId] = true
+			state.value.HandlerEntities[plantId] = true
 		end
-		
+
 		-- Build ability context
 		local ctx = {
 			EntityId = plantId,
@@ -422,110 +465,51 @@ local function OnStep(world)
 			Column = plant.Column,
 			CurrentTime = currentTime,
 		}
-		
+
 		-- Execute OnTick for this plant's handler
 		local result = PlantAbilityRegistry.ExecuteOnTick(ctx)
-		
+
 		if result then
 			-- Log message if provided
 			if result.Message then
 				Logger.Info("SpecialPlant", result.Message)
 			end
-			
+
 			-- Handle despawn request
 			if result.Despawn then
 				if result.ClearGrid then
 					GridService.Clear(plant.Column, plant.Lane)
 				end
 				EntityPool.SafeDespawn(plantId, world)
-				State.HandlerEntities[plantId] = nil
+				state.value.HandlerEntities[plantId] = nil
 				PlantAbilityRegistry.CleanupState(plantId, plant.PlantType)
 			end
 		end
 	end
-	
+
 	-- Cleanup handler state for despawned entities
-	for entityId in State.HandlerEntities do
+	for entityId in state.value.HandlerEntities do
 		if not world:contains(entityId) then
 			local plant = world:get(entityId, Components.PlantTypeComponent)
 			if plant then
 				PlantAbilityRegistry.CleanupState(entityId, plant.PlantType)
 			end
-			State.HandlerEntities[entityId] = nil
+			state.value.HandlerEntities[entityId] = nil
 		end
 	end
 
 	-- Cleanup tracking for despawned entities
-	for entityId in State.FusePlants do
+	for entityId in state.value.FusePlants do
 		if not world:contains(entityId) then
-			State.FusePlants[entityId] = nil
+			state.value.FusePlants[entityId] = nil
 		end
 	end
 end
 
 -- ============================================================
--- SECTION 6: INIT / DISPOSE
--- ============================================================
-
--- Store world reference for network handlers
-local _world: any = nil
-
-local function Init(world)
-	_world = world
-	
-	-- Listen for CobCannon fire requests (delegates to CobCannonAbility)
-	Network.CobCannonFireRequest.SetCallback(function(player: Player, data)
-		local plantId = data.PlantEntityId
-		local targetLane = data.TargetLane
-		local targetColumn = data.TargetColumn
-
-		-- Validate plant exists and is a CobCannon
-		if not _world:contains(plantId) then
-			Logger.Warn("SpecialPlant", `CobCannon fire failed: plant {plantId} not found`)
-			return
-		end
-
-		local plant = _world:get(plantId, Components.PlantTypeComponent)
-		if not plant or plant.PlantType ~= "CobCannon" then
-			Logger.Warn("SpecialPlant", `CobCannon fire failed: entity {plantId} is not a CobCannon`)
-			return
-		end
-
-		-- Delegate to CobCannonAbility handler
-		local currentTime = os.clock()
-		local success, errorMsg = CobCannonAbility.Fire(_world, plantId, targetColumn, targetLane, currentTime)
-		
-		if not success then
-			Logger.Debug("SpecialPlant", `CobCannon fire failed: {errorMsg or "unknown"}`)
-			return
-		end
-		
-		Logger.Info("SpecialPlant", `Player {player.Name} fired CobCannon {plantId} at ({targetColumn}, {targetLane})`)
-	end)
-	
-	Logger.Debug("SpecialPlantSystem", "Initialized")
-end
-
-local function Dispose()
-	-- Clear state
-	table.clear(State.FusePlants)
-	
-	-- Clear all handler states and tracking
-	for entityId, _ in State.HandlerEntities do
-		PlantAbilityRegistry.CleanupState(entityId, nil) -- nil = all handlers
-	end
-	table.clear(State.HandlerEntities)
-	
-	_world = nil
-	Logger.Debug("SpecialPlantSystem", "Disposed")
-end
-
--- ============================================================
--- SECTION 7: MODULE EXPORT
+-- SECTION 6: MODULE EXPORT
 -- ============================================================
 return {
 	priority = CONFIG.PRIORITY,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = SpecialPlantSystem,
 }

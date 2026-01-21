@@ -12,6 +12,8 @@
 	1. This system runs at Priority 95 → Rebuilds LaneCache
 	2. TargetingSystem/ProjectileSystem run at Priority 120+ → Consume fresh cache
 	3. All lane queries are O(1) lookups instead of O(N) world:query() loops
+	
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
@@ -28,27 +30,8 @@ local CONFIG = table.freeze({
 	DEBUG_LOGGING = false,
 })
 
--- 3. STATE (minimal - this system is stateless by design)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	LaneCache.Clear()
-	State.IsInitialized = false
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 3. SYSTEM FUNCTION
+local function SpatialHashingSystem(world)
 	-- Rebuild the cache from scratch every frame
 	-- Pass HypnotizedComponent so LaneCache can track ally zombies
 	local mapConfig = MapConfig.IsInitialized() and MapConfig.GetConfig() or nil
@@ -62,10 +45,8 @@ local function OnStep(world)
 	LaneCache.RebuildPlants(world, Components.PlantTypeComponent)
 end
 
--- 7. EXPORT
+-- 4. EXPORT
 return {
 	priority = 95,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = SpatialHashingSystem,
 }

@@ -9,6 +9,8 @@
 	Checks for game over condition (zombie reaches house).
 	
 	CRITICAL: Uses Matter.useDeltaTime() for lag-independent movement.
+
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
@@ -16,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -38,53 +41,16 @@ local CONFIG = table.freeze({
 	MAX_DT = 1 / 15, -- Maximum deltaTime to prevent teleporting on lag spikes
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	LastBatchTime = 0,
-	PositionUpdates = {} :: { [number]: number },
-	ReachedHouse = {} :: { [number]: boolean },
-	CachedConfig = nil :: MapConfig.MapConfigType?,
-	CachedBasePos = Vector3.zero,
-	CachedZombieDir = Vector3.zero,
+-- 3. HELPER TYPES
+type ZombieMovementState = {
+	LastBatchTime: number,
+	PositionUpdates: { [number]: number },
+	ReachedHouse: { [number]: boolean },
 }
 
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	-- Pre-cache MapConfig to avoid yield in OnStep
-	-- MapConfig.Initialize() is called during server bootstrap
-	if MapConfig.IsInitialized() then
-		State.CachedConfig = MapConfig.GetConfigIfReady()
-	else
-		-- Fallback: force init (should not happen if bootstrap is correct)
-		State.CachedConfig = MapConfig.GetConfig()
-	end
-
-	-- Cache frequently used values
-	State.CachedBasePos = MapConfig.GetBasePosition()
-	State.CachedZombieDir = MapConfig.GetZombieDirection()
-
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-	State.LastBatchTime = 0
-	State.CachedConfig = nil
-	State.CachedBasePos = Vector3.zero
-	State.CachedZombieDir = Vector3.zero
-	table.clear(State.PositionUpdates)
-	table.clear(State.ReachedHouse)
-end
-
 -- Helper: Convert world X position to grid column
-local function worldXToGridColumn(worldX: number): number?
-	local config = State.CachedConfig
+local function worldXToGridColumn(worldX: number, cachedConfig: MapConfig.MapConfigType?): number?
+	local config = cachedConfig
 	if not config then
 		return nil
 	end
@@ -103,23 +69,32 @@ local function worldXToGridColumn(worldX: number): number?
 	return column
 end
 
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 4. SYSTEM FUNCTION
+local function ZombieMovementSystem(world)
 	local currentTime = os.clock()
+
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("ZombieMovementState", {
+		LastBatchTime = 0,
+		PositionUpdates = {} :: { [number]: number },
+		ReachedHouse = {} :: { [number]: boolean },
+	})
+
+	-- Cache MapConfig values via useMemo (refreshed when map changes)
+	local cachedConfig, cachedBasePos, cachedZombieDir = Hooks.useMemo(function()
+		if MapConfig.IsInitialized() then
+			return MapConfig.GetConfigIfReady(), MapConfig.GetBasePosition(), MapConfig.GetZombieDirection()
+		end
+		return nil, Vector3.zero, Vector3.zero
+	end, { MapConfig.IsInitialized() })
 
 	-- CRITICAL: Use Matter's deltaTime for frame-rate independence
 	local dt = Matter.useDeltaTime()
 	dt = math.clamp(dt, CONFIG.MIN_DT, CONFIG.MAX_DT)
 
-	-- Refresh cached MapConfig values (may change after loadmap)
-	if MapConfig.IsInitialized() then
-		State.CachedBasePos = MapConfig.GetBasePosition()
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	end
-
 	-- Get base position and zombie direction from cache
-	local basePos = State.CachedBasePos
-	local zombieDir = State.CachedZombieDir
+	local basePos = cachedBasePos
+	local zombieDir = cachedZombieDir
 
 	-- Process all zombies with movement
 	for id, pos, movement, zombie in
@@ -138,7 +113,7 @@ local function OnStep(world)
 		end
 
 		-- Skip if already reached house
-		if State.ReachedHouse[id] then
+		if state.value.ReachedHouse[id] then
 			continue
 		end
 
@@ -189,8 +164,8 @@ local function OnStep(world)
 		end
 
 		if reachedBase then
-			if not State.ReachedHouse[id] then
-				State.ReachedHouse[id] = true
+			if not state.value.ReachedHouse[id] then
+				state.value.ReachedHouse[id] = true
 
 				-- Deal damage to base
 				BaseHealth.OnZombieReachedHouse()
@@ -217,7 +192,7 @@ local function OnStep(world)
 		-- Update GridPositionComponent if zombie has one
 		local gridPos = world:get(id, Components.GridPositionComponent)
 		if gridPos then
-			local newColumn = worldXToGridColumn(newX)
+			local newColumn = worldXToGridColumn(newX, cachedConfig)
 			if newColumn and newColumn ~= gridPos.Column then
 				world:insert(
 					id,
@@ -230,15 +205,15 @@ local function OnStep(world)
 		end
 
 		-- Track position for batched network update
-		State.PositionUpdates[id] = newX
+		state.value.PositionUpdates[id] = newX
 	end
 
 	-- Send batched position updates to clients (throttled)
-	if currentTime - State.LastBatchTime >= CONFIG.BATCH_INTERVAL then
+	if currentTime - state.value.LastBatchTime >= CONFIG.BATCH_INTERVAL then
 		local entityIds = {}
 		local positionsX = {}
 
-		for entityId, posX in State.PositionUpdates do
+		for entityId, posX in state.value.PositionUpdates do
 			if world:contains(entityId) then
 				table.insert(entityIds, entityId)
 				table.insert(positionsX, posX)
@@ -252,22 +227,20 @@ local function OnStep(world)
 			})
 		end
 
-		table.clear(State.PositionUpdates)
-		State.LastBatchTime = currentTime
+		table.clear(state.value.PositionUpdates)
+		state.value.LastBatchTime = currentTime
 	end
 
 	-- Clean up tracking for despawned zombies
-	for id in State.ReachedHouse do
+	for id in state.value.ReachedHouse do
 		if not world:contains(id) then
-			State.ReachedHouse[id] = nil
+			state.value.ReachedHouse[id] = nil
 		end
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 return {
 	priority = 150,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = ZombieMovementSystem,
 }

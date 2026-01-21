@@ -15,8 +15,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PerformanceConfig = require(ReplicatedStorage.Shared.config.PerformanceConfig)
-local Logger = require(ReplicatedStorage.Shared.utils.Logger)
-local ErrorHandler = require(ReplicatedStorage.Shared.utils.ErrorHandler)
+local Logger = require(ReplicatedStorage.Shared.utils.core.Logger)
+local ErrorHandler = require(ReplicatedStorage.Shared.utils.core.ErrorHandler)
 
 local EntityPool = {}
 

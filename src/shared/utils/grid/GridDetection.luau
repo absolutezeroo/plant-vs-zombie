@@ -15,7 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Utils = Shared:WaitForChild("utils")
 local Config = Shared:WaitForChild("config")
 
-local LaneCache = require(Utils:WaitForChild("LaneCache"))
+local LaneCache = require(Utils:WaitForChild("ecs"):WaitForChild("LaneCache"))
 local MapConfig = require(Config:WaitForChild("MapConfig"))
 local GridConfig = require(Config:WaitForChild("GridConfig"))
 

@@ -9,10 +9,7 @@
 	Uses AnimationService for idle/spawn/death animations (no Humanoid).
 	Falls back to colored cube if model not found.
 	
-	LIFECYCLE:
-	- Init(): Setup network listeners (CAN yield)
-	- system(): Static plants, no per-frame updates (CANNOT yield)
-	- Dispose(): Disconnect events, cleanup visuals
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +20,7 @@ local Players = game:GetService("Players")
 -- Packages
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages.Trove)
+local Hooks = require(Packages.MatterHooks)
 
 -- Use FindFirstChild to avoid yielding (modules should exist from init.client.luau)
 local Shared = ReplicatedStorage:FindFirstChild("Shared")
@@ -88,12 +86,12 @@ type PlantVisual = {
 	Lane: number,
 	OwnerId: number, -- Player UserId who owns this plant
 }
-local _plantVisuals: { [number]: PlantVisual } = {}
 
--- Mutations cache: entityId -> mutation list (cleaner than model attributes)
+-- Shared state (accessible from exported functions)
+local _plantVisuals: { [number]: PlantVisual } = {}
 local _plantMutations: { [number]: { string } } = {}
 
--- Trove for cleanup (connections)
+-- Trove for network listener cleanup (managed by useMemo)
 local _trove = Trove.new()
 
 -- Fallback visual config (when model not found)
@@ -475,52 +473,29 @@ local function getPlantVisual(entityId: number): (Model?, Part?)
 end
 
 --[[
-	Init - Setup network listeners (CAN yield)
-]]
-local function Init(_world)
-	setupNetworkListeners()
-	Logger.Debug("PlantRender", "Initialized")
-end
-
---[[
-	System - Static plants, no per-frame updates needed
-]]
-local function PlantRenderSystem(_world)
-	-- All updates come via network events
-end
-
---[[
-	Dispose - Cleanup all visuals and connections
-]]
-local function Dispose()
-	-- Trove handles all connection cleanup
-	_trove:Destroy()
-	_trove = Trove.new() -- Reset for potential reuse
-
-	-- Destroy all plant visuals
-	for entityId in _plantVisuals do
-		destroyPlantVisual(entityId)
-	end
-
-	-- Clear mutations cache
-	table.clear(_plantMutations)
-
-	Logger.Debug("PlantRender", "Disposed")
-end
-
---[[
 	Get mutations for an entity (used by tooltip)
 ]]
 local function getMutations(entityId: number): { string }
 	return _plantMutations[entityId] or {}
 end
 
+--[[
+	System - Initialize on first run and handle static plants
+]]
+local function PlantRenderSystem(_world)
+	-- Initialize network listeners once via useMemo
+	Hooks.useMemo(function()
+		setupNetworkListeners()
+		Logger.Debug("PlantRender", "Initialized")
+		return true
+	end, {})
+
+	-- All updates come via network events
+end
+
 return {
-	_name = "PlantRenderSystem",
 	priority = 405,
 	system = PlantRenderSystem,
-	Init = Init,
-	Dispose = Dispose,
 	getPlantVisual = getPlantVisual,
 	getMutations = getMutations,
 }

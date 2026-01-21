@@ -8,6 +8,8 @@
 	Sun falls with simulated gravity until reaching ground level.
 	
 	MULTIPLAYER: Each player gets their own sky suns (not shared).
+
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
@@ -16,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -43,52 +46,51 @@ local CONFIG = table.freeze({
 	MAX_DT = 1 / 15,
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	LastSpawnTime = 0,
-	NextSpawnDelay = 0,
-	WaveService = nil :: any,
-	CachedGridY = 0 :: number,
-	CachedCellWidth = 0 :: number,
-	CachedCellDepth = 0 :: number,
+-- 3. HELPER TYPES
+type SunSpawnState = {
+	LastSpawnTime: number,
+	NextSpawnDelay: number,
+	WaveService: any,
+	CachedGridY: number,
+	CachedCellWidth: number,
+	CachedCellDepth: number,
 }
 
 -- Helper: Get WaveService (lazy load)
-local function getWaveService()
-	if not State.WaveService then
-		State.WaveService = require(Server.services.WaveService)
+local function getWaveService(state: { value: SunSpawnState })
+	if not state.value.WaveService then
+		state.value.WaveService = require(Server.services.WaveService)
 	end
-	return State.WaveService
+	return state.value.WaveService
 end
 
 -- Helper: Get ground Y from cached config
-local function getGroundY(): number
-	return State.CachedGridY
+local function getGroundY(state: { value: SunSpawnState }): number
+	return state.value.CachedGridY
 end
 
 -- Helper: Get spawn height for sky suns
-local function getSpawnHeight(): number
-	return getGroundY() + CONFIG.SPAWN_HEIGHT_OFFSET
+local function getSpawnHeight(state: { value: SunSpawnState }): number
+	return getGroundY(state) + CONFIG.SPAWN_HEIGHT_OFFSET
 end
 
 -- Helper: Get random grid position
-local function getRandomGridPosition(): (number, number, number)
+local function getRandomGridPosition(state: { value: SunSpawnState }): (number, number, number)
 	local column, lane = ChanceUtils.RandomGridCell()
-	local cellCenter = MapConfig.GridToWorld(column, lane) -- Safe: MapConfig initialized at bootstrap
-	local cellW = State.CachedCellWidth
-	local cellD = State.CachedCellDepth
+	local cellCenter = MapConfig.GridToWorld(column, lane)
+	local cellW = state.value.CachedCellWidth
+	local cellD = state.value.CachedCellDepth
 
 	local offsetX = ChanceUtils.RandomOffset(cellW * 0.3)
 	local offsetZ = ChanceUtils.RandomOffset(cellD * 0.3)
 
-	return cellCenter.X + offsetX, getSpawnHeight(), cellCenter.Z + offsetZ
+	return cellCenter.X + offsetX, getSpawnHeight(state), cellCenter.Z + offsetZ
 end
 
 -- Helper: Spawn sky sun for a specific player
-local function spawnSkySunForPlayer(world: any, ownerId: number): number
-	local x, y, z = getRandomGridPosition()
-	local targetY = getGroundY() + CONFIG.GROUND_OFFSET + ChanceUtils.RandomFloat(0, 2)
+local function spawnSkySunForPlayer(world: any, state: { value: SunSpawnState }, ownerId: number): number
+	local x, y, z = getRandomGridPosition(state)
+	local targetY = getGroundY(state) + CONFIG.GROUND_OFFSET + ChanceUtils.RandomFloat(0, 2)
 
 	local entityId = EntityPool.Spawn(
 		Components.PositionComponent({
@@ -125,65 +127,53 @@ local function spawnSkySunForPlayer(world: any, ownerId: number): number
 	return entityId
 end
 
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	-- Pre-cache config values to avoid yield in OnStep
-	if MapConfig.IsInitialized() then
-		local config = MapConfig.GetConfigIfReady()
-		State.CachedGridY = if config then config.GridY else 0
-	else
-		-- Fallback: force init (should not happen if bootstrap is correct)
-		State.CachedGridY = MapConfig.GetConfig().GridY
-	end
-
-	-- Cache cell size
-	local cellW, cellD = MapConfig.GetCellSize()
-	State.CachedCellWidth = cellW
-	State.CachedCellDepth = cellD
-
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-	State.LastSpawnTime = 0
-	State.NextSpawnDelay = 0
-	State.WaveService = nil
-	State.CachedGridY = 0
-	State.CachedCellWidth = 0
-	State.CachedCellDepth = 0
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 4. SYSTEM FUNCTION
+local function SunSpawnSystem(world)
 	local currentTime = os.clock()
 
+	-- State managed via Hooks.useMap
+	local state = Hooks.useMap("SunSpawnState", {
+		LastSpawnTime = 0,
+		NextSpawnDelay = 0,
+		WaveService = nil :: any,
+		CachedGridY = 0,
+		CachedCellWidth = 0,
+		CachedCellDepth = 0,
+	})
+
+	-- Initialize cached config values once via useMemo
+	Hooks.useMemo(function()
+		if MapConfig.IsInitialized() then
+			local config = MapConfig.GetConfigIfReady()
+			state.value.CachedGridY = if config then config.GridY else 0
+		else
+			state.value.CachedGridY = MapConfig.GetConfig().GridY
+		end
+
+		local cellW, cellD = MapConfig.GetCellSize()
+		state.value.CachedCellWidth = cellW
+		state.value.CachedCellDepth = cellD
+		return true
+	end, {})
+
 	-- Only spawn sun during "Playing" state
-	local WaveService = getWaveService()
+	local WaveService = getWaveService(state)
 	local gameState = WaveService.GetGameState()
 
 	if gameState ~= "Playing" then
-		State.LastSpawnTime = currentTime
+		state.value.LastSpawnTime = currentTime
 		return
 	end
 
-	-- No SUN_DROP_SCALE needed anymore - each player gets their own sun
-	-- The economy is already balanced since suns are individual
-
 	-- Check if it's time to spawn new sun
 	local baseInterval = CONFIG.SPAWN_INTERVAL + ChanceUtils.RandomOffset(CONFIG.SPAWN_INTERVAL_VARIANCE)
-	if currentTime - State.LastSpawnTime >= State.NextSpawnDelay then
+	if currentTime - state.value.LastSpawnTime >= state.value.NextSpawnDelay then
 		-- Spawn one sun for EACH player (individual economy)
 		for _, player in Players:GetPlayers() do
-			spawnSkySunForPlayer(world, player.UserId)
+			spawnSkySunForPlayer(world, state, player.UserId)
 		end
-		State.LastSpawnTime = currentTime
-		State.NextSpawnDelay = baseInterval
+		state.value.LastSpawnTime = currentTime
+		state.value.NextSpawnDelay = baseInterval
 	end
 
 	-- Process falling sun and despawning
@@ -204,7 +194,7 @@ local function OnStep(world)
 			local dtSun = Matter.useDeltaTime()
 			dtSun = math.clamp(dtSun, CONFIG.MIN_DT, CONFIG.MAX_DT)
 			local newY = pos.Y - CONFIG.FALL_SPEED * dtSun
-			local targetY = sun.TargetY or (getGroundY() + CONFIG.GROUND_OFFSET)
+			local targetY = sun.TargetY or (state.value.CachedGridY + CONFIG.GROUND_OFFSET)
 
 			if newY <= targetY then
 				-- Landed
@@ -245,10 +235,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 5. EXPORT
 return {
 	priority = 300,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = SunSpawnSystem,
 }

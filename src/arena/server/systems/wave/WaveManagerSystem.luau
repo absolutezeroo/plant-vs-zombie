@@ -11,6 +11,8 @@
 	- Fires WaveStateEvents for UI/Audio
 	
 	For API calls, use: require(WaveService).StartGame(), etc.
+	
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 --------------------------------------------------------------------------------
@@ -46,8 +48,7 @@ local CONFIG = table.freeze({
 })
 
 --------------------------------------------------------------------------------
--- [3] STATE (reference to WaveService.State)
--- Note: WaveManagerSystem uses WaveService.GetState() for mutable state
+-- [3] PRIVATE HELPERS
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
@@ -151,9 +152,9 @@ local function startWave(waveNumber: number, world: any, state: any, spawner: an
 end
 
 --------------------------------------------------------------------------------
--- [5] ONSTEP (main loop - CANNOT yield)
+-- [4] SYSTEM FUNCTION (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
-local function OnStep(world)
+local function WaveManagerSystem(world)
 	local state = WaveService.GetState()
 	local spawner = WaveService.GetSpawner()
 	local broadcaster = WaveService.GetBroadcaster()
@@ -296,22 +297,9 @@ local function OnStep(world)
 end
 
 --------------------------------------------------------------------------------
--- [6] INIT / DISPOSE
---------------------------------------------------------------------------------
-local function Init(_world)
-	-- WaveService handles manager initialization
-end
-
-local function Dispose()
-	WaveService.ResetGameState()
-end
-
---------------------------------------------------------------------------------
--- [7] EXPORT
+-- [5] EXPORT
 --------------------------------------------------------------------------------
 return {
 	priority = 100,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = WaveManagerSystem,
 }

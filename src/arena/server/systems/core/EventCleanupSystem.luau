@@ -7,6 +7,8 @@
 	Events in Matter ECS are entities with event components.
 	This system removes all event entities at the end of each frame.
 	"Events exist for exactly one frame"
+	
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
@@ -29,26 +31,8 @@ local CONFIG = table.freeze({
 	},
 })
 
--- 3. STATE (minimal - this system is stateless)
-local State = {
-	IsInitialized = false,
-}
-
--- 4. INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-end
-
--- 5. DISPOSE
-local function Dispose()
-	State.IsInitialized = false
-end
-
--- 6. MAIN LOOP
-local function OnStep(world)
+-- 3. SYSTEM FUNCTION
+local function EventCleanupSystem(world)
 	-- Query for all event entities and despawn them
 	-- Events only exist for one frame
 	for _, eventComponent in CONFIG.EVENT_COMPONENTS do
@@ -58,10 +42,8 @@ local function OnStep(world)
 	end
 end
 
--- 7. EXPORT
+-- 4. EXPORT
 return {
 	priority = 400,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = EventCleanupSystem,
 }

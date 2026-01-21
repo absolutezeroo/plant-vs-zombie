@@ -19,6 +19,11 @@
 --------------------------------------------------------------------------------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Packages = ReplicatedStorage:WaitForChild("Packages")
+local MatterHooks = require(Packages.MatterHooks)
+local useMap = MatterHooks.useMap
+local useMemo = MatterHooks.useMemo
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
 local GridConfig = require(Shared.config.GridConfig)
@@ -45,46 +50,13 @@ local CONFIG = table.freeze({
 	ZOMBIE_BITE_RANGE = GameConstants.Combat.ZOMBIE_BITE_RANGE,
 	ZOMBIE_BITE_INTERVAL = GameConstants.Combat.ZOMBIE_BITE_INTERVAL,
 	MULTI_DIR_RADIUS_MULT = 1.5, -- Multiplier for multi-directional projectiles
+	DEFAULT_CELL_WIDTH = 6,
+	DEFAULT_ZOMBIE_DIR = Vector3.new(-1, 0, 0),
 })
 
 --------------------------------------------------------------------------------
--- [3] STATE (mutable runtime state)
+-- [3] PRIVATE HELPERS
 --------------------------------------------------------------------------------
-local State = {
-	ZombieAttackTimes = {} :: { [number]: number },
-	FrameStats = {
-		projectileHits = 0,
-		splashHits = 0,
-		stunsApplied = 0,
-		stunsExpired = 0,
-		slowsApplied = 0,
-		slowsExpired = 0,
-		thawsApplied = 0,
-		zombieBites = 0,
-		plantsDestroyed = 0,
-	},
-	CachedGridOrigin = Vector3.zero,
-	CachedCellWidth = 6,
-	CachedZombieDir = Vector3.new(-1, 0, 0),
-	IsInitialized = false,
-}
-
---------------------------------------------------------------------------------
--- [4] PRIVATE HELPERS
---------------------------------------------------------------------------------
-local function resetFrameStats()
-	State.FrameStats.projectileHits = 0
-	State.FrameStats.splashHits = 0
-	State.FrameStats.stunsApplied = 0
-	State.FrameStats.stunsExpired = 0
-	State.FrameStats.slowsApplied = 0
-	State.FrameStats.slowsExpired = 0
-	State.FrameStats.thawsApplied = 0
-	State.FrameStats.zombieBites = 0
-	State.FrameStats.plantsDestroyed = 0
-end
-
--- Logging removed (was _frameStats debug log)
 
 --[[
 	Spawn a DamageIntent for the damage pipeline.
@@ -267,13 +239,10 @@ local function applySplashDamage(
 							AppliedAt = os.clock(),
 						})
 					)
-					State.FrameStats.slowsApplied += 1
 				end
 			end
 		end
 	end
-
-	State.FrameStats.splashHits += hitCount
 end
 
 -- Try to apply stun effect (butter from Kernel-pult)
@@ -291,7 +260,6 @@ local function tryApplyStun(world: MatterWorld, zombieId: number, proj: any): bo
 				AppliedAt = os.clock(),
 			})
 		)
-		State.FrameStats.stunsApplied += 1
 		return true
 	end
 
@@ -327,44 +295,41 @@ local function findPlantAtPosition(world: MatterWorld, column: number, lane: num
 	return plantId
 end
 
--- Get grid column from world X position (uses cached values from Init)
-local function getColumnFromX(x: number): number
-	local origin = State.CachedGridOrigin
-	local cellW = State.CachedCellWidth
-	local localX = x - origin.X
-	return math.floor(localX / cellW) + 1
+-- Get grid column from world X position
+local function getColumnFromX(x: number, gridOrigin: Vector3, cellWidth: number): number
+	local localX = x - gridOrigin.X
+	return math.floor(localX / cellWidth) + 1
 end
 
--- Get grid lane from world Z position (uses cached values from Init)
-local function getLaneFromZ(z: number): number
-	local origin = State.CachedGridOrigin
-	local cellW = State.CachedCellWidth
-	local localZ = z - origin.Z
-	local lane = math.floor(localZ / cellW) + 1
+-- Get grid lane from world Z position
+local function getLaneFromZ(z: number, gridOrigin: Vector3, cellWidth: number): number
+	local localZ = z - gridOrigin.Z
+	local lane = math.floor(localZ / cellWidth) + 1
 	return math.clamp(lane, 1, GridConfig.GRID_LANES)
 end
 
 --------------------------------------------------------------------------------
--- [5] ONSTEP (main loop - CANNOT yield)
+-- [4] SYSTEM (main loop - CANNOT yield)
 --------------------------------------------------------------------------------
-local function OnStep(world: MatterWorld)
+local function system(world: MatterWorld)
 	local currentTime = os.clock()
 
-	-- Reset frame stats at start of combat processing
-	resetFrameStats()
+	-- Use hooks for mutable state that persists across frames
+	local zombieAttackTimes = useMap("ZombieAttackTimes", {} :: { [number]: number })
 	
-	-- Refresh cached MapConfig values (may change after loadmap)
-	if MapConfig.IsInitialized() then
-		State.CachedGridOrigin = MapConfig.GetGridOrigin()
-		State.CachedCellWidth = MapConfig.GetCellSize()
-		State.CachedZombieDir = MapConfig.GetZombieDirection()
-	end
+	-- Use memoized config values (refreshed when MapConfig is initialized)
+	local isMapInit = MapConfig.IsInitialized()
+	local gridOrigin, cellWidth, zombieDir = useMemo(function()
+		if isMapInit then
+			return MapConfig.GetGridOrigin(), MapConfig.GetCellSize(), MapConfig.GetZombieDirection()
+		end
+		return Vector3.zero, CONFIG.DEFAULT_CELL_WIDTH, CONFIG.DEFAULT_ZOMBIE_DIR
+	end, { isMapInit })
 
 	-- Process stun effect expiration
 	for zombieId, stun in world:query(Components.StunComponent) do
 		if currentTime - stun.AppliedAt >= stun.Duration then
 			world:remove(zombieId, Components.StunComponent)
-			State.FrameStats.stunsExpired += 1
 		end
 	end
 
@@ -435,7 +400,6 @@ local function OnStep(world: MatterWorld)
 					-- Remove slow from zombie
 					if world:get(zombieId, Components.SlowComponent) then
 						world:remove(zombieId, Components.SlowComponent)
-						State.FrameStats.thawsApplied += 1
 					end
 				end
 
@@ -504,7 +468,6 @@ local function OnStep(world: MatterWorld)
 									AppliedAt = currentTime,
 								})
 							)
-							State.FrameStats.slowsApplied += 1
 						end
 					end
 				end
@@ -513,8 +476,6 @@ local function OnStep(world: MatterWorld)
 				if not killed then
 					tryApplyStun(world, zombieId, proj)
 				end
-
-				State.FrameStats.projectileHits += 1
 
 				hitZombie = true
 				hitZombieId = zombieId
@@ -550,7 +511,6 @@ local function OnStep(world: MatterWorld)
 	for zombieId, slow in world:query(Components.SlowComponent) do
 		if currentTime - slow.AppliedAt >= slow.Duration then
 			world:remove(zombieId, Components.SlowComponent)
-			State.FrameStats.slowsExpired += 1
 		end
 	end
 
@@ -582,49 +542,46 @@ local function OnStep(world: MatterWorld)
 				-- Already attacking - check if target still exists
 				if not world:contains(target.TargetEntity) then
 					-- Target destroyed, resume moving (backward toward zombie spawns)
-					local direction = State.CachedZombieDir
 					world:remove(zombieId, Components.TargetComponent)
 					world:insert(
 						zombieId,
 						Components.MovementComponent({
-							VelocityX = -direction.X * stats.Speed,
+							VelocityX = -zombieDir.X * stats.Speed,
 							VelocityY = 0,
-							VelocityZ = -direction.Z * stats.Speed,
+							VelocityZ = -zombieDir.Z * stats.Speed,
 						})
 					)
-					State.ZombieAttackTimes[zombieId] = nil
+					zombieAttackTimes.value[zombieId] = nil
 					continue
 				end
 				
 				-- Attack the enemy zombie
-				local lastAttack = State.ZombieAttackTimes[zombieId] or 0
+				local lastAttack = zombieAttackTimes.value[zombieId] or 0
 				if currentTime - lastAttack >= stats.AttackSpeed then
 					-- Hypnotized zombie attacks other zombies with "Bite" damage type
 					local killed = spawnDamageIntent(
 						world, target.TargetEntity, stats.Damage,
 						zombieId, "HypnotizedZombie", "Bite"
 					)
-					State.ZombieAttackTimes[zombieId] = currentTime
-					State.FrameStats.zombieBites += 1
+					zombieAttackTimes.value[zombieId] = currentTime
 					
 					if killed then
 						-- Resume moving backward
-						local direction = State.CachedZombieDir
 						world:remove(zombieId, Components.TargetComponent)
 						world:insert(
 							zombieId,
 							Components.MovementComponent({
-								VelocityX = -direction.X * stats.Speed,
+								VelocityX = -zombieDir.X * stats.Speed,
 								VelocityY = 0,
-								VelocityZ = -direction.Z * stats.Speed,
+								VelocityZ = -zombieDir.Z * stats.Speed,
 							})
 						)
-						State.ZombieAttackTimes[zombieId] = nil
+						zombieAttackTimes.value[zombieId] = nil
 					end
 				end
 			else
 				-- Find enemy zombie to attack (non-hypnotized zombies)
-				local lane = getLaneFromZ(zombiePos.Z)
+				local lane = getLaneFromZ(zombiePos.Z, gridOrigin, cellWidth)
 				local zombiesInLane = LaneCache.GetEntitiesInLane(lane)
 				
 				for _, otherZombieId in zombiesInLane do
@@ -676,22 +633,21 @@ local function OnStep(world: MatterWorld)
 			-- Already eating - check if target still exists
 			if not world:contains(target.TargetEntity) then
 				-- Target destroyed, resume moving
-				local direction = State.CachedZombieDir
 				world:remove(zombieId, Components.TargetComponent)
 				world:insert(
 					zombieId,
 					Components.MovementComponent({
-						VelocityX = direction.X * stats.Speed,
+						VelocityX = zombieDir.X * stats.Speed,
 						VelocityY = 0,
-						VelocityZ = direction.Z * stats.Speed,
+						VelocityZ = zombieDir.Z * stats.Speed,
 					})
 				)
-				State.ZombieAttackTimes[zombieId] = nil
+				zombieAttackTimes.value[zombieId] = nil
 				continue
 			end
 
 			-- Check attack timer
-			local lastAttack = State.ZombieAttackTimes[zombieId] or 0
+			local lastAttack = zombieAttackTimes.value[zombieId] or 0
 			if currentTime - lastAttack >= stats.AttackSpeed then
 				-- Determine actual target (may be redirected to Pumpkin shell)
 				local actualTarget = target.TargetEntity
@@ -717,7 +673,7 @@ local function OnStep(world: MatterWorld)
 				local eatCancelled = ZombieAbilityData.ExecuteHook("OnEat", zombie.ZombieType, eatCtx, actualTarget)
 				if eatCancelled then
 					-- Ability handled the eat (e.g., Bungee steals plant)
-					State.ZombieAttackTimes[zombieId] = currentTime
+					zombieAttackTimes.value[zombieId] = currentTime
 					continue
 				end
 				
@@ -726,8 +682,7 @@ local function OnStep(world: MatterWorld)
 					world, actualTarget, stats.Damage,
 					zombieId, zombie.ZombieType, "Bite"
 				)
-				State.ZombieAttackTimes[zombieId] = currentTime
-				State.FrameStats.zombieBites += 1
+				zombieAttackTimes.value[zombieId] = currentTime
 
 				if killed then
 					-- Check if we killed a HypnoShroom (before Pumpkin check, as HypnoShroom may be protected)
@@ -736,7 +691,6 @@ local function OnStep(world: MatterWorld)
 						local plantStats = PlantData[killedPlant.PlantType]
 						if plantStats and plantStats.HypnotizesOnDeath then
 							-- Hypnotize this zombie!
-							local direction = State.CachedZombieDir
 							
 							-- Add HypnotizedComponent
 							world:insert(zombieId, Components.HypnotizedComponent({
@@ -749,9 +703,9 @@ local function OnStep(world: MatterWorld)
 							world:insert(
 								zombieId,
 								Components.MovementComponent({
-									VelocityX = -direction.X * stats.Speed,
+									VelocityX = -zombieDir.X * stats.Speed,
 									VelocityY = 0,
-									VelocityZ = -direction.Z * stats.Speed,
+									VelocityZ = -zombieDir.Z * stats.Speed,
 								})
 							)
 							
@@ -760,8 +714,7 @@ local function OnStep(world: MatterWorld)
 								ZombieId = zombieId,
 							})
 							
-							State.ZombieAttackTimes[zombieId] = nil
-							State.FrameStats.plantsDestroyed += 1
+							zombieAttackTimes.value[zombieId] = nil
 							continue
 						end
 					end
@@ -779,31 +732,27 @@ local function OnStep(world: MatterWorld)
 								TargetEntity = innerPlantId,
 								TargetType = "Plant",
 							}))
-							State.FrameStats.plantsDestroyed += 1
 							-- Don't resume moving - continue eating inner plant
 							continue
 						end
 					end
 					
 					-- Plant/Shell destroyed, resume moving
-					local direction = State.CachedZombieDir
 					world:remove(zombieId, Components.TargetComponent)
 					world:insert(
 						zombieId,
 						Components.MovementComponent({
-							VelocityX = direction.X * stats.Speed,
+							VelocityX = zombieDir.X * stats.Speed,
 							VelocityY = 0,
-							VelocityZ = direction.Z * stats.Speed,
+							VelocityZ = zombieDir.Z * stats.Speed,
 						})
 					)
-					State.ZombieAttackTimes[zombieId] = nil
-					State.FrameStats.plantsDestroyed += 1
+					zombieAttackTimes.value[zombieId] = nil
 				end
 			end
 		else
 			-- No target - check if there's a plant in our path
-			local column = getColumnFromX(zombiePos.X)
-			local zombieDir = State.CachedZombieDir
+			local column = getColumnFromX(zombiePos.X, gridOrigin, cellWidth)
 			
 			-- Flying zombies skip ground plants entirely (they fly over)
 			if stats.IsFlying then
@@ -850,9 +799,8 @@ local function OnStep(world: MatterWorld)
 									
 									-- Calculate jump landing position (past the plant)
 									local jumpDistance = CONFIG.ZOMBIE_BITE_RANGE * 3
-									local vaultDir = State.CachedZombieDir
-									local endX = zombiePos.X + (vaultDir.X * jumpDistance)
-									local endZ = zombiePos.Z + (vaultDir.Z * jumpDistance)
+									local endX = zombiePos.X + (zombieDir.X * jumpDistance)
+									local endZ = zombiePos.Z + (zombieDir.Z * jumpDistance)
 									
 									-- Send vault event to clients (for jump animation)
 									Network.ZombieVaulted.FireAll({
@@ -879,9 +827,9 @@ local function OnStep(world: MatterWorld)
 									world:insert(
 										zombieId,
 										Components.MovementComponent({
-											VelocityX = vaultDir.X * stats.Speed,
+											VelocityX = zombieDir.X * stats.Speed,
 											VelocityY = 0,
-											VelocityZ = vaultDir.Z * stats.Speed,
+											VelocityZ = zombieDir.Z * stats.Speed,
 										})
 									)
 									
@@ -910,7 +858,7 @@ local function OnStep(world: MatterWorld)
 								})
 							)
 
-							State.ZombieAttackTimes[zombieId] = currentTime
+							zombieAttackTimes.value[zombieId] = currentTime
 							break
 						end
 					end
@@ -940,7 +888,6 @@ local function OnStep(world: MatterWorld)
 					end
 					
 					-- Check if hypnotized zombie is ahead of us (in our movement direction)
-					local zombieDir = State.CachedZombieDir
 					local isAhead = if zombieDir.X < 0 then otherPos.X < zombiePos.X else otherPos.X > zombiePos.X
 					if not isAhead then
 						continue
@@ -965,7 +912,7 @@ local function OnStep(world: MatterWorld)
 								VelocityZ = 0,
 							})
 						)
-						State.ZombieAttackTimes[zombieId] = currentTime
+						zombieAttackTimes.value[zombieId] = currentTime
 						break
 					end
 				end
@@ -974,45 +921,17 @@ local function OnStep(world: MatterWorld)
 	end
 
 	-- Clean up attack times for despawned zombies
-	for zombieId in State.ZombieAttackTimes do
+	for zombieId in zombieAttackTimes.value do
 		if not world:contains(zombieId) then
-			State.ZombieAttackTimes[zombieId] = nil
+			zombieAttackTimes.value[zombieId] = nil
 		end
 	end
 end
 
 --------------------------------------------------------------------------------
--- [6] INIT / DISPOSE
---------------------------------------------------------------------------------
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-
-	-- Pre-cache MapConfig values to avoid yield in OnStep
-	-- Note: MapConfig getters work regardless of init state
-	State.CachedGridOrigin = MapConfig.GetGridOrigin()
-	State.CachedCellWidth = MapConfig.GetCellSize()
-	State.CachedZombieDir = MapConfig.GetZombieDirection()
-
-	State.IsInitialized = true
-end
-
-local function Dispose()
-	State.IsInitialized = false
-	State.CachedGridOrigin = Vector3.zero
-	State.CachedCellWidth = 6
-	State.CachedZombieDir = Vector3.new(-1, 0, 0)
-	table.clear(State.ZombieAttackTimes)
-	resetFrameStats()
-end
-
---------------------------------------------------------------------------------
--- [7] EXPORT
+-- [5] EXPORT
 --------------------------------------------------------------------------------
 return {
 	priority = 170,
-	system = OnStep,
-	Init = Init,
-	Dispose = Dispose,
+	system = system,
 }

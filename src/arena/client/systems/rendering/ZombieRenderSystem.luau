@@ -8,10 +8,7 @@
 	Creates and updates visual zombie representations.
 	Uses real models from Assets/Zombies, falls back to colored cubes.
 	
-	LIFECYCLE:
-	- Init(): Setup network listeners (CAN yield)
-	- system(): Interpolate zombie positions (CANNOT yield)
-	- Dispose(): Disconnect events, cleanup visuals
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +22,7 @@ assert(Shared, "ZombieRenderSystem: Shared folder not found")
 local Packages = ReplicatedStorage:FindFirstChild("Packages")
 assert(Packages, "ZombieRenderSystem: Packages folder not found")
 local Trove = require(Packages:WaitForChild("Trove"))
+local Hooks = require(Packages.MatterHooks)
 
 local GridConfig = require(Shared.config.GridConfig)
 local MapConfig = require(Shared.config.MapConfig)
@@ -592,18 +590,18 @@ local function setupNetworkListeners()
 end
 
 --[[
-	Init - Setup network listeners (CAN yield)
+	Init - Setup network listeners (via useMemo in system)
 ]]
-local function Init(_world)
+local function setupAndInitialize()
 	setupNetworkListeners()
-	
+
 	-- Cache MapConfig values (they don't change during gameplay)
 	if MapConfig.IsInitialized() then
 		_cachedGroundY = MapConfig.GetConfig().GridY
 		_cachedZombieDir = MapConfig.GetZombieDirection()
 		_mapConfigCached = true
 	end
-	
+
 	-- Listen for map config sync to update cache
 	_trove:Add(Network.MapConfigSync.On(function(_data)
 		task.defer(function()
@@ -626,9 +624,15 @@ local MovementConfig = {
 }
 
 --[[
-	System - Interpolate zombie positions (CANNOT yield)
+	System - Initialize on first run and interpolate zombie positions
 ]]
 local function ZombieRenderSystem(_world)
+	-- Initialize network listeners once via useMemo
+	Hooks.useMemo(function()
+		setupAndInitialize()
+		return true
+	end, {})
+
 	-- Skip if MapConfig not initialized yet (Studio mode)
 	if not MapConfig.IsInitialized() then
 		return
@@ -732,31 +736,7 @@ local function ZombieRenderSystem(_world)
 	end
 end
 
---[[
-	Dispose - Cleanup all visuals and connections
-]]
-local function Dispose()
-	-- Disconnect all events
-	_trove:Clean()
-
-	-- Destroy all zombie visuals
-	for entityId in _zombieVisuals do
-		destroyZombieVisual(entityId)
-	end
-
-	-- Reset cached values
-	_mapConfigCached = false
-	_cachedGroundY = 0
-	_cachedZombieDir = Vector3.new(-1, 0, 0)
-	_nextGroanTime = 0
-
-	Logger.Debug("ZombieRender", "Disposed")
-end
-
 return {
-	_name = "ZombieRenderSystem",
 	priority = 410,
 	system = ZombieRenderSystem,
-	Init = Init,
-	Dispose = Dispose,
 }

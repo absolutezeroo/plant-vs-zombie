@@ -10,10 +10,7 @@
 	- Cleaning up grid occupancy for plants
 	- Spawning coins for zombie kills
 	
-	V2.0 Architecture:
-	- Init(world): Initialize trove for cleanup
-	- Dispose(): Clean up connections
-	- OnStep(world): Process entity deaths via health query
+	V3 Architecture: Matter Hooks pattern
 ]]
 
 -- 1. IMPORTS
@@ -21,7 +18,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Trove = require(Packages:WaitForChild("Trove"))
+local Hooks = require(Packages.MatterHooks)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -46,55 +43,21 @@ local CONFIG = table.freeze({
 	DEFAULT_COIN_VALUE = 5,
 })
 
--- 3. STATE
-local State = {
-	IsInitialized = false,
-	Trove = nil :: any,
-	PlayerDataService = nil :: any,
-	StatsService = nil :: any,
-}
+-- 3. PRIVATE HELPERS
 
--- 4. PRIVATE HELPERS
-
--- Helper: Get PlayerDataService (lazy load)
-local function getPlayerDataService()
-	if not State.PlayerDataService then
-		State.PlayerDataService = require(Server.services.PlayerDataService)
-	end
-	return State.PlayerDataService
+-- Helper: Get services (lazy load via useMemo in system)
+local function getServices()
+	local PlayerDataService = require(Server.services.PlayerDataService)
+	local StatsService = require(Server.services.StatsService)
+	return PlayerDataService, StatsService
 end
 
--- Helper: Get StatsService (lazy load)
-local function getStatsService()
-	if not State.StatsService then
-		State.StatsService = require(Server.services.StatsService)
-	end
-	return State.StatsService
-end
-
--- 5. LIFECYCLE: INIT
-local function Init(_world)
-	if State.IsInitialized then
-		return
-	end
-	State.IsInitialized = true
-
-	State.Trove = Trove.new()
-end
-
--- 6. LIFECYCLE: DISPOSE
-local function Dispose()
-	if State.Trove then
-		State.Trove:Destroy()
-		State.Trove = Trove.new()
-	end
-	State.IsInitialized = false
-	State.PlayerDataService = nil
-	State.StatsService = nil
-end
-
--- 7. MAIN LOOP
-local function OnStep(world)
+-- 4. SYSTEM FUNCTION
+local function EntityDeathSystem(world)
+	-- Lazy load services via useMemo (empty deps = once)
+	local PlayerDataService, StatsService = Hooks.useMemo(function()
+		return getServices()
+	end, {})
 	-- Check all entities with health
 	for id, health in world:query(Components.HealthComponent) do
 		if health.Current <= 0 then
@@ -195,8 +158,6 @@ local function OnStep(world)
 				}))
 
 				-- Award coins to all players
-				local PlayerDataService = getPlayerDataService()
-				local StatsService = getStatsService()
 				for _, player in Players:GetPlayers() do
 					PlayerDataService.AddCoins(player, coinValue)
 					PlayerDataService.IncrementStat(player, "ZombiesKilled", 1)
@@ -234,10 +195,8 @@ local function OnStep(world)
 	end
 end
 
--- 8. EXPORT
+-- 5. EXPORT
 return {
 	priority = 180,
-	Init = Init,
-	Dispose = Dispose,
-	system = OnStep,
+	system = EntityDeathSystem,
 }
