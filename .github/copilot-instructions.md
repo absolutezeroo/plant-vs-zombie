@@ -335,3 +335,27 @@ end))
     * *Path:* `src/**/client/controllers/`
 * **Data (`*Data.luau`):** Static Configuration Tables. strictly `table.freeze()`.
     * *Path:* `src/shared/data/`
+
+## 🏗️ ECS SYSTEM ARCHITECTURE (MATTER HOOKS V3)
+
+**STRICT RULE:** The "Class-based" system pattern (Init/Dispose/local State) is **BANNED**. All systems must be refactored to use **Matter Hooks**.
+
+### 1. System Structure Rules
+* **Imports:** Must require `Packages.MatterHooks`.
+* **Export:** Return ONLY `{ priority = X, system = SystemFn }`. NEVER export `Init` or `Dispose`.
+* **Lifecycle:** The system function runs every frame. Use Hooks for all setup and teardown logic.
+
+### 2. State Management Rules
+* **File-Level State:** NEVER use file-level mutable variables (e.g., `local State = {}`). This breaks hot-reloading.
+* **System State:** Use `Hooks.useMap("UniqueKey", default)` inside the system function for persistent data.
+* **Entity State:** Use `Hooks.useMap(entityId, default)` inside query loops for per-entity data (cooldowns, timers). This ensures automatic garbage collection when the entity leaves the query.
+* **One-Time Setup:** Use `Hooks.useMemo(fn, {})` with empty dependencies to replace `Init()` logic (e.g., requiring lazy modules or loading configs).
+
+### 3. Input Handling Rules
+* **Method:** NEVER use `ContextActionService` methods (`BindAction`, `UnbindAction`) manually.
+* **Hook:** Use `Hooks.useContextAction(actionName, callback, options)` to bind inputs. The Hook handles binding and unbinding automatically based on system execution.
+
+### 4. Async & Loading Rules
+* **No Yielding:** The system function MUST NOT yield (no `task.wait`, no `.Event:Wait()`).
+* **Hook:** Use `Hooks.useAsync(callback, dependencies)` for operations that need to yield (DataStore, Asset loading).
+* **Flow:** Check properties `.completed` and `.result.success` to gate logic that depends on asynchronous data.

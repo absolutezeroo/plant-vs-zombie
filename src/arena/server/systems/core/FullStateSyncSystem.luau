@@ -5,6 +5,7 @@
 	Priority: 50 (Very early - before other systems)
 	
 	When a player joins, sends them all existing entities and game state.
+	Uses MatterHooks.useAsync for non-blocking delayed sync operations.
 ]]
 
 -- 1. IMPORTS
@@ -13,6 +14,8 @@ local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Trove = require(Packages:WaitForChild("Trove"))
+local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -31,7 +34,6 @@ local CONFIG = table.freeze({
 
 -- 3. STATE
 local State = {
-	IsInitialized = false,
 	Trove = nil :: any,
 	PendingSync = {} :: { [Player]: boolean },
 	World = nil :: any,
@@ -40,11 +42,11 @@ local State = {
 -- Helper: Sync all state to a player
 local function syncPlayer(player: Player, world: any)
 	if not player or not player.Parent then
-		return
+		return false
 	end
 
 	-- Sync all plants
-	for id, plant, pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
+	for id, plant, _pos in world:query(Components.PlantTypeComponent, Components.PositionComponent) do
 		-- Get mutations if present
 		local mutationsComp = world:get(id, Components.MutationsComponent)
 		local mutations: { string } = {}
@@ -89,14 +91,15 @@ local function syncPlayer(player: Player, world: any)
 		MaxHealth = BaseHealth.GetMaxHealth(),
 		DamageAmount = 0,
 	})
+
+	return true
 end
 
 -- 4. INIT
 local function Init(_world)
-	if State.IsInitialized then
+	if State.Trove then
 		return
 	end
-	State.IsInitialized = true
 
 	State.Trove = Trove.new()
 
@@ -115,7 +118,6 @@ local function Dispose()
 		State.Trove:Clean()
 		State.Trove = nil
 	end
-	State.IsInitialized = false
 	table.clear(State.PendingSync)
 	State.World = nil
 end
@@ -124,16 +126,24 @@ end
 local function OnStep(world)
 	State.World = world
 
-	-- Process pending syncs (with small delay for client readiness)
+	-- Process pending syncs using useAsync for non-blocking delay
 	for player, _ in State.PendingSync do
 		if player and player.Parent then
-			task.delay(CONFIG.SYNC_DELAY, function()
-				if player and player.Parent then
-					syncPlayer(player, world)
-				end
-			end)
+			-- Use useAsync to handle the delayed sync without yielding
+			local ready = Hooks.useAsync(function()
+				-- Simulate delay by yielding in async context
+				task.wait(CONFIG.SYNC_DELAY)
+				return syncPlayer(player, world)
+			end, {}, player) -- discriminator = player for unique tracking
+
+			if ready.completed then
+				-- Sync completed (success or failure), remove from pending
+				State.PendingSync[player] = nil
+			end
+		else
+			-- Player left, remove from pending
+			State.PendingSync[player] = nil
 		end
-		State.PendingSync[player] = nil
 	end
 end
 

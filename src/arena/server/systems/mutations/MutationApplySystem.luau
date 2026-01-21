@@ -12,6 +12,8 @@
 	This system runs once per plant spawn and adds the appropriate
 	mutation effect components (BurnEffect, ChainLightning, etc.)
 	
+	Uses MatterHooks.useAsync for non-blocking mutation loading operations.
+	
 	LIFECYCLE:
 	- Init(): No init needed
 	- OnStep(): Main loop (CANNOT yield) - applies mutations to new plants
@@ -24,7 +26,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Matter = require(Packages:WaitForChild("Matter"))
+local Hooks = require(Packages:WaitForChild("MatterHooks"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Components = require(Shared.components)
@@ -46,30 +48,22 @@ local CONFIG = table.freeze({
 -- ============================================================
 -- SECTION 3: STATE (all mutable data)
 -- ============================================================
-local State = {
-	-- No mutable state needed - MutationService handles cache
-}
+-- No mutable state needed - MutationService handles cache
+-- Hook state is managed by MatterHooks internally
 
 -- ============================================================
 -- SECTION 4: PRIVATE HELPERS
 -- ============================================================
 
+-- Load mutations for a plant (wrapped for useAsync)
+local function loadMutationsForPlant(userId: number, plantType: string): { string }
+	-- Currently synchronous, but useAsync allows this to become async in future
+	return MutationService.GetPlantMutations(userId, plantType)
+end
+
 -- Apply mutation components to a plant entity
-local function applyMutationsToPlant(world, entityId: number, plantType: string, userId: number)
-	local mutationIds = MutationService.GetPlantMutations(userId, plantType)
-	if #mutationIds == 0 then
-		return
-	end
-
-	-- Get combined effects
-	local effects = MutationData.CalculateCombinedEffects(mutationIds)
-
-	-- Apply stat modifiers to existing components
-	if effects.HealthBonus and effects.HealthBonus ~= 1 then
-		ECSUtils.ScaleHealth(world, entityId, effects.HealthBonus, Components)
-	end
-
-	-- Track mutations on the entity
+local function applyMutationsToPlant(world, entityId: number, plantType: string, mutationIds: { string }, userId: number)
+	-- Always add MutationsComponent to mark entity as processed
 	world:insert(
 		entityId,
 		Components.MutationsComponent({
@@ -77,6 +71,13 @@ local function applyMutationsToPlant(world, entityId: number, plantType: string,
 			OwnerId = userId,
 		})
 	)
+
+	if #mutationIds == 0 then
+		return
+	end
+
+	-- Get combined effects
+	local effects = MutationData.CalculateCombinedEffects(mutationIds)
 
 	-- Apply effect components based on mutations
 
@@ -188,8 +189,30 @@ local function OnStep(world)
 	for entityId, plantType, owner in
 		world:query(Components.PlantTypeComponent, Components.OwnerComponent):without(Components.MutationsComponent)
 	do
-		-- This plant was just spawned and doesn't have mutations applied yet
-		applyMutationsToPlant(world, entityId, plantType.PlantType, owner.PlayerId)
+		-- Use useAsync for non-blocking mutation loading
+		-- Discriminator is entityId to track each plant's loading state independently
+		local ready = Hooks.useAsync(function()
+			return loadMutationsForPlant(owner.PlayerId, plantType.PlantType)
+		end, { entityId, owner.PlayerId, plantType.PlantType }, entityId)
+
+		if ready.completed then
+			if ready.result.success then
+				local mutationIds = ready.result.value
+				-- Apply mutations now that loading is complete
+				applyMutationsToPlant(world, entityId, plantType.PlantType, mutationIds, owner.PlayerId)
+			else
+				-- Loading failed, apply empty mutations component to prevent retry loop
+				Logger.Warn("MutationApplySystem", `Failed to load mutations for entity {entityId}: {ready.result.error}`)
+				world:insert(
+					entityId,
+					Components.MutationsComponent({
+						MutationIds = {},
+						OwnerId = owner.PlayerId,
+					})
+				)
+			end
+		end
+		-- If not completed, continue waiting (hook will track state)
 	end
 end
 
