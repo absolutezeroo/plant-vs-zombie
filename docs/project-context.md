@@ -1,7 +1,7 @@
 ---
 project_name: 'plant-vs-zombie'
 user_name: 'Clayton'
-date: '2026-01-18'
+date: '2026-01-22'
 game_engine: 'Roblox'
 architecture_doc: '_bmad-output/game-architecture.md'
 status: 'Production (Content & VFX)'
@@ -12,7 +12,9 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 
 **Purpose:** Critical implementation rules for AI agents working on this Roblox tower defense game. This file captures unobvious patterns, performance constraints, and anti-patterns that prevent implementation mistakes.
 
-**Status:** Production (Content & VFX) — Architecture refactoring complete. Matter V2 patterns (Isolated State, Frozen Config, Services) are fully implemented.
+**Status:** Production (Content & VFX) — Architecture refactoring complete. Matter V2 patterns (Hooks, Frozen Config, Services) are fully implemented.
+
+**Stats:** 35 server systems, 13 arena services, 53 ECS components, 48 plants defined.
 
 ---
 
@@ -68,27 +70,41 @@ sections_completed: ['technology_stack', 'engine_rules', 'networking_rules', 'pe
 **Input/Safety Phase (0-99):**
 - **SafetySystem:** Priority 1 (performance monitoring, entity cap enforcement)
 - **FullStateSyncSystem:** Priority 50 (network state sync for new players)
+- **TileModifierSystem:** Priority 85 (tile effects, damage zones, speed modifiers)
+- **ZombieAbilitySystem:** Priority 90 (zombie OnTick abilities - Regen, Catapult, minions)
 - **SpatialHashingSystem:** Priority 95 (rebuilds LaneCache FIRST)
 
 **Simulation Phase (100-299):**
 - **WaveManagerSystem:** Priority 100 (wave spawning logic)
-- **ZombieMovementSystem:** Priority 150 (entity movement)
-- **MushroomSystem:** Priority 155 (mushroom special behavior)
-- **ProjectileSpawnSystem:** Priority 160 (projectile creation)
-- **ProjectileMovementSystem:** Priority 161 (projectile movement)
-- **TrapSystem/EnhancementSystem:** Priority 165 (trap detection, projectile enhancement)
-- **CombatSystem:** Priority 170 (damage resolution)
-- **SpecialPlantSystem/BossSystem:** Priority 175 (special abilities)
-- **EntityDeathSystem:** Priority 180 (death processing)
+- **ZombieMovementSystem:** Priority 150 (entity movement, game-over detection)
+- **MushroomSystem:** Priority 155 (mushroom special behavior, SunShroom growth)
+- **ProjectileSpawnSystem:** Priority 160 (projectile creation, homing)
+- **ProjectileMovementSystem:** Priority 161 (projectile movement, homing tracking)
+- **EnhancementSystem:** Priority 165 (Torchwood fire enhancement)
+- **TrapSystem:** Priority 165 (trap detection, Garlic diversion, tire popping)
+- **CombatSystem:** Priority 170 (projectile collision, zombie eating)
+- **DamageModifierSystem:** Priority 172 (damage modifier pipeline)
+- **DamageResolverSystem:** Priority 175 (applies finalized damage)
+- **SpecialPlantSystem:** Priority 175 (explosions, Squash, Chomper)
+- **BossSystem:** Priority 175 (Gargantuar Imp spawn at 50%)
+- **EntityDeathSystem:** Priority 180 (death processing, coin spawns)
+- **FogSystem:** Priority 180 (fog zones, Plantern illumination)
 - **PlantFoodSystem:** Priority 185 (plant food abilities)
-- **PlacementSystem:** Priority 200 (plant placement)
-- **MutationApplySystem:** Priority 205 (mutation setup)
+- **PlacementSystem:** Priority 200 (plant placement validation)
+- **MutationApplySystem:** Priority 205 (mutation setup on new plants)
 
 **Economy Phase (300-399):**
-- **SunSpawnSystem:** Priority 300 (sun drops)
+- **SunSpawnSystem:** Priority 300 (sky sun drops)
 - **SunflowerProductionSystem:** Priority 305 (sunflower sun generation)
+- **CoinProductionSystem:** Priority 306 (Marigold coin production)
 - **SunCollectionSystem:** Priority 310 (sun pickup)
-- **Mutation Systems:** Priority 345-375 (splash, burn, freeze, lightning, lifesteal, sun-on-kill)
+- **SplashDamageSystem:** Priority 345 (splash/area damage)
+- **BurnDamageSystem:** Priority 350 (fire DoT)
+- **FreezeSystem:** Priority 355 (freeze effects, expiration)
+- **ChainLightningSystem:** Priority 360 (chain lightning propagation)
+- **PoisonCloudSystem:** Priority 365 (poison cloud AoE)
+- **LifestealSystem:** Priority 370 (heal on damage)
+- **SunOnKillSystem:** Priority 375 (sun on zombie kill)
 
 **Cleanup Phase (400+):**
 - **EventCleanupSystem:** Priority 400 (despawn event entities)

@@ -1,10 +1,10 @@
 ---
 title: 'API Reference'
 project: 'plant-vs-zombie'
-date: '2026-01-18'
-version: '2.2'
+date: '2026-01-22'
+version: '2.4'
 purpose: 'Document all service APIs to prevent call mismatches'
-status: 'Post-Refactoring V2 - All services use isolated state pattern'
+status: 'Production - 13 Arena services, 11 Lobby server modules'
 ---
 
 # API Reference: Services & Managers
@@ -87,41 +87,86 @@ This document lists all public functions for each service module to prevent call
 
 **Location:** `src/lobby/server/services/PlayerDataService.luau`
 
-⚠️ **Note:** This is a SIMPLIFIED version for the Lobby place. It shares the same ProfileStore but has fewer functions.
+⚠️ **Note:** This is the FULL version for the Lobby place. It manages player profiles, currencies, unlocks, mutations, and deck management.
 
 ### Profile Management
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `Initialize()` | - | `void` | Initializes ProfileStore |
-| `LoadProfile(player)` | `Player` | `void` | Load player profile |
+| `LoadProfile(player)` | `Player` | `Promise` | Load player profile |
 | `ReleaseProfile(player)` | `Player` | `void` | Release profile on leave |
 | `GetProfile(player)` | `Player` | `Profile?` | Get raw profile object |
 | `GetData(player)` | `Player` | `ProfileData?` | Get profile data |
+| `WaitForProfile(player, timeout?)` | `Player, number?` | `any` | Wait for profile to load |
+| `OnDataChanged(callback)` | `function` | `() -> ()` | Subscribe to data changes |
 
-### Deck Management
-| Function | Parameters | Returns | Description |
-|----------|------------|---------|-------------|
-| `GetDeck(player)` | `Player` | `{string}?` | Get current deck |
-| `SetDeck(player, deck)` | `Player, {string}` | `boolean` | Save deck |
-
-### Stage Progression
-| Function | Parameters | Returns | Description |
-|----------|------------|---------|-------------|
-| `CompleteStage(player, stageId, stars)` | `Player, string, number` | `boolean, boolean` | Mark stage complete |
-| `GetStageStars(player, stageId)` | `Player, string` | `number` | Get stars for stage |
-
-### Currency
+### Currency: Coins
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `GetCoins(player)` | `Player` | `number` | Get current coins |
 | `AddCoins(player, amount)` | `Player, number` | `boolean` | Add coins |
+| `SpendCoins(player, amount)` | `Player, number` | `boolean` | Spend coins |
+
+### Currency: Gems
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetGems(player)` | `Player` | `number` | Get current gems |
+| `AddGems(player, amount)` | `Player, number` | `boolean` | Add gems |
+| `SpendGems(player, amount)` | `Player, number` | `boolean` | Spend gems |
 
 ### XP/Level
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `GetLevel(player)` | `Player` | `number` | Get current level |
 | `GetXP(player)` | `Player` | `number` | Get total XP |
+| `GetLevelProgress(player)` | `Player` | `number` | Get 0-1 progress to next level |
+| `GetXPForNextLevel(player)` | `Player` | `number` | XP needed for next level |
 | `AddXP(player, amount)` | `Player, number` | `number` | Add XP, returns levels gained |
+
+### Plants & Unlocks
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `HasPlant(player, plantType)` | `Player, string` | `boolean` | Check if plant unlocked |
+| `GetUnlockedPlants(player)` | `Player` | `{string}` | Get unlocked plants |
+| `UnlockPlant(player, plantType)` | `Player, string` | `boolean` | Unlock plant |
+| `PurchasePlant(player, plantType, cost)` | `Player, string, number` | `boolean, string?` | Purchase plant |
+
+### Deck Management
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetDeck(player)` | `Player` | `{string}?` | Get current deck |
+| `SetDeck(player, deck)` | `Player, {string}` | `boolean` | Set deck |
+| `SaveDeck(player, deck)` | `Player, {string}` | `boolean, string?` | Save deck with validation |
+
+### Statistics
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetStats(player)` | `Player` | `StatsTable` | Get all stats |
+| `IncrementStat(player, statName, amount?)` | `Player, string, number?` | `void` | Increment stat |
+
+### Mutations (Lobby Only)
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `GetOwnedMutations(player, plantType)` | `Player, string` | `{string}` | Get owned mutations for plant |
+| `GetAllOwnedMutations(player)` | `Player` | `{[string]: {string}}` | Get all owned mutations |
+| `OwnsMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean` | Check if owns mutation |
+| `GetEquippedMutations(player, plantType)` | `Player, string` | `{string}` | Get equipped mutations |
+| `GetAllEquippedMutations(player)` | `Player` | `{[string]: {string}}` | Get all equipped |
+| `HasMutationEquipped(player, plantType, mutationType)` | `Player, string, string` | `boolean` | Check if equipped |
+| `PurchaseMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean, string?, number?` | Purchase mutation |
+| `EquipMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean, string?` | Equip mutation |
+| `UnequipMutation(player, plantType, mutationType)` | `Player, string, string` | `boolean` | Unequip mutation |
+
+### Sync / Debug (Admin)
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `SyncToClient(player)` | `Player` | `void` | Sync all data to client |
+| `ResetProfile(player)` | `Player` | `boolean` | Reset to defaults |
+| `MaxResources(player)` | `Player` | `boolean` | Max all resources |
+| `SetLevel(player, level)` | `Player, number` | `boolean` | Set level |
+| `SetCoins(player, amount)` | `Player, number` | `boolean` | Set coins |
+| `SetGems(player, amount)` | `Player, number` | `boolean` | Set gems |
+| `Dispose()` | - | `void` | Cleanup |
 
 ---
 
@@ -129,12 +174,25 @@ This document lists all public functions for each service module to prevent call
 
 **Location:** `src/arena/server/services/ArenaService.luau`
 
+Manages battle sessions per player.
+
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `Initialize(world, loop)` | `Matter.World, Matter.Loop` | `void` | Initialize with ECS world |
-| `StartBattle(player, stageId, deck)` | `Player, string, {string}` | `void` | Start a battle |
-| `EndBattle(player, victory)` | `Player, boolean` | `void` | End the current battle |
-| `GetPlayerState(player)` | `Player` | `PlayerState?` | Get current battle state |
+| `GetBattleData(player)` | `Player` | `BattleData?` | Get battle data for a player |
+| `StartBattle(player, worldId, difficulty, deck)` | `Player, string, string, {string}` | `boolean` | Start a battle (returns success) |
+| `EndBattle(player, victory, wavesSurvived, coins, xp)` | `Player, boolean, number, number, number` | `void` | End the current battle |
+| `OnPlayerRemoving(player)` | `Player` | `void` | Clean up when player leaves |
+| `GetWorldConfig(player)` | `Player` | `WorldConfig?` | Get world config for player's active battle |
+| `GetDifficultyConfig(player)` | `Player` | `DifficultyConfig?` | Get difficulty config for player's active battle |
+
+### BattleData Type
+```lua
+type BattleData = {
+    WorldId: string,
+    Difficulty: string,
+    Deck: {string},
+}
+```
 
 ---
 
@@ -199,7 +257,7 @@ Manages player sun economy. Auto-initializes on first API call.
 |----------|------------|---------|-------------|
 | `GetSun(player)` | `Player` | `number` | Get player's current sun (0 if not tracked) |
 | `AddSun(player, amount)` | `Player, number` | `void` | Add sun to player (can be negative) |
-| `SpendSun(player, amount)` | `Player, number` | `boolean` | Spend sun (returns false if insufficient) |
+| `SpendSun(player, amount, reason?)` | `Player, number, string?` | `boolean` | Spend sun (returns false if insufficient) |
 | `SetSun(player, amount)` | `Player, number` | `void` | Set sun to specific amount (min 0) |
 | `ResetPlayer(player)` | `Player` | `void` | Reset player to starting sun (50) |
 | `BroadcastSunUpdate(player, sunEntityId?)` | `Player, number?` | `void` | Sync sun to client via network |
@@ -277,9 +335,14 @@ type SessionStats = {
 
 **Location:** `src/lobby/server/services/LobbyService.luau`
 
+Orchestrates teleport pad functionality. Thin facade delegating to managers.
+
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `Initialize(zapServer)` | `ZapServer` | `void` | Initialize with Zap |
+| `Initialize(zapServer)` | `ZapServer` | `void` | Initialize with Zap network |
+| `GetPadConfig(padId)` | `string` | `PadConfig?` | Get pad config (debugging) |
+| `PlayerJoinedPad(player, padModel)` | `Player, Model` | `void` | Manual join (testing) |
+| `PlayerLeftPad(player)` | `Player` | `void` | Manual leave (testing) |
 
 ---
 
@@ -292,10 +355,10 @@ Manages lighting presets per world theme with smooth transitions.
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `Initialize()` | - | `void` | Initialize service |
-| `ApplyPreset(presetName)` | `string` | `void` | Apply lighting preset ("Day", "Night", "Pool", "Fog", "Roof") |
-| `TransitionTo(presetName, duration?)` | `string, number?` | `void` | Smooth transition to preset (default 1s) |
-| `GetCurrentPreset()` | - | `string` | Get current lighting preset name |
-| `ResetToDefault()` | - | `void` | Reset to Day lighting |
+| `ApplyPreset(theme, instant?)` | `string, boolean?` | `void` | Apply lighting preset (instant = skip transition) |
+| `ApplyFromWorld(worldId, instant?)` | `string, boolean?` | `void` | Apply lighting from world config |
+| `GetCurrentTheme()` | - | `string` | Get current lighting theme name |
+| `IsTransitioning()` | - | `boolean` | Check if currently transitioning |
 
 ### Preset Types
 - `"Day"` - Bright outdoor lighting
@@ -306,19 +369,87 @@ Manages lighting presets per world theme with smooth transitions.
 
 ---
 
-## MapService
+## MapLoader
 
-**Location:** `src/arena/server/services/MapService.luau`
+**Location:** `src/arena/server/services/MapLoader.luau`
 
 Handles dynamic map loading from ReplicatedStorage.Maps.
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `Initialize()` | - | `void` | Initialize service |
-| `LoadMap(mapId)` | `string` | `Model?` | Load and parent map to workspace |
-| `UnloadCurrentMap()` | - | `void` | Remove current map from workspace |
-| `GetCurrentMap()` | - | `Model?` | Get currently loaded map model |
-| `GetMapList()` | - | `{string}` | Get available map IDs |
+| `Initialize()` | - | `void` | Initialize the MapLoader |
+| `GetCurrentMapId()` | - | `string?` | Get loaded map ID |
+| `GetCurrentMap()` | - | `Model?` | Get loaded map model |
+| `LoadMap(mapId)` | `string` | `boolean` | Load map into workspace |
+| `UnloadMap()` | - | `void` | Unload current map |
+| `MapExists(mapId)` | `string` | `boolean` | Check if map exists |
+| `GetAvailableMaps()` | - | `{string}` | Get available map IDs |
+| `PreloadMapAssets(mapId, player?)` | `string, Player?` | `boolean, number` | Preload map assets |
+| `LoadMapWithPreload(mapId, player?)` | `string, Player?` | `boolean` | Load with preloading |
+| `SyncConfigToPlayer(player)` | `Player` | `void` | Sync config to late joiner |
+
+---
+
+## FogService (NEW)
+
+**Location:** `src/arena/server/services/FogService.luau`
+
+Manages fog visibility zones for night/fog worlds.
+
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `IsFogActive()` | - | `boolean` | Check if fog is currently active |
+| `GetFoggyColumns()` | - | `{number}` | Get current foggy columns |
+| `EnableFog(foggyColumns?)` | `{number}?` | `void` | Enable fog (optionally specify columns) |
+| `EnableFogFromBounds()` | - | `boolean` | Enable fog using MapConfig FogBounds |
+| `DisableFog()` | - | `void` | Disable fog |
+| `Dispose()` | - | `void` | Reset state |
+
+---
+
+## TileModifierService (NEW)
+
+**Location:** `src/arena/server/services/TileModifierService.luau`
+
+Manages tile/cell modifiers (craters, fire zones, ice zones, tombstones).
+
+### Lifecycle
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `Init(world)` | `any` | `void` | Initialize with world reference |
+| `Dispose()` | - | `void` | Dispose and cleanup |
+
+### Modifier Management
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `AddModifier(column, lane, data)` | `number, number, ModifierData` | `number?` | Add a tile modifier, returns entity ID |
+| `RemoveModifier(entityId)` | `number` | `boolean` | Remove modifier by entity ID |
+| `GetModifiers(column, lane)` | `number, number` | `{any}` | Get all modifiers on a cell |
+| `GetModifiersByStackGroup(column, lane, stackGroup)` | `number, number, string` | `{number}` | Get modifiers by stack group |
+
+### Cell Queries
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `HasBlockingModifier(column, lane)` | `number, number` | `boolean` | Check if placement blocked |
+| `AllowsAquatic(column, lane)` | `number, number` | `boolean` | Check if allows aquatic plants |
+| `GetSpeedMultiplier(column, lane)` | `number, number` | `number` | Get effective speed multiplier |
+| `GetZombieDamagePerSecond(column, lane)` | `number, number` | `number` | Get zombie DPS on cell |
+| `GetPlantDamagePerSecond(column, lane)` | `number, number` | `number` | Get plant DPS on cell |
+
+### Cleanup
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `ClearCell(column, lane)` | `number, number` | `void` | Clear all modifiers on cell |
+| `ClearByType(modifierType)` | `string` | `void` | Clear modifiers by type |
+| `ClearAll()` | - | `void` | Clear all modifiers |
+
+### Preset Helpers
+| Function | Parameters | Returns | Description |
+|----------|------------|---------|-------------|
+| `AddCrater(column, lane)` | `number, number` | `number?` | Add permanent crater |
+| `AddFireZone(column, lane, duration, dps)` | `number, number, number, number` | `number?` | Add fire zone |
+| `AddIceZone(column, lane, duration, slowPercent)` | `number, number, number, number` | `number?` | Add ice zone |
+| `AddTombstone(column, lane)` | `number, number` | `number?` | Add tombstone
 
 ---
 
@@ -448,13 +579,18 @@ Server-authoritative grid occupancy tracking singleton. Single source of truth f
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `IsOccupied(column, lane)` | `number, number` | `boolean` | Check if cell has a plant |
-| `GetEntityAt(column, lane)` | `number, number` | `number?` | Get entity ID at cell |
+| `IsOccupied(column, lane)` | `number, number` | `boolean` | Check if cell has a plant or is blocked |
+| `IsBlocked(column, lane)` | `number, number` | `boolean` | Check if cell is blocked (crater/obstacle) |
+| `GetEntityAt(column, lane)` | `number, number` | `number?` | Get entity ID occupying a cell |
 | `GetEntity(column, lane)` | `number, number` | `number?` | Alias for GetEntityAt |
-| `Occupy(column, lane, entityId)` | `number, number, number` | `boolean` | Mark cell occupied (fails if already occupied) |
+| `Occupy(column, lane, entityId, ownerId?)` | `number, number, number, number?` | `boolean` | Mark cell occupied with optional owner |
 | `Clear(column, lane)` | `number, number` | `void` | Clear a cell |
+| `BlockCell(column, lane)` | `number, number` | `void` | Block a cell (crater/obstacle) |
+| `UnblockCell(column, lane)` | `number, number` | `void` | Unblock a cell |
 | `ClearByEntity(entityId)` | `number` | `boolean` | Find and clear cell by entity ID |
 | `Reset()` | - | `void` | Reset entire grid (new game) |
+| `GetPlayerPlantCount(playerId)` | `number` | `number` | Get plant count for a player |
+| `ClearPlayerData(playerId)` | `number` | `void` | Clear a player's tracking data |
 | `GetPlantCount()` | - | `number` | Count of occupied cells |
 | `GetAllOccupied()` | - | `{{Column, Lane, EntityId}}` | Get all occupied cells |
 
@@ -794,6 +930,7 @@ model:PivotTo(cframe)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.4 | 2026-01-22 | **Major Update:** Added FogService, TileModifierService. Updated ArenaService API (new signatures). Updated GridService (blocking, player tracking). Updated LightingService (renamed functions). Updated MapLoader (7 new functions). Expanded PlayerDataService (Lobby) with mutations, gems, sync, debug APIs. Updated ServerEventBus with typed fire methods. Fixed 35 arena server systems count. |
 | 2.3 | 2026-01-19 | Added God Mode Architecture: ValidationMiddleware, ServerEventBus, DamageModifierRegistry, DamageIntent pipeline documentation |
 | 2.2 | 2026-01-18 | Added LightingService and MapService documentation. Updated to Argon toolchain. |
 | 2.1 | 2026-01-12 | Operation Swarm Cleanup: Added complete GridService API documentation. System priority corrections. |

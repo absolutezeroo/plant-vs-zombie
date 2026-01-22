@@ -1,6 +1,6 @@
 # 🌻 ROADMAP - Garden Swarm - État d'Implémentation
 
-> **Dernière mise à jour automatisée:** 20 Janvier 2026  
+> **Dernière mise à jour automatisée:** 22 Janvier 2026  
 > Basé sur l'analyse complète du codebase (`PlantData.luau`, Systems ECS, Services, UI)
 
 ---
@@ -12,13 +12,13 @@
 | Métrique | Valeur | Status |
 |----------|--------|--------|
 | **Phase Actuelle** | Phase 3 (Epic 6 - Polish) | 🟢 En cours |
-| **Architecture ECS** | Matter V2 Pattern | ✅ Complète |
-| **Systèmes Serveur Arena** | 27/27 | ✅ 100% |
+| **Architecture ECS** | Matter V2 Pattern (Hooks) | ✅ Complète |
+| **Systèmes Serveur Arena** | 35/35 | ✅ 100% |
 | **Systèmes Client Arena** | 7/7 | ✅ 100% |
-| **Services Arena** | 10/10 | ✅ 100% |
+| **Services Arena** | 13/13 | ✅ 100% |
 | **Lobby Serveur** | 11/11 | ✅ 100% |
 | **Lobby Client** | 6/6 | ✅ 100% |
-| **Composants ECS** | 45 fichiers | ✅ 100% |
+| **Composants ECS** | 53 (47 + 6 tags) | ✅ 100% |
 | **Modules Partagés** | 92 fichiers | ✅ 99% |
 
 ---
@@ -103,8 +103,8 @@
 | Plante           | Coût ☀️ | Mécanique                                | État             | Notes                        |
 |------------------|---------|------------------------------------------|------------------|------------------------------|
 | **Torchwood**    | 175     | `EnhancesPeas`, `FireDamageMultiplier=2` | ✅ Implémenté     | EnhancementSystem complet    |
-| **Plantern**     | 25      | `RemovesFog`                             | ❌ Non implémenté | Fog system manquant          |
-| **Blover**       | 100     | `RemovesFlying`                          | ✅ Implémenté    | SpecialPlantSystem tue flying zombies |
+| **Plantern**     | 25      | `RemovesFog`, `FogRadius=36`             | ⚠️ Partiel       | FogSystem existe, illumination à compléter |
+| **Blover**       | 100     | `RemovesFlying`, `RemovesFog`            | ✅ Implémenté    | SpecialPlantSystem tue flying zombies |
 | **UmbrellaLeaf** | 100     | `DeflectsProjectiles`                    | ❌ Non implémenté | Catapult zombies?            |
 | **GoldMagnet**   | 50      | `CollectsCoins`                          | ❌ Non implémenté | Coin system manquant         |
 | **LilyPad**      | 25      | `IsWaterPlatform`                        | ✅ Implémenté    | PlacementSystem valide WaterLanes     |
@@ -133,64 +133,131 @@
 | Défensives   | 5      | 5            | 0            | 0                |
 | Producteurs  | 4      | 4            | 0            | 0                |
 | Champignons  | 7      | 7            | 0            | 0                |
-| Support      | 9      | 4            | 0            | 5                |
+| Support      | 9      | 4            | 1            | 4                |
 | Pièges       | 1      | 1            | 0            | 0                |
-| **TOTAL**    | **48** | **43 (90%)** | **0 (0%)**   | **5 (10%)**      |
+| **TOTAL**    | **48** | **43 (90%)** | **1 (2%)**   | **4 (8%)**       |
 
 ---
 
-## ✅ SYSTÈMES ECS EXISTANTS
+## ✅ SYSTÈMES ECS EXISTANTS (35 Systèmes Serveur)
 
-### Combat Systems (`src/arena/server/systems/combat/`)
-- ✅ `ProjectileSpawnSystem.luau` - Tir, multi-shot, 3-lane, 5-way, catapult
-- ✅ `ProjectileMovementSystem.luau` - Déplacement projectiles
-- ✅ `CombatSystem.luau` - Détection collision, dégâts
-- ✅ `SpecialPlantSystem.luau` - Explosions, Squash, Chomper, PotatoMine
-- ✅ `EnhancementSystem.luau` - Torchwood fire enhancement
-- ✅ `PlantFoodSystem.luau` - Capacités ultimes
-- ✅ `TrapSystem.luau` - Spikeweed + PopsTires + Garlic DivertsZombies
-- ⚠️ `BossSystem.luau` - Pour zombies boss
+### Combat Systems (`src/arena/server/systems/combat/`) - 10 systèmes
+- ✅ `ProjectileSpawnSystem.luau` (P:160) - Tir, multi-shot, 3-lane, 5-way, catapult, homing
+- ✅ `ProjectileMovementSystem.luau` (P:161) - Déplacement projectiles, homing tracking
+- ✅ `EnhancementSystem.luau` (P:165) - Torchwood fire enhancement
+- ✅ `TrapSystem.luau` (P:165) - Spikeweed + PopsTires + Garlic DivertsZombies
+- ✅ `CombatSystem.luau` (P:170) - Détection collision, dégâts, zombie eating
+- ✅ `DamageModifierSystem.luau` (P:172) - Pipeline modifieurs de dégâts
+- ✅ `DamageResolverSystem.luau` (P:175) - Application finale des dégâts
+- ✅ `BossSystem.luau` (P:175) - Gargantuar spawns Imp at 50%
+- ✅ `SpecialPlantSystem.luau` (P:175) - Explosions, Squash, Chomper, PotatoMine
+- ✅ `PlantFoodSystem.luau` (P:185) - Capacités ultimes
 
-### Unit Systems (`src/arena/server/systems/units/`)
-- ✅ `MushroomSystem.luau` - Sleep, Hide, day/night cycle
-- ✅ `PlacementSystem.luau` - Validation placement, coût, cooldown
-- ✅ `EntityDeathSystem.luau` - Nettoyage entités mortes
-- ✅ `ZombieMovementSystem.luau` - Mouvement zombies
+### Core Systems (`src/arena/server/systems/core/`) - 5 systèmes
+- ✅ `SafetySystem.luau` (P:1) - Entity cap enforcement (200 max)
+- ✅ `FullStateSyncSystem.luau` (P:50) - State sync for late joiners
+- ✅ `SpatialHashingSystem.luau` (P:95) - LaneCache rebuild every frame
+- ✅ `EventCleanupSystem.luau` (P:400) - Ephemeral event cleanup
+- ✅ `PerformanceMonitorSystem.luau` (P:500) - Frame time logging
 
-### Economy Systems (`src/arena/server/systems/economy/`)
-- ✅ `SunflowerProductionSystem.luau` - Production soleil
-- ✅ `SunSpawnSystem.luau` - Spawn soleil du ciel
-- ✅ `SunCollectionSystem.luau` - Collecte soleil
-- ✅ `CoinProductionSystem.luau` - Marigold produit coins
+### Unit Systems (`src/arena/server/systems/units/`) - 5 systèmes
+- ✅ `ZombieAbilitySystem.luau` (P:90) - Zombie OnTick abilities (Regen, Catapult)
+- ✅ `ZombieMovementSystem.luau` (P:150) - Mouvement zombies, game-over detection
+- ✅ `MushroomSystem.luau` (P:155) - Sleep, Hide, day/night, SunShroom growth
+- ✅ `EntityDeathSystem.luau` (P:180) - Nettoyage entités mortes, coin spawns
+- ✅ `PlacementSystem.luau` (P:200) - Validation placement, coût, cooldown
 
-### Mutation Systems (`src/arena/server/systems/mutations/`)
-- ✅ `FreezeSystem.luau` - Effets gel
-- ✅ `BurnDamageSystem.luau` - Dégâts feu
-- ✅ `SplashDamageSystem.luau` - Dégâts zone
-- ✅ `ChainLightningSystem.luau` - Chaîne éclairs
-- ✅ `LifestealSystem.luau` - Vol de vie
-- ✅ `PoisonCloudSystem.luau` - Nuages poison
+### Economy Systems (`src/arena/server/systems/economy/`) - 4 systèmes
+- ✅ `SunSpawnSystem.luau` (P:300) - Spawn soleil du ciel
+- ✅ `SunflowerProductionSystem.luau` (P:305) - Production soleil
+- ✅ `CoinProductionSystem.luau` (P:306) - Marigold produit coins
+- ✅ `SunCollectionSystem.luau` (P:310) - Collecte soleil
+
+### Environment Systems (`src/arena/server/systems/environment/`) - 2 systèmes
+- ✅ `TileModifierSystem.luau` (P:85) - Tile effects (damage zones, speed mods)
+- ✅ `FogSystem.luau` (P:180) - Fog zones, Plantern illumination, Blover clear
+
+### Mutation Systems (`src/arena/server/systems/mutations/`) - 8 systèmes
+- ✅ `MutationApplySystem.luau` (P:205) - Apply mutations to new plants
+- ✅ `SplashDamageSystem.luau` (P:345) - Dégâts zone
+- ✅ `BurnDamageSystem.luau` (P:350) - Dégâts feu DoT
+- ✅ `FreezeSystem.luau` (P:355) - Effets gel et expiration
+- ✅ `ChainLightningSystem.luau` (P:360) - Chaîne éclairs
+- ✅ `PoisonCloudSystem.luau` (P:365) - Nuages poison AoE
+- ✅ `LifestealSystem.luau` (P:370) - Vol de vie
+- ✅ `SunOnKillSystem.luau` (P:375) - Sun on zombie kill
+
+### Wave Systems (`src/arena/server/systems/wave/`) - 1 système
+- ✅ `WaveManagerSystem.luau` (P:100) - Wave spawning, phase management
 
 ---
 
-## 🔧 COMPONENTS DISPONIBLES
+## 🔧 COMPONENTS ECS (53 total)
 
-### Combat Components
-- ✅ `ProjectileComponent` - IsFrozen, IsCatapult, CanStun, PiercesShields, CanHitFlying
+### Core Components (`src/shared/components/core/`) - 7 composants
+- ✅ `FogZoneComponent` - Fog zone marker (🟡 unused - fog feature pending)
+- ✅ `GridPositionComponent` - Position grille (Row, Column, X, Z, Y)
+- ✅ `HealthComponent` - Health (Current, Max)
+- ✅ `MovementComponent` - Movement (Speed, DirectionX/Z, IsMoving)
+- ✅ `OwnerComponent` - Player owner (PlayerId)
+- ✅ `PositionComponent` - World position (X, Y, Z)
+- ✅ `Tags` - 6 tags (PlantTag, ZombieTag, ProjectileTag, ResourceTag, InactiveTag, ReplicatedTag)
+
+### Combat Components (`src/shared/components/combat/`) - 11 composants
 - ✅ `ArmedComponent` - PotatoMine arming state
-- ✅ `ChewingComponent` - Chomper busy state
-- ✅ `HidingComponent` - ScaredyShroom hide state
+- ✅ `ChewingComponent` - Chomper busy state (ChewDuration=42)
+- ✅ `EnhancedProjectileComponent` - Fire peas (DamageMultiplier=2)
+- ✅ `HidingComponent` - ScaredyShroom hide state (HideRadius=6)
+- ✅ `HomingComponent` - Cattail homing (TargetEntity, TurnSpeed)
+- ✅ `PlantFoodComponent` - Glowing zombie marker
+- ✅ `ProjectileComponent` - Full projectile data (IsFrozen, IsCatapult, CanStun, etc.)
 - ✅ `SlowComponent` - Freeze/slow effects
-- ✅ `StunComponent` - Butter stun
-- ✅ `SplashComponent` - Area damage
-- ✅ `EnhancedProjectileComponent` - Fire peas
+- ✅ `SplashComponent` - Area damage (SplashRadius, SplashDamage)
+- ✅ `StunComponent` - Butter stun (Duration=4)
+- ✅ `TargetComponent` - Entity targeting (EntityId, Distance)
 
-### Unit Components
+### Unit Components (`src/shared/components/units/`) - 9 composants
+- ✅ `GhostComponent` - Client prediction ghost (RequestId, TimeCreated)
+- ✅ `HypnotizedComponent` - HypnoShroom effect (HypnotizedAt, OriginalSpeed)
+- ✅ `JumpingComponent` - Squash/Pole vaulter state
+- ✅ `PlantTypeComponent` - Plant type + OwnerId
+- ✅ `ShellComponent` - Pumpkin protection (ProtectsPlant, ProtectedByShell)
+- ✅ `ShieldComponent` - Zombie shields (Current, Max)
 - ✅ `SleepingComponent` - Mushroom day sleep
-- ✅ `PlantTypeComponent` - Plant type + lane
-- ✅ `ShellComponent` - Pumpkin protection (stacking)
-- ✅ `ShieldComponent` - Zombie shields
-- ✅ `JumpingComponent` - Pole vaulter state
+- ✅ `VaultedComponent` - Pole Vaulter used ability
+- ✅ `ZombieTypeComponent` - Zombie type + Lane + SpawnTime
+
+### Economy Components (`src/shared/components/economy/`) - 2 composants
+- ✅ `CoinComponent` - Coin value/spawn data
+- ✅ `SunComponent` - Sun orb data (Value=25, Lifetime=10)
+
+### Event Components (`src/shared/components/events/`) - 11 composants
+- ✅ `CoinDropEvent` - Ephemeral coin drop
+- ✅ `DamageEvent` - Ephemeral damage (Target, Amount, DamageType)
+- ✅ `DamageIntent` - In-flight damage for modifier pipeline
+- ✅ `DeathEvent` - Ephemeral death notification
+- ✅ `DeathExplosionEvent` - Jack-in-the-Box explosion
+- ✅ `PlantActionEvent` - Special actions (Wake, Arm, Explode)
+- ✅ `ProjectileHitEvent` - Hit event for mutations
+- ✅ `SpawnEvent` - Spawn notification
+- ✅ `SpawnMinionEvent` - Gargantuar Imp spawn
+- ✅ `TileModifierComponent` - Cell modifiers (crater, fire, ice)
+- ✅ `WaveStateEvent` - Wave state changes
+
+### Mutation Components (`src/shared/components/mutations/`) - 13 composants
+- ✅ `BurnEffectComponent` - Fire mutation source
+- ✅ `BurningComponent` - Active burn status on zombie
+- ✅ `ChainLightningComponent` - Electric mutation
+- ✅ `DamageReductionComponent` - Reinforced mutation
+- ✅ `FreezeEffectComponent` - Ice mutation source
+- ✅ `FrozenComponent` - Frozen status on zombie
+- ✅ `LifestealComponent` - Shadow mutation
+- ✅ `MutationsComponent` - Active mutations on plant
+- ✅ `PoisonCloudComponent` - Toxic mutation cloud
+- ✅ `PoisonedComponent` - Poison status on zombie
+- ✅ `RageComponent` - Zombie rage (Newspaper)
+- ✅ `SplashDamageComponent` - Primal mutation splash
+- ✅ `SunOnKillComponent` - Solar mutation
 
 ---
 
@@ -246,31 +313,22 @@
 
 ## 🏗️ ARCHITECTURE SYSTÈME (COMPLÈTE)
 
-### Systèmes Serveur Arena (27 fichiers - V2 Pattern)
-
-| Catégorie | Systèmes | Status |
-|-----------|----------|--------|
-| **Combat** (8) | BossSystem, CombatSystem, EnhancementSystem, PlantFoodSystem, ProjectileMovementSystem, ProjectileSpawnSystem, SpecialPlantSystem, TrapSystem | ✅ 100% |
-| **Core** (5) | EventCleanupSystem, FullSyncSystem, PerformanceSystem, SafeEntityCapSystem, LaneCacheSystem | ✅ 100% |
-| **Economy** (4) | CoinProductionSystem, SunCollectionSystem, SunflowerProductionSystem, SunSpawnSystem | ✅ 100% |
-| **Environment** (1) | FogSystem | ✅ 100% |
-| **Mutations** (8) | BurnDamageSystem, ChainLightningSystem, FreezeSystem, LifestealSystem, MutationApplySystem, PoisonCloudSystem, SplashDamageSystem, SolarKillSystem | ✅ 100% |
-| **Units** (4) | EntityDeathSystem, MushroomSystem, PlacementSystem, ZombieMovementSystem | ✅ 100% |
-| **Wave** (1) | WaveLoopSystem | ✅ 100% |
-
-### Services Arena (10 fichiers)
+### Services Arena (13 fichiers)
 
 | Service | Rôle | Status |
 |---------|------|--------|
 | ArenaService | Lifecycle battle, config monde/difficulté | ✅ |
-| GridService | Occupancy tracking, plant limits | ✅ |
+| FogService | Fog zone management | ✅ (NEW) |
+| GridService | Occupancy tracking, blocking, plant limits | ✅ |
 | LightingService | Presets éclairage par monde | ✅ |
-| MapService | Chargement dynamique maps | ✅ |
+| MapLoader | Chargement dynamique maps | ✅ |
 | MutationService | Cache mutations joueur | ✅ |
 | PlantFoodService | Charges Plant Food (0-3) | ✅ |
 | PlayerDataService | Persistence ProfileStore | ✅ |
+| ServerEventBus | Event pub/sub pour reactions | ✅ |
 | StatsService | Statistiques session | ✅ |
 | SunService | Économie soleil joueur | ✅ |
+| TileModifierService | Tile modifiers (craters, fire, ice) | ✅ (NEW) |
 | WaveService | État vagues, orchestration | ✅ |
 
 ### Systèmes Client Arena (7 fichiers)
@@ -324,18 +382,18 @@ Les systèmes suivants étaient marqués comme non-implémentés mais sont en fa
 7. **✅ CoffeeBean Wake** - `PlantActionEvent("WakeMushroom")` + MushroomSystem handler
 8. **✅ ExplodeONut** - `handleDeathExplosion()` ajouté dans EntityDeathSystem
 
-### 🟡 Plantes restantes à implémenter (5)
+### 🟡 Plantes restantes à implémenter (4)
 
 | Plante | Mécanique | Effort | Notes |
 |--------|-----------|--------|-------|
-| **Plantern** | `RemovesFog` | 4h | FogSystem existe, ajouter zone illuminée |
 | **UmbrellaLeaf** | `DeflectsProjectiles` | 4h | Nécessite catapult zombies |
 | **GoldMagnet** | `CollectsCoins` | 3h | Auto-collect coins in range |
 | **GraveBuster** | `RemovesGraves` | 4h | Nécessite grave spawning system |
 | **Imitater** | `IsImitater` | 6h | Clone plant avec UI selection |
 
-**Effort total restant:** ~21h
-   - Cooldown séparé
+**Note:** Plantern est partiellement implémenté (FogSystem existe, zone illuminée à compléter)
+
+**Effort total restant:** ~17h
 
 ### 🟢 Basse Priorité (Polish)
 
@@ -381,6 +439,7 @@ Les systèmes suivants étaient marqués comme non-implémentés mais sont en fa
 
 ---
 
-> **Dernière mise à jour:** 18 Janvier 2026  
-> **Source:** Analyse automatisée du codebase complet  
-> **Prochaine review:** Fin Sprint 3
+> **Dernière mise à jour:** 22 Janvier 2026  
+> **Source:** Analyse automatisée du codebase complet (5 agents)  
+> **Stats:** 35 systèmes serveur, 13 services, 53 composants, 48 plantes  
+> **Prochaine review:** Fin Sprint 4
